@@ -26,12 +26,12 @@
 
     <Border Background="white" BorderThickness="0" CornerRadius="15" Padding="5">
         <Grid>
+            <!-- Main content grid -->
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*"/>
                 <ColumnDefinition Width="4*"/>
             </Grid.ColumnDefinitions>
             
-
             <Border Grid.Column="0" Background="red" CornerRadius="15" Padding="15"> <!--SIDEBAR-->
                 <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_full.svg" Width="100" Height="20" FillColor="#555555" VerticalAlignment="Top" HorizontalAlignment="Left"/>
             </Border>
@@ -46,10 +46,26 @@
                         <TextBlock Text="Topbar" FontSize="18" Foreground="Black"/>
                     </Border>
                     <Border Grid.Row="1" Background="Orange" Padding="10"> <!--WORKSPACE-->
-                        <TextBlock Text="Workspace" FontSize="18" Foreground="Black"/>
+                        <Grid Background="Green">
+                            <TextBlock Text="Workspace - Content fills entire area" FontSize="18" Foreground="Black"/>
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>
+            
+            <!-- Overlay notification panel - positioned on top -->
+            <Canvas Grid.ColumnSpan="2" IsHitTestVisible="False">
+                <StackPanel Canvas.Right="15" Canvas.Bottom="15" 
+                           Background="Blue" 
+                           Width="350" 
+                           Height="600" 
+                           IsHitTestVisible="True"
+                           Opacity="0.9">
+                    <TextBlock Text="Notifications Overlay" FontSize="16" Foreground="White" Margin="10"/>
+                    <TextBlock Text="This panel covers ~1/4 of workspace" FontSize="12" Foreground="White" Margin="10,0"/>
+                    <TextBlock Text="But workspace content fills entire area" FontSize="12" Foreground="White" Margin="10,0"/>
+                </StackPanel>
+            </Canvas>
         </Grid>
     </Border>
 
