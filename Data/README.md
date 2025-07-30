@@ -1,0 +1,1 @@
+The data system within mnemo is split into two; runtime  data is stored using SQLite database, while portable data is stored as .mnemo files

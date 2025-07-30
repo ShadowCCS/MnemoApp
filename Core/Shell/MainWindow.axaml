@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MnemoApp.Core.Shell"
+        xmlns:services="using:MnemoApp.Core.Services"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1150" d:DesignHeight="720"
+        x:Class="MnemoApp.Core.Shell.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/UI/Assets/mnemo-logo.ico"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        Background="{x:Null}"
+        Width="1150"
+        Height="720"
+        MinWidth="1000"
+        MinHeight="600"
+        Title="Mnemo">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Border Background="white" BorderThickness="0" CornerRadius="15" Padding="5">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="4*"/>
+            </Grid.ColumnDefinitions>
+            
+
+            <Border Grid.Column="0" Background="red" CornerRadius="15" Padding="15"> <!--SIDEBAR-->
+                <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_full.svg" Width="100" Height="20" FillColor="#555555" VerticalAlignment="Top" HorizontalAlignment="Left"/>
+            </Border>
+
+            <Border Grid.Column="1" CornerRadius="15" Padding="5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="1*"/>
+                        <RowDefinition Height="15*"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="lightgray" Padding="10" PointerPressed="app_MouseDown"> <!--TOPBAR-->
+                        <TextBlock Text="Topbar" FontSize="18" Foreground="Black"/>
+                    </Border>
+                    <Border Grid.Row="1" Background="Orange" Padding="10"> <!--WORKSPACE-->
+                        <TextBlock Text="Workspace" FontSize="18" Foreground="Black"/>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+
+</Window>

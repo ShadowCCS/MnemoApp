@@ -1,0 +1,16 @@
+# Visual Studio related files
+.vs/
+bin/
+obj/
+
+# Other common .NET ignored files
+*.suo
+*.user
+*.log
+*.pdb
+*.dll
+*.exe
+
+# Icon libraries - Ignoring for now
+UI/Icons/Tabler/filled/
+UI/Icons/Tabler/outline/

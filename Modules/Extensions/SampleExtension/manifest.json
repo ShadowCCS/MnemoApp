@@ -1,0 +1,7 @@
+{
+    "name": "SampleExtension",
+    "version": "1.0.0",
+    "apiVersion": "1.0.0",
+    "description": "This is an example extension for the MnemoApp.",
+    "author": "Mnemo"
+}
