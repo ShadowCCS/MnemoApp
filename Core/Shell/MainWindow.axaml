@@ -55,16 +55,34 @@
             
             <!-- Overlay notification panel - positioned on top -->
             <Canvas Grid.ColumnSpan="2" IsHitTestVisible="False">
-                <StackPanel Canvas.Right="15" Canvas.Bottom="15" 
-                           Background="Blue" 
-                           Width="350" 
-                           Height="600" 
-                           IsHitTestVisible="True"
-                           Opacity="0.9">
-                    <TextBlock Text="Notifications Overlay" FontSize="16" Foreground="White" Margin="10"/>
-                    <TextBlock Text="This panel covers ~1/4 of workspace" FontSize="12" Foreground="White" Margin="10,0"/>
-                    <TextBlock Text="But workspace content fills entire area" FontSize="12" Foreground="White" Margin="10,0"/>
-                </StackPanel>
+                <Border Canvas.Right="15" Canvas.Bottom="15" 
+                        Background="Blue" 
+                        Width="350" 
+                        Height="600" 
+                        IsHitTestVisible="True"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,15,15">
+                            <Border Background="Red" CornerRadius="10" Padding="10"> <!--Demo Notification-->
+                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_icon.svg" Width="20" Height="20" FillColor="#555555" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                    <StackPanel Spacing="0">
+                                        <TextBlock Text="Update available" FontSize="16" Foreground="White" HorizontalAlignment="Left" FontWeight="Bold"/>
+                                        <TextBlock Text="Version 1.1 ready to install" FontSize="12" Foreground="White" HorizontalAlignment="Left" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button FontSize="10" Foreground="White" HorizontalAlignment="Left" VerticalAlignment="Center" Background="Transparent" BorderThickness="0">
+                                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/square-rounded-x.svg" Width="20" Height="20" StrokeWidth="2.5" StrokeColor="#555555" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </Canvas>
         </Grid>
     </Border>

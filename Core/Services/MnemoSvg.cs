@@ -3,10 +3,13 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Skia;
+using System.Text;
 using SkiaSharp;
 using Svg.Skia;
 using System;
 using System.IO;
+using System.Xml.Linq;
+using System.Linq;
 
 namespace MnemoApp.Core.Services
 {
@@ -14,7 +17,7 @@ namespace MnemoApp.Core.Services
     {
         // Dependency Properties
         public static readonly StyledProperty<Color> FillColorProperty =
-            AvaloniaProperty.Register<MnemoSvg, Color>(nameof(FillColor), Colors.Black);
+            AvaloniaProperty.Register<MnemoSvg, Color>(nameof(FillColor), Colors.Transparent);
 
         public static readonly StyledProperty<Color> StrokeColorProperty =
             AvaloniaProperty.Register<MnemoSvg, Color>(nameof(StrokeColor), Colors.Transparent);
@@ -51,13 +54,14 @@ namespace MnemoApp.Core.Services
         }
 
         private SKSvg? _svg;
+        private string? _originalSvgContent;
 
         static MnemoSvg()
         {
             // Listen for property changes to invalidate visual
-            FillColorProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.InvalidateVisual());
-            StrokeColorProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.InvalidateVisual());
-            StrokeWidthProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.InvalidateVisual());
+            FillColorProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
+            StrokeColorProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
+            StrokeWidthProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
             SvgPathProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnSvgPathChanged());
         }
 
@@ -69,13 +73,40 @@ namespace MnemoApp.Core.Services
 
         private void OnSvgPathChanged()
         {
+            LoadOriginalSvg();
             LoadSvg();
             InvalidateVisual();
         }
 
-        private void LoadSvg()
+        private void OnPropertiesChanged()
+        {
+            LoadSvg();
+            InvalidateVisual();
+        }
+
+        private void LoadOriginalSvg()
         {
             if (string.IsNullOrEmpty(SvgPath))
+            {
+                _originalSvgContent = null;
+                return;
+            }
+
+            try
+            {
+                using var stream = AssetLoader.Open(new Uri(SvgPath));
+                using var reader = new StreamReader(stream);
+                _originalSvgContent = reader.ReadToEnd();
+            }
+            catch
+            {
+                _originalSvgContent = null;
+            }
+        }
+
+        private void LoadSvg()
+        {
+            if (string.IsNullOrEmpty(_originalSvgContent))
             {
                 _svg = null;
                 return;
@@ -83,13 +114,88 @@ namespace MnemoApp.Core.Services
 
             try
             {
-                using var stream = AssetLoader.Open(new Uri(SvgPath));
+                var modifiedSvg = ModifySvgContent(_originalSvgContent);
+                using var stream = new MemoryStream(Encoding.UTF8.GetBytes(modifiedSvg));
                 _svg = new SKSvg();
                 _svg.Load(stream);
             }
             catch
             {
                 _svg = null;
+            }
+        }
+
+        private string ModifySvgContent(string originalSvg)
+        {
+            try
+            {
+                var doc = XDocument.Parse(originalSvg);
+
+                // Find all drawable elements
+                var elements = doc.Descendants()
+                    .Where(e => e.Name.LocalName == "path" || 
+                               e.Name.LocalName == "circle" || 
+                               e.Name.LocalName == "rect" || 
+                               e.Name.LocalName == "ellipse" ||
+                               e.Name.LocalName == "polygon" ||
+                               e.Name.LocalName == "polyline");
+
+                foreach (var element in elements)
+                {
+                    // Only replace fill attribute if FillColor is explicitly set (not transparent)
+                    if (FillColor.A > 0)
+                    {
+                        var fillHex = $"#{FillColor.R:X2}{FillColor.G:X2}{FillColor.B:X2}";
+                        element.SetAttributeValue("fill", fillHex);
+                        
+                        if (FillColor.A < 255)
+                        {
+                            var fillOpacity = FillColor.A / 255.0;
+                            element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3"));
+                        }
+                        else
+                        {
+                            element.Attribute("fill-opacity")?.Remove();
+                        }
+                    }
+                    // If FillColor is transparent (default), preserve existing fill attributes
+
+                    // Replace stroke attributes if StrokeWidth > 0
+                    if (StrokeWidth > 0)
+                    {
+                        element.SetAttributeValue("stroke-width", StrokeWidth.ToString());
+                        
+                        if (StrokeColor.A > 0)
+                        {
+                            var strokeHex = $"#{StrokeColor.R:X2}{StrokeColor.G:X2}{StrokeColor.B:X2}";
+                            element.SetAttributeValue("stroke", strokeHex);
+                            
+                            if (StrokeColor.A < 255)
+                            {
+                                var strokeOpacity = StrokeColor.A / 255.0;
+                                element.SetAttributeValue("stroke-opacity", strokeOpacity.ToString("F3"));
+                            }
+                            else
+                            {
+                                element.Attribute("stroke-opacity")?.Remove();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Remove stroke if width is 0
+                        element.Attribute("stroke")?.Remove();
+                        element.Attribute("stroke-width")?.Remove();
+                        element.Attribute("stroke-opacity")?.Remove();
+                    }
+                }
+
+                return doc.ToString();
+            }
+            catch
+            {
+                // If XML parsing fails, return original
+                return originalSvg;
             }
         }
 
@@ -114,34 +220,8 @@ namespace MnemoApp.Core.Services
 
             canvas.Scale(scale);
 
-            // Apply color and stroke modifications
-            using var paint = new SKPaint();
-            
-            // Create a color filter for fill color if it's not transparent
-            if (FillColor.A > 0)
-            {
-                var fillColorFilter = SKColorFilter.CreateBlendMode(
-                    new SKColor(FillColor.R, FillColor.G, FillColor.B, FillColor.A),
-                    SKBlendMode.SrcIn);
-                paint.ColorFilter = fillColorFilter;
-            }
-
-            // Draw the SVG
-            canvas.DrawPicture(_svg.Picture, paint);
-
-            // If stroke is enabled, draw stroke overlay
-            if (StrokeWidth > 0 && StrokeColor.A > 0)
-            {
-                using var strokePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    StrokeWidth = (float)StrokeWidth,
-                    Color = new SKColor(StrokeColor.R, StrokeColor.G, StrokeColor.B, StrokeColor.A),
-                    IsAntialias = true
-                };
-
-                canvas.DrawPicture(_svg.Picture, strokePaint);
-            }
+            // Draw the SVG (colors and stroke are now baked into the SVG)
+            canvas.DrawPicture(_svg.Picture);
 
             // Convert to Avalonia bitmap and draw
             using var image = surface.Snapshot();
