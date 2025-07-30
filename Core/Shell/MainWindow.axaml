@@ -47,7 +47,7 @@
                     </Border>
                     <Border Grid.Row="1" Background="Orange" Padding="10"> <!--WORKSPACE-->
                         <Grid Background="Green">
-                            <TextBlock Text="Workspace - Content fills entire area" FontSize="18" Foreground="Black"/>
+                            <ContentControl Content="{Binding CurrentPage}"/>
                         </Grid>
                     </Border>
                 </Grid>

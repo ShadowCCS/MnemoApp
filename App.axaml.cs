@@ -5,6 +5,9 @@ using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Markup.Xaml;
 using MnemoApp.Core.Shell;
+using MnemoApp.Core.Navigation;
+using MnemoApp.Core;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MnemoApp;
 
@@ -22,10 +25,13 @@ public partial class App : Application
             // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = new MainWindowViewModel(),
-            };
+            
+            // Get services from the host
+            var mainWindow = ApplicationHost.Services.GetRequiredService<MainWindow>();
+            var mainWindowViewModel = ApplicationHost.Services.GetRequiredService<MainWindowViewModel>();
+            
+            mainWindow.DataContext = mainWindowViewModel;
+            desktop.MainWindow = mainWindow;
         }
 
         base.OnFrameworkInitializationCompleted();
