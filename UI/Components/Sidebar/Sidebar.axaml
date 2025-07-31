@@ -1,9 +1,9 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:services="using:MnemoApp.Core.Services"
-             xmlns:vm="using:MnemoApp.Core.Shell"
+             xmlns:vm="using:MnemoApp.UI.Components.Sidebar"
              x:Class="MnemoApp.UI.Components.Sidebar.Sidebar"
-             x:DataType="vm:MainWindowViewModel">
+             x:DataType="vm:SidebarViewModel">
     
     <Grid>
         <!-- Expanded Sidebar -->
@@ -42,33 +42,53 @@
             </StackPanel>
             
             <!-- Navigation Section -->
-            <StackPanel Grid.Row="1" 
-                        Spacing="12">
-                <TextBlock Text="Main Hub" 
-                           FontSize="12" 
-                           FontWeight="SemiBold" 
-                           Foreground="#374151"
-                           Margin="0,0,0,8"/>
-                <Separator Background="#e5e7eb" 
-                           Height="1" 
-                           Margin="0,0,0,8"/>
-                
-                <Button Classes="nav-button"
-                        Background="Transparent" 
-                        BorderThickness="0" 
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        Padding="12,8">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/home.svg" 
-                                          Width="20" Height="20" 
-                                          StrokeColor="#6b7280"/>
-                        <TextBlock Text="Dashboard" 
-                                   Foreground="#374151"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
-            </StackPanel>
+            <ScrollViewer Grid.Row="1" 
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Categories}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Spacing="8" Margin="0,0,0,16">
+                                <!-- Category Header -->
+                                <TextBlock Text="{Binding Name}" 
+                                           FontSize="12" 
+                                           FontWeight="SemiBold" 
+                                           Foreground="#374151"
+                                           Margin="0,0,0,8"/>
+                                <Separator Background="#e5e7eb" 
+                                           Height="1" 
+                                           Margin="0,0,0,8"/>
+                                
+                                <!-- Category Items -->
+                                <ItemsControl ItemsSource="{Binding Items}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Classes="nav-button"
+                                                    Classes.selected="{Binding IsSelected}"
+                                                    Background="Transparent" 
+                                                    BorderThickness="0" 
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Padding="12,8"
+                                                    Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <services:MnemoSvg SvgPath="{Binding IconPath, FallbackValue='avares://MnemoApp/UI/Icons/Tabler/outline/circle.svg'}" 
+                                                                      Width="20" Height="20" 
+                                                                      StrokeColor="#6b7280"/>
+                                                    <TextBlock Text="{Binding Title}" 
+                                                               Foreground="#374151"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
             
             <!-- Footer Section -->
             <StackPanel Grid.Row="2" 
@@ -143,19 +163,37 @@
             </StackPanel>
             
             <!-- Navigation Section -->
-            <StackPanel Grid.Row="1" 
-                        Spacing="12"
-                        HorizontalAlignment="Center">
-                <Button Classes="nav-button-collapsed"
-                        Background="Transparent" 
-                        BorderThickness="0" 
-                        ToolTip.Tip="Dashboard"
-                        Padding="8">
-                    <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/home.svg" 
-                                      Width="20" Height="20" 
-                                      StrokeColor="#6b7280"/>
-                </Button>
-            </StackPanel>
+            <ScrollViewer Grid.Row="1" 
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <ItemsControl ItemsSource="{Binding Categories}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ItemsControl ItemsSource="{Binding Items}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Classes="nav-button-collapsed"
+                                                    Classes.selected="{Binding IsSelected}"
+                                                    Background="Transparent" 
+                                                    BorderThickness="0" 
+                                                    ToolTip.Tip="{Binding Title}"
+                                                    Padding="8"
+                                                    Margin="0,0,0,8"
+                                                    Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <services:MnemoSvg SvgPath="{Binding IconPath, FallbackValue='avares://MnemoApp/UI/Icons/Tabler/outline/circle.svg'}" 
+                                                                  Width="20" Height="20" 
+                                                                  StrokeColor="#6b7280"/>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Border>
     </Grid>
@@ -171,6 +209,11 @@
             <Setter Property="Background" Value="#e5e7eb"/>
         </Style>
         
+        <Style Selector="Button.nav-button.selected">
+            <Setter Property="Background" Value="#dbeafe"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        
         <Style Selector="Button.nav-button-collapsed:pointerover">
             <Setter Property="Background" Value="#f3f4f6"/>
             <Setter Property="CornerRadius" Value="6"/>
@@ -178,6 +221,11 @@
         
         <Style Selector="Button.nav-button-collapsed:pressed">
             <Setter Property="Background" Value="#e5e7eb"/>
+        </Style>
+        
+        <Style Selector="Button.nav-button-collapsed.selected">
+            <Setter Property="Background" Value="#dbeafe"/>
+            <Setter Property="CornerRadius" Value="6"/>
         </Style>
     </UserControl.Styles>
 </UserControl>

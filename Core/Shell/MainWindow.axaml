@@ -34,7 +34,7 @@
             </Grid.ColumnDefinitions>
             
             <!-- Sidebar -->
-            <sidebar:Sidebar IsCollapsed="{Binding IsSidebarCollapsed}" />
+            <sidebar:Sidebar DataContext="{Binding SidebarViewModel}" />
 
             <Border Grid.Column="1" CornerRadius="15" Padding="5">
                 <Grid>

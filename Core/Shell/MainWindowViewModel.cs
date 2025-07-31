@@ -2,36 +2,46 @@
 using CommunityToolkit.Mvvm.Input;
 using MnemoApp.Core.Common;
 using MnemoApp.Core.Navigation;
+using MnemoApp.Core.MnemoAPI;
+using MnemoApp.UI.Components.Sidebar;
+using MnemoApp.Modules.Dashboard;
+
 namespace MnemoApp.Core.Shell
 {
     public partial class MainWindowViewModel : ViewModelBase
     {
-        public ViewModelBase? CurrentPage => _navigationService?.CurrentViewModel;
+        public ViewModelBase? CurrentPage => _mnemoAPI?.navigate?.CurrentViewModel;
+        public SidebarViewModel? SidebarViewModel { get; }
 
-        private readonly INavigationService? _navigationService;
-        
-        private bool _isSidebarCollapsed = false;
-
-        public bool IsSidebarCollapsed
-        {
-            get => _isSidebarCollapsed;
-            set => SetProperty(ref _isSidebarCollapsed, value);
-        }
+        private readonly IMnemoAPI? _mnemoAPI;
 
         public ICommand ToggleSidebarCommand { get; }
 
         // Parameterless constructor for design-time
         public MainWindowViewModel()
         {
-            _navigationService = null;
+            _mnemoAPI = null;
+            SidebarViewModel = null;
             ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
         }
         
-        public MainWindowViewModel(INavigationService navigationService)
+        public MainWindowViewModel(IMnemoAPI mnemoAPI, SidebarViewModel sidebarViewModel)
         {
-            _navigationService = navigationService;
-            _navigationService.ViewModelChanged += OnViewModelChanged;
+            _mnemoAPI = mnemoAPI;
+            SidebarViewModel = sidebarViewModel;
+            _mnemoAPI.navigate.ViewModelChanged += OnViewModelChanged;
             ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
+            
+            // Navigate to default page (Dashboard)
+            NavigateToDefaultPage();
+        }
+
+        private void NavigateToDefaultPage()
+        {
+            if (_mnemoAPI?.navigate != null)
+            {
+                _mnemoAPI.navigate.Navigate<DashboardViewModel>();
+            }
         }
 
         private void OnViewModelChanged(ViewModelBase vm)
@@ -41,7 +51,8 @@ namespace MnemoApp.Core.Shell
 
         public void ToggleSidebar()
         {
-            IsSidebarCollapsed = !IsSidebarCollapsed;
+            if (SidebarViewModel != null)
+                SidebarViewModel.IsSidebarCollapsed = !SidebarViewModel.IsSidebarCollapsed;
         }
     }
 }
