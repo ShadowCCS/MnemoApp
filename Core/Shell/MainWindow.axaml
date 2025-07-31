@@ -4,6 +4,7 @@
         xmlns:services="using:MnemoApp.Core.Services"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:sidebar="using:MnemoApp.UI.Components.Sidebar"
         mc:Ignorable="d" d:DesignWidth="1150" d:DesignHeight="720"
         x:Class="MnemoApp.Core.Shell.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -24,23 +25,22 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Border Background="white" BorderThickness="0" CornerRadius="15" Padding="5">
+    <Border Background="white" BorderThickness="0" CornerRadius="15">
         <Grid>
             <!-- Main content grid -->
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1*"/>
-                <ColumnDefinition Width="4*"/>
+                <ColumnDefinition Width="Auto" MinWidth="60" MaxWidth="250"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             
-            <Border Grid.Column="0" Background="red" CornerRadius="15" Padding="15"> <!--SIDEBAR-->
-                <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_full.svg" Width="100" Height="20" FillColor="#555555" VerticalAlignment="Top" HorizontalAlignment="Left"/>
-            </Border>
+            <!-- Sidebar -->
+            <sidebar:Sidebar IsCollapsed="{Binding IsSidebarCollapsed}" />
 
             <Border Grid.Column="1" CornerRadius="15" Padding="5">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="1*"/>
-                        <RowDefinition Height="15*"/>
+                        <RowDefinition Height="17*"/>
                     </Grid.RowDefinitions>
                     <Border Grid.Row="0" Background="lightgray" Padding="10" PointerPressed="app_MouseDown"> <!--TOPBAR-->
                         <TextBlock Text="Topbar" FontSize="18" Foreground="Black"/>
@@ -86,5 +86,4 @@
             </Canvas>
         </Grid>
     </Border>
-
 </Window>

@@ -1,0 +1,183 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="using:MnemoApp.Core.Services"
+             xmlns:vm="using:MnemoApp.Core.Shell"
+             x:Class="MnemoApp.UI.Components.Sidebar.Sidebar"
+             x:DataType="vm:MainWindowViewModel">
+    
+    <Grid>
+        <!-- Expanded Sidebar -->
+        <Border x:Name="ExpandedSidebar"
+            Background="Red" 
+            CornerRadius="15" 
+            Padding="15"
+            BoxShadow="0 2 8 #1A000000"
+            Width="250"
+            IsVisible="{Binding !IsSidebarCollapsed}">
+        
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Header Section -->
+            <StackPanel Grid.Row="0" 
+                        Orientation="Horizontal" 
+                        Spacing="10"
+                        Margin="0,0,0,20">
+                <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_full.svg" 
+                                  Width="100" Height="20" 
+                                  FillColor="#2563eb"/>
+                <Button Background="Transparent" 
+                        BorderThickness="0" 
+                        Command="{Binding ToggleSidebarCommand}"
+                        ToolTip.Tip="Collapse sidebar"
+                        VerticalAlignment="Center">
+                    <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/chevron-left.svg" 
+                                      Width="16" Height="16" 
+                                      StrokeColor="#6b7280"/>
+                </Button>
+            </StackPanel>
+            
+            <!-- Navigation Section -->
+            <StackPanel Grid.Row="1" 
+                        Spacing="12">
+                <TextBlock Text="Main Hub" 
+                           FontSize="12" 
+                           FontWeight="SemiBold" 
+                           Foreground="#374151"
+                           Margin="0,0,0,8"/>
+                <Separator Background="#e5e7eb" 
+                           Height="1" 
+                           Margin="0,0,0,8"/>
+                
+                <Button Classes="nav-button"
+                        Background="Transparent" 
+                        BorderThickness="0" 
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="12,8">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/home.svg" 
+                                          Width="20" Height="20" 
+                                          StrokeColor="#6b7280"/>
+                        <TextBlock Text="Dashboard" 
+                                   Foreground="#374151"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            
+            <!-- Footer Section -->
+            <StackPanel Grid.Row="2" 
+                        Spacing="12">
+                
+                <Separator Background="#e5e7eb" 
+                           Height="1" 
+                           Margin="0,8,0,0"/>
+                
+                <Button Classes="nav-button"
+                        Background="Transparent" 
+                        BorderThickness="0" 
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="12,8">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/paper-plane.svg" 
+                                          Width="20" Height="20" 
+                                          StrokeColor="#6b7280"/>
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Quick Actions" 
+                                       Foreground="#374151"
+                                       FontSize="14"/>
+                            <TextBlock Text="alt + shift + Q" 
+                                       FontSize="11" 
+                                       Foreground="#9ca3af"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Button>
+                
+                <TextBlock Text="v1.0.0-beta" 
+                           FontSize="11" 
+                           Foreground="#9ca3af"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,0"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+    
+    <!-- Collapsed Sidebar -->
+    <Border x:Name="CollapsedSidebar"
+            Background="#f8f9fa" 
+            CornerRadius="15" 
+            Padding="15"
+            BoxShadow="0 2 8 #1A000000"
+            Width="70"
+            IsVisible="{Binding IsSidebarCollapsed}">
+        
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Header Section -->
+            <StackPanel Grid.Row="0" 
+                        Orientation="Vertical" 
+                        Spacing="10"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,20">
+                <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_icon.svg" 
+                                  Width="24" Height="24" 
+                                  FillColor="#2563eb"/>
+                <Button Background="Transparent" 
+                        BorderThickness="0" 
+                        Command="{Binding ToggleSidebarCommand}"
+                        ToolTip.Tip="Expand sidebar">
+                    <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/chevron-right.svg" 
+                                      Width="16" Height="16" 
+                                      StrokeColor="#6b7280"/>
+                </Button>
+            </StackPanel>
+            
+            <!-- Navigation Section -->
+            <StackPanel Grid.Row="1" 
+                        Spacing="12"
+                        HorizontalAlignment="Center">
+                <Button Classes="nav-button-collapsed"
+                        Background="Transparent" 
+                        BorderThickness="0" 
+                        ToolTip.Tip="Dashboard"
+                        Padding="8">
+                    <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/home.svg" 
+                                      Width="20" Height="20" 
+                                      StrokeColor="#6b7280"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+    </Grid>
+    
+    <UserControl.Styles>
+        <!-- Navigation button styles -->
+        <Style Selector="Button.nav-button:pointerover">
+            <Setter Property="Background" Value="#f3f4f6"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        
+        <Style Selector="Button.nav-button:pressed">
+            <Setter Property="Background" Value="#e5e7eb"/>
+        </Style>
+        
+        <Style Selector="Button.nav-button-collapsed:pointerover">
+            <Setter Property="Background" Value="#f3f4f6"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+        
+        <Style Selector="Button.nav-button-collapsed:pressed">
+            <Setter Property="Background" Value="#e5e7eb"/>
+        </Style>
+    </UserControl.Styles>
+</UserControl>

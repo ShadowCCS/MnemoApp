@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MnemoApp.Modules.Dashboard"
+        xmlns:vm="clr-namespace:MnemoApp.Modules.Dashboard"
+        mc:Ignorable="d"
+        x:Class="MnemoApp.Modules.Dashboard.DashboardView"
+        Title="DashboardView"
+        Width="800"
+        Height="600">
+    <Grid>
+        <TextBlock Text="Dashboard" FontSize="20" Foreground="Black"/>
+    </Grid>
+</Window>
