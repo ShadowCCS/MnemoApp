@@ -59,6 +59,7 @@
                         Background="Blue" 
                         Width="350" 
                         Height="600" 
+                        Opacity="0"
                         IsHitTestVisible="True"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom">

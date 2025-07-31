@@ -1,0 +1,315 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- Mnemo Dawn Theme -->
+    
+    <!-- Background Colors -->
+    <Color x:Key="SidebarBackground">#D2D2D2</Color>
+    <Color x:Key="WorkspaceBackground">#DFDFDF</Color>
+    <Color x:Key="OverlayBackground">#D2D2D2</Color>
+    <Color x:Key="TopbarBackground">Transparent</Color>
+    
+    <!-- Text Colors -->
+    <Color x:Key="TextPrimary">#222222</Color>
+    <Color x:Key="TextSecondary">#555555</Color>
+    <Color x:Key="TextTertiary">#848484</Color>
+    <Color x:Key="TextFaded">#999999</Color>
+    <Color x:Key="TextDisabled">#999999</Color>
+    <Color x:Key="NotificationTitleColor">#5D5D5D</Color>
+    <Color x:Key="NotificationDescriptionColor">#898989</Color>
+    <Color x:Key="BreadcrumbText">#999999</Color>
+    <Color x:Key="VersionText">#848484</Color>
+    
+    <!-- Icon Colors -->
+    <Color x:Key="IconsSidebar">#555555</Color>
+    <Color x:Key="IconsTopbar">#7B7B7B</Color>
+    <Color x:Key="IconsWorkspace">#7B7B7B</Color>
+    <Color x:Key="IconsOverlay">#7B7B7B</Color>
+    <Color x:Key="IconsSeparationBar">#919191</Color>
+    <Color x:Key="CardIconColor">#555555</Color>
+    <Color x:Key="NotificationIconColor">#7B7B7B</Color>
+    <Color x:Key="NotificationIconForeground">#D9D9D9</Color>
+    <Color x:Key="OverlayIconColor">#797979</Color>
+    <Color x:Key="LearnCardIconColor">#999999</Color>
+    <Color x:Key="ListItemIconColor">#777777</Color>
+    <Color x:Key="AccentButtonIcon">#FFFFFF</Color>
+    <Color x:Key="GhostButtonIcon">#777777</Color>
+    
+    <!-- Link Colors -->
+    <Color x:Key="Links">#2686C2</Color>
+    <Color x:Key="LinksHover">#2686C2</Color>
+    
+    <!-- Navigation Colors -->
+    <Color x:Key="NavButtonBackground">Transparent</Color>
+    <Color x:Key="NavButtonHover">#C5C5C5</Color>
+    <Color x:Key="NavButtonActive">#C5C5C5</Color>
+    <Color x:Key="NavElementBackground">#D2D2D2</Color>
+    <Color x:Key="NavElementActiveBackground">#2079FF</Color>
+    <Color x:Key="NavElementHoverBackground">#C7C7C7</Color>
+    
+    <!-- Widget Colors -->
+    <Color x:Key="WidgetBackgroundPrimary">#C5C5C5</Color>
+    <Color x:Key="WidgetBackgroundSecondary">#D7D7D7</Color>
+    
+    <!-- Widget Icon Background Colors -->
+    <Color x:Key="WidgetIconBackground1">#A4C5F0</Color>
+    <Color x:Key="WidgetIconBackground2">#B5FFA7</Color>
+    <Color x:Key="WidgetIconBackground3">#FFE48F</Color>
+    <Color x:Key="WidgetIconBackground4">#FF9496</Color>
+    <Color x:Key="WidgetIconBackground5">#E0E0E0</Color>
+    
+    <!-- Widget Icon Colors -->
+    <Color x:Key="WidgetIconColor1">#3687A2</Color>
+    <Color x:Key="WidgetIconColor2">#6DA861</Color>
+    <Color x:Key="WidgetIconColor3">#EAB308</Color>
+    <Color x:Key="WidgetIconColor4">#EF4444</Color>
+    <Color x:Key="WidgetIconColor5">#777777</Color>
+    
+    <!-- Card Colors -->
+    <Color x:Key="CardBackgroundPrimary">#EBEBEB</Color>
+    <Color x:Key="CardBackgroundSecondary">#D7D7D7</Color>
+    <Color x:Key="CardAccent">#2079FF</Color>
+    <Color x:Key="LearnCardBackground">#D2D2D2</Color>
+    <Color x:Key="LearnCardTitleColor">#616161</Color>
+    <Color x:Key="LearnCardSubTextColor">#575757</Color>
+    
+    <!-- Notification Colors -->
+    <Color x:Key="NotificationBackgroundPrimary">#D2D2D2</Color>
+    <Color x:Key="NotificationBackgroundSecondary">#EBEBEB</Color>
+    
+    <!-- System Colors -->
+    <Color x:Key="SystemInfoBackground">#3954b0</Color>
+    <Color x:Key="SystemProcessBackground">#886ce4</Color>
+    <Color x:Key="SystemWarningBackground">#f0ad4e</Color>
+    <Color x:Key="SystemErrorBackground">#d9534f</Color>
+    <Color x:Key="SystemSuccessBackground">#5cb85c</Color>
+    
+    <!-- Progress Bar Colors -->
+    <Color x:Key="ProgressBarBackground">#c8c8c8</Color>
+    <Color x:Key="ProgressBarFill">#2079ff</Color>
+    <Color x:Key="ProgressBarSecondaryBackground">#C0C0C0</Color>
+    <Color x:Key="ProgressBarSecondaryFill">#8B8B8B</Color>
+    
+    <!-- Button Colors -->
+    <Color x:Key="MainButtonBackground">#D7D7D7</Color>
+    <Color x:Key="MainButtonTextColor">#676767</Color>
+    <Color x:Key="InstallButtonBackground">#2079FF</Color>
+    <Color x:Key="InstallButtonTextColor">#FFFFFF</Color>
+    <Color x:Key="SecondaryButtonBackground">#DBDBDB</Color>
+    <Color x:Key="SecondaryButtonTextColor">#858585</Color>
+    <Color x:Key="CreateButtonBackground">#D7D7D7</Color>
+    <Color x:Key="CreateButtonTextColor">#777777</Color>
+    <Color x:Key="BasicButtonBackground">#FFFFFF</Color>
+    <Color x:Key="BasicButtonTextColor">#565656</Color>
+    <Color x:Key="DestructiveButtonColor">#ff5050</Color>
+    <Color x:Key="DestructiveButtonHoverColor">#FF6868</Color>
+    <Color x:Key="NewButtonBackground">#2079FF</Color>
+    <Color x:Key="AccentButtonText">#9E9E9E</Color>
+    <Color x:Key="GhostButtonBackground">Transparent</Color>
+    <Color x:Key="GhostButtonText">#777777</Color>
+    
+    <!-- View Switch Colors -->
+    <Color x:Key="ViewSwitchButton">#BBBBBB</Color>
+    <Color x:Key="ViewSwitchButtonActive">#2079FF</Color>
+    
+    <!-- Paginator Colors -->
+    <Color x:Key="PaginatorBackground">#EBEBEB</Color>
+    <Color x:Key="PaginatorActive">#2079FF</Color>
+    <Color x:Key="PaginatorText">#6A6A6A</Color>
+    
+    <!-- Overlay Colors -->
+    <Color x:Key="OverlayIconBackground">#CBCBCB</Color>
+    <Color x:Key="OverlayItemBackgroundColor">#d2d2d2</Color>
+    <Color x:Key="OverlayItemActiveBackgroundColor">#2079FF</Color>
+    <Color x:Key="OverlayItemHoverBackgroundColor">#c5c5c5</Color>
+    <Color x:Key="OverlayHighlightColor">#b3b3b3</Color>
+    
+    <!-- Search Bar Colors -->
+    <Color x:Key="SearchBarBackground">#D2D2D2</Color>
+    <Color x:Key="SearchBarTextColor">#777777</Color>
+    
+    <!-- Badge Colors -->
+    <Color x:Key="BadgeBackground">#D2D2D2</Color>
+    <Color x:Key="BadgeIconBackground">#929292</Color>
+    
+    <!-- Toggle Button Colors -->
+    <Color x:Key="ToggleButtonBackground">#B1B1B1</Color>
+    <Color x:Key="ToggleButtonHoverBackground">#B1B1B1</Color>
+    <Color x:Key="ToggleButtonActiveBackground">#2079FF</Color>
+    <Color x:Key="ToggleButtonEye">#D9D9D9</Color>
+    
+    <!-- Highlight Colors -->
+    <Color x:Key="TextHighlightColor">#A4C8E8</Color>
+    
+    <!-- Line Colors -->
+    <Color x:Key="LineColor">#828282</Color>
+    
+    <!-- List Item Colors -->
+    <Color x:Key="ListItemBackground">Transparent</Color>
+    <Color x:Key="ListItemText">#777777</Color>
+    <Color x:Key="ListItemHoverBackground">#D2D2D2</Color>
+    <Color x:Key="ListItemActiveBackground">#D2D2D2</Color>
+    
+    <!-- Answer Colors -->
+    <Color x:Key="AnswerCorrect">#95d6a2</Color>
+    <Color x:Key="AnswerWrong">#dbd29f</Color>
+    
+    <!-- Logo Colors -->
+    <Color x:Key="SidebarLogo">#555555</Color>
+    
+         <!-- Solid Color Brushes -->
+     <!-- Background Brushes -->
+     <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="{DynamicResource SidebarBackground}"/>
+     <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="{DynamicResource WorkspaceBackground}"/>
+     <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="{DynamicResource OverlayBackground}"/>
+     <SolidColorBrush x:Key="TopbarBackgroundBrush" Color="{DynamicResource TopbarBackground}"/>
+     
+     <!-- Text Brushes -->
+     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimary}"/>
+     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondary}"/>
+     <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource TextTertiary}"/>
+     <SolidColorBrush x:Key="TextFadedBrush" Color="{DynamicResource TextFaded}"/>
+     <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextDisabled}"/>
+     <SolidColorBrush x:Key="NotificationTitleColorBrush" Color="{DynamicResource NotificationTitleColor}"/>
+     <SolidColorBrush x:Key="NotificationDescriptionColorBrush" Color="{DynamicResource NotificationDescriptionColor}"/>
+     <SolidColorBrush x:Key="BreadcrumbTextBrush" Color="{DynamicResource BreadcrumbText}"/>
+     <SolidColorBrush x:Key="VersionTextBrush" Color="{DynamicResource VersionText}"/>
+     
+     <!-- Icon Brushes -->
+     <SolidColorBrush x:Key="IconsSidebarBrush" Color="{DynamicResource IconsSidebar}"/>
+     <SolidColorBrush x:Key="IconsTopbarBrush" Color="{DynamicResource IconsTopbar}"/>
+     <SolidColorBrush x:Key="IconsWorkspaceBrush" Color="{DynamicResource IconsWorkspace}"/>
+     <SolidColorBrush x:Key="IconsOverlayBrush" Color="{DynamicResource IconsOverlay}"/>
+     <SolidColorBrush x:Key="IconsSeparationBarBrush" Color="{DynamicResource IconsSeparationBar}"/>
+     <SolidColorBrush x:Key="CardIconColorBrush" Color="{DynamicResource CardIconColor}"/>
+     <SolidColorBrush x:Key="NotificationIconColorBrush" Color="{DynamicResource NotificationIconColor}"/>
+     <SolidColorBrush x:Key="NotificationIconForegroundBrush" Color="{DynamicResource NotificationIconForeground}"/>
+     <SolidColorBrush x:Key="OverlayIconColorBrush" Color="{DynamicResource OverlayIconColor}"/>
+     <SolidColorBrush x:Key="LearnCardIconColorBrush" Color="{DynamicResource LearnCardIconColor}"/>
+     <SolidColorBrush x:Key="ListItemIconColorBrush" Color="{DynamicResource ListItemIconColor}"/>
+     <SolidColorBrush x:Key="AccentButtonIconBrush" Color="{DynamicResource AccentButtonIcon}"/>
+     <SolidColorBrush x:Key="GhostButtonIconBrush" Color="{DynamicResource GhostButtonIcon}"/>
+     
+     <!-- Link Brushes -->
+     <SolidColorBrush x:Key="LinksBrush" Color="{DynamicResource Links}"/>
+     <SolidColorBrush x:Key="LinksHoverBrush" Color="{DynamicResource LinksHover}"/>
+     
+     <!-- Navigation Brushes -->
+     <SolidColorBrush x:Key="NavButtonBackgroundBrush" Color="{DynamicResource NavButtonBackground}"/>
+     <SolidColorBrush x:Key="NavButtonHoverBrush" Color="{DynamicResource NavButtonHover}"/>
+     <SolidColorBrush x:Key="NavButtonActiveBrush" Color="{DynamicResource NavButtonActive}"/>
+     <SolidColorBrush x:Key="NavElementBackgroundBrush" Color="{DynamicResource NavElementBackground}"/>
+     <SolidColorBrush x:Key="NavElementActiveBackgroundBrush" Color="{DynamicResource NavElementActiveBackground}"/>
+     <SolidColorBrush x:Key="NavElementHoverBackgroundBrush" Color="{DynamicResource NavElementHoverBackground}"/>
+     
+     <!-- Widget Brushes -->
+     <SolidColorBrush x:Key="WidgetBackgroundPrimaryBrush" Color="{DynamicResource WidgetBackgroundPrimary}"/>
+     <SolidColorBrush x:Key="WidgetBackgroundSecondaryBrush" Color="{DynamicResource WidgetBackgroundSecondary}"/>
+     
+     <!-- Widget Icon Background Brushes -->
+     <SolidColorBrush x:Key="WidgetIconBackground1Brush" Color="{DynamicResource WidgetIconBackground1}"/>
+     <SolidColorBrush x:Key="WidgetIconBackground2Brush" Color="{DynamicResource WidgetIconBackground2}"/>
+     <SolidColorBrush x:Key="WidgetIconBackground3Brush" Color="{DynamicResource WidgetIconBackground3}"/>
+     <SolidColorBrush x:Key="WidgetIconBackground4Brush" Color="{DynamicResource WidgetIconBackground4}"/>
+     <SolidColorBrush x:Key="WidgetIconBackground5Brush" Color="{DynamicResource WidgetIconBackground5}"/>
+     
+     <!-- Widget Icon Brushes -->
+     <SolidColorBrush x:Key="WidgetIconColor1Brush" Color="{DynamicResource WidgetIconColor1}"/>
+     <SolidColorBrush x:Key="WidgetIconColor2Brush" Color="{DynamicResource WidgetIconColor2}"/>
+     <SolidColorBrush x:Key="WidgetIconColor3Brush" Color="{DynamicResource WidgetIconColor3}"/>
+     <SolidColorBrush x:Key="WidgetIconColor4Brush" Color="{DynamicResource WidgetIconColor4}"/>
+     <SolidColorBrush x:Key="WidgetIconColor5Brush" Color="{DynamicResource WidgetIconColor5}"/>
+     
+     <!-- Card Brushes -->
+     <SolidColorBrush x:Key="CardBackgroundPrimaryBrush" Color="{DynamicResource CardBackgroundPrimary}"/>
+     <SolidColorBrush x:Key="CardBackgroundSecondaryBrush" Color="{DynamicResource CardBackgroundSecondary}"/>
+     <SolidColorBrush x:Key="CardAccentBrush" Color="{DynamicResource CardAccent}"/>
+     <SolidColorBrush x:Key="LearnCardBackgroundBrush" Color="{DynamicResource LearnCardBackground}"/>
+     <SolidColorBrush x:Key="LearnCardTitleColorBrush" Color="{DynamicResource LearnCardTitleColor}"/>
+     <SolidColorBrush x:Key="LearnCardSubTextColorBrush" Color="{DynamicResource LearnCardSubTextColor}"/>
+     
+     <!-- Notification Brushes -->
+     <SolidColorBrush x:Key="NotificationBackgroundPrimaryBrush" Color="{DynamicResource NotificationBackgroundPrimary}"/>
+     <SolidColorBrush x:Key="NotificationBackgroundSecondaryBrush" Color="{DynamicResource NotificationBackgroundSecondary}"/>
+     
+     <!-- System Brushes -->
+     <SolidColorBrush x:Key="SystemInfoBackgroundBrush" Color="{DynamicResource SystemInfoBackground}"/>
+     <SolidColorBrush x:Key="SystemProcessBackgroundBrush" Color="{DynamicResource SystemProcessBackground}"/>
+     <SolidColorBrush x:Key="SystemWarningBackgroundBrush" Color="{DynamicResource SystemWarningBackground}"/>
+     <SolidColorBrush x:Key="SystemErrorBackgroundBrush" Color="{DynamicResource SystemErrorBackground}"/>
+     <SolidColorBrush x:Key="SystemSuccessBackgroundBrush" Color="{DynamicResource SystemSuccessBackground}"/>
+     
+     <!-- Progress Bar Brushes -->
+     <SolidColorBrush x:Key="ProgressBarBackgroundBrush" Color="{DynamicResource ProgressBarBackground}"/>
+     <SolidColorBrush x:Key="ProgressBarFillBrush" Color="{DynamicResource ProgressBarFill}"/>
+     <SolidColorBrush x:Key="ProgressBarSecondaryBackgroundBrush" Color="{DynamicResource ProgressBarSecondaryBackground}"/>
+     <SolidColorBrush x:Key="ProgressBarSecondaryFillBrush" Color="{DynamicResource ProgressBarSecondaryFill}"/>
+     
+     <!-- Button Brushes -->
+     <SolidColorBrush x:Key="MainButtonBackgroundBrush" Color="{DynamicResource MainButtonBackground}"/>
+     <SolidColorBrush x:Key="MainButtonTextColorBrush" Color="{DynamicResource MainButtonTextColor}"/>
+     <SolidColorBrush x:Key="InstallButtonBackgroundBrush" Color="{DynamicResource InstallButtonBackground}"/>
+     <SolidColorBrush x:Key="InstallButtonTextColorBrush" Color="{DynamicResource InstallButtonTextColor}"/>
+     <SolidColorBrush x:Key="SecondaryButtonBackgroundBrush" Color="{DynamicResource SecondaryButtonBackground}"/>
+     <SolidColorBrush x:Key="SecondaryButtonTextColorBrush" Color="{DynamicResource SecondaryButtonTextColor}"/>
+     <SolidColorBrush x:Key="CreateButtonBackgroundBrush" Color="{DynamicResource CreateButtonBackground}"/>
+     <SolidColorBrush x:Key="CreateButtonTextColorBrush" Color="{DynamicResource CreateButtonTextColor}"/>
+     <SolidColorBrush x:Key="BasicButtonBackgroundBrush" Color="{DynamicResource BasicButtonBackground}"/>
+     <SolidColorBrush x:Key="BasicButtonTextColorBrush" Color="{DynamicResource BasicButtonTextColor}"/>
+     <SolidColorBrush x:Key="DestructiveButtonColorBrush" Color="{DynamicResource DestructiveButtonColor}"/>
+     <SolidColorBrush x:Key="DestructiveButtonHoverColorBrush" Color="{DynamicResource DestructiveButtonHoverColor}"/>
+     <SolidColorBrush x:Key="NewButtonBackgroundBrush" Color="{DynamicResource NewButtonBackground}"/>
+     <SolidColorBrush x:Key="AccentButtonTextBrush" Color="{DynamicResource AccentButtonText}"/>
+     <SolidColorBrush x:Key="GhostButtonBackgroundBrush" Color="{DynamicResource GhostButtonBackground}"/>
+     <SolidColorBrush x:Key="GhostButtonTextBrush" Color="{DynamicResource GhostButtonText}"/>
+     
+     <!-- View Switch Brushes -->
+     <SolidColorBrush x:Key="ViewSwitchButtonBrush" Color="{DynamicResource ViewSwitchButton}"/>
+     <SolidColorBrush x:Key="ViewSwitchButtonActiveBrush" Color="{DynamicResource ViewSwitchButtonActive}"/>
+     
+     <!-- Paginator Brushes -->
+     <SolidColorBrush x:Key="PaginatorBackgroundBrush" Color="{DynamicResource PaginatorBackground}"/>
+     <SolidColorBrush x:Key="PaginatorActiveBrush" Color="{DynamicResource PaginatorActive}"/>
+     <SolidColorBrush x:Key="PaginatorTextBrush" Color="{DynamicResource PaginatorText}"/>
+     
+     <!-- Overlay Brushes -->
+     <SolidColorBrush x:Key="OverlayIconBackgroundBrush" Color="{DynamicResource OverlayIconBackground}"/>
+     <SolidColorBrush x:Key="OverlayItemBackgroundColorBrush" Color="{DynamicResource OverlayItemBackgroundColor}"/>
+     <SolidColorBrush x:Key="OverlayItemActiveBackgroundColorBrush" Color="{DynamicResource OverlayItemActiveBackgroundColor}"/>
+     <SolidColorBrush x:Key="OverlayItemHoverBackgroundColorBrush" Color="{DynamicResource OverlayItemHoverBackgroundColor}"/>
+     <SolidColorBrush x:Key="OverlayHighlightColorBrush" Color="{DynamicResource OverlayHighlightColor}"/>
+     
+     <!-- Search Bar Brushes -->
+     <SolidColorBrush x:Key="SearchBarBackgroundBrush" Color="{DynamicResource SearchBarBackground}"/>
+     <SolidColorBrush x:Key="SearchBarTextColorBrush" Color="{DynamicResource SearchBarTextColor}"/>
+     
+     <!-- Badge Brushes -->
+     <SolidColorBrush x:Key="BadgeBackgroundBrush" Color="{DynamicResource BadgeBackground}"/>
+     <SolidColorBrush x:Key="BadgeIconBackgroundBrush" Color="{DynamicResource BadgeIconBackground}"/>
+     
+     <!-- Toggle Button Brushes -->
+     <SolidColorBrush x:Key="ToggleButtonBackgroundBrush" Color="{DynamicResource ToggleButtonBackground}"/>
+     <SolidColorBrush x:Key="ToggleButtonHoverBackgroundBrush" Color="{DynamicResource ToggleButtonHoverBackground}"/>
+     <SolidColorBrush x:Key="ToggleButtonActiveBackgroundBrush" Color="{DynamicResource ToggleButtonActiveBackground}"/>
+     <SolidColorBrush x:Key="ToggleButtonEyeBrush" Color="{DynamicResource ToggleButtonEye}"/>
+     
+     <!-- Highlight Brushes -->
+     <SolidColorBrush x:Key="TextHighlightColorBrush" Color="{DynamicResource TextHighlightColor}"/>
+     
+     <!-- Line Brushes -->
+     <SolidColorBrush x:Key="LineColorBrush" Color="{DynamicResource LineColor}"/>
+     
+     <!-- List Item Brushes -->
+     <SolidColorBrush x:Key="ListItemBackgroundBrush" Color="{DynamicResource ListItemBackground}"/>
+     <SolidColorBrush x:Key="ListItemTextBrush" Color="{DynamicResource ListItemText}"/>
+     <SolidColorBrush x:Key="ListItemHoverBackgroundBrush" Color="{DynamicResource ListItemHoverBackground}"/>
+     <SolidColorBrush x:Key="ListItemActiveBackgroundBrush" Color="{DynamicResource ListItemActiveBackground}"/>
+     
+     <!-- Answer Brushes -->
+     <SolidColorBrush x:Key="AnswerCorrectBrush" Color="{DynamicResource AnswerCorrect}"/>
+     <SolidColorBrush x:Key="AnswerWrongBrush" Color="{DynamicResource AnswerWrong}"/>
+     
+     <!-- Logo Brushes -->
+     <SolidColorBrush x:Key="SidebarLogoBrush" Color="{DynamicResource SidebarLogo}"/>
+    
+</ResourceDictionary>

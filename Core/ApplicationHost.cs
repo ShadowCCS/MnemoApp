@@ -11,6 +11,7 @@ using MnemoApp.Core.Shell;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 using MnemoApp.Modules.Learning;
+using MnemoApp.Modules.Settings;
 
 namespace MnemoApp.Core
 {
@@ -42,6 +43,7 @@ namespace MnemoApp.Core
             // Register modules
             services.AddTransient<DashboardViewModel>();
             services.AddTransient<FlashcardsViewModel>();
+            services.AddTransient<SettingsViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
 
@@ -64,10 +66,18 @@ namespace MnemoApp.Core
             
             // Register Learning modules
             api.sidebar.Register(
-                "Flashcards", 
-                typeof(FlashcardsViewModel), 
-                "Learning", 
+                "Flashcards",
+                typeof(FlashcardsViewModel),
+                "Main Hub",
                 "avares://MnemoApp/UI/Icons/Tabler/outline/cards.svg"
+            );
+
+            // Register Settings module
+            api.sidebar.Register(
+                "Settings", 
+                typeof(SettingsViewModel), 
+                "Utility & Personalization", 
+                "avares://MnemoApp/UI/Icons/Tabler/outline/settings.svg"
             );
             
             // TODO: Register other modules here
