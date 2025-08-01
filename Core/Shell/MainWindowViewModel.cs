@@ -1,8 +1,10 @@
-﻿using System.Windows.Input;
+﻿using System.Collections.ObjectModel;
+using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using MnemoApp.Core.Common;
 using MnemoApp.Core.Navigation;
 using MnemoApp.Core.MnemoAPI;
+using MnemoApp.Core.Overlays;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 
@@ -12,6 +14,7 @@ namespace MnemoApp.Core.Shell
     {
         public ViewModelBase? CurrentPage => _mnemoAPI?.navigate?.CurrentViewModel;
         public SidebarViewModel? SidebarViewModel { get; }
+        public ObservableCollection<OverlayViewModelWrapper> Overlays => _mnemoAPI?.overlay?.Overlays ?? new ObservableCollection<OverlayViewModelWrapper>();
 
         private readonly IMnemoAPI? _mnemoAPI;
 

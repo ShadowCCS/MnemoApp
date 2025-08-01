@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="MnemoApp.UI.Components.Overlays.OverlayContainer">
+    
+    <!-- Full-screen overlay background with semi-transparent backdrop -->
+    <Grid x:Name="BackgroundGrid" 
+          Background="#80000000" 
+          IsHitTestVisible="True">
+        
+        <!-- Content positioning container -->
+        <Border x:Name="ContentBorder"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="White"
+                CornerRadius="8"
+                Padding="0"
+                MinWidth="0"
+                MinHeight="0"
+                MaxWidth="Infinity"
+                MaxHeight="Infinity">
+            
+            <!-- This is where the actual overlay content will be placed -->
+            <ContentPresenter Content="{Binding $parent[UserControl].Content}" />
+        </Border>
+    </Grid>
+</UserControl>

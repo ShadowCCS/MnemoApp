@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MnemoApp.Core.Navigation;
 using MnemoApp.Core.MnemoAPI;
+using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Services;
 using MnemoApp.Core.Shell;
 using MnemoApp.UI.Components.Sidebar;
@@ -31,6 +32,7 @@ namespace MnemoApp.Core
             // Register core services
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<ISidebarService, SidebarService>();
+            services.AddSingleton<IOverlayService, OverlayService>();
             
             // Register MnemoAPI
             services.AddSingleton<IMnemoAPI, MnemoApp.Core.MnemoAPI.MnemoAPI>();
