@@ -8,15 +8,13 @@
     </Application.DataTemplates>
   
     <Application.Styles>
-        <FluentTheme />
+        <!-- Global font family application -->
+        <Style Selector="TemplatedControl">
+            <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
+        </Style>
+
+        <!-- This has to be included for initalization, but will be replaced by ThemeService -->
+        <StyleInclude Source="avares://MnemoApp/UI/Themes/Core/Dawn/theme.axaml"/>
     </Application.Styles>
-    
-    <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <!-- Default theme - will be replaced by ThemeService on startup -->
-                <ResourceInclude Source="avares://MnemoApp/UI/Themes/Core/Dawn/theme.axaml"/>
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Application.Resources>
+
 </Application>

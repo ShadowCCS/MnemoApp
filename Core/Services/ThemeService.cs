@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Platform;
 using Avalonia.Controls;
+using Avalonia.Styling;
 
 namespace MnemoApp.Core.Services
 {
@@ -250,12 +251,12 @@ namespace MnemoApp.Core.Services
             {
                 try
                 {
-                    ResourceInclude themeResource;
+                    StyleInclude themeStyle;
                     
                     if (theme.IsCore)
                     {
                         // For core themes, use avares:// URI
-                        themeResource = new ResourceInclude(new Uri("avares://MnemoApp/"))
+                        themeStyle = new StyleInclude(new Uri("avares://MnemoApp/"))
                         {
                             Source = new Uri(theme.ThemePath)
                         };
@@ -263,7 +264,7 @@ namespace MnemoApp.Core.Services
                     else
                     {
                         // For custom themes, use file path
-                        themeResource = new ResourceInclude(new Uri("file:///"))
+                        themeStyle = new StyleInclude(new Uri("file:///"))
                         {
                             Source = new Uri($"file:///{theme.ThemePath.Replace('\\', '/')}")
                         };
@@ -275,19 +276,19 @@ namespace MnemoApp.Core.Services
                         var app = Application.Current;
                         if (app != null)
                         {
-                            // Clear existing theme resources from MergedDictionaries
-                            var existingResourceThemes = app.Resources.MergedDictionaries
-                                .OfType<ResourceInclude>()
+                            // Clear existing theme styles
+                            var existingThemeStyles = app.Styles
+                                .OfType<StyleInclude>()
                                 .Where(s => s.Source?.ToString().Contains("/theme.axaml") == true)
                                 .ToList();
                             
-                            foreach (var existingTheme in existingResourceThemes)
+                            foreach (var existingTheme in existingThemeStyles)
                             {
-                                app.Resources.MergedDictionaries.Remove(existingTheme);
+                                app.Styles.Remove(existingTheme);
                             }
                             
-                            // Add new theme to MergedDictionaries
-                            app.Resources.MergedDictionaries.Add(themeResource);
+                            // Add new theme style at the beginning so it has lower priority than custom styles
+                            app.Styles.Insert(0, themeStyle);
                         }
                     });
                 }
