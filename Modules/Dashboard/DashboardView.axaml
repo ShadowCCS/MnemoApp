@@ -9,6 +9,7 @@
     <Grid>
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
             <TextBlock Text="Dashboard" FontSize="20" Foreground="Black"/>
+            <Button Content="Test"/>
         </StackPanel>
     </Grid>
 </UserControl>

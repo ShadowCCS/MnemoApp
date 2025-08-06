@@ -219,7 +219,7 @@
     <Color x:Key="ScrollBarButtonArrowForegroundDisabled">#999999</Color>
     
     <!-- Common Values -->
-    <x:Double x:Key="ButtonBorderThemeThickness">1</x:Double>
+    <Thickness x:Key="ButtonBorderThemeThickness">1</Thickness>
     <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
     <Thickness x:Key="ButtonPadding">8,4,8,4</Thickness>
 </ResourceDictionary>
