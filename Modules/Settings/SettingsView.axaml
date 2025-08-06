@@ -5,11 +5,12 @@
         xmlns:local="clr-namespace:MnemoApp.Modules.Settings"
         xmlns:vm="clr-namespace:MnemoApp.Modules.Settings"
         mc:Ignorable="d"
-        x:Class="MnemoApp.Modules.Settings.SettingsView">
+        x:Class="MnemoApp.Modules.Settings.SettingsView"
+        x:DataType="vm:SettingsViewModel">
     <Grid>
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
             <TextBlock Text="Settings" FontSize="20" Foreground="Black"/>
-            <Button Content="Toggle Theme"/>
+            <Button Content="Toggle Theme" Command="{Binding ToggleThemeCommand}"/>
             <Button Content="Toggle Language"/>
         </StackPanel>
     </Grid>

@@ -16,11 +16,11 @@ namespace MnemoApp.Core.Services
     public class MnemoSvg : Control
     {
         // Dependency Properties
-        public static readonly StyledProperty<Color> FillColorProperty =
-            AvaloniaProperty.Register<MnemoSvg, Color>(nameof(FillColor), Colors.Transparent);
+        public static readonly StyledProperty<IBrush?> FillProperty =
+            AvaloniaProperty.Register<MnemoSvg, IBrush?>(nameof(Fill), Brushes.Transparent);
 
-        public static readonly StyledProperty<Color> StrokeColorProperty =
-            AvaloniaProperty.Register<MnemoSvg, Color>(nameof(StrokeColor), Colors.Transparent);
+        public static readonly StyledProperty<IBrush?> StrokeProperty =
+            AvaloniaProperty.Register<MnemoSvg, IBrush?>(nameof(Stroke), Brushes.Transparent);
 
         public static readonly StyledProperty<double> StrokeWidthProperty =
             AvaloniaProperty.Register<MnemoSvg, double>(nameof(StrokeWidth), 0.0);
@@ -29,16 +29,16 @@ namespace MnemoApp.Core.Services
             AvaloniaProperty.Register<MnemoSvg, string?>(nameof(SvgPath));
 
         // Properties
-        public Color FillColor
+        public IBrush? Fill
         {
-            get => GetValue(FillColorProperty);
-            set => SetValue(FillColorProperty, value);
+            get => GetValue(FillProperty);
+            set => SetValue(FillProperty, value);
         }
 
-        public Color StrokeColor
+        public IBrush? Stroke
         {
-            get => GetValue(StrokeColorProperty);
-            set => SetValue(StrokeColorProperty, value);
+            get => GetValue(StrokeProperty);
+            set => SetValue(StrokeProperty, value);
         }
 
         public double StrokeWidth
@@ -59,8 +59,8 @@ namespace MnemoApp.Core.Services
         static MnemoSvg()
         {
             // Listen for property changes to invalidate visual
-            FillColorProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
-            StrokeColorProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
+            FillProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
+            StrokeProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
             StrokeWidthProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
             SvgPathProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnSvgPathChanged());
         }
@@ -142,15 +142,16 @@ namespace MnemoApp.Core.Services
 
                 foreach (var element in elements)
                 {
-                    // Only replace fill attribute if FillColor is explicitly set (not transparent)
-                    if (FillColor.A > 0)
+                    // Handle fill brush
+                    if (Fill is ISolidColorBrush fillBrush && fillBrush != Brushes.Transparent)
                     {
-                        var fillHex = $"#{FillColor.R:X2}{FillColor.G:X2}{FillColor.B:X2}";
+                        var fillColor = fillBrush.Color;
+                        var fillHex = $"#{fillColor.R:X2}{fillColor.G:X2}{fillColor.B:X2}";
                         element.SetAttributeValue("fill", fillHex);
                         
-                        if (FillColor.A < 255)
+                        if (fillColor.A < 255)
                         {
-                            var fillOpacity = FillColor.A / 255.0;
+                            var fillOpacity = fillColor.A / 255.0;
                             element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3"));
                         }
                         else
@@ -158,21 +159,27 @@ namespace MnemoApp.Core.Services
                             element.Attribute("fill-opacity")?.Remove();
                         }
                     }
-                    // If FillColor is transparent (default), preserve existing fill attributes
+                    else if (Fill == null || Fill == Brushes.Transparent)
+                    {
+                        // Remove fill attributes if brush is null or transparent
+                        element.Attribute("fill")?.Remove();
+                        element.Attribute("fill-opacity")?.Remove();
+                    }
 
-                    // Replace stroke attributes if StrokeWidth > 0
+                    // Handle stroke brush and width
                     if (StrokeWidth > 0)
                     {
                         element.SetAttributeValue("stroke-width", StrokeWidth.ToString());
                         
-                        if (StrokeColor.A > 0)
+                        if (Stroke is ISolidColorBrush strokeBrush && strokeBrush != Brushes.Transparent)
                         {
-                            var strokeHex = $"#{StrokeColor.R:X2}{StrokeColor.G:X2}{StrokeColor.B:X2}";
+                            var strokeColor = strokeBrush.Color;
+                            var strokeHex = $"#{strokeColor.R:X2}{strokeColor.G:X2}{strokeColor.B:X2}";
                             element.SetAttributeValue("stroke", strokeHex);
                             
-                            if (StrokeColor.A < 255)
+                            if (strokeColor.A < 255)
                             {
-                                var strokeOpacity = StrokeColor.A / 255.0;
+                                var strokeOpacity = strokeColor.A / 255.0;
                                 element.SetAttributeValue("stroke-opacity", strokeOpacity.ToString("F3"));
                             }
                             else
@@ -183,7 +190,7 @@ namespace MnemoApp.Core.Services
                     }
                     else
                     {
-                        // Remove stroke if width is 0
+                        // Remove stroke attributes if width is 0
                         element.Attribute("stroke")?.Remove();
                         element.Attribute("stroke-width")?.Remove();
                         element.Attribute("stroke-opacity")?.Remove();

@@ -12,6 +12,7 @@
     <Folder Include="Models\" />
     <AvaloniaResource Include="UI\Assets\**" />
     <AvaloniaResource Include="UI\Icons\**" />
+    <AvaloniaResource Include="UI\Themes\**" />
   </ItemGroup>
 
   <ItemGroup>

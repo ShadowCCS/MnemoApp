@@ -1,12 +1,12 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     
-    <!-- Mnemo Dawn Theme -->
-
+    <!-- Mnemo Dusk Theme -->
+    
     <!-- Fonts  Weights-->
-    <FontFamily x:Key="MediumFont">avares://MnemoApp/UI/Themes/Fonts/Lexend/Lexend-Medium.ttf</FontFamily>
-    <FontFamily x:Key="BoldFont">avares://MnemoApp/UI/Themes/Fonts/Lexend/Lexend-Bold.ttf</FontFamily>
-    <FontFamily x:Key="SemiBoldFont">avares://MnemoApp/UI/Themes/Fonts/Lexend/Lexend-SemiBold.ttf</FontFamily>
+    <FontFamily x:Key="MediumFont">avares://MnemoApp/UI/Themes/Fonts/Inter/InterDisplay-Medium.ttf</FontFamily>
+    <FontFamily x:Key="BoldFont">avares://MnemoApp/UI/Themes/Fonts/Inter/InterDisplay-Bold.ttf</FontFamily>
+    <FontFamily x:Key="SemiBoldFont">avares://MnemoApp/UI/Themes/Fonts/Inter/InterDisplay-SemiBold.ttf</FontFamily>
 
     <!-- Font Sizes -->
     <x:Double x:Key="NavbarFontSize">12</x:Double>
@@ -17,79 +17,79 @@
     <x:Double x:Key="ExtraExtraSmallFontSize">9</x:Double>
 
     <!-- Background Colors -->
-    <Color x:Key="SidebarBackground">#D2D2D2</Color>
-    <Color x:Key="WorkspaceBackground">#DFDFDF</Color>
-    <Color x:Key="OverlayBackground">#D2D2D2</Color>
+    <Color x:Key="SidebarBackground">#2D2D2D</Color>
+    <Color x:Key="WorkspaceBackground">#202020</Color>
+    <Color x:Key="OverlayBackground">#2D2D2D</Color>
     <Color x:Key="TopbarBackground">Transparent</Color>
     
     <!-- Text Colors -->
-    <Color x:Key="TextPrimary">#222222</Color>
-    <Color x:Key="TextSecondary">#555555</Color>
-    <Color x:Key="TextTertiary">#848484</Color>
-    <Color x:Key="TextFaded">#999999</Color>
-    <Color x:Key="TextDisabled">#999999</Color>
-    <Color x:Key="NotificationTitleColor">#5D5D5D</Color>
-    <Color x:Key="NotificationDescriptionColor">#898989</Color>
-    <Color x:Key="BreadcrumbText">#999999</Color>
-    <Color x:Key="VersionText">#848484</Color>
+    <Color x:Key="TextPrimary">#DDDDDD</Color>
+    <Color x:Key="TextSecondary">#AAAAAA</Color>
+    <Color x:Key="TextTertiary">#7B7B7B</Color>
+    <Color x:Key="TextFaded">#666666</Color>
+    <Color x:Key="TextDisabled">#666666</Color>
+    <Color x:Key="NotificationTitleColor">#A2A2A2</Color>
+    <Color x:Key="NotificationDescriptionColor">#767676</Color>
+    <Color x:Key="BreadcrumbText">#666666</Color>
+    <Color x:Key="VersionText">#7B7B7B</Color>
     
     <!-- Icon Colors -->
-    <Color x:Key="IconsSidebar">#555555</Color>
+    <Color x:Key="IconsSidebar">#AAAAAA</Color>
     <Color x:Key="ChevronSidebar">#8A8A8A</Color>
-    <Color x:Key="IconsTopbar">#7B7B7B</Color>
-    <Color x:Key="IconsWorkspace">#7B7B7B</Color>
-    <Color x:Key="IconsOverlay">#7B7B7B</Color>
-    <Color x:Key="IconsSeparationBar">#919191</Color>
-    <Color x:Key="CardIconColor">#555555</Color>
-    <Color x:Key="NotificationIconColor">#7B7B7B</Color>
-    <Color x:Key="NotificationIconForeground">#D9D9D9</Color>
-    <Color x:Key="OverlayIconColor">#797979</Color>
-    <Color x:Key="LearnCardIconColor">#999999</Color>
-    <Color x:Key="ListItemIconColor">#777777</Color>
+    <Color x:Key="IconsTopbar">#848484</Color>
+    <Color x:Key="IconsWorkspace">#848484</Color>
+    <Color x:Key="IconsOverlay">#848484</Color>
+    <Color x:Key="IconsSeparationBar">#6E6E6E</Color>
+    <Color x:Key="CardIconColor">#AAAAAA</Color>
+    <Color x:Key="NotificationIconColor">#848484</Color>
+    <Color x:Key="NotificationIconForeground">#262626</Color>
+    <Color x:Key="OverlayIconColor">#868686</Color>
+    <Color x:Key="LearnCardIconColor">#666666</Color>
+    <Color x:Key="ListItemIconColor">#888888</Color>
     <Color x:Key="AccentButtonIcon">#FFFFFF</Color>
-    <Color x:Key="GhostButtonIcon">#777777</Color>
+    <Color x:Key="GhostButtonIcon">#888888</Color>
     
     <!-- Link Colors -->
-    <Color x:Key="Links">#2686C2</Color>
-    <Color x:Key="LinksHover">#2686C2</Color>
+    <Color x:Key="Links">#4A9EE7</Color>
+    <Color x:Key="LinksHover">#4A9EE7</Color>
     
     <!-- Navigation Colors -->
     <Color x:Key="NavButtonBackground">Transparent</Color>
-    <Color x:Key="NavButtonHover">#C5C5C5</Color>
-    <Color x:Key="NavButtonActive">#C5C5C5</Color>
-    <Color x:Key="NavElementBackground">#D2D2D2</Color>
+    <Color x:Key="NavButtonHover">#3A3A3A</Color>
+    <Color x:Key="NavButtonActive">#3A3A3A</Color>
+    <Color x:Key="NavElementBackground">#2D2D2D</Color>
     <Color x:Key="NavElementActiveBackground">#2079FF</Color>
-    <Color x:Key="NavElementHoverBackground">#C7C7C7</Color>
+    <Color x:Key="NavElementHoverBackground">#383838</Color>
     
     <!-- Widget Colors -->
-    <Color x:Key="WidgetBackgroundPrimary">#C5C5C5</Color>
-    <Color x:Key="WidgetBackgroundSecondary">#D7D7D7</Color>
+    <Color x:Key="WidgetBackgroundPrimary">#3A3A3A</Color>
+    <Color x:Key="WidgetBackgroundSecondary">#282828</Color>
     
     <!-- Widget Icon Background Colors -->
-    <Color x:Key="WidgetIconBackground1">#A4C5F0</Color>
-    <Color x:Key="WidgetIconBackground2">#B5FFA7</Color>
-    <Color x:Key="WidgetIconBackground3">#FFE48F</Color>
-    <Color x:Key="WidgetIconBackground4">#FF9496</Color>
-    <Color x:Key="WidgetIconBackground5">#E0E0E0</Color>
+    <Color x:Key="WidgetIconBackground1">#5B7A9F</Color>
+    <Color x:Key="WidgetIconBackground2">#4A6B58</Color>
+    <Color x:Key="WidgetIconBackground3">#665170</Color>
+    <Color x:Key="WidgetIconBackground4">#6B6A69</Color>
+    <Color x:Key="WidgetIconBackground5">#1F1F1F</Color>
     
     <!-- Widget Icon Colors -->
-    <Color x:Key="WidgetIconColor1">#3687A2</Color>
-    <Color x:Key="WidgetIconColor2">#6DA861</Color>
-    <Color x:Key="WidgetIconColor3">#EAB308</Color>
-    <Color x:Key="WidgetIconColor4">#EF4444</Color>
-    <Color x:Key="WidgetIconColor5">#777777</Color>
+    <Color x:Key="WidgetIconColor1">#87CEFD</Color>
+    <Color x:Key="WidgetIconColor2">#92D59E</Color>
+    <Color x:Key="WidgetIconColor3">#F4C430</Color>
+    <Color x:Key="WidgetIconColor4">#EF6C6C</Color>
+    <Color x:Key="WidgetIconColor5">#888888</Color>
     
     <!-- Card Colors -->
-    <Color x:Key="CardBackgroundPrimary">#EBEBEB</Color>
-    <Color x:Key="CardBackgroundSecondary">#D7D7D7</Color>
+    <Color x:Key="CardBackgroundPrimary">#141414</Color>
+    <Color x:Key="CardBackgroundSecondary">#282828</Color>
     <Color x:Key="CardAccent">#2079FF</Color>
-    <Color x:Key="LearnCardBackground">#D2D2D2</Color>
-    <Color x:Key="LearnCardTitleColor">#616161</Color>
-    <Color x:Key="LearnCardSubTextColor">#575757</Color>
+    <Color x:Key="LearnCardBackground">#2D2D2D</Color>
+    <Color x:Key="LearnCardTitleColor">#9E9E9E</Color>
+    <Color x:Key="LearnCardSubTextColor">#A8A8A8</Color>
     
     <!-- Notification Colors -->
-    <Color x:Key="NotificationBackgroundPrimary">#D2D2D2</Color>
-    <Color x:Key="NotificationBackgroundSecondary">#EBEBEB</Color>
+    <Color x:Key="NotificationBackgroundPrimary">#2D2D2D</Color>
+    <Color x:Key="NotificationBackgroundSecondary">#141414</Color>
     
     <!-- System Colors -->
     <Color x:Key="SystemInfoBackground">#3954b0</Color>
@@ -99,77 +99,77 @@
     <Color x:Key="SystemSuccessBackground">#5cb85c</Color>
     
     <!-- Progress Bar Colors -->
-    <Color x:Key="ProgressBarBackground">#c8c8c8</Color>
+    <Color x:Key="ProgressBarBackground">#373737</Color>
     <Color x:Key="ProgressBarFill">#2079ff</Color>
-    <Color x:Key="ProgressBarSecondaryBackground">#C0C0C0</Color>
-    <Color x:Key="ProgressBarSecondaryFill">#8B8B8B</Color>
+    <Color x:Key="ProgressBarSecondaryBackground">#3F3F3F</Color>
+    <Color x:Key="ProgressBarSecondaryFill">#747474</Color>
     
     <!-- Button Colors -->
-    <Color x:Key="MainButtonBackground">#D7D7D7</Color>
-    <Color x:Key="MainButtonTextColor">#676767</Color>
+    <Color x:Key="MainButtonBackground">#282828</Color>
+    <Color x:Key="MainButtonTextColor">#989898</Color>
     <Color x:Key="InstallButtonBackground">#2079FF</Color>
     <Color x:Key="InstallButtonTextColor">#FFFFFF</Color>
-    <Color x:Key="SecondaryButtonBackground">#DBDBDB</Color>
-    <Color x:Key="SecondaryButtonTextColor">#858585</Color>
-    <Color x:Key="CreateButtonBackground">#D7D7D7</Color>
-    <Color x:Key="CreateButtonTextColor">#777777</Color>
-    <Color x:Key="BasicButtonBackground">#FFFFFF</Color>
-    <Color x:Key="BasicButtonTextColor">#565656</Color>
+    <Color x:Key="SecondaryButtonBackground">#242424</Color>
+    <Color x:Key="SecondaryButtonTextColor">#7A7A7A</Color>
+    <Color x:Key="CreateButtonBackground">#282828</Color>
+    <Color x:Key="CreateButtonTextColor">#888888</Color>
+    <Color x:Key="BasicButtonBackground">#000000</Color>
+    <Color x:Key="BasicButtonTextColor">#A9A9A9</Color>
     <Color x:Key="DestructiveButtonColor">#ff5050</Color>
     <Color x:Key="DestructiveButtonHoverColor">#FF6868</Color>
     <Color x:Key="NewButtonBackground">#2079FF</Color>
-    <Color x:Key="AccentButtonText">#9E9E9E</Color>
+    <Color x:Key="AccentButtonText">#616161</Color>
     <Color x:Key="GhostButtonBackground">Transparent</Color>
-    <Color x:Key="GhostButtonText">#777777</Color>
+    <Color x:Key="GhostButtonText">#888888</Color>
     
     <!-- View Switch Colors -->
-    <Color x:Key="ViewSwitchButton">#BBBBBB</Color>
+    <Color x:Key="ViewSwitchButton">#444444</Color>
     <Color x:Key="ViewSwitchButtonActive">#2079FF</Color>
     
     <!-- Paginator Colors -->
-    <Color x:Key="PaginatorBackground">#EBEBEB</Color>
+    <Color x:Key="PaginatorBackground">#141414</Color>
     <Color x:Key="PaginatorActive">#2079FF</Color>
-    <Color x:Key="PaginatorText">#6A6A6A</Color>
+    <Color x:Key="PaginatorText">#959595</Color>
     
     <!-- Overlay Colors -->
-    <Color x:Key="OverlayIconBackground">#CBCBCB</Color>
-    <Color x:Key="OverlayItemBackgroundColor">#d2d2d2</Color>
+    <Color x:Key="OverlayIconBackground">#343434</Color>
+    <Color x:Key="OverlayItemBackgroundColor">#2d2d2d</Color>
     <Color x:Key="OverlayItemActiveBackgroundColor">#2079FF</Color>
-    <Color x:Key="OverlayItemHoverBackgroundColor">#c5c5c5</Color>
-    <Color x:Key="OverlayHighlightColor">#b3b3b3</Color>
+    <Color x:Key="OverlayItemHoverBackgroundColor">#3a3a3a</Color>
+    <Color x:Key="OverlayHighlightColor">#4c4c4c</Color>
     
     <!-- Search Bar Colors -->
-    <Color x:Key="SearchBarBackground">#D2D2D2</Color>
-    <Color x:Key="SearchBarTextColor">#777777</Color>
+    <Color x:Key="SearchBarBackground">#2D2D2D</Color>
+    <Color x:Key="SearchBarTextColor">#888888</Color>
     
     <!-- Badge Colors -->
-    <Color x:Key="BadgeBackground">#D2D2D2</Color>
-    <Color x:Key="BadgeIconBackground">#929292</Color>
+    <Color x:Key="BadgeBackground">#2D2D2D</Color>
+    <Color x:Key="BadgeIconBackground">#6D6D6D</Color>
     
     <!-- Toggle Button Colors -->
-    <Color x:Key="ToggleButtonBackground">#B1B1B1</Color>
-    <Color x:Key="ToggleButtonHoverBackground">#B1B1B1</Color>
+    <Color x:Key="ToggleButtonBackground">#4E4E4E</Color>
+    <Color x:Key="ToggleButtonHoverBackground">#4E4E4E</Color>
     <Color x:Key="ToggleButtonActiveBackground">#2079FF</Color>
-    <Color x:Key="ToggleButtonEye">#D9D9D9</Color>
+    <Color x:Key="ToggleButtonEye">#262626</Color>
     
     <!-- Highlight Colors -->
-    <Color x:Key="TextHighlightColor">#A4C8E8</Color>
+    <Color x:Key="TextHighlightColor">#5B3717</Color>
     
     <!-- Line Colors -->
-    <Color x:Key="LineColor">#828282</Color>
+    <Color x:Key="LineColor">#7D7D7D</Color>
     
     <!-- List Item Colors -->
     <Color x:Key="ListItemBackground">Transparent</Color>
-    <Color x:Key="ListItemText">#777777</Color>
-    <Color x:Key="ListItemHoverBackground">#D2D2D2</Color>
-    <Color x:Key="ListItemActiveBackground">#D2D2D2</Color>
+    <Color x:Key="ListItemText">#888888</Color>
+    <Color x:Key="ListItemHoverBackground">#2D2D2D</Color>
+    <Color x:Key="ListItemActiveBackground">#2D2D2D</Color>
     
     <!-- Answer Colors -->
-    <Color x:Key="AnswerCorrect">#95d6a2</Color>
-    <Color x:Key="AnswerWrong">#dbd29f</Color>
+    <Color x:Key="AnswerCorrect">#6A295D</Color>
+    <Color x:Key="AnswerWrong">#242D60</Color>
     
     <!-- Logo Colors -->
-    <Color x:Key="SidebarLogo">#555555</Color>
+    <Color x:Key="SidebarLogo">#AAAAAA</Color>
     
          <!-- Solid Color Brushes -->
      <!-- Background Brushes -->
