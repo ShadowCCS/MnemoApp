@@ -246,58 +246,62 @@ namespace MnemoApp.Core.Services
         }
 
         private async Task ApplyThemeAsync(ThemeManifest theme)
+{
+    await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+    {
+        var app = Application.Current;
+        if (app != null)
         {
-            await Task.Run(() =>
+            try
             {
-                try
-                {
-                    StyleInclude themeStyle;
-                    
-                    if (theme.IsCore)
-                    {
-                        // For core themes, use avares:// URI
-                        themeStyle = new StyleInclude(new Uri("avares://MnemoApp/"))
-                        {
-                            Source = new Uri(theme.ThemePath)
-                        };
-                    }
-                    else
-                    {
-                        // For custom themes, use file path
-                        themeStyle = new StyleInclude(new Uri("file:///"))
-                        {
-                            Source = new Uri($"file:///{theme.ThemePath.Replace('\\', '/')}")
-                        };
-                    }
+                // Remove all theme styles
+                var existingThemeStyles = app.Styles
+                    .OfType<StyleInclude>()
+                    .Where(s => s.Source?.ToString().Contains("/theme.axaml") == true)
+                    .ToList();
 
-                    // Apply on UI thread
-                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        var app = Application.Current;
-                        if (app != null)
-                        {
-                            // Clear existing theme styles
-                            var existingThemeStyles = app.Styles
-                                .OfType<StyleInclude>()
-                                .Where(s => s.Source?.ToString().Contains("/theme.axaml") == true)
-                                .ToList();
-                            
-                            foreach (var existingTheme in existingThemeStyles)
-                            {
-                                app.Styles.Remove(existingTheme);
-                            }
-                            
-                            // Add new theme style at the beginning so it has lower priority than custom styles
-                            app.Styles.Insert(0, themeStyle);
-                        }
-                    });
-                }
-                catch (Exception ex)
+                foreach (var existingTheme in existingThemeStyles)
                 {
-                    throw new InvalidOperationException($"Failed to apply theme '{theme.Name}': {ex.Message}", ex);
+                    app.Styles.Remove(existingTheme);
                 }
-            });
+
+                // Force garbage collection to clear any cached resources
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+
+                // Create new theme style
+                StyleInclude themeStyle;
+                if (theme.IsCore)
+                {
+                    themeStyle = new StyleInclude(new Uri("avares://MnemoApp/"))
+                    {
+                        Source = new Uri(theme.ThemePath)
+                    };
+                }
+                else
+                {
+                    themeStyle = new StyleInclude(new Uri("file:///"))
+                    {
+                        Source = new Uri($"file:///{theme.ThemePath.Replace('\\', '/')}")
+                    };
+                }
+
+                // Add new theme style at the end for highest priority
+                app.Styles.Add(themeStyle);
+
+                // Optionally, force resource reload
+                app.Resources = new Avalonia.Controls.ResourceDictionary();
+
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying theme on UI thread: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                throw;
+            }
         }
+    });
+}
 
         private async Task SaveThemeToSettingsAsync(string themeName)
         {

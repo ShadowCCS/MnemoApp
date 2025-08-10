@@ -55,6 +55,19 @@ namespace MnemoApp.Core.Services
 
         private SKSvg? _svg;
         private string? _originalSvgContent;
+        private IDisposable? _fillBrushSubscription;
+        private IDisposable? _strokeBrushSubscription;
+
+        private sealed class CallbackDisposable : IDisposable
+        {
+            private Action? _dispose;
+            public CallbackDisposable(Action dispose) => _dispose = dispose;
+            public void Dispose()
+            {
+                _dispose?.Invoke();
+                _dispose = null;
+            }
+        }
 
         static MnemoSvg()
         {
@@ -68,6 +81,7 @@ namespace MnemoApp.Core.Services
         protected override void OnInitialized()
         {
             base.OnInitialized();
+            SubscribeToBrushChanges();
             LoadSvg();
         }
 
@@ -80,8 +94,43 @@ namespace MnemoApp.Core.Services
 
         private void OnPropertiesChanged()
         {
+            SubscribeToBrushChanges();
             LoadSvg();
             InvalidateVisual();
+        }
+
+        private void SubscribeToBrushChanges()
+        {
+            _fillBrushSubscription?.Dispose();
+            _strokeBrushSubscription?.Dispose();
+
+            if (Fill is ISolidColorBrush solidFill && solidFill is AvaloniaObject aoFill)
+            {
+                EventHandler<AvaloniaPropertyChangedEventArgs>? handler = (s, e) =>
+                {
+                    if (e.Property == SolidColorBrush.ColorProperty)
+                    {
+                        LoadSvg();
+                        InvalidateVisual();
+                    }
+                };
+                aoFill.PropertyChanged += handler;
+                _fillBrushSubscription = new CallbackDisposable(() => aoFill.PropertyChanged -= handler);
+            }
+
+            if (Stroke is ISolidColorBrush solidStroke && solidStroke is AvaloniaObject aoStroke)
+            {
+                EventHandler<AvaloniaPropertyChangedEventArgs>? handler = (s, e) =>
+                {
+                    if (e.Property == SolidColorBrush.ColorProperty)
+                    {
+                        LoadSvg();
+                        InvalidateVisual();
+                    }
+                };
+                aoStroke.PropertyChanged += handler;
+                _strokeBrushSubscription = new CallbackDisposable(() => aoStroke.PropertyChanged -= handler);
+            }
         }
 
         private void LoadOriginalSvg()
@@ -237,6 +286,13 @@ namespace MnemoApp.Core.Services
             
             var bitmap = new Avalonia.Media.Imaging.Bitmap(stream);
             context.DrawImage(bitmap, new Rect(0, 0, Bounds.Width, Bounds.Height));
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnDetachedFromVisualTree(e);
+            _fillBrushSubscription?.Dispose();
+            _strokeBrushSubscription?.Dispose();
         }
 
         protected override Size MeasureOverride(Size availableSize)

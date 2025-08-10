@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MnemoApp.Modules.Dashboard"
         xmlns:vm="clr-namespace:MnemoApp.Modules.Dashboard"
+        xmlns:services="using:MnemoApp.Core.Services"
         mc:Ignorable="d"
         x:Class="MnemoApp.Modules.Dashboard.DashboardView">
     <Grid>

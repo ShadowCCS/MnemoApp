@@ -16,6 +16,8 @@
     <Color x:Key="NotificationDescriptionColor">#898989</Color>
     <Color x:Key="BreadcrumbText">#999999</Color>
     <Color x:Key="VersionText">#848484</Color>
+    <Color x:Key="QuickActionsTextPrimary">#555555</Color>
+    <Color x:Key="QuickActionsTextSecondary">#999999</Color>
     
     <!-- Icon Colors -->
     <Color x:Key="IconsSidebar">#555555</Color>
@@ -217,9 +219,22 @@
     <Color x:Key="ScrollBarButtonArrowForegroundPointerOver">#555555</Color>
     <Color x:Key="ScrollBarButtonArrowForegroundPressed">#444444</Color>
     <Color x:Key="ScrollBarButtonArrowForegroundDisabled">#999999</Color>
-    
+
+    <!-- Tooltip -->
+    <Color x:Key="TooltipBackground">#DFDFDF</Color>
+    <Color x:Key="TooltipForeground">#565656</Color>
+    <Color x:Key="TooltipBorder">#D2D2D2</Color>
+
+    <!-- Navigation Button -->
+    <Color x:Key="NavigationButtonBackground">#D2D2D2</Color>
+    <Color x:Key="NavigationButtonBackgroundHover">#DBDBDB</Color>
+    <Color x:Key="NavigationButtonBackgroundSelected">#c5c5c5</Color>
+    <Color x:Key="NavigationButtonBackgroundPressed">#C5C5C5</Color>
+    <Color x:Key="NavigationButtonForeground">#555555</Color>
+    <Color x:Key="NavigationButtonForegroundSelected">#555555</Color>
+
     <!-- Common Values -->
     <Thickness x:Key="ButtonBorderThemeThickness">1</Thickness>
     <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
-    <Thickness x:Key="ButtonPadding">8,4,8,4</Thickness>
+    <Thickness x:Key="ButtonPadding">6</Thickness>
 </ResourceDictionary>

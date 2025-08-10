@@ -61,11 +61,11 @@
 
   <ControlTheme x:Key="FluentScrollBarLineButton" TargetType="RepeatButton">
     <Setter Property="Opacity" Value="0" />
-    <Setter Property="TextElement.Foreground" Value="{DynamicResource ScrollBarButtonArrowForeground}"/>
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource ScrollBarButtonArrowForegroundBrush}"/>
     <Setter Property="Template">
       <ControlTemplate>
         <ContentPresenter x:Name="PART_ContentPresenter"
-                          Background="{DynamicResource ScrollBarButtonBackground}"
+                          Background="{DynamicResource ScrollBarButtonBackgroundBrush}"
                           BorderBrush="{DynamicResource ScrollBarButtonBorderBrush}"
                           Content="{TemplateBinding Content}"/>
       </ControlTemplate>
@@ -77,28 +77,28 @@
     </Setter>
 
     <Style Selector="^:pointerover">
-      <Setter Property="TextElement.Foreground" Value="{DynamicResource ScrollBarButtonArrowForegroundPointerOver}"/>
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource ScrollBarButtonArrowForegroundPointerOverBrush}"/>
 
       <Style Selector="^ /template/ ContentPresenter" >
-        <Setter Property="Background" Value="{DynamicResource ScrollBarButtonBackgroundPointerOver}" />
+        <Setter Property="Background" Value="{DynamicResource ScrollBarButtonBackgroundPointerOverBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ScrollBarButtonBorderBrushPointerOver}" />
       </Style>
     </Style>
 
     <Style Selector="^:pressed">
-      <Setter Property="TextElement.Foreground" Value="{DynamicResource ScrollBarButtonArrowForegroundPressed}"/>
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource ScrollBarButtonArrowForegroundPressedBrush}"/>
 
       <Style Selector="^ /template/ ContentPresenter" >
-        <Setter Property="Background" Value="{DynamicResource ScrollBarButtonBackgroundPressed}" />
+        <Setter Property="Background" Value="{DynamicResource ScrollBarButtonBackgroundPressedBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ScrollBarButtonBorderBrushPressed}" />
       </Style>
     </Style>
 
     <Style Selector="^:disabled">
-      <Setter Property="TextElement.Foreground" Value="{DynamicResource ScrollBarButtonArrowForegroundDisabled}"/>
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource ScrollBarButtonArrowForegroundDisabledBrush}"/>
 
       <Style Selector="^ /template/ ContentPresenter" >
-        <Setter Property="Background" Value="{DynamicResource ScrollBarButtonBackgroundDisabled}" />
+        <Setter Property="Background" Value="{DynamicResource ScrollBarButtonBackgroundDisabledBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ScrollBarButtonBorderBrushDisabled}" />
       </Style>
     </Style>
@@ -107,8 +107,8 @@
   <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
     <Setter Property="MinWidth" Value="{DynamicResource ScrollBarSize}" />
     <Setter Property="MinHeight" Value="{DynamicResource ScrollBarSize}" />
-    <Setter Property="Background" Value="{DynamicResource ScrollBarBackground}" />
-    <Setter Property="Foreground" Value="{DynamicResource ScrollBarForeground}" />
+    <Setter Property="Background" Value="{DynamicResource ScrollBarBackgroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ScrollBarForegroundBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource ScrollBarBorderBrush}" />
 
     <Style Selector="^:vertical">

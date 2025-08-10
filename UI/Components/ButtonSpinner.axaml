@@ -72,10 +72,10 @@
   </ControlTheme>
 
   <ControlTheme x:Key="{x:Type ButtonSpinner}" TargetType="ButtonSpinner">
-    <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextControlForegroundBrush}" />
     <Setter Property="Padding" Value="10, 0" />
-    <Setter Property="Background" Value="{DynamicResource TextControlBackground}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrush}" />
+    <Setter Property="Background" Value="{DynamicResource TextControlBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrushBrush}" />
     <Setter Property="BorderThickness" Value="{DynamicResource TextControlBorderThemeThickness}" />
     <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
     <Setter Property="MinHeight" Value="{DynamicResource TextControlThemeMinHeight}" />

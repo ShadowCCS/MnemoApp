@@ -168,7 +168,7 @@
     </Style>
 
     <Style Selector="^:hasnotime /template/ Button#PART_FlyoutButton TextBlock">
-      <Setter Property="Foreground" Value="{DynamicResource TextControlPlaceholderForeground}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextControlPlaceholderForegroundBrush}"/>
     </Style>
 
     <Style Selector="^:error /template/ Button#PART_FlyoutButton">

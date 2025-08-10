@@ -8,6 +8,9 @@ using MnemoApp.Core.Shell;
 using MnemoApp.Core.Navigation;
 using MnemoApp.Core;
 using Microsoft.Extensions.DependencyInjection;
+using System.Threading.Tasks;
+using MnemoApp.Core.Services;
+using System;
 
 namespace MnemoApp;
 
@@ -16,9 +19,10 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        ApplicationHost.Initialize();
     }
 
-    public override void OnFrameworkInitializationCompleted()
+    public override async void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -32,6 +36,9 @@ public partial class App : Application
             
             mainWindow.DataContext = mainWindowViewModel;
             desktop.MainWindow = mainWindow;
+
+            // Initialize theme service
+            await InitializeThemeSystemAsync();
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -43,10 +50,28 @@ public partial class App : Application
         var dataValidationPluginsToRemove =
             BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
 
-        // remove each entry found
+        // remove each entry foundd
         foreach (var plugin in dataValidationPluginsToRemove)
         {
             BindingPlugins.DataValidators.Remove(plugin);
+        }
+    }
+
+    private static async Task InitializeThemeSystemAsync()
+    {
+        try
+        {
+            var themeService = ApplicationHost.Services.GetRequiredService<IThemeService>();
+            if (themeService != null)
+            {
+                // Load theme from settings on startup
+                await themeService.LoadThemeFromSettingsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't crash the app
+            System.Diagnostics.Debug.WriteLine($"Theme initialization failed: {ex.Message}");
         }
     }
 }

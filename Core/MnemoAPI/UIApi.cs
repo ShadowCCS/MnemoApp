@@ -8,10 +8,12 @@ namespace MnemoApp.Core.MnemoAPI
     public class UIApi
     {
         public ThemeApi themes { get; }
+        public TopbarApi topbar { get; }
 
-        public UIApi(IThemeService themeService)
+        public UIApi(IThemeService themeService, ITopbarService topbarService)
         {
             themes = new ThemeApi(themeService);
+            topbar = new TopbarApi(topbarService);
         }
     }
 
@@ -58,5 +60,38 @@ namespace MnemoApp.Core.MnemoAPI
         {
             return _themeService.GetCurrentTheme();
         }
+    }
+
+    public class TopbarApi
+    {
+        private readonly ITopbarService _topbarService;
+
+        public TopbarApi(ITopbarService topbarService)
+        {
+            _topbarService = topbarService;
+        }
+
+        public System.Guid addButton(string iconPath, object? stroke = null, bool notification = false, int order = 0, System.Windows.Input.ICommand? command = null, string? toolTip = null)
+        {
+            var model = new TopbarButtonModel
+            {
+                IconPath = iconPath,
+                Stroke = stroke,
+                Notification = notification,
+                Order = order,
+                Command = command,
+                ToolTip = toolTip
+            };
+            return _topbarService.AddButton(model);
+        }
+
+        public System.Guid addCustom(Avalonia.Controls.Control control, int order = 0)
+        {
+            return _topbarService.AddCustom(control, order);
+        }
+
+        public bool remove(System.Guid id) => _topbarService.Remove(id);
+
+        public bool setNotification(System.Guid id, bool notification) => _topbarService.SetNotification(id, notification);
     }
 }

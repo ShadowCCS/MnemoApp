@@ -36,6 +36,12 @@ namespace MnemoApp.UI.Components.Sidebar
 
             // Subscribe to navigation changes to update selected item
             _navigationService.ViewModelChanged += OnViewModelChanged;
+
+            // Initialize selection based on current view model at startup
+            if (_navigationService.CurrentViewModel is not null)
+            {
+                OnViewModelChanged(_navigationService.CurrentViewModel);
+            }
         }
 
         private void ToggleSidebar()

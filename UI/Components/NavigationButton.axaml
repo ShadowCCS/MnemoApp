@@ -1,0 +1,79 @@
+﻿<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:services="using:MnemoApp.Core.Services"
+        x:ClassModifier="internal"
+        x:CompileBindings="True">
+
+  <!-- Navigation Button Styles -->
+
+  <!-- Regular nav-button styles -->
+  <Style Selector="Button.nav-button">
+    <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundBrush}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource SidebarButtonCornerRadius}"/>
+  </Style>
+
+  <!-- Default text/icon colors within nav-button -->
+  <Style Selector="Button.nav-button TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+  </Style>
+  <Style Selector="Button.nav-button services|MnemoSvg">
+    <Setter Property="Stroke" Value="{DynamicResource IconsSidebarBrush}"/>
+  </Style>
+
+  <Style Selector="Button.nav-button:pointerover">
+    <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundHoverBrush}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource SidebarButtonCornerRadius}"/>
+  </Style>
+
+  <Style Selector="Button.nav-button:pressed">
+    <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundPressedBrush}"/>
+  </Style>
+
+  <Style Selector="Button.nav-button.selected">
+    <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundSelectedBrush}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource SidebarButtonCornerRadius}"/>
+  </Style>
+
+  <Style Selector="Button.nav-button.selected TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource NavigationButtonForegroundSelectedBrush}"/>
+  </Style>
+  <Style Selector="Button.nav-button.selected services|MnemoSvg">
+    <Setter Property="Stroke" Value="{DynamicResource IconsSidebarBrush}"/>
+  </Style>
+
+  <!-- Collapsed nav-button styles -->
+  <Style Selector="Button.nav-button-collapsed">
+    <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundBrush}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource SidebarButtonCornerRadius}"/>
+  </Style>
+
+  <!-- Default text/icon colors within collapsed nav-button -->
+  <Style Selector="Button.nav-button-collapsed TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+  </Style>
+  <Style Selector="Button.nav-button-collapsed services|MnemoSvg">
+    <Setter Property="Stroke" Value="{DynamicResource IconsSidebarBrush}"/>
+  </Style>
+
+  <Style Selector="Button.nav-button-collapsed:pointerover">
+    <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundHoverBrush}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource ButtonCornerRadius}"/>
+  </Style>
+
+  <Style Selector="Button.nav-button-collapsed:pressed">
+    <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundPressedBrush}"/>
+  </Style>
+
+  <Style Selector="Button.nav-button-collapsed.selected">
+    <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundSelectedBrush}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource SidebarButtonCornerRadius}"/>
+  </Style>
+
+  <Style Selector="Button.nav-button-collapsed.selected TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource NavigationButtonForegroundSelectedBrush}"/>
+  </Style>
+  <Style Selector="Button.nav-button-collapsed.selected services|MnemoSvg">
+    <Setter Property="Stroke" Value="{DynamicResource IconsSidebarBrush}"/>
+  </Style>
+
+</Styles>

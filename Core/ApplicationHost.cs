@@ -51,8 +51,6 @@ namespace MnemoApp.Core
             // Initialize MnemoAPI if needed
             var api = _serviceProvider.GetRequiredService<IMnemoAPI>();
             
-            // Initialize theme system
-            _ = InitializeThemeSystemAsync();
             
             // Register modules with sidebar
             RegisterModulesWithSidebar(api);
@@ -84,25 +82,7 @@ namespace MnemoApp.Core
                 "avares://MnemoApp/UI/Icons/Tabler/outline/adjustments-alt.svg"
             );
             
-            // TODO: Register other modules here
         }
         
-        private static async Task InitializeThemeSystemAsync()
-        {
-            try
-            {
-                var themeService = _serviceProvider?.GetRequiredService<IThemeService>();
-                if (themeService != null)
-                {
-                    // Load theme from settings on startup
-                    await themeService.LoadThemeFromSettingsAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log error but don't crash the app
-                System.Diagnostics.Debug.WriteLine($"Theme initialization failed: {ex.Message}");
-            }
-        }
     }
 }

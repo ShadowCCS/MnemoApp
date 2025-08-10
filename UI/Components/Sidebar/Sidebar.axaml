@@ -4,6 +4,9 @@
              xmlns:vm="using:MnemoApp.UI.Components.Sidebar"
              x:Class="MnemoApp.UI.Components.Sidebar.Sidebar"
              x:DataType="vm:SidebarViewModel">
+    <UserControl.Styles>
+        <StyleInclude Source="avares://MnemoApp/UI/Components/NavigationButton.axaml" />
+    </UserControl.Styles>
     
     <Grid>
         <!-- Expanded Sidebar -->
@@ -36,7 +39,8 @@
                         VerticalAlignment="Center">
                     <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/chevron-left.svg" 
                                       Width="18" Height="18" 
-                                      Stroke="{DynamicResource ChevronSidebarBrush}"/>
+                                      Stroke="{DynamicResource ChevronSidebarBrush}"
+                                      StrokeWidth="2"/>
                 </Button>
             </StackPanel>
             
@@ -62,24 +66,20 @@
                                         <DataTemplate>
                                             <Button Classes="nav-button"
                                                     Classes.selected="{Binding IsSelected}"
-                                                    Background="Transparent" 
                                                     BorderThickness="0" 
                                                     HorizontalAlignment="Stretch"
                                                     HorizontalContentAlignment="Left"
                                                     ToolTip.Tip="{Binding Title}"
                                                     FontSize="{DynamicResource NavbarFontSize}" 
                                                     FontFamily="{DynamicResource MediumFont}" 
-                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                     Padding="12,8"
                                                     Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
                                                     CommandParameter="{Binding}">
                                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                                     <services:MnemoSvg SvgPath="{Binding IconPath, FallbackValue='avares://MnemoApp/UI/Icons/Tabler/outline/circle.svg'}" 
                                                                       Width="20" Height="20" 
-                                                                      Stroke="{DynamicResource IconsSidebarBrush}"
                                                                       StrokeWidth="2"/>
                                                     <TextBlock Text="{Binding Title}" 
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
                                                                VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -97,30 +97,33 @@
                         Spacing="12">
                 
                 <Button Classes="nav-button"
-                        Background="Transparent" 
+                        Background="{DynamicResource CardBackgroundPrimaryBrush}" 
                         BorderThickness="0" 
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         ToolTip.Tip="Keyboard shortcuts"
                         Padding="12,8">
                     <StackPanel Orientation="Horizontal" Spacing="12">
-                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/paper-plane.svg" 
+                        <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="6" CornerRadius="6">
+                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/pointer-x.svg" 
                                           Width="20" Height="20" 
-                                          Stroke="{DynamicResource IconsSidebarBrush}"/>
+                                          Stroke="{DynamicResource CardIconColorBrush}"
+                                          StrokeWidth="2"/>
+                        </Border>
                         <StackPanel Spacing="2">
                             <TextBlock Text="Quick Actions" 
-                                       Foreground="#374151"
+                                       Foreground="{DynamicResource QuickActionsTextPrimaryBrush}"
                                        FontSize="14"/>
                             <TextBlock Text="alt + shift + Q" 
                                        FontSize="11" 
-                                       Foreground="#9ca3af"/>
+                                       Foreground="{DynamicResource QuickActionsTextSecondaryBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </Button>
                 
                 <TextBlock Text="v1.0.0-beta" 
                            FontSize="11" 
-                           Foreground="#9ca3af"
+                           Foreground="{DynamicResource VersionTextBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,8,0,0"/>
             </StackPanel>
@@ -156,7 +159,8 @@
                         ToolTip.Tip="Expand sidebar">
                     <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/chevron-right.svg" 
                                       Width="16" Height="16" 
-                                      Stroke="{DynamicResource ChevronSidebarBrush}"/>
+                                      Stroke="{DynamicResource ChevronSidebarBrush}"
+                                      StrokeWidth="2"/>
                 </Button>
             </StackPanel>
             
@@ -173,7 +177,6 @@
                                         <DataTemplate>
                                             <Button Classes="nav-button-collapsed"
                                                     Classes.selected="{Binding IsSelected}"
-                                                    Background="Transparent" 
                                                     BorderThickness="0" 
                                                     ToolTip.Tip="{Binding Title}"
                                                     Padding="8"
@@ -182,7 +185,7 @@
                                                     CommandParameter="{Binding}">
                                                 <services:MnemoSvg SvgPath="{Binding IconPath, FallbackValue='avares://MnemoApp/UI/Icons/Tabler/outline/circle.svg'}" 
                                                                   Width="20" Height="20" 
-                                                                  Stroke="{DynamicResource IconsSidebarBrush}"/>
+                                                                  StrokeWidth="2"/>
                                             </Button>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -195,47 +198,4 @@
         </Grid>
     </Border>
     </Grid>
-    
-    <UserControl.Styles>
-        <!-- Navigation button styles -->
-        <Style Selector="Button.nav-button:pointerover">
-            <Setter Property="Background" Value="#f3f4f6"/>
-            <Setter Property="CornerRadius" Value="8"/>
-        </Style>
-        
-        <Style Selector="Button.nav-button:pressed">
-            <Setter Property="Background" Value="#e5e7eb"/>
-        </Style>
-        
-        <Style Selector="Button.nav-button.selected">
-            <Setter Property="Background" Value="#dbeafe"/>
-            <Setter Property="CornerRadius" Value="8"/>
-        </Style>
-        
-        <Style Selector="Button.nav-button.selected services|MnemoSvg">
-            <Setter Property="Stroke" Value="{DynamicResource IconsSidebarBrush}"/>
-        </Style>
-
-        <Style Selector="Button.nav-button.selected TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        </Style>
-
-        <Style Selector="Button.nav-button-collapsed:pointerover">
-            <Setter Property="Background" Value="#f3f4f6"/>
-            <Setter Property="CornerRadius" Value="6"/>
-        </Style>
-        
-        <Style Selector="Button.nav-button-collapsed:pressed">
-            <Setter Property="Background" Value="#e5e7eb"/>
-        </Style>
-        
-        <Style Selector="Button.nav-button-collapsed.selected">
-            <Setter Property="Background" Value="#dbeafe"/>
-            <Setter Property="CornerRadius" Value="6"/>
-        </Style>
-
-        <Style Selector="Button.nav-button-collapsed.selected services|MnemoSvg">
-            <Setter Property="Stroke" Value="{DynamicResource IconsSidebarBrush}"/>
-        </Style>
-    </UserControl.Styles>
 </UserControl>

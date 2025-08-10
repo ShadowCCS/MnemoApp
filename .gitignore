@@ -2,6 +2,7 @@
 .vs/
 bin/
 obj/
+.cursor/
 
 # Other common .NET ignored files
 *.suo
@@ -14,3 +15,7 @@ obj/
 # Icon libraries - Ignoring for now
 UI/Icons/Tabler/filled/
 UI/Icons/Tabler/outline/
+
+instructions.md
+
+UI/Themes/theme-implementation-instructions.txt

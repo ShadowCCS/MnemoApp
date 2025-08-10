@@ -21,15 +21,15 @@
   <sys:Double x:Key="ToolTipContentMaxWidth">320</sys:Double>
 
   <ControlTheme x:Key="{x:Type ToolTip}" TargetType="ToolTip">
-    <Setter Property="Foreground" Value="{DynamicResource ToolTipForeground}" />
-    <Setter Property="Background" Value="{DynamicResource ToolTipBackground}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource ToolTipBorderBrush}" />
-    <Setter Property="BorderThickness" Value="{DynamicResource ToolTipBorderThemeThickness}" />
-    <Setter Property="FontSize" Value="{DynamicResource ToolTipContentThemeFontSize}" />
-    <Setter Property="Padding" Value="{DynamicResource ToolTipBorderThemePadding}" />
-    <Setter Property="MaxWidth" Value="{DynamicResource ToolTipContentMaxWidth}" />
-    <Setter Property="CornerRadius" Value="{DynamicResource OverlayCornerRadius}" />
-    <Setter Property="Opacity" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource TooltipForegroundBrush}" />
+    <Setter Property="Background" Value="{DynamicResource TooltipBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource TooltipBorderBrush}" />
+    <Setter Property="BorderThickness" Value="{DynamicResource TooltipBorderThickness}" />
+    <Setter Property="FontSize" Value="{DynamicResource TooltipFontSize}" />
+    <Setter Property="Padding" Value="{DynamicResource TooltipPadding}" />
+    <Setter Property="MaxWidth" Value="{DynamicResource TooltipMaxWidth}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource TooltipCornerRadius}" />
+    <Setter Property="Opacity" Value="{DynamicResource TooltipOpacity}" />
     <Setter Property="Transitions">
       <Transitions>
         <DoubleTransition Property="Opacity" Duration="0:0:0.15" />

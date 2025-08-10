@@ -42,9 +42,9 @@
     <Setter Property="Padding" Value="{DynamicResource ComboBoxPadding}" />
     <Setter Property="FocusAdorner" Value="{x:Null}" />
     <Setter Property="MaxDropDownHeight" Value="504" />
-    <Setter Property="Foreground" Value="{DynamicResource ComboBoxForeground}" />
-    <Setter Property="Background" Value="{DynamicResource ComboBoxBackground}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ComboBoxForegroundBrush}" />
+    <Setter Property="Background" Value="{DynamicResource ComboBoxBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderBrushBrush}" />
     <Setter Property="BorderThickness" Value="{DynamicResource ComboBoxBorderThemeThickness}" />
     <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
     <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />

@@ -42,9 +42,22 @@
                         <RowDefinition Height="1*"/>
                         <RowDefinition Height="17*"/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Row="0" Background="{DynamicResource TopbarBackgroundBrush}" Padding="10" PointerPressed="app_MouseDown"> <!--TOPBAR-->
-                        <TextBlock Text="Topbar" FontSize="18" Foreground="Black"/>
-                    </Border>
+
+                    <Grid Grid.Row="0" Background="{DynamicResource TopbarBackgroundBrush}" PointerPressed="app_MouseDown"> <!--TOPBAR-->
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="Red" Padding="10" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10">
+                            </Border>
+                            <Border Grid.Column="1" Background="Blue" Padding="10" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10">
+                                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <!-- Buttons and custom controls here!-->
+                                </StackPanel>
+                            </Border>
+                    </Grid>
+
+
                     <Border Grid.Row="1" Padding="10"> <!--WORKSPACE-->
                         <Grid Background="{DynamicResource WorkspaceBackgroundBrush}">
                             <ContentControl Content="{Binding CurrentPage}"/>
@@ -77,7 +90,7 @@
                                         <TextBlock Text="Version 1.1 ready to install" FontSize="12" Foreground="White" HorizontalAlignment="Left" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <Button FontSize="10" Foreground="White" HorizontalAlignment="Left" VerticalAlignment="Center" Background="Transparent" BorderThickness="0">
-                                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/square-rounded-x.svg" Width="20" Height="20" StrokeWidth="2.5" Stroke="{DynamicResource IconsSidebar}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/square-rounded-x.svg" Width="20" Height="20" StrokeWidth="2.5" Stroke="{DynamicResource IconsSidebarBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Button>
                                 </StackPanel>
                             </Border>
