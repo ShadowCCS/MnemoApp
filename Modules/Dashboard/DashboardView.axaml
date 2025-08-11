@@ -9,7 +9,7 @@
         x:Class="MnemoApp.Modules.Dashboard.DashboardView">
     <Grid>
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock Text="Dashboard" FontSize="20" Foreground="Black"/>
+            <TextBlock Text="Dashboard" FontSize="20" Foreground="Black" FontFamily="{DynamicResource Font.Bold}"/>
             <Button Content="Test"/>
         </StackPanel>
     </Grid>

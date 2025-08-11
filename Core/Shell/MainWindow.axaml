@@ -6,6 +6,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:sidebar="using:MnemoApp.UI.Components.Sidebar"
+        xmlns:overlays="using:MnemoApp.UI.Components"
+        xmlns:ov="using:MnemoApp.Core.Overlays"
         mc:Ignorable="d" d:DesignWidth="1150" d:DesignHeight="720"
         x:Class="MnemoApp.Core.Shell.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -85,38 +87,8 @@
                 </Grid>
             </Border>
             
-            <!-- Overlay notification panel - positioned on top -->
-            <Canvas Grid.ColumnSpan="2" IsHitTestVisible="False">
-                <Border Canvas.Right="15" Canvas.Bottom="15" 
-                        Background="Blue" 
-                        Width="350" 
-                        Height="600" 
-                        Opacity="0"
-                        IsHitTestVisible="False"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Bottom">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,15,15">
-                            <Border Background="Red" CornerRadius="10" Padding="10"> <!--Demo Notification-->
-                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                    <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_icon.svg" Width="20" Height="20" Fill="{DynamicResource SidebarLogoBrush}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                                    <StackPanel Spacing="0">
-                                        <TextBlock Text="Update available" FontSize="16" Foreground="White" HorizontalAlignment="Left" FontWeight="Bold"/>
-                                        <TextBlock Text="Version 1.1 ready to install" FontSize="12" Foreground="White" HorizontalAlignment="Left" TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                    <Button FontSize="10" Foreground="White" HorizontalAlignment="Left" VerticalAlignment="Center" Background="Transparent" BorderThickness="0">
-                                        <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/square-rounded-x.svg" Width="20" Height="20" StrokeWidth="2.5" Stroke="{DynamicResource IconsSidebarBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Button>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </Canvas>
+            <!-- Global overlays host -->
+            <Grid Grid.ColumnSpan="2" ov:OverlayHostBehavior.IsOverlayHost="True" />
         </Grid>
     </Border>
 </Window>

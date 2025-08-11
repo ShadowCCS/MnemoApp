@@ -35,7 +35,7 @@
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/MenuFlyoutPresenter.axaml" />
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/NotificationCard.axaml" />
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/NumericUpDown.axaml" />
-                <ResourceInclude Source="avares://MnemoApp/UI/Components/OverlayPopupHost.axaml" />
+                <!-- OverlayPopupHost is a UserControl and must not be merged as a resource dictionary -->
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/PopupRoot.axaml" />
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/PathIcon.axaml" />
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/RepeatButton.axaml" />

@@ -55,7 +55,7 @@
                                 <!-- Category Header -->
                                 <TextBlock Text="{Binding Name}" 
                                            FontSize="{DynamicResource NavbarFontSize}" 
-                                           FontFamily="{DynamicResource BoldFont}" 
+                                           FontFamily="{DynamicResource Font.Medium}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8"/>
 

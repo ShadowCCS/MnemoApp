@@ -12,6 +12,8 @@ using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 using MnemoApp.Modules.Learning;
 using MnemoApp.Modules.Settings;
+using MnemoApp.Core.Overlays;
+using MnemoApp.Modules.UITesting;
 
 namespace MnemoApp.Core
 {
@@ -33,6 +35,7 @@ namespace MnemoApp.Core
             services.AddSingleton<ISidebarService, SidebarService>();
             services.AddSingleton<IThemeService, ThemeService>();
             services.AddSingleton<ITopbarService, TopbarService>();
+            services.AddSingleton<IOverlayService, OverlayManager>();
             
             // Register MnemoAPI
             services.AddSingleton<IMnemoAPI, MnemoApp.Core.MnemoAPI.MnemoAPI>();
@@ -46,6 +49,7 @@ namespace MnemoApp.Core
             services.AddTransient<DashboardViewModel>();
             services.AddTransient<FlashcardsViewModel>();
             services.AddTransient<SettingsViewModel>();
+            services.AddTransient<UITestingViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
 

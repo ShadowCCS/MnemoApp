@@ -1,25 +1,54 @@
-<ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    x:ClassModifier="internal"
-                    x:CompileBindings="True">
-  <ControlTheme x:Key="{x:Type OverlayPopupHost}" TargetType="OverlayPopupHost">
-    <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
-    <Setter Property="FontSize" Value="{DynamicResource ControlContentThemeFontSize}"/>
-    <Setter Property="FontFamily" Value="{DynamicResource ContentControlThemeFontFamily}" />
-    <Setter Property="FontWeight" Value="Normal" />
-    <Setter Property="FontStyle" Value="Normal" />
-    <Setter Property="Template">
-      <ControlTemplate>
-        <LayoutTransformControl LayoutTransform="{TemplateBinding Transform}">
-          <VisualLayerManager IsPopup="True">
-            <ContentPresenter Name="PART_ContentPresenter"
-                              Background="{TemplateBinding Background}"
-                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                              Content="{TemplateBinding Content}"
-                              Padding="{TemplateBinding Padding}"/>
-          </VisualLayerManager>
-        </LayoutTransformControl>
-      </ControlTemplate>
-    </Setter>
-  </ControlTheme>
-</ResourceDictionary>
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MnemoApp.Core.Overlays"
+             xmlns:conv="using:MnemoApp.UI.Converters"
+             x:Class="MnemoApp.UI.Components.OverlayPopupHost"
+             x:DataType="vm:IOverlayService"
+             KeyDown="OnKeyDown">
+  <UserControl.Styles>
+    <Style Selector="UserControl#OverlayPopupHostRoot">
+      <Setter Property="ZIndex" Value="9999"/>
+    </Style>
+  </UserControl.Styles>
+  <UserControl.Resources>
+    <conv:OverlayBackdropConverter x:Key="OverlayBackdropConverter" />
+  </UserControl.Resources>
+
+  <!-- Host overlays on top of the window content -->
+  <Grid Name="OverlayPopupHostRoot" IsHitTestVisible="True" Focusable="True">
+    <ItemsControl ItemsSource="{Binding Overlays}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <Grid />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:OverlayInstance">
+          <Grid IsHitTestVisible="True"
+                ZIndex="{Binding ZIndex}">
+            <!-- Backdrop -->
+            <Border IsVisible="{Binding Options.ShowBackdrop}"
+                    IsHitTestVisible="{Binding Options.CloseOnOutsideClick}"
+                    PointerPressed="BackdropPressed">
+              <Border.Background>
+                <MultiBinding Converter="{StaticResource OverlayBackdropConverter}">
+                  <Binding Path="Options.BackdropBrush"/>
+                  <Binding Path="Options.BackdropColor"/>
+                  <Binding Path="Options.BackdropOpacity"/>
+                </MultiBinding>
+              </Border.Background>
+            </Border>
+
+            <!-- Content container with alignment options -->
+            <Border HorizontalAlignment="{Binding Options.HorizontalAlignment}"
+                    VerticalAlignment="{Binding Options.VerticalAlignment}"
+                    Margin="{Binding Options.Margin}"
+                    Background="Transparent">
+              <ContentPresenter Content="{Binding Content}"/>
+            </Border>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </Grid>
+</UserControl>

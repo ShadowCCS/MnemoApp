@@ -7,6 +7,8 @@ using Avalonia;
 using Avalonia.Media;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
+using Tmds.DBus.Protocol;
+using MnemoApp.Core.Overlays;
 
 namespace MnemoApp.Core.Shell
 {
@@ -143,7 +145,23 @@ namespace MnemoApp.Core.Shell
         
         private void Minimize() { _mnemoAPI?.system.minimize(); }
         private void Maximize() { _mnemoAPI?.system.maximize(); }
-        private void Close() { _mnemoAPI?.system.exit(); }
+        private async void Close() {  
+            var choice = await _mnemoAPI!.ui.overlay.CreateDialog(
+            "Close Application",
+            "Are you sure you want to close the application?",
+            "Close",
+            "Cancel",
+            new OverlayOptions { ShowBackdrop = true });
+
+            if (choice == "Close") {
+                _mnemoAPI!.system.exit();
+            }
+            else if (choice == "Cancel") {
+                return;
+            }
+        }
         private void Options() { /* TODO: open options */ }
+
+        
     }
 }
