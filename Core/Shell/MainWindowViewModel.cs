@@ -149,8 +149,8 @@ namespace MnemoApp.Core.Shell
             var choice = await _mnemoAPI!.ui.overlay.CreateDialog(
             "Close Application",
             "Are you sure you want to close the application?",
-            "Close",
             "Cancel",
+            "Close",
             new OverlayOptions { ShowBackdrop = true });
 
             if (choice == "Close") {

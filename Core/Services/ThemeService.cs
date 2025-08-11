@@ -149,8 +149,8 @@ namespace MnemoApp.Core.Services
         {
             try
             {
-                // Known core themes (we could make this dynamic if needed)
-                var coreThemeNames = new[] { "Dawn", "Dusk" };
+                // Known core themes (add any new embedded core themes here)
+                var coreThemeNames = new[] { "Dawn", "Dusk"};
                 
                 foreach (var themeName in coreThemeNames)
                 {

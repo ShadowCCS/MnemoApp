@@ -13,7 +13,6 @@ using MnemoApp.Modules.Dashboard;
 using MnemoApp.Modules.Learning;
 using MnemoApp.Modules.Settings;
 using MnemoApp.Core.Overlays;
-using MnemoApp.Modules.UITesting;
 
 namespace MnemoApp.Core
 {
@@ -49,7 +48,6 @@ namespace MnemoApp.Core
             services.AddTransient<DashboardViewModel>();
             services.AddTransient<FlashcardsViewModel>();
             services.AddTransient<SettingsViewModel>();
-            services.AddTransient<UITestingViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
 
@@ -85,7 +83,6 @@ namespace MnemoApp.Core
                 "Utility & Personalization", 
                 "avares://MnemoApp/UI/Icons/Tabler/outline/adjustments-alt.svg"
             );
-            
         }
         
     }

@@ -11,9 +11,11 @@
           MinWidth="360">
     <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
       <TextBlock Text="{Binding Title}"
-                 FontSize="18" FontWeight="Bold"/>
+                 FontSize="{DynamicResource FontSize.Medium}" FontFamily="{DynamicResource Font.Bold}"/>
       <TextBlock Grid.Row="1"
                   Text="{Binding Description}"
+                  FontFamily="{DynamicResource Font.Medium}"
+                  FontSize="{DynamicResource FontSize.ExtraSmall}"
                  TextWrapping="Wrap"
                  Opacity="0.85"/>
       <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">

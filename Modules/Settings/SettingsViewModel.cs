@@ -21,31 +21,10 @@ public class SettingsViewModel : ViewModelBase
 
     private async Task ToggleTheme()
     {
-        try
+        var result = await _mnemoAPI.ui.overlay.Show<string?>("UI/Components/Overlays/ThemeSelectOverlay.axaml", name: "ThemeSelectOverlay");
+        if (result != null)
         {
-            var theme = _mnemoAPI.ui.themes.getCurrentTheme();
-            System.Diagnostics.Debug.WriteLine($"Current theme: {theme?.Name ?? "null"}");
-            
-            bool success;
-            if (theme?.Name == "Dawn")
-            {
-                System.Diagnostics.Debug.WriteLine("Switching to Dusk...");
-                success = await _mnemoAPI.ui.themes.setTheme("Dusk");
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("Switching to Dawn...");
-                success = await _mnemoAPI.ui.themes.setTheme("Dawn");
-            }
-            
-            System.Diagnostics.Debug.WriteLine($"Theme switch success: {success}");
-            
-            var newTheme = _mnemoAPI.ui.themes.getCurrentTheme();
-            System.Diagnostics.Debug.WriteLine($"New theme: {newTheme?.Name ?? "null"}");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error toggling theme: {ex.Message}");
+            await _mnemoAPI.ui.themes.setTheme(result);
         }
     }
 }
