@@ -141,9 +141,9 @@ namespace MnemoApp.Core.Shell
             //TODO: Implement
         }
         
-        private void Minimize() { /* TODO: window minimize */ }
-        private void Maximize() { /* TODO: toggle maximize */ }
-        private void Close() { /* TODO: close app */ }
+        private void Minimize() { _mnemoAPI?.system.minimize(); }
+        private void Maximize() { _mnemoAPI?.system.maximize(); }
+        private void Close() { _mnemoAPI?.system.exit(); }
         private void Options() { /* TODO: open options */ }
     }
 }

@@ -9,5 +9,6 @@ namespace MnemoApp.Core.MnemoAPI
         INavigationService navigate { get; set; }
         ISidebarService sidebar { get; set; }
         UIApi ui { get; set; }
+        SystemApi system { get; set; }
     }
 }
