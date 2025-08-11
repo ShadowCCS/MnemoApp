@@ -31,6 +31,13 @@ namespace MnemoApp.Core.Services
             return model.Id;
         }
 
+        public Guid AddSeparator(int order = 0, double height = 24, double thickness = 1)
+        {
+            var sep = new TopbarSeparatorModel { Order = order, Height = height, Thickness = thickness };
+            InsertSorted(sep);
+            return sep.Id;
+        }
+
         public bool Remove(Guid id)
         {
             var existing = _items.FirstOrDefault(i => i.Id == id);

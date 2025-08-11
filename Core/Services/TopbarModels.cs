@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using Avalonia;
 using Avalonia.Controls;
 
 namespace MnemoApp.Core.Services
@@ -8,7 +9,8 @@ namespace MnemoApp.Core.Services
     public enum TopbarItemType
     {
         Button,
-        Custom
+        Custom,
+        Separator
     }
 
     public interface ITopbarItem
@@ -24,8 +26,7 @@ namespace MnemoApp.Core.Services
         public TopbarItemType Type => TopbarItemType.Button;
         public int Order { get; init; }
 
-        public string IconPath { get; init; } = string.Empty; // avares:// path
-        public object? Stroke { get; init; } // Brush or Binding-friendly object
+        public string IconPath { get; init; } = string.Empty;
         public bool Notification { get; set; }
         public string? ToolTip { get; init; }
         public ICommand? Command { get; init; }
@@ -46,11 +47,22 @@ namespace MnemoApp.Core.Services
         }
     }
 
+    public sealed class TopbarSeparatorModel : ITopbarItem
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+        public TopbarItemType Type => TopbarItemType.Separator;
+        public int Order { get; init; }
+        public double Height { get; init; } = 24;
+        public double Thickness { get; init; } = 1;
+        public Thickness Margin { get; init; } = new Thickness(6, 0);
+    }
+
     public interface ITopbarService
     {
         ReadOnlyObservableCollection<ITopbarItem> Items { get; }
         Guid AddButton(TopbarButtonModel model);
         Guid AddCustom(Control control, int order = 0);
+        Guid AddSeparator(int order = 0, double height = 24, double thickness = 1);
         bool Remove(Guid id);
         bool SetNotification(Guid id, bool notification);
         void Clear();

@@ -29,33 +29,22 @@ namespace MnemoApp.Core.MnemoAPI
             _themeService = themeService;
         }
 
-        /// <summary>
-        /// Gets all available themes (core + custom)
-        /// </summary>
+
         public async System.Threading.Tasks.Task<System.Collections.Generic.List<ThemeManifest>> getAllThemes()
         {
             return await _themeService.GetAllThemesAsync();
         }
 
-        /// <summary>
-        /// Gets a specific theme by name
-        /// </summary>
         public async System.Threading.Tasks.Task<ThemeManifest?> getTheme(string name)
         {
             return await _themeService.GetThemeAsync(name);
         }
 
-        /// <summary>
-        /// Sets the current theme
-        /// </summary>
         public async System.Threading.Tasks.Task<bool> setTheme(string name)
         {
             return await _themeService.SetThemeAsync(name);
         }
 
-        /// <summary>
-        /// Gets the currently active theme
-        /// </summary>
         public ThemeManifest? getCurrentTheme()
         {
             return _themeService.GetCurrentTheme();
@@ -71,12 +60,13 @@ namespace MnemoApp.Core.MnemoAPI
             _topbarService = topbarService;
         }
 
+        public System.Collections.ObjectModel.ReadOnlyObservableCollection<ITopbarItem> items => _topbarService.Items;
+
         public System.Guid addButton(string iconPath, object? stroke = null, bool notification = false, int order = 0, System.Windows.Input.ICommand? command = null, string? toolTip = null)
         {
             var model = new TopbarButtonModel
             {
                 IconPath = iconPath,
-                Stroke = stroke,
                 Notification = notification,
                 Order = order,
                 Command = command,
@@ -93,5 +83,8 @@ namespace MnemoApp.Core.MnemoAPI
         public bool remove(System.Guid id) => _topbarService.Remove(id);
 
         public bool setNotification(System.Guid id, bool notification) => _topbarService.SetNotification(id, notification);
+
+        public System.Guid addSeparator(int order = 0, double height = 24, double thickness = 1)
+            => _topbarService.AddSeparator(order, height, thickness);
     }
 }

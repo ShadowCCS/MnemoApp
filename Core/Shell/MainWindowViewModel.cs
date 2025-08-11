@@ -3,19 +3,30 @@ using CommunityToolkit.Mvvm.Input;
 using MnemoApp.Core.Common;
 using MnemoApp.Core.Navigation;
 using MnemoApp.Core.MnemoAPI;
+using Avalonia;
+using Avalonia.Media;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 
 namespace MnemoApp.Core.Shell
 {
+    
     public partial class MainWindowViewModel : ViewModelBase
     {
         public ViewModelBase? CurrentPage => _mnemoAPI?.navigate?.CurrentViewModel;
         public SidebarViewModel? SidebarViewModel { get; }
+        public UIApi? ui => _mnemoAPI?.ui;
 
         private readonly IMnemoAPI? _mnemoAPI;
 
         public ICommand ToggleSidebarCommand { get; }
+
+        //Topbar Commands
+        public ICommand ShowNotificationsCommand { get; }
+        public ICommand MinimizeCommand { get; }
+        public ICommand MaximizeCommand { get; }
+        public ICommand CloseCommand { get; }
+        public ICommand OptionsCommand { get; }
 
         // Parameterless constructor for design-time
         public MainWindowViewModel()
@@ -23,6 +34,12 @@ namespace MnemoApp.Core.Shell
             _mnemoAPI = null;
             SidebarViewModel = null;
             ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
+            // Initialize topbar commands with no-op actions for design-time to satisfy non-nullability
+            ShowNotificationsCommand = new RelayCommand(() => { });
+            MinimizeCommand = new RelayCommand(() => { });
+            MaximizeCommand = new RelayCommand(() => { });
+            CloseCommand = new RelayCommand(() => { });
+            OptionsCommand = new RelayCommand(() => { });
         }
         
         public MainWindowViewModel(IMnemoAPI mnemoAPI, SidebarViewModel sidebarViewModel)
@@ -31,9 +48,19 @@ namespace MnemoApp.Core.Shell
             SidebarViewModel = sidebarViewModel;
             _mnemoAPI.navigate.ViewModelChanged += OnViewModelChanged;
             ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
+
+            // Initialize Topbar Commands for runtime
+            ShowNotificationsCommand = new RelayCommand(ShowNotifications);
+            MinimizeCommand = new RelayCommand(Minimize);
+            MaximizeCommand = new RelayCommand(Maximize);
+            CloseCommand = new RelayCommand(Close);
+            OptionsCommand = new RelayCommand(Options);
             
             // Navigate to default page (Dashboard)
             NavigateToDefaultPage();
+
+            // Populate topbar
+            SetupTopbar();
         }
 
         private void NavigateToDefaultPage()
@@ -54,5 +81,69 @@ namespace MnemoApp.Core.Shell
             if (SidebarViewModel != null)
                 SidebarViewModel.IsSidebarCollapsed = !SidebarViewModel.IsSidebarCollapsed;
         }
+
+        private void SetupTopbar()
+        {
+            if (_mnemoAPI?.ui == null)
+                return;
+
+            IBrush? iconsBrush = null;
+            if (Application.Current?.Resources.TryGetResource("IconsTopbarBrush", null, out var brushObj) == true)
+            {
+                iconsBrush = brushObj as IBrush;
+            }
+
+            _mnemoAPI.ui.topbar.addButton(
+                iconPath: "avares://MnemoApp/UI/Icons/Tabler/outline/bell.svg",
+                notification: true,
+                order: 20,
+                command: ShowNotificationsCommand,
+                toolTip: "Notifications"
+            );
+            
+            _mnemoAPI.ui.topbar.addSeparator(order: 30, height: 16, thickness: 2);
+
+            _mnemoAPI.ui.topbar.addButton(
+                iconPath: "avares://MnemoApp/UI/Icons/Tabler/outline/square-rounded-minus.svg",
+                notification: false,
+                order: 30,
+                command: MinimizeCommand,
+                toolTip: "Minimize Application"
+            );
+
+            _mnemoAPI.ui.topbar.addButton(
+                iconPath: "avares://MnemoApp/UI/Icons/Tabler/outline/maximize.svg",
+                notification: false,
+                order: 50,
+                command: MaximizeCommand,
+                toolTip: "Maximize Application"
+            );
+
+            _mnemoAPI.ui.topbar.addButton(
+                iconPath: "avares://MnemoApp/UI/Icons/Tabler/outline/square-rounded-x.svg",
+                notification: false,
+                order: 60,
+                command: CloseCommand,
+                toolTip: "Close Application"
+            );
+
+            _mnemoAPI.ui.topbar.addButton(
+                iconPath: "avares://MnemoApp/UI/Icons/Tabler/outline/dots-circle-horizontal.svg",
+                notification: false,
+                order: 60,
+                command: OptionsCommand,
+                toolTip: "Options"
+            );
+        }
+
+        private void ShowNotifications()
+        {
+            //TODO: Implement
+        }
+        
+        private void Minimize() { /* TODO: window minimize */ }
+        private void Maximize() { /* TODO: toggle maximize */ }
+        private void Close() { /* TODO: close app */ }
+        private void Options() { /* TODO: open options */ }
     }
 }

@@ -10,11 +10,11 @@ namespace MnemoApp.Core.MnemoAPI
         public required ISidebarService sidebar { get; set; }
         public required UIApi ui { get; set; }
 
-        public MnemoAPI(INavigationService navigationService, ISidebarService sidebarService, IThemeService themeService)
+        public MnemoAPI(INavigationService navigationService, ISidebarService sidebarService, IThemeService themeService, ITopbarService topbarService)
         {
             navigate = navigationService;
             sidebar = sidebarService;
-            ui = new UIApi(themeService);
+            ui = new UIApi(themeService, topbarService);
         }
 
         //TODO: Add other services here

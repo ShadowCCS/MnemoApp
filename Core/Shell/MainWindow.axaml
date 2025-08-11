@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:MnemoApp.Core.Shell"
         xmlns:services="using:MnemoApp.Core.Services"
+        xmlns:ui="using:MnemoApp.UI.Components"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:sidebar="using:MnemoApp.UI.Components.Sidebar"
@@ -48,12 +49,30 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="Red" Padding="10" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10">
+                            <Border Grid.Column="0" Background="Red" Padding="5" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2">
                             </Border>
-                            <Border Grid.Column="1" Background="Blue" Padding="10" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10">
-                                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                    <!-- Buttons and custom controls here!-->
-                                </StackPanel>
+                            <Border Grid.Column="1" Padding="5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="2">
+                                <ItemsControl ItemsSource="{Binding ui.topbar.items}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="4"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.DataTemplates>
+                                        <DataTemplate DataType="services:TopbarButtonModel">
+                                            <ui:TopbarButton/>
+                                        </DataTemplate>
+                                        <DataTemplate DataType="services:TopbarSeparatorModel">
+                                            <Border Width="{Binding Thickness}"
+                                                    Height="{Binding Height}"
+                                                    Margin="{Binding Margin}"
+                                                    Background="{DynamicResource IconsSeparationBarBrush}"/>
+                                        </DataTemplate>
+                                        <DataTemplate DataType="services:TopbarCustomModel">
+                                            <ContentPresenter Content="{Binding Content}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.DataTemplates>
+                                </ItemsControl>
                             </Border>
                     </Grid>
 
@@ -73,7 +92,7 @@
                         Width="350" 
                         Height="600" 
                         Opacity="0"
-                        IsHitTestVisible="True"
+                        IsHitTestVisible="False"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom">
                     <Grid>

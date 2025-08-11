@@ -90,5 +90,31 @@
         <Setter Property="Foreground" Value="{DynamicResource AccentButtonForegroundDisabledBrush}" />
       </Style>
     </Style>
+
+    <Style Selector="^.topbar">
+      <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TopbarButtonBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TopbarButtonForegroundBrush}" />
+      </Style>
+
+      <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TopbarButtonBackgroundHoverBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TopbarButtonForegroundBrush}" />
+      </Style>
+
+      <Style Selector="^:pressed  /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TopbarButtonBackgroundPressedBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TopbarButtonForegroundBrush}" />
+      </Style>
+
+      <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TopbarButtonBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TopbarButtonForegroundBrush}" />
+      </Style>
+    </Style>
   </ControlTheme>
 </ResourceDictionary>

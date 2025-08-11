@@ -245,6 +245,13 @@
     <SolidColorBrush x:Key="NavigationButtonForegroundSelectedBrush" Color="{DynamicResource NavigationButtonForegroundSelected}"/>
     <CornerRadius x:Key="SidebarButtonCornerRadius">8</CornerRadius>
 
+    <!-- Topbar Button -->
+    <SolidColorBrush x:Key="TopbarButtonBackgroundBrush" Color="{DynamicResource TopbarButtonBackground}"/>
+    <SolidColorBrush x:Key="TopbarButtonBackgroundHoverBrush" Color="{DynamicResource TopbarButtonBackgroundHover}"/>
+    <SolidColorBrush x:Key="TopbarButtonBackgroundSelectedBrush" Color="{DynamicResource TopbarButtonBackgroundSelected}"/>
+    <SolidColorBrush x:Key="TopbarButtonBackgroundPressedBrush" Color="{DynamicResource TopbarButtonBackgroundPressed}"/>
+    <SolidColorBrush x:Key="TopbarButtonForegroundBrush" Color="{DynamicResource TopbarButtonForeground}"/>
+
     <!-- Provide missing border brushes for scroll bar buttons -->
     <SolidColorBrush x:Key="ScrollBarButtonBorderBrush" Color="{DynamicResource ScrollBarButtonBackground}"/>
     <SolidColorBrush x:Key="ScrollBarButtonBorderBrushPointerOver" Color="{DynamicResource ScrollBarButtonBackgroundPointerOver}"/>

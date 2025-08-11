@@ -32,6 +32,7 @@ namespace MnemoApp.Core
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<ISidebarService, SidebarService>();
             services.AddSingleton<IThemeService, ThemeService>();
+            services.AddSingleton<ITopbarService, TopbarService>();
             
             // Register MnemoAPI
             services.AddSingleton<IMnemoAPI, MnemoApp.Core.MnemoAPI.MnemoAPI>();
@@ -50,8 +51,7 @@ namespace MnemoApp.Core
 
             // Initialize MnemoAPI if needed
             var api = _serviceProvider.GetRequiredService<IMnemoAPI>();
-            
-            
+
             // Register modules with sidebar
             RegisterModulesWithSidebar(api);
         }

@@ -15,7 +15,7 @@ obj/
 # Icon libraries - Ignoring for now
 UI/Icons/Tabler/filled/
 UI/Icons/Tabler/outline/
+GithubAssets/
 
 instructions.md
 
-UI/Themes/theme-implementation-instructions.txt

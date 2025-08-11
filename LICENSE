@@ -1,0 +1,45 @@
+GNU AFFERO GENERAL PUBLIC LICENSE
+Version 3, 19 November 2007
+
+Copyright (C) 2025 Mnemo
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.
+
+---
+
+MONETIZATION AND OPTIONAL MANAGED SERVICES
+
+1. Core Features.
+1.1 Mnemo’s core functionality (“Core Features”) is licensed under the GNU Affero General Public License Version 3 (“AGPL-3.0”) and shall be made available free of charge.
+1.2 Access to the Core Features is not conditioned on the purchase or use of any paid service or subscription.
+
+2. Optional Managed Services.
+2.1 Mnemo may provide optional hosted or managed services (“Managed Services”) to assist users with setup, configuration, synchronization, maintenance, and other operational tasks.
+2.2 Use of Managed Services is entirely optional and not required to use the Core Features.
+
+3. Fees and Payment.
+3.1 Managed Services are offered on a subscription basis at rates published by Mnemo.
+3.2 Fees are non-refundable except as required by applicable law.
+
+4. Service Availability and Limitations.
+4.1 Mnemo will use commercially reasonable efforts to provide Managed Services but does not guarantee uninterrupted or error-free operation.
+4.2 Managed Services may have usage limits or quotas as described in applicable documentation.
+
+5. Disclaimers and Liability.
+5.1 Managed Services are provided “as is” without warranties of any kind.
+5.2 Mnemo’s liability for Managed Services is limited to fees paid in the twelve (12) months preceding any claim.
+
+6. Reservation of Rights.
+6.1 All rights, title, and interest in the Managed Services, including intellectual property rights, remain with Mnemo.
+
+---
+
+For full details of the AGPL-3.0 license, see: https://www.gnu.org/licenses/agpl-3.0.html
+
+---
+
+CONTENT LICENSING
+
+All non-code content in this repository (documentation, icons, UI assets created by Mnemo) is licensed under Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). User-created content is not covered by this license.
+
+See https://creativecommons.org/licenses/by-nc/4.0/ for details.
