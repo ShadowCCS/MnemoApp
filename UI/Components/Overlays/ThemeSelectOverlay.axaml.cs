@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using Avalonia.Markup.Xaml;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -152,8 +153,14 @@ namespace MnemoApp.UI.Components.Overlays
         private async Task ImportAsync()
         {
             var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
-            var dlg = new OpenFolderDialog { Title = "Import Theme Folder" };
-            var path = await dlg.ShowAsync(GetWindow());
+            var topLevel = TopLevel.GetTopLevel(this);
+            var folders = await topLevel!.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Import Theme Folder",
+                AllowMultiple = false
+            });
+            var folder = folders?.FirstOrDefault();
+            var path = folder?.TryGetLocalPath();
             if (string.IsNullOrWhiteSpace(path)) return;
             try
             {
@@ -170,8 +177,14 @@ namespace MnemoApp.UI.Components.Overlays
         {
             if (string.IsNullOrWhiteSpace(SelectedTheme)) return;
             var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
-            var dlg = new OpenFolderDialog { Title = "Export Theme To" };
-            var path = await dlg.ShowAsync(GetWindow());
+            var topLevel = TopLevel.GetTopLevel(this);
+            var folders = await topLevel!.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Export Theme To",
+                AllowMultiple = false
+            });
+            var folder = folders?.FirstOrDefault();
+            var path = folder?.TryGetLocalPath();
             if (string.IsNullOrWhiteSpace(path)) return;
             try
             {
@@ -192,12 +205,7 @@ namespace MnemoApp.UI.Components.Overlays
             UpdateFiltered();
         }
 
-        private Window GetWindow()
-        {
-            return (Window)TopLevel.GetTopLevel(this)!;
-        }
-
-        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        public new event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged(string name)
             => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
     }
