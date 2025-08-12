@@ -1,8 +1,22 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:MnemoApp.UI.Components.Overlays"
+              xmlns:cmp="using:MnemoApp.UI.Components"
+              xmlns:core="using:MnemoApp.Core.Services"
+              xmlns:conv="using:MnemoApp.UI.Converters"
              x:Class="MnemoApp.UI.Components.Overlays.ThemeSelectOverlay"
              x:DataType="local:ThemeSelectOverlay">
+  <UserControl.Resources>
+    <conv:BoolToBrushConverter x:Key="BooleanToBrushConverter"/>
+    <conv:SelectedBrushConverter x:Key="SelectedBrushConverter"/>
+  </UserControl.Resources>
+  <UserControl.Styles>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="#11000000"/>
+      <Setter Property="BorderBrush" Value="#22FFFFFF"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+  </UserControl.Styles>
   <Border Background="{DynamicResource WorkspaceBackgroundBrush}"
           BorderBrush="{DynamicResource IconsSeparationBarBrush}"
           BorderThickness="1"
@@ -18,32 +32,60 @@
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         
-        <!-- Top section - Header -->
-        <StackPanel Grid.Row="0" Background="Blue" Margin="0,0,0,12" Spacing="12" Orientation="Horizontal">
-          <ComboBox MinWidth="130">
-            <ComboBoxItem Content="All Categories"/>
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12" Spacing="12" Orientation="Horizontal" VerticalAlignment="Center">
+          <ComboBox MinWidth="130" SelectedIndex="0">
+            <ComboBoxItem Content="All"/>
             <ComboBoxItem Content="Last Used"/>
           </ComboBox>
-          
-          <TextBox Text="Search" MinWidth="360"/>
 
-          <Button Content="Import"/>
-          <Button Content="Export"/>
+          <TextBox Watermark="Search" Text="{Binding SearchQuery, Mode=TwoWay}" MinWidth="360"/>
+
+          <Button Content="Import" Command="{Binding ImportCommand}"/>
+          <Button Content="Export" Command="{Binding ExportCommand}"/>
         </StackPanel>
         
-        <!-- Middle section - Main content area -->
-        <WrapPanel Grid.Row="1" Background="Green" Margin="20" MaxWidth="550">
-          <Button Content="ThemeName" Width="120" Height="100" Background="Red" Margin="6"/>
-          <Button Content="ThemeName" Width="120" Height="100" Background="Red" Margin="6"/>
-          <Button Content="ThemeName" Width="120" Height="100" Background="Red" Margin="6"/>
-          <Button Content="ThemeName" Width="120" Height="100" Background="Red" Margin="6"/>
-          <Button Content="ThemeName" Width="120" Height="100" Background="Red" Margin="6"/>
-          <Button Content="ThemeName" Width="120" Height="100" Background="Red" Margin="6"/>
-          <Button Content="ThemeName" Width="120" Height="100" Background="Red" Margin="6"/>
-        </WrapPanel>
-        
-        <!-- Bottom section - Actions -->
-        <StackPanel Grid.Row="2" Background="Red" Orientation="Horizontal" Spacing="12">
+        <!-- Main Area -->
+        <ScrollViewer Grid.Row="1">
+          <ItemsControl ItemsSource="{Binding PagedThemes}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Margin="4" ItemWidth="140" ItemHeight="120"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="core:ThemeManifest">
+                <Border CornerRadius="10" Padding="6" Margin="6">
+                  <Border.Background>
+                    <MultiBinding Converter="{StaticResource SelectedBrushConverter}">
+                      <Binding RelativeSource="{RelativeSource AncestorType=local:ThemeSelectOverlay}" Path="SelectedTheme"/>
+                      <Binding Path="Name"/>
+                      <Binding Source="#22888888"/>
+                    </MultiBinding>
+                  </Border.Background>
+                  <Button Width="120" Height="100" Background="Transparent" BorderBrush="Transparent" Command="{Binding $parent[local:ThemeSelectOverlay].SelectThemeCommand}" CommandParameter="{Binding}">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <Border CornerRadius="8" Height="57" Width="95" Background="#282828" ClipToBounds="True">
+                        <core:ThemePreviewSvg SvgPath="avares://MnemoApp/UI/Assets/theme_preview.svg"
+                                              Color1="{Binding PreviewColors[0]}"
+                                              Color2="{Binding PreviewColors[1]}"
+                                              Color3="{Binding PreviewColors[2]}"/>
+                      </Border>
+                      <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Margin="8,6,8,0" HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="11" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Bottom -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+          <TextBlock Text="{Binding PageInfo}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+          <Button Content="Prev" Command="{Binding PrevPageCommand}"/>
+          <Button Content="Next" Command="{Binding NextPageCommand}"/>
           <Button Content="Apply" Command="{Binding ConfirmCommand}"/>
         </StackPanel>
       </Grid>

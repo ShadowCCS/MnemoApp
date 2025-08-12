@@ -34,6 +34,7 @@ namespace MnemoApp.Core.MnemoAPI
         public ThemeApi(IThemeService themeService)
         {
             _themeService = themeService;
+            _themeService.StartWatching();
         }
 
 
@@ -56,6 +57,21 @@ namespace MnemoApp.Core.MnemoAPI
         {
             return _themeService.GetCurrentTheme();
         }
+
+        public async System.Threading.Tasks.Task<bool> applyTheme(string name)
+        {
+            return await _themeService.ApplyThemeAsync(name);
+        }
+
+        // New endpoints
+        public async System.Threading.Tasks.Task<MnemoApp.Core.Services.ThemeManifest> import(string sourceDirectory)
+            => await _themeService.ImportThemeAsync(sourceDirectory);
+
+        public async System.Threading.Tasks.Task export(string themeName, string destinationDirectory)
+            => await _themeService.ExportThemeAsync(themeName, destinationDirectory);
+
+        public void startWatching() => _themeService.StartWatching();
+        public void stopWatching() => _themeService.StopWatching();
     }
 
     public class TopbarApi

@@ -37,5 +37,18 @@ namespace MnemoApp.Core.Services
         /// Loads the theme from settings on app startup
         /// </summary>
         Task LoadThemeFromSettingsAsync();
+
+        // Import a theme directory (validates and writes to appdata Themes/Name)
+        Task<ThemeManifest> ImportThemeAsync(string sourceDirectoryPath, System.Threading.CancellationToken cancellationToken = default);
+
+        // Export a theme directory to a destination folder (manifest.json + content.zip)
+        Task ExportThemeAsync(string themeName, string destinationDirectoryPath, System.Threading.CancellationToken cancellationToken = default);
+
+        // Apply a theme and update last used timestamp + manage extracted cache
+        Task<bool> ApplyThemeAsync(string name, System.Threading.CancellationToken cancellationToken = default);
+
+        // File watching for custom theme folder changes
+        void StartWatching();
+        void StopWatching();
     }
 }
