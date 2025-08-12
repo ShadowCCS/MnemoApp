@@ -28,5 +28,6 @@
     <PackageReference Include="Svg.Controls.Skia.Avalonia" Version="11.3.0.2" />
     <PackageReference Include="Svg.Skia" Version="3.0.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.6" />
   </ItemGroup>
 </Project>

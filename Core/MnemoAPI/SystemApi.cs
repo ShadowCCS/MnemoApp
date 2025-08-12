@@ -6,6 +6,8 @@ namespace MnemoApp.Core.MnemoAPI
 {
     public class SystemApi
     {
+        // Package helpers are exposed via MnemoAPI.storage for advanced ops.
+        // Keep this class focused on window/system-level actions.
         private IClassicDesktopStyleApplicationLifetime? GetDesktopLifetime()
         {
             return Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;

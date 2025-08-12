@@ -1,9 +1,7 @@
-using System;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using MnemoApp.Core.Common;
 using MnemoApp.Core.MnemoAPI;
-using MnemoApp.Core.Services;
 using CommunityToolkit.Mvvm.Input;
 
 namespace MnemoApp.Modules.Settings;

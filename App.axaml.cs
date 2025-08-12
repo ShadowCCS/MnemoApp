@@ -33,12 +33,12 @@ public partial class App : Application
             // Get services from the host
             var mainWindow = ApplicationHost.Services.GetRequiredService<MainWindow>();
             var mainWindowViewModel = ApplicationHost.Services.GetRequiredService<MainWindowViewModel>();
+
+            // Initialize theme without blocking UI startup
+            _ = InitializeThemeSystemAsync();
             
             mainWindow.DataContext = mainWindowViewModel;
             desktop.MainWindow = mainWindow;
-
-            // Initialize theme service
-            await InitializeThemeSystemAsync();
         }
 
         base.OnFrameworkInitializationCompleted();

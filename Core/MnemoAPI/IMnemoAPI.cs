@@ -1,6 +1,8 @@
 
 using MnemoApp.Core.Navigation;
 using MnemoApp.Core.Services;
+using MnemoApp.Core.Storage;
+using MnemoApp.Data.Packaged;
 
 namespace MnemoApp.Core.MnemoAPI
 {
@@ -10,5 +12,7 @@ namespace MnemoApp.Core.MnemoAPI
         ISidebarService sidebar { get; set; }
         UIApi ui { get; set; }
         SystemApi system { get; set; }
+        MnemoDataApi data { get; set; }
+        MnemoApp.Data.Packaged.MnemoStorageManager storage { get; set; }
     }
 }

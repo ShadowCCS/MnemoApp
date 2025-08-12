@@ -14,6 +14,9 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Controls;
 using Avalonia.Styling;
+using MnemoApp.Data.Runtime;
+using MnemoApp.Core.MnemoAPI;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MnemoApp.Core.Services
 {
@@ -25,21 +28,21 @@ namespace MnemoApp.Core.Services
         private List<ThemeManifest> _cachedThemes = new();
         private ThemeManifest? _currentTheme;
         private const string CoreThemeBasePath = "avares://MnemoApp/UI/Themes/Core/";
-        private readonly string _settingsPath;
+        private StyleInclude? _appliedThemeStyle;
+        private readonly SemaphoreSlim _themeCacheLock = new(1, 1);
+        private Task? _cacheWarmupTask;
+
 
         public ThemeService()
         {
-            // Set up paths
-            var dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MnemoApp");
-            _settingsPath = Path.Combine(dataDirectory, "Portable", "settings.json");
-
         }
 
         public async Task<List<ThemeManifest>> GetAllThemesAsync()
         {
             if (_cachedThemes.Count == 0)
             {
-                await RefreshThemeCacheAsync();
+                _cacheWarmupTask ??= RefreshThemeCacheAsync();
+                await _cacheWarmupTask;
             }
             return _cachedThemes.ToList();
         }
@@ -50,40 +53,7 @@ namespace MnemoApp.Core.Services
             return themes.FirstOrDefault(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
         }
 
-        public async Task<bool> SetThemeAsync(string name)
-        {
-            try
-            {
-                System.Diagnostics.Debug.WriteLine($"SetThemeAsync called for: {name}");
-                
-                var theme = await GetThemeAsync(name);
-                if (theme == null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Theme '{name}' not found");
-                    return false;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"Found theme: {theme.Name}, IsCore: {theme.IsCore}, Path: {theme.ThemePath}");
-
-                // Load and apply the theme
-                await ApplyThemeInternalAsync(theme);
-                System.Diagnostics.Debug.WriteLine("Theme applied successfully");
-                
-                // Save to settings
-                await SaveThemeToSettingsAsync(name);
-                System.Diagnostics.Debug.WriteLine("Theme saved to settings");
-                
-                _currentTheme = theme;
-                await UpdateLastUsedAsync(theme.Name);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error in SetThemeAsync: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                return false;
-            }
-        }
+        public Task<bool> SetThemeAsync(string name) => ApplyThemeAsync(name);
 
         public ThemeManifest? GetCurrentTheme()
         {
@@ -92,26 +62,34 @@ namespace MnemoApp.Core.Services
 
         public async Task RefreshThemeCacheAsync()
         {
-            var result = new ThemeScanResult();
-            
-            // Scan core themes
-            await ScanCoreThemesAsync(result);
-            
-            _cachedThemes = result.Themes;
-            
-            System.Diagnostics.Debug.WriteLine($"Loaded {_cachedThemes.Count} themes:");
-            foreach (var theme in _cachedThemes)
+            await _themeCacheLock.WaitAsync();
+            try
             {
-                System.Diagnostics.Debug.WriteLine($"  - {theme.Name} (IsCore: {theme.IsCore})");
-            }
-            
-            if (result.Errors.Count > 0)
-            {
-                System.Diagnostics.Debug.WriteLine("Theme loading errors:");
-                foreach (var error in result.Errors)
+                var result = new ThemeScanResult();
+                
+                // Scan core themes
+                await ScanCoreThemesAsync(result);
+                
+                _cachedThemes = result.Themes;
+                
+                System.Diagnostics.Debug.WriteLine($"Loaded {_cachedThemes.Count} themes:");
+                foreach (var theme in _cachedThemes)
                 {
-                    System.Diagnostics.Debug.WriteLine($"  - {error}");
+                    System.Diagnostics.Debug.WriteLine($"  - {theme.Name} (IsCore: {theme.IsCore})");
                 }
+                
+                if (result.Errors.Count > 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("Theme loading errors:");
+                    foreach (var error in result.Errors)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  - {error}");
+                    }
+                }
+            }
+            finally
+            {
+                _themeCacheLock.Release();
             }
         }
 
@@ -119,31 +97,18 @@ namespace MnemoApp.Core.Services
         {
             try
             {
-                if (File.Exists(_settingsPath))
-                {
-                    var settingsJson = await File.ReadAllTextAsync(_settingsPath);
-                    var settings = JsonSerializer.Deserialize<Dictionary<string, object>>(settingsJson);
-                    
-                    if (settings?.TryGetValue("Theme", out var themeValue) == true && 
-                        themeValue is JsonElement element && 
-                        element.ValueKind == JsonValueKind.String)
-                    {
-                        var themeName = element.GetString();
-                        if (!string.IsNullOrEmpty(themeName))
-                        {
-                            await SetThemeAsync(themeName);
-                            return;
-                        }
-                    }
-                }
-                
-                // Fallback to Dawn theme if no setting found
-                await SetThemeAsync("Dawn");
+                var unified = TryGetUnifiedTheme();
+                var selected = !string.IsNullOrWhiteSpace(unified)
+                    ? unified
+                    : ApplicationHost.Services
+                        .GetRequiredService<IMnemoAPI>()
+                        .data.GetProperty<string>("Theme");
+
+                await ApplyThemeAsync(string.IsNullOrWhiteSpace(selected) ? "Dawn" : selected!);
             }
             catch
             {
-                // Fallback to Dawn theme on any error
-                await SetThemeAsync("Dawn");
+                await ApplyThemeAsync("Dawn");
             }
         }
 
@@ -200,48 +165,31 @@ namespace MnemoApp.Core.Services
         // Renamed to avoid confusion with the public interface method signature
         private async Task ApplyThemeInternalAsync(ThemeManifest theme)
         {
-
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var app = Application.Current;
-                if (app != null)
+                if (app == null) return;
+
+                try
                 {
-                    try
+                    if (_appliedThemeStyle != null)
                     {
-                        // Remove all theme styles
-                        var existingThemeStyles = app.Styles
-                            .OfType<StyleInclude>()
-                            .Where(s => s.Source?.ToString().Contains("/theme.axaml") == true)
-                            .ToList();
-
-                        foreach (var existingTheme in existingThemeStyles)
-                        {
-                            app.Styles.Remove(existingTheme);
-                        }
-
-                        
-
-                        // Force garbage collection to clear any cached resources
-                        GC.Collect();
-                        GC.WaitForPendingFinalizers();
-
-                        // Create and add new theme style (core only)
-                        var themeStyle = new StyleInclude(new Uri("avares://MnemoApp/"))
-                        {
-                            Source = new Uri(theme.ThemePath)
-                        };
-                        app.Styles.Add(themeStyle);
-
-                        // Optionally, force resource reload
-                        app.Resources = new Avalonia.Controls.ResourceDictionary();
-
+                        app.Styles.Remove(_appliedThemeStyle);
+                        _appliedThemeStyle = null;
                     }
-                    catch (Exception ex)
+
+                    var themeStyle = new StyleInclude(new Uri("avares://MnemoApp/"))
                     {
-                        System.Diagnostics.Debug.WriteLine($"Error applying theme on UI thread: {ex.Message}");
-                        System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                        throw;
-                    }
+                        Source = new Uri(theme.ThemePath)
+                    };
+                    app.Styles.Add(themeStyle);
+                    _appliedThemeStyle = themeStyle;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error applying theme on UI thread: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                    throw;
                 }
             });
         }
@@ -264,36 +212,13 @@ namespace MnemoApp.Core.Services
         }
 
 
-        private async Task SaveThemeToSettingsAsync(string themeName)
+        private Task SaveThemeToSettingsAsync(string themeName)
         {
             try
             {
-                // Ensure directory exists
-                var settingsDir = Path.GetDirectoryName(_settingsPath);
-                if (settingsDir != null && !Directory.Exists(settingsDir))
-                {
-                    Directory.CreateDirectory(settingsDir);
-                }
-
-                Dictionary<string, object> settings;
-                
-                // Load existing settings if they exist
-                if (File.Exists(_settingsPath))
-                {
-                    var existingJson = await File.ReadAllTextAsync(_settingsPath);
-                    settings = JsonSerializer.Deserialize<Dictionary<string, object>>(existingJson) ?? new();
-                }
-                else
-                {
-                    settings = new Dictionary<string, object>();
-                }
-
-                // Update theme setting
-                settings["Theme"] = themeName;
-
-                // Save back to file
-                var updatedJson = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_settingsPath, updatedJson);
+                var _mnemoAPI = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+                _mnemoAPI.data.SetProperty("Theme", themeName);
+                return Task.CompletedTask;
             }
             catch (Exception ex)
             {
@@ -308,6 +233,13 @@ namespace MnemoApp.Core.Services
         public async Task<bool> ApplyThemeAsync(string name, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (_currentTheme != null &&
+                string.Equals(_currentTheme.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             var theme = await GetThemeAsync(name);
             if (theme == null)
             {
@@ -317,7 +249,37 @@ namespace MnemoApp.Core.Services
             _currentTheme = theme;
             await UpdateLastUsedAsync(theme.Name);
             await SaveThemeToSettingsAsync(theme.Name);
+            TrySetUnifiedTheme(theme.Name);
             return true;
+        }
+
+        private static string? TryGetUnifiedTheme()
+        {
+            try
+            {
+                // Resolve IMnemoAPI via ApplicationHost.Services if ready
+                var provider = MnemoApp.Core.ApplicationHost.Services;
+                var api = (MnemoApp.Core.MnemoAPI.IMnemoAPI?)provider.GetService(typeof(MnemoApp.Core.MnemoAPI.IMnemoAPI));
+                return api?.data.GetProperty<string>("Theme", MnemoApp.Data.Runtime.StorageScope.Runtime);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void TrySetUnifiedTheme(string value)
+        {
+            try
+            {
+                var provider = MnemoApp.Core.ApplicationHost.Services;
+                var api = (MnemoApp.Core.MnemoAPI.IMnemoAPI?)provider.GetService(typeof(MnemoApp.Core.MnemoAPI.IMnemoAPI));
+                api?.data.SetProperty("Theme", value, MnemoApp.Data.Runtime.StorageScope.Runtime);
+            }
+            catch
+            {
+                // ignore
+            }
         }
 
         public Task<ThemeManifest> ImportThemeAsync(string sourceDirectoryPath, CancellationToken cancellationToken = default)

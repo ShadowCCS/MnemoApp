@@ -13,6 +13,9 @@ using MnemoApp.Modules.Dashboard;
 using MnemoApp.Modules.Learning;
 using MnemoApp.Modules.Settings;
 using MnemoApp.Core.Overlays;
+using MnemoApp.Core.Storage;
+using MnemoApp.Data.Runtime;
+using MnemoApp.Data.Packaged;
 
 namespace MnemoApp.Core
 {
@@ -35,6 +38,14 @@ namespace MnemoApp.Core
             services.AddSingleton<IThemeService, ThemeService>();
             services.AddSingleton<ITopbarService, TopbarService>();
             services.AddSingleton<IOverlayService, OverlayManager>();
+            
+            // Storage
+            services.AddSingleton<IRuntimeStorage>(sp =>
+            {
+                var baseDir = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "MnemoApp", "Runtime");
+                return new SqliteRuntimeStorage(baseDir);
+            });
+            services.AddSingleton<MnemoStorageManager>();
             
             // Register MnemoAPI
             services.AddSingleton<IMnemoAPI, MnemoApp.Core.MnemoAPI.MnemoAPI>();

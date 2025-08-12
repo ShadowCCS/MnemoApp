@@ -13,7 +13,7 @@
             <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
         </Style>
 
-        <!-- This has to be included for initalization, but will be replaced by ThemeService -->
+        <!-- Has to be included for application init, don't remove, will be replaced at load-->
         <StyleInclude Source="avares://MnemoApp/UI/Themes/Core/Dawn/theme.axaml"/>
     </Application.Styles>
 
