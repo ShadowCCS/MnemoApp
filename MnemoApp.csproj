@@ -12,7 +12,7 @@
     <Folder Include="Models\" />
     <AvaloniaResource Include="UI\Assets\**" />
     <AvaloniaResource Include="UI\Icons\Tabler\outline\**" />
-    <AvaloniaResource Include="UI\Icons\ToastIcons\**" />
+    <AvaloniaResource Include="UI\Icons\Toast\**" />
     <AvaloniaResource Include="UI\Themes\**" />
   </ItemGroup>
 

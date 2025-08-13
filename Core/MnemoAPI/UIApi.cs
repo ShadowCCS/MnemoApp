@@ -14,6 +14,7 @@ namespace MnemoApp.Core.MnemoAPI
     {
         public ThemeApi themes { get; }
         public TopbarApi topbar { get; }
+        public ToastApi toast { get; }
         public OverlayApi overlay { get; }
 
         public UIApi(IThemeService themeService, ITopbarService topbarService, IOverlayService overlayService)
@@ -21,6 +22,13 @@ namespace MnemoApp.Core.MnemoAPI
             themes = new ThemeApi(themeService);
             topbar = new TopbarApi(topbarService);
             overlay = new OverlayApi(overlayService);
+            var toastService = Core.ApplicationHost.Services.GetService(typeof(IToastService)) as IToastService;
+            if (toastService == null)
+            {
+                // Fallback for design-time
+                toastService = new ToastService();
+            }
+            toast = new ToastApi(toastService);
         }
     }
 
@@ -166,5 +174,33 @@ namespace MnemoApp.Core.MnemoAPI
             dialog.OnChoose = choice => _overlayService.CloseOverlay(created.id, choice);
             return created.task;
         }
+    }
+
+    public class ToastApi
+    {
+        private readonly IToastService _toastService;
+
+        public ToastApi(IToastService toastService)
+        {
+            _toastService = toastService;
+        }
+
+        public System.Collections.ObjectModel.ReadOnlyObservableCollection<ToastNotification> passive => _toastService.PassiveToasts;
+        public System.Collections.ObjectModel.ReadOnlyObservableCollection<ToastNotification> status => _toastService.StatusToasts;
+
+        public System.Guid show(string title, string? message = null, ToastType type = ToastType.Info, System.TimeSpan? duration = null, bool dismissable = true)
+            => _toastService.Show(title, message, type, duration, dismissable);
+
+        public System.Guid showStatus(string title, string? message = null, ToastType type = ToastType.Process, bool dismissable = true, double? initialProgress = null, string? progressText = null)
+            => _toastService.ShowStatus(title, message, type, dismissable, initialProgress, progressText);
+
+        public bool updateStatus(System.Guid id, double? progress = null, string? progressText = null, string? title = null, string? message = null, ToastType? type = null)
+            => _toastService.TryUpdateStatus(id, progress, progressText, title, message, type);
+
+        public bool completeStatus(System.Guid id) => _toastService.CompleteStatus(id);
+
+        public bool remove(System.Guid id) => _toastService.Remove(id);
+
+        public void clear() => _toastService.Clear();
     }
 }

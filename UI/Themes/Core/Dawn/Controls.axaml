@@ -12,8 +12,8 @@
     <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource TextTertiary}"/>
     <SolidColorBrush x:Key="TextFadedBrush" Color="{DynamicResource TextFaded}"/>
     <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextDisabled}"/>
-    <SolidColorBrush x:Key="NotificationTitleColorBrush" Color="{DynamicResource NotificationTitleColor}"/>
-    <SolidColorBrush x:Key="NotificationDescriptionColorBrush" Color="{DynamicResource NotificationDescriptionColor}"/>
+    <SolidColorBrush x:Key="ToastTitleColorBrush" Color="{DynamicResource ToastTitleColor}"/>
+    <SolidColorBrush x:Key="ToastDescriptionColorBrush" Color="{DynamicResource ToastDescriptionColor}"/>
     <SolidColorBrush x:Key="BreadcrumbTextBrush" Color="{DynamicResource BreadcrumbText}"/>
     <SolidColorBrush x:Key="VersionTextBrush" Color="{DynamicResource VersionText}"/>
 
@@ -25,8 +25,8 @@
     <SolidColorBrush x:Key="IconsOverlayBrush" Color="{DynamicResource IconsOverlay}"/>
     <SolidColorBrush x:Key="IconsSeparationBarBrush" Color="{DynamicResource IconsSeparationBar}"/>
     <SolidColorBrush x:Key="CardIconColorBrush" Color="{DynamicResource CardIconColor}"/>
-    <SolidColorBrush x:Key="NotificationIconColorBrush" Color="{DynamicResource NotificationIconColor}"/>
-    <SolidColorBrush x:Key="NotificationIconForegroundBrush" Color="{DynamicResource NotificationIconForeground}"/>
+    <SolidColorBrush x:Key="ToastIconColorBrush" Color="{DynamicResource ToastIconColor}"/>
+    <SolidColorBrush x:Key="ToastIconForegroundBrush" Color="{DynamicResource ToastIconForeground}"/>
     <SolidColorBrush x:Key="OverlayIconColorBrush" Color="{DynamicResource OverlayIconColor}"/>
     <SolidColorBrush x:Key="LearnCardIconColorBrush" Color="{DynamicResource LearnCardIconColor}"/>
     <SolidColorBrush x:Key="ListItemIconColorBrush" Color="{DynamicResource ListItemIconColor}"/>
@@ -40,6 +40,8 @@
     <SolidColorBrush x:Key="NavButtonHoverBrush" Color="{DynamicResource NavButtonHover}"/>
     <SolidColorBrush x:Key="NavButtonActiveBrush" Color="{DynamicResource NavButtonActive}"/>
     <SolidColorBrush x:Key="NavElementBackgroundBrush" Color="{DynamicResource NavElementBackground}"/>
+    <SolidColorBrush x:Key="ToastBackgroundPrimaryBrush" Color="{DynamicResource ToastBackgroundPrimary}"/>
+    <SolidColorBrush x:Key="ToastBackgroundSecondaryBrush" Color="{DynamicResource ToastBackgroundSecondary}"/>
     <SolidColorBrush x:Key="NavElementActiveBackgroundBrush" Color="{DynamicResource NavElementActiveBackground}"/>
     <SolidColorBrush x:Key="NavElementHoverBackgroundBrush" Color="{DynamicResource NavElementHoverBackground}"/>
     <SolidColorBrush x:Key="WidgetBackgroundPrimaryBrush" Color="{DynamicResource WidgetBackgroundPrimary}"/>

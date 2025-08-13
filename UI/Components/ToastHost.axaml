@@ -1,0 +1,50 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MnemoApp.Core.Services"
+             xmlns:toasts="using:MnemoApp.UI.Components.Toasts"
+             x:Class="MnemoApp.UI.Components.ToastHost"
+             x:DataType="vm:IToastService">
+  <UserControl.Styles>
+    <Style Selector="UserControl#ToastHostRoot">
+      <Setter Property="ZIndex" Value="10000"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid Name="ToastHostRoot">
+    <StackPanel HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Margin="12"
+                Spacing="8">
+
+      <!-- Passive toasts stack above -->
+      <ItemsControl ItemsSource="{Binding PassiveToasts}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="8" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ToastNotification">
+            <toasts:ToastControl DataContext="{Binding}"/>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- Status toasts are always at the bottom -->
+      <ItemsControl ItemsSource="{Binding StatusToasts}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="8" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ToastNotification">
+            <toasts:StatusToastControl DataContext="{Binding}"/>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </Grid>
+</UserControl>
+
+

@@ -88,7 +88,10 @@
                 </Grid>
             </Border>
             
-            <!-- Global overlays host -->
+            <!-- Toast host outside overlay, anchored bottom-right -->
+            <ui:ToastHost Grid.ColumnSpan="2" />
+
+            <!-- Global overlays host (stays on top) -->
             <Grid Grid.ColumnSpan="2" ov:OverlayHostBehavior.IsOverlayHost="True" />
         </Grid>
     </Border>

@@ -7,7 +7,6 @@ using Avalonia;
 using Avalonia.Media;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
-using Tmds.DBus.Protocol;
 using MnemoApp.Core.Overlays;
 
 namespace MnemoApp.Core.Shell

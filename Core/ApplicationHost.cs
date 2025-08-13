@@ -37,6 +37,7 @@ namespace MnemoApp.Core
             services.AddSingleton<ISidebarService, SidebarService>();
             services.AddSingleton<IThemeService, ThemeService>();
             services.AddSingleton<ITopbarService, TopbarService>();
+            services.AddSingleton<IToastService, ToastService>();
             services.AddSingleton<IOverlayService, OverlayManager>();
             
             // Storage

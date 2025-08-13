@@ -12,8 +12,8 @@
     <Color x:Key="TextTertiary">#848484</Color>
     <Color x:Key="TextFaded">#999999</Color>
     <Color x:Key="TextDisabled">#999999</Color>
-    <Color x:Key="NotificationTitleColor">#5D5D5D</Color>
-    <Color x:Key="NotificationDescriptionColor">#898989</Color>
+    <Color x:Key="ToastTitleColor">#5D5D5D</Color>
+    <Color x:Key="ToastDescriptionColor">#898989</Color>
     <Color x:Key="BreadcrumbText">#999999</Color>
     <Color x:Key="VersionText">#848484</Color>
     <Color x:Key="QuickActionsTextPrimary">#555555</Color>
@@ -27,8 +27,8 @@
     <Color x:Key="IconsOverlay">#7B7B7B</Color>
     <Color x:Key="IconsSeparationBar">#919191</Color>
     <Color x:Key="CardIconColor">#555555</Color>
-    <Color x:Key="NotificationIconColor">#7B7B7B</Color>
-    <Color x:Key="NotificationIconForeground">#D9D9D9</Color>
+    <Color x:Key="ToastIconColor">#7B7B7B</Color>
+    <Color x:Key="ToastIconForeground">#D9D9D9</Color>
     <Color x:Key="OverlayIconColor">#797979</Color>
     <Color x:Key="LearnCardIconColor">#999999</Color>
     <Color x:Key="ListItemIconColor">#777777</Color>
@@ -62,8 +62,8 @@
     <Color x:Key="LearnCardBackground">#D2D2D2</Color>
     <Color x:Key="LearnCardTitleColor">#616161</Color>
     <Color x:Key="LearnCardSubTextColor">#575757</Color>
-    <Color x:Key="NotificationBackgroundPrimary">#D2D2D2</Color>
-    <Color x:Key="NotificationBackgroundSecondary">#EBEBEB</Color>
+    <Color x:Key="ToastBackgroundPrimary">#ffffff</Color>
+    <Color x:Key="ToastBackgroundSecondary">Transparent</Color>
     <Color x:Key="SystemInfoBackground">#3954b0</Color>
     <Color x:Key="SystemProcessBackground">#886ce4</Color>
     <Color x:Key="SystemWarningBackground">#f0ad4e</Color>

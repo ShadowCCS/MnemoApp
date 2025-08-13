@@ -7,10 +7,12 @@
         xmlns:services="using:MnemoApp.Core.Services"
         mc:Ignorable="d"
         x:Class="MnemoApp.Modules.Dashboard.DashboardView">
-    <Grid>
+    <Grid Margin="10">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
             <TextBlock Text="Dashboard" FontSize="20" Foreground="Black" FontFamily="{DynamicResource Font.Bold}"/>
             <Button Content="Test"/>
+
+
         </StackPanel>
     </Grid>
 </UserControl>
