@@ -19,6 +19,9 @@ namespace MnemoApp.Core.Services
         public static readonly StyledProperty<IBrush?> FillProperty =
             AvaloniaProperty.Register<MnemoSvg, IBrush?>(nameof(Fill), Brushes.Transparent);
 
+			public static readonly StyledProperty<bool> OnlyFirstFillProperty =
+				AvaloniaProperty.Register<MnemoSvg, bool>(nameof(OnlyFirstFill), false);
+
         public static readonly StyledProperty<IBrush?> StrokeProperty =
             AvaloniaProperty.Register<MnemoSvg, IBrush?>(nameof(Stroke), Brushes.Transparent);
 
@@ -34,6 +37,12 @@ namespace MnemoApp.Core.Services
             get => GetValue(FillProperty);
             set => SetValue(FillProperty, value);
         }
+
+			public bool OnlyFirstFill
+			{
+				get => GetValue(OnlyFirstFillProperty);
+				set => SetValue(OnlyFirstFillProperty, value);
+			}
 
         public IBrush? Stroke
         {
@@ -73,6 +82,7 @@ namespace MnemoApp.Core.Services
         {
             // Listen for property changes to invalidate visual
             FillProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
+				OnlyFirstFillProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
             StrokeProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
             StrokeWidthProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnPropertiesChanged());
             SvgPathProperty.Changed.AddClassHandler<MnemoSvg>((x, e) => x.OnSvgPathChanged());
@@ -174,46 +184,69 @@ namespace MnemoApp.Core.Services
             }
         }
 
-        private string ModifySvgContent(string originalSvg)
+			private string ModifySvgContent(string originalSvg)
         {
             try
             {
                 var doc = XDocument.Parse(originalSvg);
 
-                // Find all drawable elements
-                var elements = doc.Descendants()
-                    .Where(e => e.Name.LocalName == "path" || 
-                               e.Name.LocalName == "circle" || 
-                               e.Name.LocalName == "rect" || 
-                               e.Name.LocalName == "ellipse" ||
-                               e.Name.LocalName == "polygon" ||
-                               e.Name.LocalName == "polyline");
+					// Find all drawable elements
+					var elements = doc.Descendants()
+						.Where(e => e.Name.LocalName == "path" || 
+								   e.Name.LocalName == "circle" || 
+								   e.Name.LocalName == "rect" || 
+								   e.Name.LocalName == "ellipse" ||
+								   e.Name.LocalName == "polygon" ||
+								   e.Name.LocalName == "polyline");
 
-                foreach (var element in elements)
+					bool firstFillApplied = false;
+					foreach (var element in elements)
                 {
-                    // Handle fill brush
-                    if (Fill is ISolidColorBrush fillBrush && fillBrush != Brushes.Transparent)
-                    {
-                        var fillColor = fillBrush.Color;
-                        var fillHex = $"#{fillColor.R:X2}{fillColor.G:X2}{fillColor.B:X2}";
-                        element.SetAttributeValue("fill", fillHex);
-                        
-                        if (fillColor.A < 255)
-                        {
-                            var fillOpacity = fillColor.A / 255.0;
-                            element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3"));
-                        }
-                        else
-                        {
-                            element.Attribute("fill-opacity")?.Remove();
-                        }
-                    }
-                    else if (Fill == null || Fill == Brushes.Transparent)
-                    {
-                        // Remove fill attributes if brush is null or transparent
-                        element.Attribute("fill")?.Remove();
-                        element.Attribute("fill-opacity")?.Remove();
-                    }
+						// Handle fill brush
+						if (Fill is ISolidColorBrush fillBrush && fillBrush != Brushes.Transparent)
+						{
+							if (OnlyFirstFill)
+							{
+								if (!firstFillApplied)
+								{
+									var fillColor = fillBrush.Color;
+									var fillHex = $"#{fillColor.R:X2}{fillColor.G:X2}{fillColor.B:X2}";
+									element.SetAttributeValue("fill", fillHex);
+									if (fillColor.A < 255)
+									{
+										var fillOpacity = fillColor.A / 255.0;
+										element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3"));
+									}
+									else
+									{
+										element.Attribute("fill-opacity")?.Remove();
+									}
+									firstFillApplied = true;
+								}
+								// else: leave subsequent elements' fill as-is
+							}
+							else
+							{
+								var fillColor = fillBrush.Color;
+								var fillHex = $"#{fillColor.R:X2}{fillColor.G:X2}{fillColor.B:X2}";
+								element.SetAttributeValue("fill", fillHex);
+								if (fillColor.A < 255)
+								{
+									var fillOpacity = fillColor.A / 255.0;
+									element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3"));
+								}
+								else
+								{
+									element.Attribute("fill-opacity")?.Remove();
+								}
+							}
+						}
+						else if (!OnlyFirstFill && (Fill == null || Fill == Brushes.Transparent))
+						{
+							// Remove fill attributes if brush is null or transparent (only when not targeting just the first)
+							element.Attribute("fill")?.Remove();
+							element.Attribute("fill-opacity")?.Remove();
+						}
 
                     // Handle stroke brush and width
                     if (StrokeWidth > 0)
@@ -246,7 +279,7 @@ namespace MnemoApp.Core.Services
                     }
                 }
 
-                return doc.ToString();
+					return doc.ToString();
             }
             catch
             {

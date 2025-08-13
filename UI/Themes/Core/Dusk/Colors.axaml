@@ -64,11 +64,11 @@
     <Color x:Key="LearnCardSubTextColor">#A8A8A8</Color>
     <Color x:Key="NotificationBackgroundPrimary">#2D2D2D</Color>
     <Color x:Key="NotificationBackgroundSecondary">#141414</Color>
-    <Color x:Key="SystemInfoBackground">#3954b0</Color>
-    <Color x:Key="SystemProcessBackground">#886ce4</Color>
-    <Color x:Key="SystemWarningBackground">#f0ad4e</Color>
-    <Color x:Key="SystemErrorBackground">#d9534f</Color>
-    <Color x:Key="SystemSuccessBackground">#5cb85c</Color>
+    <Color x:Key="SystemInfoBackground">#1f3a93</Color>
+    <Color x:Key="SystemProcessBackground">#4c4287</Color>
+    <Color x:Key="SystemWarningBackground">#b38b00</Color>
+    <Color x:Key="SystemErrorBackground">#a93f3c</Color>
+    <Color x:Key="SystemSuccessBackground">#3a7d3a</Color>
     <Color x:Key="ProgressBarBackground">#373737</Color>
     <Color x:Key="ProgressBarFill">#2079ff</Color>
     <Color x:Key="ProgressBarSecondaryBackground">#3F3F3F</Color>
