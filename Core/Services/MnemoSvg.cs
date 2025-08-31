@@ -214,14 +214,14 @@ namespace MnemoApp.Core.Services
 									element.SetAttributeValue("fill", fillHex);
 									if (fillColor.A < 255)
 									{
-										var fillOpacity = fillColor.A / 255.0;
-										element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3"));
-									}
-									else
-									{
-										element.Attribute("fill-opacity")?.Remove();
-									}
-									firstFillApplied = true;
+																			var fillOpacity = fillColor.A / 255.0;
+									element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
+								}
+								else
+								{
+									element.Attribute("fill-opacity")?.Remove();
+								}
+								firstFillApplied = true;
 								}
 								// else: leave subsequent elements' fill as-is
 							}
@@ -233,7 +233,7 @@ namespace MnemoApp.Core.Services
 								if (fillColor.A < 255)
 								{
 									var fillOpacity = fillColor.A / 255.0;
-									element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3"));
+									element.SetAttributeValue("fill-opacity", fillOpacity.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
 								}
 								else
 								{
@@ -255,7 +255,7 @@ namespace MnemoApp.Core.Services
                     // Handle stroke brush and width
                     if (StrokeWidth > 0)
                     {
-                        element.SetAttributeValue("stroke-width", StrokeWidth.ToString());
+                        element.SetAttributeValue("stroke-width", StrokeWidth.ToString(System.Globalization.CultureInfo.InvariantCulture));
                         
                         if (Stroke is ISolidColorBrush strokeBrush && strokeBrush != Brushes.Transparent)
                         {
@@ -266,7 +266,7 @@ namespace MnemoApp.Core.Services
                             if (strokeColor.A < 255)
                             {
                                 var strokeOpacity = strokeColor.A / 255.0;
-                                element.SetAttributeValue("stroke-opacity", strokeOpacity.ToString("F3"));
+                                element.SetAttributeValue("stroke-opacity", strokeOpacity.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
                             }
                             else
                             {

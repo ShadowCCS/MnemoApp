@@ -73,10 +73,17 @@ namespace MnemoApp.Core.Services
             if (string.IsNullOrWhiteSpace(languageCode)) return false;
             languageCode = languageCode.Trim();
 
-            if (!_dict.ContainsKey(languageCode))
+            // Check if the language exists and has data loaded
+            if (!_dict.ContainsKey(languageCode) || !HasLanguageData(languageCode))
             {
-                // Allow setting unknown language; it may be populated by extensions later
-                _dict.TryAdd(languageCode, new(StringComparer.OrdinalIgnoreCase));
+                // Try to load the language from packaged resources
+                LoadPackagedCoreLanguages();
+                
+                // If still not available, create empty dictionary to allow extensions to populate it later
+                if (!_dict.ContainsKey(languageCode))
+                {
+                    _dict.TryAdd(languageCode, new(StringComparer.OrdinalIgnoreCase));
+                }
             }
 
             if (string.Equals(CurrentLanguage, languageCode, StringComparison.OrdinalIgnoreCase))
@@ -92,6 +99,11 @@ namespace MnemoApp.Core.Services
 
             LanguageChanged?.Invoke(this, CurrentLanguage);
             return await Task.FromResult(true);
+        }
+
+        private bool HasLanguageData(string languageCode)
+        {
+            return _dict.TryGetValue(languageCode, out var lang) && lang.Count > 0;
         }
 
         public string T(string @namespace, string key, IReadOnlyDictionary<string, string>? parameters = null)
@@ -179,20 +191,30 @@ namespace MnemoApp.Core.Services
                 var baseUri = new Uri("avares://MnemoApp/");
                 var languagesUri = new Uri("avares://MnemoApp/UI/Languages");
 
-                // Enumerate all assets under UI/Languages and find manifest.json files
-                var manifestUris = Avalonia.Platform.AssetLoader.GetAssets(baseUri, languagesUri)
+                // Get assets specifically under UI/Languages
+                var allAssets = Avalonia.Platform.AssetLoader.GetAssets(baseUri, languagesUri)
+                    .Where(u => u.AbsolutePath.StartsWith("/UI/Languages/", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                // Enumerate all assets under UI/Languages and find manifest.json files (exclude themes)
+                var manifestUris = allAssets
                     .Where(u => u.AbsolutePath.EndsWith("/manifest.json", StringComparison.OrdinalIgnoreCase))
+                    .Where(u => u.AbsolutePath.Contains("/UI/Languages/", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
                 foreach (var manifestUri in manifestUris)
                 {
-                    // manifestUri example: avares://MnemoApp/UI/Languages/en/manifest.json
+                    // manifestUri example: avares://MnemoApp/UI/Languages/Core/en/manifest.json
                     var segments = manifestUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-                    if (segments.Length < 3) continue; // UI, Languages, {code}, manifest.json
+                    if (segments.Length < 3) continue; // UI, Languages, ..., {code}, manifest.json
                     var code = segments[^2];
 
-                    // Load translations if present
-                    var langJsonUri = new Uri($"avares://MnemoApp/UI/Languages/{code}/language.json");
+                    // Get the directory where the manifest was found
+                    var manifestDir = manifestUri.AbsolutePath.Substring(0, manifestUri.AbsolutePath.LastIndexOf('/'));
+
+                    // Load translations if present - check in the same directory as manifest
+                    var langJsonUri = new Uri($"avares://MnemoApp{manifestDir}/language.json");
+                    
                     if (Avalonia.Platform.AssetLoader.Exists(langJsonUri))
                     {
                         using var s = Avalonia.Platform.AssetLoader.Open(langJsonUri);
@@ -216,21 +238,21 @@ namespace MnemoApp.Core.Services
                             string? resolvedFlag = null;
                             if (!string.IsNullOrWhiteSpace(m.Flag))
                             {
-                                // If manifest flag is relative, make it relative to language folder; if absolute avares, use as-is
+                                // If manifest flag is relative, make it relative to the actual manifest directory; if absolute avares, use as-is
                                 if (Uri.TryCreate(m.Flag, UriKind.Absolute, out var abs) && abs.Scheme == "avares")
                                 {
                                     resolvedFlag = abs.ToString();
                                 }
                                 else
                                 {
-                                    var candidate = new Uri($"avares://MnemoApp/UI/Languages/{code}/{m.Flag.TrimStart('/')}");
+                                    var candidate = new Uri($"avares://MnemoApp{manifestDir}/{m.Flag.TrimStart('/')}");
                                     if (Avalonia.Platform.AssetLoader.Exists(candidate))
                                         resolvedFlag = candidate.ToString();
                                 }
                             }
                             if (resolvedFlag == null)
                             {
-                                var fallback = new Uri($"avares://MnemoApp/UI/Languages/{code}/flag.svg");
+                                var fallback = new Uri($"avares://MnemoApp{manifestDir}/flag.svg");
                                 if (Avalonia.Platform.AssetLoader.Exists(fallback))
                                     resolvedFlag = fallback.ToString();
                             }

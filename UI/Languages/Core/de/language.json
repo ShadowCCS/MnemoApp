@@ -1,0 +1,31 @@
+{
+  "System": {
+    "Title": "System",
+    "Welcome": "Willkommen! Du bist jetzt Teil der Mnemo-Community"
+  },
+  "Dashboard": {
+    "Title": "Dashboard",
+    "Description": "Willkommen bei Mnemo! Dies ist dein Haupt-Hub für all deine Lern- und Inhaltserstellungsanforderungen. Es wird derzeit entwickelt und wird bald aktualisiert."
+  },
+  "Flashcards": {
+    "Title": "Lernkarten",
+    "Coming Soon": "Flashcards kommen bald"
+  },
+  "Sidebar": {
+    "Main Hub": "Haupt Hub",
+    "Utility & Personalization": "Dienstprogramme & Persönliches",
+    "Quick Actions": "Schnellaktionen"
+  },
+  "Settings": {
+    "Title": "Einstellungen",
+    "ToggleTheme": "Design wechseln",
+    "ToggleLanguage": "Sprache wechseln"
+  },
+  "Core": {
+    "Ok": "OK",
+    "Cancel": "Abbrechen",
+    "CloseApplication": "Anwendung schließen",
+    "CloseApplicationConfirmation": "Möchtest du die Anwendung wirklich schließen?",
+    "Close": "Schließen"
+  }
+}

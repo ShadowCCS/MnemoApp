@@ -11,6 +11,7 @@ namespace MnemoApp.Core.Services
         void Unregister(string title, string categoryName);
         SidebarCategory? GetCategory(string categoryName);
         SidebarItem? GetItem(string title, string categoryName);
+        void ClearAll();
         
         event Action<SidebarCategory>? CategoryAdded;
         event Action<SidebarItem, SidebarCategory>? ItemAdded;

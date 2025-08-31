@@ -1,0 +1,31 @@
+{
+  "System": {
+    "Title": "System",
+    "Welcome": "Welcome! You're now part of the Mnemo community"
+  },
+  "Dashboard": {
+    "Title": "Dashboard",
+    "Description": "Welcome to Mnemo! This is your main hub for all your learning and content creation requirements. It's currently under development and will be updated soon."
+  },
+  "Flashcards": {
+    "Title": "Flashcards",
+    "Coming Soon": "Flashcards coming soon"
+  },
+  "Sidebar": {
+    "Main Hub": "Main Hub",
+    "Utility & Personalization": "Utility & Personalization",
+    "Quick Actions": "Quick Actions"
+  },
+  "Settings": {
+    "Title": "Settings",
+    "ToggleTheme": "Toggle Theme",
+    "ToggleLanguage": "Toggle Language"
+  },
+  "Core": {
+    "Ok": "OK",
+    "Cancel": "Cancel",
+    "CloseApplication": "Close Application",
+    "CloseApplicationConfirmation": "Are you sure you want to close the application?",
+    "Close": "Close"
+  }
+}

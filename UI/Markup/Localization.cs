@@ -69,31 +69,44 @@ namespace MnemoApp.UI.Markup
         public static string? GetTextKey(AvaloniaObject element) => element.GetValue(TextKeyProperty);
 
         private static readonly ConcurrentDictionary<TextBlock, byte> _registered = new();
+        private static bool _languageChangeHandlerRegistered = false;
 
         static Localization()
         {
             NamespaceProperty.Changed.AddClassHandler<TextBlock>((tb, _) => Update(tb));
             TextKeyProperty.Changed.AddClassHandler<TextBlock>((tb, _) => Update(tb));
+        }
 
+        private static void EnsureLanguageChangeHandler()
+        {
+            if (_languageChangeHandlerRegistered) return;
+            
             var loc = ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
             if (loc != null)
             {
                 loc.LanguageChanged += (_, __) => BroadcastUpdate();
+                _languageChangeHandlerRegistered = true;
             }
         }
 
         private static void BroadcastUpdate()
         {
-            foreach (var kv in _registered.Keys)
+            // Ensure UI updates happen on the UI thread
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                Update(kv);
-            }
+                foreach (var kv in _registered.Keys)
+                {
+                    Update(kv);
+                }
+            });
         }
 
         private static void Update(TextBlock? tb)
         {
             if (tb == null) return;
             _registered.TryAdd(tb, 0);
+
+            EnsureLanguageChangeHandler();
 
             var ns = GetNamespace(tb);
             var key = GetTextKey(tb);

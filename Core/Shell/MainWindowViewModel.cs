@@ -8,6 +8,9 @@ using Avalonia.Media;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 using MnemoApp.Core.Overlays;
+using MnemoApp.Core.Services;
+using System;
+using System.Threading.Tasks;
 
 namespace MnemoApp.Core.Shell
 {
@@ -35,12 +38,12 @@ namespace MnemoApp.Core.Shell
             _mnemoAPI = null;
             SidebarViewModel = null;
             ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
-            // Initialize topbar commands with no-op actions for design-time to satisfy non-nullability
             ShowNotificationsCommand = new RelayCommand(() => { });
             MinimizeCommand = new RelayCommand(() => { });
             MaximizeCommand = new RelayCommand(() => { });
             CloseCommand = new RelayCommand(() => { });
             OptionsCommand = new RelayCommand(() => { });
+            
         }
         
         public MainWindowViewModel(IMnemoAPI mnemoAPI, SidebarViewModel sidebarViewModel)
@@ -54,6 +57,8 @@ namespace MnemoApp.Core.Shell
             ShowNotificationsCommand = new RelayCommand(ShowNotifications);
             MinimizeCommand = new RelayCommand(Minimize);
             MaximizeCommand = new RelayCommand(Maximize);
+            
+            
             CloseCommand = new RelayCommand(Close);
             OptionsCommand = new RelayCommand(Options);
             
@@ -62,6 +67,9 @@ namespace MnemoApp.Core.Shell
 
             // Populate topbar
             SetupTopbar();
+            // Show welcome toast - TODO: only show first launch
+            _mnemoAPI.ui.toast.show(_mnemoAPI.ui.language.get("System", "Title"), _mnemoAPI.ui.language.get("System", "Welcome"), ToastType.Info, TimeSpan.FromSeconds(10), dismissable: true);
+
         }
 
         private void NavigateToDefaultPage()

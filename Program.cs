@@ -12,8 +12,7 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        ApplicationHost.Initialize();
-
+        // ApplicationHost initialization now happens in App.OnFrameworkInitializationCompleted
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

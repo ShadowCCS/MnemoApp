@@ -80,6 +80,11 @@ namespace MnemoApp.Core.Services
             }
         }
 
+        public void ClearAll()
+        {
+            _categories.Clear();
+        }
+
         public SidebarCategory? GetCategory(string categoryName)
         {
             return _categories.FirstOrDefault(cat => 

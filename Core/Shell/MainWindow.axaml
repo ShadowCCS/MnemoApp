@@ -52,7 +52,7 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Border Grid.Column="0" Padding="5" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2">
-                                <TextBlock Text="Settings > Appearance" FontSize="{DynamicResource Font.Size.Small}" FontFamily="{DynamicResource Font.Medium}" Foreground="{DynamicResource TextFaded}" Margin="2"/>
+                                <!-- Breadcrumb -->
                             </Border>
                             <Border Grid.Column="1" Padding="5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="2">
                                 <ItemsControl ItemsSource="{Binding ui.topbar.items}">

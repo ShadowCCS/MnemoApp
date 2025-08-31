@@ -113,7 +113,7 @@ namespace MnemoApp.Core.MnemoAPI
             return await _localizationService.GetAvailableLanguagesAsync();
         }
 
-        public string t(string ns, string key)
+        public string get(string ns, string key)
         {
             return _localizationService.T(ns, key);
         }

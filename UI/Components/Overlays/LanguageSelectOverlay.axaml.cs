@@ -11,6 +11,7 @@ using Avalonia.Markup.Xaml;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using MnemoApp.Core;
+using MnemoApp.Core.MnemoAPI;
 using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Services;
 
@@ -27,7 +28,12 @@ namespace MnemoApp.UI.Components.Overlays
         public string? SelectedCode
         {
             get => _selectedCode;
-            set { if (_selectedCode != value) { _selectedCode = value; OnPropertyChanged(nameof(SelectedCode)); } }
+            set { 
+                if (_selectedCode != value) { 
+                    _selectedCode = value; 
+                    OnPropertyChanged(nameof(SelectedCode)); 
+                } 
+            }
         }
 
         public ICommand SelectLanguageCommand { get; }
@@ -49,14 +55,14 @@ namespace MnemoApp.UI.Components.Overlays
         public LanguageSelectOverlay()
         {
             InitializeComponent();
-            DataContext = this;
             SelectLanguageCommand = new RelayCommand<LanguageManifest>(OnSelectLanguage);
             ConfirmCommand = new AsyncRelayCommand(ConfirmAsync);
-            NextPageCommand = new RelayCommand(NextPage);
-            PrevPageCommand = new RelayCommand(PrevPage);
+            NextPageCommand = new RelayCommand(NextPage, CanGoNext);
+            PrevPageCommand = new RelayCommand(PrevPage, CanGoPrev);
             // Hidden in XAML but define to avoid binding errors
             ImportCommand = new RelayCommand(() => { });
             ExportCommand = new RelayCommand(() => { });
+            DataContext = this;
             this.AttachedToVisualTree += async (_, __) => await LoadAsync();
         }
 
@@ -76,7 +82,11 @@ namespace MnemoApp.UI.Components.Overlays
             var items = await loc.GetAvailableLanguagesAsync();
             Languages.Clear();
             foreach (var m in items)
+            {
+                // Debug: Log the IconPath to see if it's being set correctly
+                System.Diagnostics.Debug.WriteLine($"Language: {m.Name}, Code: {m.Code}, IconPath: {m.IconPath}");
                 Languages.Add(m);
+            }
             _all.Clear();
             _all.AddRange(Languages);
             UpdateFiltered();
@@ -104,6 +114,8 @@ namespace MnemoApp.UI.Components.Overlays
             foreach (var t in _filtered.Skip(_currentPage * PageSize).Take(PageSize))
                 PagedLanguages.Add(t);
             OnPropertyChanged(nameof(PageInfo));
+            ((RelayCommand)NextPageCommand).NotifyCanExecuteChanged();
+            ((RelayCommand)PrevPageCommand).NotifyCanExecuteChanged();
         }
 
         private void NextPage()
@@ -117,6 +129,9 @@ namespace MnemoApp.UI.Components.Overlays
             if (_currentPage > 0) { _currentPage--; Repage(); }
         }
 
+        private bool CanGoNext() => _currentPage + 1 < Math.Max(1, (int)Math.Ceiling((double)_filtered.Count / PageSize));
+        private bool CanGoPrev() => _currentPage > 0;
+
         private void OnSelectLanguage(LanguageManifest? manifest)
         {
             if (manifest == null) return;
@@ -126,10 +141,26 @@ namespace MnemoApp.UI.Components.Overlays
         private async Task ConfirmAsync()
         {
             if (string.IsNullOrWhiteSpace(SelectedCode)) return;
-            var loc = ApplicationHost.Services.GetRequiredService<ILocalizationService>();
-            var ok = await loc.SetLanguageAsync(SelectedCode!);
-            var overlays = ApplicationHost.Services.GetService<IOverlayService>();
-            overlays?.CloseOverlay(OverlayName, ok ? SelectedCode : null);
+            try
+            {
+                var loc = ApplicationHost.Services.GetRequiredService<ILocalizationService>();
+                var ok = await loc.SetLanguageAsync(SelectedCode!);
+                if (!ok)
+                {
+                    var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+                    await api.ui.overlay.CreateDialog("Apply failed", "Failed to set language", "OK", "", null, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+                await api.ui.overlay.CreateDialog("Apply failed", ex.Message, "OK", "", null, null);
+            }
+            finally
+            {
+                var overlays = ApplicationHost.Services.GetRequiredService<IOverlayService>();
+                overlays.CloseOverlay(OverlayName, SelectedCode);
+            }
         }
 
         public new event PropertyChangedEventHandler? PropertyChanged;

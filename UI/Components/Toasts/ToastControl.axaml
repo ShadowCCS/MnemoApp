@@ -4,7 +4,7 @@
              xmlns:local="using:MnemoApp.UI.Components.Toasts"
              x:Class="MnemoApp.UI.Components.Toasts.ToastControl"
              x:DataType="services:ToastNotification">
-  <Border MinWidth="260"
+  <Border Width="300"
           Background="{DynamicResource ToastBackgroundPrimaryBrush}"
           CornerRadius="16"
           Padding="12,10"

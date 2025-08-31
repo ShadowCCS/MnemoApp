@@ -19,10 +19,10 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-        ApplicationHost.Initialize();
+        // ApplicationHost initialization moved to OnFrameworkInitializationCompleted for async support
     }
 
-    public override void OnFrameworkInitializationCompleted()
+    public override async void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -30,13 +30,15 @@ public partial class App : Application
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
             
-            // Get services from the host
+            // Initialize ApplicationHost with full async support (includes localization)
+            await ApplicationHost.InitializeAsync();
+            
+            // Initialize theme system (can run async)
+            _ = InitializeThemeSystemAsync();
+            
+            // Get services from the host AFTER everything is ready
             var mainWindow = ApplicationHost.Services.GetRequiredService<MainWindow>();
             var mainWindowViewModel = ApplicationHost.Services.GetRequiredService<MainWindowViewModel>();
-
-            // Initialize theme and localization without blocking UI startup
-            _ = InitializeThemeSystemAsync();
-            _ = InitializeLocalizationAsync();
             
             mainWindow.DataContext = mainWindowViewModel;
             desktop.MainWindow = mainWindow;
@@ -76,19 +78,5 @@ public partial class App : Application
         }
     }
 
-    private static async Task InitializeLocalizationAsync()
-    {
-        try
-        {
-            var loc = ApplicationHost.Services.GetRequiredService<ILocalizationService>();
-            if (loc != null)
-            {
-                await loc.InitializeAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Localization initialization failed: {ex.Message}");
-        }
-    }
+
 }

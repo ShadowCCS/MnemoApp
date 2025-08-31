@@ -25,7 +25,7 @@ namespace MnemoApp.Core
 
         public static IServiceProvider Services => _serviceProvider ?? throw new InvalidOperationException("Host not initialized");
 
-        public static void Initialize()
+        public static async Task InitializeAsync()
         {
             if (_serviceProvider != null)
                 return; // Already initialized
@@ -64,14 +64,33 @@ namespace MnemoApp.Core
 
             _serviceProvider = services.BuildServiceProvider();
 
-            // Initialize MnemoAPI if needed
+            // Initialize localization first and await it fully
+            var localization = _serviceProvider.GetRequiredService<ILocalizationService>();
+            await localization.InitializeAsync();
+
+            // Initialize MnemoAPI
             var api = _serviceProvider.GetRequiredService<IMnemoAPI>();
+            
+            // Load saved language preference and apply it
+            try
+            {
+                var savedLanguage = api.data.GetProperty<string>("Language");
+                if (!string.IsNullOrWhiteSpace(savedLanguage))
+                {
+                    await localization.SetLanguageAsync(savedLanguage);
+                }
+            }
+            catch { /* ignore */ }
+            
+            // Rebuild sidebar when language changes
+            localization.LanguageChanged += (sender, code) =>
+            {
+                var sidebar = _serviceProvider.GetRequiredService<ISidebarService>();
+                sidebar.ClearAll();
+                RegisterModulesWithSidebar(api);
+            };
 
-            // Initialize localization early
-            var loc = _serviceProvider.GetRequiredService<ILocalizationService>();
-            _ = loc.InitializeAsync();
-
-            // Register modules with sidebar
+            // Initial sidebar setup - now happens after localization is fully ready
             RegisterModulesWithSidebar(api);
         }
         
@@ -79,25 +98,25 @@ namespace MnemoApp.Core
         {
             // Register Dashboard module
             api.sidebar.Register(
-                "Dashboard", 
-                typeof(DashboardViewModel), 
-                "Main Hub", 
+                api.ui.language.get("Dashboard", "Title"),
+                typeof(DashboardViewModel),
+                api.ui.language.get("Sidebar", "Main Hub"),
                 "avares://MnemoApp/UI/Icons/Tabler/outline/home.svg"
             );
             
             // Register Learning modules
             api.sidebar.Register(
-                "Flashcards",
+                api.ui.language.get("Flashcards", "Title"),
                 typeof(FlashcardsViewModel),
-                "Main Hub",
+                api.ui.language.get("Sidebar", "Main Hub"),
                 "avares://MnemoApp/UI/Icons/Tabler/outline/layout-cards.svg"
             );
 
             // Register Settings module
             api.sidebar.Register(
-                "Settings", 
-                typeof(SettingsViewModel), 
-                "Utility & Personalization", 
+                api.ui.language.get("Settings", "Title"),
+                typeof(SettingsViewModel),
+                api.ui.language.get("Sidebar", "Utility & Personalization"),
                 "avares://MnemoApp/UI/Icons/Tabler/outline/adjustments-alt.svg"
             );
         }
