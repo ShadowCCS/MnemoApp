@@ -13,6 +13,7 @@ namespace MnemoApp.Core.MnemoAPI
     public class UIApi
     {
         public ThemeApi themes { get; }
+        public LanguageApi language { get; }
         public TopbarApi topbar { get; }
         public ToastApi toast { get; }
         public OverlayApi overlay { get; }
@@ -20,6 +21,12 @@ namespace MnemoApp.Core.MnemoAPI
         public UIApi(IThemeService themeService, ITopbarService topbarService, IOverlayService overlayService)
         {
             themes = new ThemeApi(themeService);
+            var loc = Core.ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
+            if (loc == null)
+            {
+                loc = new LocalizationService();
+            }
+            language = new LanguageApi(loc);
             topbar = new TopbarApi(topbarService);
             overlay = new OverlayApi(overlayService);
             var toastService = Core.ApplicationHost.Services.GetService(typeof(IToastService)) as IToastService;
@@ -80,6 +87,48 @@ namespace MnemoApp.Core.MnemoAPI
 
         public void startWatching() => _themeService.StartWatching();
         public void stopWatching() => _themeService.StopWatching();
+    }
+
+    /// <summary>
+    /// Language-related API endpoints
+    /// </summary>
+    public class LanguageApi
+    {
+        private readonly ILocalizationService _localizationService;
+
+        public LanguageApi(ILocalizationService localizationService)
+        {
+            _localizationService = localizationService;
+        }
+
+        public string getCurrentLanguage() => _localizationService.CurrentLanguage;
+
+        public async System.Threading.Tasks.Task<bool> setLanguage(string code)
+        {
+            return await _localizationService.SetLanguageAsync(code);
+        }
+
+        public async System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<MnemoApp.Core.Services.LanguageManifest>> getAvailableLanguages()
+        {
+            return await _localizationService.GetAvailableLanguagesAsync();
+        }
+
+        public string t(string ns, string key)
+        {
+            return _localizationService.T(ns, key);
+        }
+
+        public MnemoApp.Core.Services.LanguageManifest? getCurrentLanguageManifest() => _localizationService.GetCurrentLanguageManifest();
+
+        public void registerLanguageJson(string code, string json)
+        {
+            _localizationService.RegisterLanguageJson(code, json);
+        }
+
+        public void registerNamespace(string code, string ns, System.Collections.Generic.IReadOnlyDictionary<string, string> entries)
+        {
+            _localizationService.RegisterNamespace(code, ns, entries);
+        }
     }
 
     public class TopbarApi

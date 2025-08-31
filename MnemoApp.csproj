@@ -14,6 +14,7 @@
     <AvaloniaResource Include="UI\Icons\Tabler\outline\**" />
     <AvaloniaResource Include="UI\Icons\Toast\**" />
     <AvaloniaResource Include="UI\Themes\**" />
+    <AvaloniaResource Include="UI\Languages\**" />
   </ItemGroup>
 
   <ItemGroup>

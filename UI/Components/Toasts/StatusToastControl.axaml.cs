@@ -25,7 +25,6 @@ namespace MnemoApp.UI.Components.Toasts
                 };
             }
 
-            // Do not dismiss on root click; only the button should dismiss
         }
 
         private void InitializeComponent()
@@ -33,7 +32,6 @@ namespace MnemoApp.UI.Components.Toasts
             AvaloniaXamlLoader.Load(this);
         }
 
-        // Intentionally no root click handler
     }
 }
 

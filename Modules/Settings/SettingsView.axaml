@@ -3,15 +3,20 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MnemoApp.Modules.Settings"
+        xmlns:i18n="clr-namespace:MnemoApp.UI.Markup"
         xmlns:vm="clr-namespace:MnemoApp.Modules.Settings"
         mc:Ignorable="d"
         x:Class="MnemoApp.Modules.Settings.SettingsView"
         x:DataType="vm:SettingsViewModel">
     <Grid>
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock Text="Settings" FontSize="20" Foreground="Black"/>
-            <Button Content="Toggle Theme" Command="{Binding ToggleThemeCommand}"/>
-            <Button Content="Toggle Language"/>
+            <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="Title" FontSize="20" Foreground="Black"/>
+            <Button Command="{Binding ToggleThemeCommand}">
+                <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="ToggleTheme"/>
+            </Button>
+            <Button Command="{Binding ToggleLanguageCommand}">
+                <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="ToggleLanguage"/>
+            </Button>
         </StackPanel>
     </Grid>
 </UserControl>

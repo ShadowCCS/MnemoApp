@@ -72,6 +72,7 @@
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/ThemeVariantScope.axaml" />
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/HeaderedContentControl.axaml" />
                 <ResourceInclude Source="avares://MnemoApp/UI/Components/TextSelectionHandle.axaml" />
+                <ResourceInclude Source="avares://MnemoApp/UI/Components/SearchBox.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Styles.Resources>

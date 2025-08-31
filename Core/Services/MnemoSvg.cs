@@ -241,9 +241,13 @@ namespace MnemoApp.Core.Services
 								}
 							}
 						}
-						else if (!OnlyFirstFill && (Fill == null || Fill == Brushes.Transparent))
+						else if (!OnlyFirstFill && Fill == null)
 						{
-							// Remove fill attributes if brush is null or transparent (only when not targeting just the first)
+							// Keep original SVG fills when no Fill provided
+						}
+						else if (!OnlyFirstFill && Fill == Brushes.Transparent)
+						{
+							// Explicit transparent brush: remove fills
 							element.Attribute("fill")?.Remove();
 							element.Attribute("fill-opacity")?.Remove();
 						}

@@ -99,8 +99,6 @@
     <Color x:Key="OverlayItemActiveBackgroundColor">#2079FF</Color>
     <Color x:Key="OverlayItemHoverBackgroundColor">#c5c5c5</Color>
     <Color x:Key="OverlayHighlightColor">#b3b3b3</Color>
-    <Color x:Key="SearchBarBackground">#D2D2D2</Color>
-    <Color x:Key="SearchBarTextColor">#777777</Color>
     <Color x:Key="BadgeBackground">#D2D2D2</Color>
     <Color x:Key="BadgeIconBackground">#929292</Color>
     <Color x:Key="ToggleButtonBackground">#B1B1B1</Color>
@@ -127,10 +125,10 @@
     <Color x:Key="ButtonForegroundPointerOver">#444444</Color>
     <Color x:Key="ButtonForegroundPressed">#333333</Color>
     <Color x:Key="ButtonForegroundDisabled">#999999</Color>
-    <Color x:Key="ButtonBorderBrush">#CCCCCC</Color>
-    <Color x:Key="ButtonBorderBrushPointerOver">#BBBBBB</Color>
-    <Color x:Key="ButtonBorderBrushPressed">#AAAAAA</Color>
-    <Color x:Key="ButtonBorderBrushDisabled">#DDDDDD</Color>
+    <Color x:Key="ButtonBorder">#CCCCCC</Color>
+    <Color x:Key="ButtonBorderPointerOver">#BBBBBB</Color>
+    <Color x:Key="ButtonBorderPressed">#AAAAAA</Color>
+    <Color x:Key="ButtonBorderDisabled">#DDDDDD</Color>
     
     <!-- Accent Button -->
     <Color x:Key="AccentButtonBackground">#2079FF</Color>
@@ -151,16 +149,16 @@
     <Color x:Key="TextControlForegroundPointerOver">#222222</Color>
     <Color x:Key="TextControlForegroundFocused">#222222</Color>
     <Color x:Key="TextControlForegroundDisabled">#999999</Color>
-    <Color x:Key="TextControlBorderBrush">#CCCCCC</Color>
-    <Color x:Key="TextControlBorderBrushPointerOver">#BBBBBB</Color>
-    <Color x:Key="TextControlBorderBrushFocused">#2079FF</Color>
-    <Color x:Key="TextControlBorderBrushDisabled">#DDDDDD</Color>
+    <Color x:Key="TextControlBorder">#CCCCCC</Color>
+    <Color x:Key="TextControlBorderPointerOver">#BBBBBB</Color>
+    <Color x:Key="TextControlBorderFocused">#2079FF</Color>
+    <Color x:Key="TextControlBorderDisabled">#DDDDDD</Color>
     <Color x:Key="TextControlPlaceholderForeground">#999999</Color>
     <Color x:Key="TextControlSelectionHighlightColor">#A4C8E8</Color>
     
     <!-- ListBox -->
     <Color x:Key="ListBoxBackground">#FFFFFF</Color>
-    <Color x:Key="ListBoxBorderBrush">#CCCCCC</Color>
+    <Color x:Key="ListBoxBorder">#CCCCCC</Color>
     <Color x:Key="ListBoxItemBackground">Transparent</Color>
     <Color x:Key="ListBoxItemBackgroundSelected">#2079FF</Color>
     <Color x:Key="ListBoxItemBackgroundPointerOver">#E0E0E0</Color>
@@ -176,19 +174,34 @@
     <Color x:Key="ListBoxItemForegroundDisabled">#999999</Color>
     
     <!-- ComboBox -->
-    <Color x:Key="ComboBoxBackground">#FFFFFF</Color>
-    <Color x:Key="ComboBoxBackgroundPointerOver">#F5F5F5</Color>
-    <Color x:Key="ComboBoxBackgroundPressed">#E5E5E5</Color>
-    <Color x:Key="ComboBoxBackgroundDisabled">#F0F0F0</Color>
-    <Color x:Key="ComboBoxForeground">#222222</Color>
-    <Color x:Key="ComboBoxForegroundPointerOver">#222222</Color>
-    <Color x:Key="ComboBoxForegroundPressed">#222222</Color>
-    <Color x:Key="ComboBoxForegroundDisabled">#999999</Color>
-    <Color x:Key="ComboBoxBorderBrush">#CCCCCC</Color>
-    <Color x:Key="ComboBoxBorderBrushPointerOver">#BBBBBB</Color>
-    <Color x:Key="ComboBoxBorderBrushPressed">#AAAAAA</Color>
-    <Color x:Key="ComboBoxBorderBrushDisabled">#DDDDDD</Color>
-    
+    <Color x:Key="ComboBoxBackground">#EBEBEB</Color>
+    <Color x:Key="ComboBoxBackgroundPointerOver">#D7D7D7</Color> 
+    <Color x:Key="ComboBoxBackgroundPressed">#C5C5C5</Color>     
+    <Color x:Key="ComboBoxBackgroundDisabled">#F0F0F0</Color>    
+    <Color x:Key="ComboBoxForeground">#555555</Color>              
+    <Color x:Key="ComboBoxForegroundPointerOver">#444444</Color>   
+    <Color x:Key="ComboBoxForegroundPressed">#333333</Color>       
+    <Color x:Key="ComboBoxForegroundDisabled">#999999</Color>      
+        <Color x:Key="ComboBoxBorder">#CCCCCC</Color>
+    <Color x:Key="ComboBoxBorderPointerOver">#BBBBBB</Color>
+    <Color x:Key="ComboBoxBorderPressed">#AAAAAA</Color>
+    <Color x:Key="ComboBoxBorderDisabled">#DDDDDD</Color>     
+
+    <!-- ComboBox Item -->
+    <Color x:Key="ComboBoxItemBackground">#EBEBEB</Color>
+    <Color x:Key="ComboBoxItemBackgroundPointerOver">#D7D7D7</Color>
+    <Color x:Key="ComboBoxItemBackgroundPressed">#C5C5C5</Color>
+    <Color x:Key="ComboBoxItemBackgroundSelected">#B0B0B0</Color>
+    <Color x:Key="ComboBoxItemBackgroundSelectedPointerOver">#A0A0A0</Color>
+    <Color x:Key="ComboBoxItemBackgroundSelectedPressed">#909090</Color>
+    <Color x:Key="ComboBoxItemForeground">#555555</Color>
+    <Color x:Key="ComboBoxItemForegroundPointerOver">#444444</Color>
+    <Color x:Key="ComboBoxItemForegroundPressed">#333333</Color>
+    <Color x:Key="ComboBoxItemForegroundSelected">#222222</Color>
+    <Color x:Key="ComboBoxItemForegroundSelectedPointerOver">#222222</Color>
+    <Color x:Key="ComboBoxItemForegroundSelectedPressed">#333333</Color>
+    <Color x:Key="ComboBoxItemForegroundDisabled">#999999</Color>
+
     <!-- CheckBox -->
     <Color x:Key="CheckBoxCheckBackgroundStroke">#CCCCCC</Color>
     <Color x:Key="CheckBoxCheckBackgroundStrokePointerOver">#BBBBBB</Color>
@@ -239,8 +252,14 @@
     <Color x:Key="TopbarButtonBackgroundSelected">Transparent</Color>
     <Color x:Key="TopbarButtonBackgroundPressed">Transparent</Color>
     <Color x:Key="TopbarButtonForeground">#555555</Color>
-    <!-- Common Values -->
-    <Thickness x:Key="ButtonBorderThemeThickness">1</Thickness>
-    <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
-    <Thickness x:Key="ButtonPadding">6</Thickness>
+
+    <!-- Search Bar -->
+    <Color x:Key="SearchBarBackground">#D2D2D2</Color>
+    <Color x:Key="SearchBarTextColor">#777777</Color>
+    <Color x:Key="SearchBarBorder">#CCCCCC</Color>
+    <Color x:Key="SearchBarHover">#BBBBBB</Color>
+    <Color x:Key="SearchBarDisabled">#DDDDDD</Color>
+    <Color x:Key="SearchBarTextHover">#555555</Color>
+    <Color x:Key="SearchBarText">#777777</Color>
+    <Color x:Key="SearchBarTextDisabled">#999999</Color>
 </ResourceDictionary>

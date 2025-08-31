@@ -19,7 +19,7 @@
   <ControlTheme x:Key="{x:Type ComboBoxItem}" TargetType="ComboBoxItem">
     <Setter Property="Foreground" Value="{DynamicResource ComboBoxItemForeground}" />
     <Setter Property="Background" Value="{DynamicResource ComboBoxItemBackground}" />
-    <Setter Property="Padding" Value="{DynamicResource ComboBoxItemThemePadding}" />
+    <Setter Property="Padding" Value="{DynamicResource ComboBoxItemPadding}" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="Template">
       <ControlTemplate>

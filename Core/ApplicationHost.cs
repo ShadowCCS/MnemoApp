@@ -36,6 +36,7 @@ namespace MnemoApp.Core
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<ISidebarService, SidebarService>();
             services.AddSingleton<IThemeService, ThemeService>();
+            services.AddSingleton<ILocalizationService, LocalizationService>();
             services.AddSingleton<ITopbarService, TopbarService>();
             services.AddSingleton<IToastService, ToastService>();
             services.AddSingleton<IOverlayService, OverlayManager>();
@@ -65,6 +66,10 @@ namespace MnemoApp.Core
 
             // Initialize MnemoAPI if needed
             var api = _serviceProvider.GetRequiredService<IMnemoAPI>();
+
+            // Initialize localization early
+            var loc = _serviceProvider.GetRequiredService<ILocalizationService>();
+            _ = loc.InitializeAsync();
 
             // Register modules with sidebar
             RegisterModulesWithSidebar(api);

@@ -1,0 +1,21 @@
+{
+  "Dashboard": {
+    "Title": "Dashboard",
+    "Welcome": "Welcome back, {name}!"
+  },
+  "Flashcards": {
+    "Title": "Flashcards",
+    "StartSession": "Start session"
+  },
+  "Settings": {
+    "Title": "Settings",
+    "ToggleTheme": "Toggle Theme",
+    "ToggleLanguage": "Toggle Language"
+  },
+  "Core": {
+    "Ok": "OK",
+    "Cancel": "Cancel"
+  }
+}
+
+

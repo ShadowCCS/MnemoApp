@@ -15,6 +15,7 @@
 
         <!-- Has to be included for application init, don't remove, will be replaced at load-->
         <StyleInclude Source="avares://MnemoApp/UI/Themes/Core/Dawn/theme.axaml"/>
+    
     </Application.Styles>
 
 </Application>

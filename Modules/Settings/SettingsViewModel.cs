@@ -11,10 +11,12 @@ public class SettingsViewModel : ViewModelBase
     private readonly IMnemoAPI _mnemoAPI;
 
     public ICommand ToggleThemeCommand { get; }
+    public ICommand ToggleLanguageCommand { get; }
     public SettingsViewModel(IMnemoAPI mnemoAPI)
     {
         _mnemoAPI = mnemoAPI;
         ToggleThemeCommand = new AsyncRelayCommand(ToggleTheme);
+        ToggleLanguageCommand = new AsyncRelayCommand(ToggleLanguage);
     }
 
     private async Task ToggleTheme()
@@ -23,6 +25,15 @@ public class SettingsViewModel : ViewModelBase
         if (result != null)
         {
             await _mnemoAPI.ui.themes.setTheme(result);
+        }
+    }
+
+    private async Task ToggleLanguage()
+    {
+        var result = await _mnemoAPI.ui.overlay.Show<string?>("UI/Components/Overlays/LanguageSelectOverlay.axaml", name: "LanguageSelectOverlay");
+        if (!string.IsNullOrWhiteSpace(result))
+        {
+            await _mnemoAPI.ui.language.setLanguage(result!);
         }
     }
 }

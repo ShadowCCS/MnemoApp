@@ -44,9 +44,10 @@
     <Setter Property="MaxDropDownHeight" Value="504" />
     <Setter Property="Foreground" Value="{DynamicResource ComboBoxForegroundBrush}" />
     <Setter Property="Background" Value="{DynamicResource ComboBoxBackgroundBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderBrushBrush}" />
-    <Setter Property="BorderThickness" Value="{DynamicResource ComboBoxBorderThemeThickness}" />
-    <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderBrush}" />
+    <Setter Property="PlaceholderForeground" Value="{DynamicResource ComboBoxPlaceHolderForegroundBrush}" />
+    <Setter Property="BorderThickness" Value="{DynamicResource ComboBoxBorderBrushThickness}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource ComboBoxCornerRadius}" />
     <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
     <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
     <Setter Property="MinHeight" Value="{DynamicResource ComboBoxMinHeight}" />
@@ -54,7 +55,6 @@
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="HorizontalAlignment" Value="Left" />
     <Setter Property="VerticalAlignment" Value="Top" />
-    <Setter Property="PlaceholderForeground" Value="{DynamicResource ComboBoxPlaceHolderForeground}" />
     <Setter Property="Template">
       <ControlTemplate>
         <DataValidationErrors>
@@ -109,7 +109,7 @@
                       Margin="0,0,10,0"
                       HorizontalAlignment="Right"
                       VerticalAlignment="Center"
-                      Foreground="{DynamicResource ComboBoxDropDownGlyphForeground}"
+                      Foreground="{DynamicResource ComboBoxChevronBrush}"
                       Data="M1939 486L2029 576L1024 1581L19 576L109 486L1024 1401L1939 486Z"/>
 
             <Popup Name="PART_Popup"
@@ -144,13 +144,13 @@
     <!--  PointerOver State  -->
     <Style Selector="^:pointerover /template/ Border#Background">
       <Setter Property="Background" Value="{DynamicResource ComboBoxBackgroundPointerOver}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderBrushPointerOver}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderPointerOverBrush}" />
     </Style>
 
     <!--  Pressed State  -->
     <Style Selector="^:pressed /template/ Border#Background">
       <Setter Property="Background" Value="{DynamicResource ComboBoxBackgroundPressed}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderBrushPressed}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderPressedBrush}" />
     </Style>
 
     <!-- Error State -->
@@ -192,7 +192,7 @@
     <Style Selector="^:disabled">
       <Style Selector="^ /template/ Border#Background">
         <Setter Property="Background" Value="{DynamicResource ComboBoxBackgroundDisabled}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderBrushDisabled}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderDisabledBrush}" />
       </Style>
       <Style Selector="^ /template/ ContentControl#ContentPresenter">
         <Setter Property="Foreground" Value="{DynamicResource ComboBoxForegroundDisabled}" />
@@ -205,5 +205,6 @@
       </Style>
     </Style>
   </ControlTheme>
+  
 
 </ResourceDictionary>
