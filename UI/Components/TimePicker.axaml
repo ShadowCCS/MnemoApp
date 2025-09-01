@@ -289,7 +289,7 @@
                       Grid.Column="1"
                       Theme="{StaticResource FluentDateTimePickerButton}"
                       Height="{DynamicResource TimePickerFlyoutPresenterAcceptDismissHostGridHeight}"
-                      FontSize="16" 
+                      FontSize="{DynamicResource FontSize.Body.Medium}" 
                       HorizontalAlignment="Stretch" 
                       VerticalAlignment="Stretch">
                 <Path Stroke="{Binding $parent[Button].Foreground}" 

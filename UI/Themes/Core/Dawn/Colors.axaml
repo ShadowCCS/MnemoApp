@@ -262,4 +262,18 @@
     <Color x:Key="SearchBarTextHover">#555555</Color>
     <Color x:Key="SearchBarText">#777777</Color>
     <Color x:Key="SearchBarTextDisabled">#999999</Color>
+
+    <!-- Dropdown -->
+    <Color x:Key="DropdownBackground">#D2D2D2</Color>
+    <Color x:Key="DropdownBorder">#D2D2D2</Color>
+
+    <!-- Dropdown Item -->
+    <Color x:Key="DropdownItemBackground">#D2D2D2</Color>
+    <Color x:Key="DropdownItemBackgroundPointerOver">#BBBBBB</Color>
+    <Color x:Key="DropdownItemBackgroundPressed">#AAAAAA</Color>
+    <Color x:Key="DropdownItemBackgroundDisabled">#DDDDDD</Color>
+    <Color x:Key="DropdownItemForeground">#898989</Color>
+    <Color x:Key="DropdownItemForegroundHeader">#898989</Color>
+    <Color x:Key="DropdownItemForegroundSecondary">#898989</Color>
+    <Color x:Key="DropdownItemSeparatorBrush">#969696</Color>
 </ResourceDictionary>

@@ -33,11 +33,11 @@
                   VerticalAlignment="Center"
                   Spacing="1">
         <TextBlock Text="{Binding Title}"
-                   FontSize="14"
+                   FontSize="{DynamicResource FontSize.Body.Small}"
                    Foreground="{DynamicResource ToastTitleColorBrush}"
                    FontFamily="{DynamicResource Font.SemiBold}"/>
         <TextBlock Text="{Binding Message}"
-                   FontSize="11"
+                   FontSize="{DynamicResource FontSize.Caption}"
                    Foreground="{DynamicResource ToastDescriptionColorBrush}"
                    FontFamily="{DynamicResource Font.Regular}"
                    TextWrapping="Wrap"/>
@@ -54,7 +54,7 @@
 
         <TextBlock Text="{Binding ProgressText}"
                    IsVisible="{Binding ProgressText, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
-                   FontSize="11"
+                   FontSize="{DynamicResource FontSize.Caption}"
                    Foreground="{DynamicResource ToastDescriptionColorBrush}"
                    FontFamily="{DynamicResource Font.Regular}"/>
       </StackPanel>

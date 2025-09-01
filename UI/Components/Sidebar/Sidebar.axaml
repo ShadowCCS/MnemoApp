@@ -55,7 +55,7 @@
                             <StackPanel Spacing="8" Margin="0,0,0,16">
                                 <!-- Category Header -->
                                 <TextBlock Text="{Binding Name}" 
-                                           FontSize="{DynamicResource NavbarFontSize}" 
+                                           FontSize="{DynamicResource FontSize.Navigation}" 
                                            FontFamily="{DynamicResource Font.Medium}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            Margin="0,0,0,8"/>
@@ -71,8 +71,8 @@
                                                     HorizontalAlignment="Stretch"
                                                     HorizontalContentAlignment="Left"
                                                     ToolTip.Tip="{Binding Title}"
-                                                    FontSize="{DynamicResource NavbarFontSize}" 
-                                                    FontFamily="{DynamicResource MediumFont}" 
+                                                    FontSize="{DynamicResource FontSize.Navigation}" 
+                                                    FontFamily="{DynamicResource Font.Medium}" 
                                                     Padding="12,8"
                                                     Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
                                                     CommandParameter="{Binding}">
@@ -115,16 +115,16 @@
                             <TextBlock i18n:Localization.Namespace="Sidebar" 
                                        i18n:Localization.TextKey="Quick Actions"
                                        Foreground="{DynamicResource QuickActionsTextPrimaryBrush}"
-                                       FontSize="14"/>
+                                       FontSize="{DynamicResource FontSize.Body.Small}"/>
                             <TextBlock Text="alt + shift + Q" 
-                                       FontSize="11" 
+                                       FontSize="{DynamicResource FontSize.Caption}" 
                                        Foreground="{DynamicResource QuickActionsTextSecondaryBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </Button>
                 
                 <TextBlock Text="v1.0.0-beta" 
-                           FontSize="11" 
+                           FontSize="{DynamicResource FontSize.Caption}" 
                            Foreground="{DynamicResource VersionTextBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,8,0,0"/>

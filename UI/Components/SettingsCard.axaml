@@ -22,13 +22,13 @@
             
             <StackPanel Grid.Column="0" VerticalAlignment="Center">
               <TextBlock Text="{TemplateBinding Title}"
-                         FontSize="{DynamicResource FontSize.Medium}" 
+                         FontSize="{DynamicResource FontSize.Heading4}" 
                          FontFamily="{DynamicResource Font.Medium}" 
                          Foreground="{DynamicResource TextPrimaryBrush}" 
                          Margin="2" 
                          Padding="0"/>
               <TextBlock Text="{TemplateBinding Description}"
-                         FontSize="{DynamicResource FontSize.Small}" 
+                         FontSize="{DynamicResource FontSize.Body.Small}" 
                          FontFamily="{DynamicResource Font.Medium}" 
                          Foreground="{DynamicResource TextSecondaryBrush}" 
                          Margin="2,0,2,2"

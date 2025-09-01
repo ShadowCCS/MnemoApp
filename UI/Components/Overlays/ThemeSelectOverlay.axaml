@@ -70,8 +70,8 @@
                                             Color2="{Binding PreviewColors[1]}"
                                             Color3="{Binding PreviewColors[2]}"/>
                     </Border>
-                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Margin="8,6,8,0" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="11" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FontSize.Body.Small}" FontWeight="SemiBold" Margin="8,6,8,0" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="{DynamicResource FontSize.Caption}" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Button>
               </Border>

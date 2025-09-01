@@ -50,7 +50,7 @@
     <Setter Property="MaxHeight" Value="30" />
     <Setter Property="Template">
       <ControlTemplate>
-        <StackPanel Spacing="2" VerticalAlignment="Stretch" TextElement.FontSize="10" Orientation="Horizontal">
+        <StackPanel Spacing="2" VerticalAlignment="Stretch" TextElement.FontSize="{DynamicResource FontSize.CaptionButton}" Orientation="Horizontal">
           <Button x:Name="PART_FullScreenButton"
                   Theme="{StaticResource FluentCaptionButton}"
                   IsVisible="False">

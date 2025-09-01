@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Services;
+using MnemoApp.Core.Models;
+using MnemoApp.UI.Components.Overlays;
 
 namespace MnemoApp.Core.MnemoAPI
 {
@@ -17,6 +21,7 @@ namespace MnemoApp.Core.MnemoAPI
         public TopbarApi topbar { get; }
         public ToastApi toast { get; }
         public OverlayApi overlay { get; }
+        public DropdownApi dropdown { get; }
 
         public UIApi(IThemeService themeService, ITopbarService topbarService, IOverlayService overlayService)
         {
@@ -36,6 +41,13 @@ namespace MnemoApp.Core.MnemoAPI
                 toastService = new ToastService();
             }
             toast = new ToastApi(toastService);
+            
+            var dropdownRegistry = Core.ApplicationHost.Services.GetService(typeof(IDropdownItemRegistry)) as IDropdownItemRegistry;
+            if (dropdownRegistry == null)
+            {
+                dropdownRegistry = new DropdownItemRegistry();
+            }
+            dropdown = new DropdownApi(dropdownRegistry, overlayService);
         }
     }
 
@@ -223,6 +235,48 @@ namespace MnemoApp.Core.MnemoAPI
             dialog.OnChoose = choice => _overlayService.CloseOverlay(created.id, choice);
             return created.task;
         }
+
+        // Convenience: Options Dropdown (legacy - use dropdown.ShowWithBuilder instead)
+        public void OptionsDropdown(Control anchorControl, Action<IList<DropdownItemBase>> configureItems, OverlayOptions? options = null, string? name = null)
+        {
+            var items = new List<DropdownItemBase>();
+            configureItems(items);
+
+            var dropdown = new UI.Components.Overlays.DropdownOverlay();
+            dropdown.SetItems(items, anchorControl);
+
+            var dropdownOptions = options ?? new OverlayOptions
+            {
+                ShowBackdrop = true,
+                BackdropOpacity = 0.0,
+                CloseOnOutsideClick = true,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+            };
+
+            _overlayService.CreateOverlay(dropdown, dropdownOptions, name);
+        }
+
+        // Convenience: Notification Dropdown (legacy - use dropdown.ShowWithBuilder instead)
+        public void NotificationDropdown(Control anchorControl, Action<IList<DropdownItemBase>> configureItems, OverlayOptions? options = null, string? name = null)
+        {
+            var items = new List<DropdownItemBase>();
+            configureItems(items);
+
+            var dropdown = new UI.Components.Overlays.DropdownOverlay();
+            dropdown.SetItems(items, anchorControl);
+
+            var dropdownOptions = options ?? new OverlayOptions
+            {
+                ShowBackdrop = true,
+                BackdropOpacity = 0.0,
+                CloseOnOutsideClick = true,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+            };
+
+            _overlayService.CreateOverlay(dropdown, dropdownOptions, name);
+        }
     }
 
     public class ToastApi
@@ -251,5 +305,108 @@ namespace MnemoApp.Core.MnemoAPI
         public bool remove(System.Guid id) => _toastService.Remove(id);
 
         public void clear() => _toastService.Clear();
+    }
+
+    public class DropdownApi
+    {
+        private readonly IDropdownItemRegistry _registry;
+        private readonly IOverlayService _overlayService;
+
+        public DropdownApi(IDropdownItemRegistry registry, IOverlayService overlayService)
+        {
+            _registry = registry;
+            _overlayService = overlayService;
+        }
+
+        /// <summary>
+        /// Register a dropdown item for reuse across the application
+        /// </summary>
+        public void RegisterItem(DropdownType dropdownType, DropdownItemBase item)
+        {
+            _registry.RegisterItem(dropdownType, item);
+        }
+
+        /// <summary>
+        /// Register multiple dropdown items
+        /// </summary>
+        public void RegisterItems(DropdownType dropdownType, IEnumerable<DropdownItemBase> items)
+        {
+            _registry.RegisterItems(dropdownType, items);
+        }
+
+        /// <summary>
+        /// Show dropdown with registered items + custom items
+        /// </summary>
+        public Guid Show(Control anchorControl, DropdownType dropdownType, IEnumerable<DropdownItemBase>? additionalItems = null, string? category = null, OverlayOptions? options = null, string? name = null)
+        {
+            var registeredItems = string.IsNullOrEmpty(category) 
+                ? _registry.GetItems(dropdownType)
+                : _registry.GetItems(dropdownType, category);
+
+            var allItems = new List<DropdownItemBase>(registeredItems);
+            if (additionalItems != null)
+            {
+                allItems.AddRange(additionalItems);
+                allItems.Sort((a, b) => a.Order.CompareTo(b.Order));
+            }
+
+            var dropdown = new DropdownOverlay();
+            dropdown.SetItems(allItems, anchorControl);
+
+            var dropdownOptions = options ?? new OverlayOptions
+            {
+                ShowBackdrop = true,
+                BackdropOpacity = 0.0, // Invisible backdrop for click detection
+                CloseOnOutsideClick = true,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+            };
+
+            return _overlayService.CreateOverlay(dropdown, dropdownOptions, name);
+        }
+
+        /// <summary>
+        /// Show dropdown with only custom items (legacy compatibility)
+        /// </summary>
+        public Guid ShowCustom(Control anchorControl, IEnumerable<DropdownItemBase> items, OverlayOptions? options = null, string? name = null)
+        {
+            return Show(anchorControl, DropdownType.Options, items, null, options, name);
+        }
+
+        /// <summary>
+        /// Show dropdown using builder pattern
+        /// </summary>
+        public Guid ShowWithBuilder(Control anchorControl, Action<IList<DropdownItemBase>> configureItems, DropdownType dropdownType = DropdownType.Options, string? category = null, OverlayOptions? options = null, string? name = null)
+        {
+            var customItems = new List<DropdownItemBase>();
+            configureItems(customItems);
+            return Show(anchorControl, dropdownType, customItems, category, options, name);
+        }
+
+        /// <summary>
+        /// Get registered items (for inspection/debugging)
+        /// </summary>
+        public IEnumerable<DropdownItemBase> GetRegisteredItems(DropdownType dropdownType, string? category = null)
+        {
+            return string.IsNullOrEmpty(category) 
+                ? _registry.GetItems(dropdownType)
+                : _registry.GetItems(dropdownType, category);
+        }
+
+        /// <summary>
+        /// Remove a registered item
+        /// </summary>
+        public bool RemoveItem(DropdownType dropdownType, string itemId)
+        {
+            return _registry.RemoveItem(dropdownType, itemId);
+        }
+
+        /// <summary>
+        /// Clear all registered items for a dropdown type
+        /// </summary>
+        public void ClearItems(DropdownType dropdownType)
+        {
+            _registry.ClearItems(dropdownType);
+        }
     }
 }

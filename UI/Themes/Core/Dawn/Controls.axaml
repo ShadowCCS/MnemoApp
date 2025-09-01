@@ -293,5 +293,18 @@
     <CornerRadius x:Key="ComboBoxCornerRadius">4</CornerRadius>
     <Thickness x:Key="ButtonPadding">6</Thickness>
     <Thickness x:Key="ComboBoxBorderBrushThickness">1</Thickness>
-    
+
+    <!-- Dropdown -->
+    <SolidColorBrush x:Key="DropdownBackgroundBrush" Color="{DynamicResource DropdownBackground}" />
+    <SolidColorBrush x:Key="DropdownBorderBrush" Color="{DynamicResource DropdownBorder}" />
+
+    <!-- Dropdown Item -->
+    <SolidColorBrush x:Key="DropdownItemBackgroundBrush" Color="{DynamicResource DropdownItemBackground}" />
+    <SolidColorBrush x:Key="DropdownItemBackgroundPointerOverBrush" Color="{DynamicResource DropdownItemBackgroundPointerOver}" />
+    <SolidColorBrush x:Key="DropdownItemBackgroundPressedBrush" Color="{DynamicResource DropdownItemBackgroundPressed}" />
+    <SolidColorBrush x:Key="DropdownItemBackgroundDisabledBrush" Color="{DynamicResource DropdownItemBackgroundDisabled}" />
+    <SolidColorBrush x:Key="DropdownItemForegroundBrush" Color="{DynamicResource DropdownItemForeground}" />
+    <SolidColorBrush x:Key="DropdownItemForegroundHeaderBrush" Color="{DynamicResource DropdownItemForegroundHeader}" />
+    <SolidColorBrush x:Key="DropdownItemForegroundSecondaryBrush" Color="{DynamicResource DropdownItemForegroundSecondary}" />
+    <SolidColorBrush x:Key="DropdownItemSeparatorBrush" Color="{DynamicResource DropdownItemSeparatorBrush}" />
 </ResourceDictionary>

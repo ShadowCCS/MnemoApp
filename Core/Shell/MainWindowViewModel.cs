@@ -1,4 +1,5 @@
 ﻿using System.Windows.Input;
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.Input;
 using MnemoApp.Core.Common;
 using MnemoApp.Core.Navigation;
@@ -9,6 +10,8 @@ using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Services;
+using MnemoApp.UI.Components.Overlays;
+using MnemoApp.Core.Models;
 using System;
 using System.Threading.Tasks;
 
@@ -147,7 +150,30 @@ namespace MnemoApp.Core.Shell
 
         private void ShowNotifications()
         {
-            //TODO: Implement
+            // Create a simple dropdown without anchor control for now
+            // In a real implementation, you'd get the button position from the topbar
+            var items = new List<DropdownItemBase>
+            {
+                new DropdownHeader { Text = "Notifications" },
+                new DropdownOption { Text = "Notification 1", Command = new RelayCommand(() => { }) },
+                new DropdownOption { Text = "Notification 2", Command = new RelayCommand(() => { }) },
+                new DropdownOption { Text = "Notification 3", Command = new RelayCommand(() => { }) }
+            };
+
+            var dropdown = new UI.Components.Overlays.DropdownOverlay();
+            dropdown.SetItems(items);
+
+            var options = new OverlayOptions
+            {
+                ShowBackdrop = true,
+                BackdropOpacity = 0.0, // Invisible backdrop for click detection
+                CloseOnOutsideClick = true,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+                Margin = new Thickness(0, 50, 20, 0) // Position in top-right area
+            };
+
+            _mnemoAPI?.ui.overlay.CreateOverlay(dropdown, options, "NotificationsDropdown");
         }
         
         private void Minimize() { _mnemoAPI?.system.minimize(); }
@@ -167,7 +193,30 @@ namespace MnemoApp.Core.Shell
                 return;
             }
         }
-        private void Options() { /* TODO: open options */ }
+        private void Options() 
+        { 
+            var items = new List<DropdownItemBase>
+            {
+                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/clipboard-text.svg", Text = "Documentation", Command = new RelayCommand(() => { /* TODO: open settings */ }) },
+                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/progress-down.svg", Text = "Check Update", Command = new RelayCommand(() => { /* TODO: open preferences */ }) },
+                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/help-square.svg", Text = "Get Help", Command = new RelayCommand(() => { /* TODO: show about */ }) }
+            };
+
+            var dropdown = new UI.Components.Overlays.DropdownOverlay();
+            dropdown.SetItems(items);
+
+            var options = new OverlayOptions
+            {
+                ShowBackdrop = true,
+                BackdropOpacity = 0.0,
+                CloseOnOutsideClick = true,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+                Margin = new Thickness(0, 50, 20, 0)
+            };
+
+            _mnemoAPI?.ui.overlay.CreateOverlay(dropdown, options, "OptionsDropdown");
+        }
 
         
     }

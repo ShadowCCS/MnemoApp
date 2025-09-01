@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:MnemoApp.UI.Components.Overlays"
+             xmlns:models="using:MnemoApp.Core.Models"
+             xmlns:services="using:MnemoApp.Core.Services"
+             x:Class="MnemoApp.UI.Components.Overlays.DropdownOverlay"
+             x:DataType="local:DropdownOverlayViewModel">
+
+             <Border Background="{DynamicResource DropdownBackgroundBrush}" 
+                     BorderBrush="{DynamicResource DropdownBorderBrush}" 
+                     BorderThickness="1" 
+                     CornerRadius="6"
+                     Margin="{Binding Margin}"
+                     Padding="4">
+                 <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.DataTemplates>
+                        <DataTemplate DataType="models:DropdownOption">
+                            <Button Command="{Binding Command}" IsEnabled="{Binding IsEnabled}" Classes="DropdownItem" Background="Transparent" BorderBrush="Transparent" BorderThickness="0">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <services:MnemoSvg SvgPath="{Binding Icon}" Width="16" Height="16" Stroke="{DynamicResource DropdownItemForegroundBrush}" StrokeWidth="2"/>
+                                    <TextBlock Text="{Binding Text}" Foreground="{DynamicResource DropdownItemForegroundBrush}" FontFamily="{DynamicResource Font.Medium}" FontSize="{DynamicResource FontSize.Body.Small}"/>
+                                    <TextBlock Text="{Binding ShortcutText}" HorizontalAlignment="Right" Foreground="{DynamicResource DropdownItemForegroundSecondaryBrush}" FontFamily="{DynamicResource Font.Medium}" FontSize="{DynamicResource FontSize.Body.Small}"/>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                        <DataTemplate DataType="models:DropdownHeader">
+                            <TextBlock Text="{Binding Text}" FontFamily="{DynamicResource Font.Bold}" Margin="6,4" Foreground="{DynamicResource DropdownItemForegroundHeaderBrush}"/>
+                        </DataTemplate>
+                        <DataTemplate DataType="models:DropdownSeparator">
+                            <Separator Margin="4,2" Background="{DynamicResource DropdownItemSeparatorBrush}" Height="1.5" CornerRadius="2"/>
+                        </DataTemplate>
+                    </ItemsControl.DataTemplates>
+                 </ItemsControl>
+             </Border>
+</UserControl>
+
+

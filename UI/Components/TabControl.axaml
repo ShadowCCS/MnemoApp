@@ -7,7 +7,7 @@
       <TabControl>
         <TabItem Header="Arch">
           <Border Background="AntiqueWhite" Height="100">
-            <TextBlock Text="Content" Foreground="Black" FontSize="20"/>
+            <TextBlock Text="Content" Foreground="Black" FontSize="{DynamicResource FontSize.Heading4}"/>
           </Border>
         </TabItem>
         <TabItem Header="Leaf">

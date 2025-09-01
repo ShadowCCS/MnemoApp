@@ -40,6 +40,7 @@ namespace MnemoApp.Core
             services.AddSingleton<ITopbarService, TopbarService>();
             services.AddSingleton<IToastService, ToastService>();
             services.AddSingleton<IOverlayService, OverlayManager>();
+            services.AddSingleton<IDropdownItemRegistry, DropdownItemRegistry>();
             
             // Storage
             services.AddSingleton<IRuntimeStorage>(sp =>

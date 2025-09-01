@@ -65,8 +65,8 @@
                     <Border CornerRadius="8" Height="57" Width="95" Background="#282828" ClipToBounds="True">
                       <Svg Path="{Binding IconPath}" Width="110" Height="70"/>
                     </Border>
-                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Margin="8,6,8,0" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding Code}" Opacity="0.7" FontSize="11" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FontSize.Body.Small}" FontWeight="SemiBold" Margin="8,6,8,0" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding Code}" Opacity="0.7" FontSize="{DynamicResource FontSize.Caption}" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Button>
               </Border>
