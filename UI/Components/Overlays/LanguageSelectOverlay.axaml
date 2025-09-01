@@ -63,7 +63,7 @@
                 <Button Width="120" Height="100" Background="Transparent" BorderBrush="Transparent" Command="{Binding $parent[local:LanguageSelectOverlay].SelectLanguageCommand}" CommandParameter="{Binding}">
                   <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Border CornerRadius="8" Height="57" Width="95" Background="#282828" ClipToBounds="True">
-                      <Svg Path="{Binding IconPath}" Width="100" Height="60"/>
+                      <Svg Path="{Binding IconPath}" Width="110" Height="70"/>
                     </Border>
                     <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Margin="8,6,8,0" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding Code}" Opacity="0.7" FontSize="11" HorizontalAlignment="Center"/>

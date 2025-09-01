@@ -18,8 +18,14 @@
   },
   "Settings": {
     "Title": "Einstellungen",
-    "ToggleTheme": "Design wechseln",
-    "ToggleLanguage": "Sprache wechseln"
+    "AppearanceSectionTitle": "Erscheinungsbild",
+    "AppearanceSectionDescription": "Konfiguriere das Erscheinungsbild der Anwendung",
+    "ThemeSectionTitle": "Design",
+    "LanguageSectionTitle": "Sprache",
+    "ThemeSectionDescription": "Wähle das Design deiner Anwendung",
+    "LanguageSectionDescription": "Wähle die Sprache deiner Anwendung",
+    "ToggleTheme": "Design ändern",
+    "ToggleLanguage": "Sprache ändern"
   },
   "Core": {
     "Ok": "OK",

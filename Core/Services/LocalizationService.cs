@@ -285,6 +285,7 @@ namespace MnemoApp.Core.Services
                         {
                             Code = code,
                             Name = code.ToUpperInvariant(),
+                            NativeName = code.ToUpperInvariant(),
                             IconPath = Avalonia.Platform.AssetLoader.Exists(flagUri) ? flagUri.ToString() : null,
                             IsCore = true
                         };

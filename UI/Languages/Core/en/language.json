@@ -5,7 +5,7 @@
   },
   "Dashboard": {
     "Title": "Dashboard",
-    "Description": "Welcome to Mnemo! This is your main hub for all your learning and content creation requirements. It's currently under development and will be updated soon."
+    "Description": "Welcome to Mnemo! This is your main hub for all your learning and content creation needs. It's currently under development and will be updated soon."
   },
   "Flashcards": {
     "Title": "Flashcards",
@@ -18,14 +18,20 @@
   },
   "Settings": {
     "Title": "Settings",
-    "ToggleTheme": "Toggle Theme",
-    "ToggleLanguage": "Toggle Language"
+    "AppearanceSectionTitle": "Appearance",
+    "AppearanceSectionDescription": "Configure the appearance of the application",
+    "ThemeSectionTitle": "Theme",
+    "LanguageSectionTitle": "Language",
+    "ThemeSectionDescription": "Choose the theme of your application",
+    "LanguageSectionDescription": "Choose the language of your application",
+    "ToggleTheme": "Change Theme",
+    "ToggleLanguage": "Change Language"
   },
   "Core": {
     "Ok": "OK",
     "Cancel": "Cancel",
-    "CloseApplication": "Close Application",
-    "CloseApplicationConfirmation": "Are you sure you want to close the application?",
+    "CloseApplication": "Close application",
+    "CloseApplicationConfirmation": "Do you really want to close the application?",
     "Close": "Close"
   }
 }

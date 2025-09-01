@@ -1,0 +1,37 @@
+{
+  "System": {
+    "Title": "システム",
+    "Welcome": "ようこそ！あなたはMnemoコミュニティの一員です"
+  },
+  "Dashboard": {
+    "Title": "ダッシュボード",
+    "Description": "Mnemoへようこそ！ここは、あなたの学習とコンテンツ作成のすべてのニーズに対応するメインハブです。現在開発中で、間もなく更新されます。"
+  },
+  "Flashcards": {
+    "Title": "フラッシュカード",
+    "Coming Soon": "フラッシュカードは近日公開"
+  },
+  "Sidebar": {
+    "Main Hub": "メインハブ",
+    "Utility & Personalization": "ユーティリティ＆パーソナライゼーション",
+    "Quick Actions": "クイックアクション"
+  },
+  "Settings": {
+    "Title": "設定",
+    "AppearanceSectionTitle": "外観",
+    "AppearanceSectionDescription": "アプリケーションの外観を設定します",
+    "ThemeSectionTitle": "テーマ",
+    "LanguageSectionTitle": "言語",
+    "ThemeSectionDescription": "アプリケーションのテーマを選択します",
+    "LanguageSectionDescription": "アプリケーションの言語を選択します",
+    "ToggleTheme": "テーマの変更",
+    "ToggleLanguage": "言語の変更"
+  },
+  "Core": {
+    "Ok": "OK",
+    "Cancel": "キャンセル",
+    "CloseApplication": "アプリケーションを閉じる",
+    "CloseApplicationConfirmation": "本当にアプリケーションを閉じますか？",
+    "Close": "閉じる"
+  }
+}

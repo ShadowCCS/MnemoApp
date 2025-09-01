@@ -5,18 +5,43 @@
         xmlns:local="clr-namespace:MnemoApp.Modules.Settings"
         xmlns:i18n="clr-namespace:MnemoApp.UI.Markup"
         xmlns:vm="clr-namespace:MnemoApp.Modules.Settings"
+        xmlns:components="clr-namespace:MnemoApp.UI.Components"
         mc:Ignorable="d"
         x:Class="MnemoApp.Modules.Settings.SettingsView"
         x:DataType="vm:SettingsViewModel">
     <Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="Title" FontSize="20" Foreground="Black"/>
-            <Button Command="{Binding ToggleThemeCommand}">
-                <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="ToggleTheme"/>
-            </Button>
-            <Button Command="{Binding ToggleLanguageCommand}">
-                <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="ToggleLanguage"/>
-            </Button>
+        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top">
+            <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="Title" FontSize="{DynamicResource FontSize.Large}" FontFamily="{DynamicResource Font.Bold}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="2"/>
+
+            <Separator Margin="0,20,0,0" />
+            <StackPanel>
+                <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="AppearanceSectionTitle" FontSize="{DynamicResource FontSize.Medium}" FontFamily="{DynamicResource Font.Medium}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="2"/>
+                <TextBlock i18n:Localization.Namespace="Settings" i18n:Localization.TextKey="AppearanceSectionDescription" FontSize="{DynamicResource FontSize.Small}" FontFamily="{DynamicResource Font.Medium}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="2"/>
+            </StackPanel>
+
+            <StackPanel Spacing="12" Margin="0,12,0,0">
+                <components:SettingsCard Namespace="Settings" 
+                                       TitleKey="ThemeSectionTitle" 
+                                       DescriptionKey="ThemeSectionDescription">
+                    <components:SettingsCard.RightContent>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Command="{Binding ToggleThemeCommand}" Background="Transparent" BorderThickness="0">
+                                <TextBlock Text="{Binding CurrentTheme}" FontSize="{DynamicResource FontSize.Small}" FontFamily="{DynamicResource Font.Medium}" Foreground="{DynamicResource TextFadedBrush}" VerticalAlignment="Center" Margin="2"/>
+                            </Button>
+                        </StackPanel>
+                    </components:SettingsCard.RightContent>
+                </components:SettingsCard>
+
+                <components:SettingsCard Namespace="Settings" 
+                                       TitleKey="LanguageSectionTitle" 
+                                       DescriptionKey="LanguageSectionDescription">
+                    <components:SettingsCard.RightContent>
+                        <Button Command="{Binding ToggleLanguageCommand}" Background="Transparent" BorderThickness="0">
+                            <TextBlock Text="{Binding CurrentLanguage}" FontSize="{DynamicResource FontSize.Small}" FontFamily="{DynamicResource Font.Medium}" Foreground="{DynamicResource TextFadedBrush}" VerticalAlignment="Center" Margin="2"/>
+                        </Button>
+                    </components:SettingsCard.RightContent>
+                </components:SettingsCard>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </UserControl>

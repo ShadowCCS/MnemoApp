@@ -7,6 +7,7 @@ namespace MnemoApp.Core.Services
     {
         public required string Code { get; set; }
         public required string Name { get; set; }
+        public required string NativeName { get; set; }
         public string? IconPath { get; set; }
         
         [JsonPropertyName("flag")]

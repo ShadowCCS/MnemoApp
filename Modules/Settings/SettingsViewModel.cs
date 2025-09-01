@@ -12,6 +12,8 @@ public class SettingsViewModel : ViewModelBase
 
     public ICommand ToggleThemeCommand { get; }
     public ICommand ToggleLanguageCommand { get; }
+    public string CurrentTheme => _mnemoAPI.ui.themes.getCurrentTheme()?.Name ?? "Error";
+    public string CurrentLanguage => _mnemoAPI.ui.language.getCurrentLanguageManifest()?.NativeName ?? "Error";
     public SettingsViewModel(IMnemoAPI mnemoAPI)
     {
         _mnemoAPI = mnemoAPI;
@@ -26,6 +28,7 @@ public class SettingsViewModel : ViewModelBase
         {
             await _mnemoAPI.ui.themes.setTheme(result);
         }
+        OnPropertyChanged(nameof(CurrentTheme));
     }
 
     private async Task ToggleLanguage()
@@ -34,6 +37,7 @@ public class SettingsViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(result))
         {
             await _mnemoAPI.ui.language.setLanguage(result!);
+            OnPropertyChanged(nameof(CurrentLanguage));
         }
     }
 }
