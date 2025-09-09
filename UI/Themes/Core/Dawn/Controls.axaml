@@ -307,4 +307,8 @@
     <SolidColorBrush x:Key="DropdownItemForegroundHeaderBrush" Color="{DynamicResource DropdownItemForegroundHeader}" />
     <SolidColorBrush x:Key="DropdownItemForegroundSecondaryBrush" Color="{DynamicResource DropdownItemForegroundSecondary}" />
     <SolidColorBrush x:Key="DropdownItemSeparatorBrush" Color="{DynamicResource DropdownItemSeparatorBrush}" />
+
+    <!-- Generate Path -->
+    <SolidColorBrush x:Key="GeneratePathTextBrush" Color="{DynamicResource GeneratePathText}" />
+
 </ResourceDictionary>

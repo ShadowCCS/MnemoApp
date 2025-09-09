@@ -276,4 +276,7 @@
     <Color x:Key="DropdownItemForegroundHeader">#898989</Color>
     <Color x:Key="DropdownItemForegroundSecondary">#898989</Color>
     <Color x:Key="DropdownItemSeparatorBrush">#969696</Color>
+
+    <!-- Generate Path -->
+    <Color x:Key="GeneratePathText">#616161</Color>
 </ResourceDictionary>

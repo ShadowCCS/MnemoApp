@@ -41,6 +41,15 @@
                         </Button>
                     </components:SettingsCard.RightContent>
                 </components:SettingsCard>
+
+                <components:SettingsCard Namespace="Settings" 
+                                       TitleKey="AISectionTitle" 
+                                       DescriptionKey="AISectionDescription">
+                    <components:SettingsCard.RightContent>
+                        <ComboBox ItemsSource="{Binding AvailableModels}" SelectedItem="{Binding CurrentModel}" />
+                            <TextBlock Text="{Binding CurrentModel}" FontSize="{DynamicResource FontSize.Body.Small}" FontFamily="{DynamicResource Font.Medium}" Foreground="{DynamicResource TextFadedBrush}" VerticalAlignment="Center" Margin="2"/>  
+                    </components:SettingsCard.RightContent>
+                </components:SettingsCard>
             </StackPanel>
         </StackPanel>
     </Grid>

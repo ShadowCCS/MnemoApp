@@ -1,32 +1,41 @@
 using System;
 using System.Globalization;
+using Avalonia;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 
 namespace MnemoApp.UI.Converters
 {
-    public class BoolToBrushConverter : IValueConverter
+    public class BoolToBrushConverter : AvaloniaObject, IValueConverter
     {
+        public static readonly StyledProperty<IBrush?> TrueBrushProperty =
+            AvaloniaProperty.Register<BoolToBrushConverter, IBrush?>(nameof(TrueBrush));
+
+        public static readonly StyledProperty<IBrush?> FalseBrushProperty =
+            AvaloniaProperty.Register<BoolToBrushConverter, IBrush?>(nameof(FalseBrush));
+
+        public IBrush? TrueBrush
+        {
+            get => GetValue(TrueBrushProperty);
+            set => SetValue(TrueBrushProperty, value);
+        }
+
+        public IBrush? FalseBrush
+        {
+            get => GetValue(FalseBrushProperty);
+            set => SetValue(FalseBrushProperty, value);
+        }
+
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             var isTrue = value is bool b && b;
+            
             if (isTrue)
             {
-                if (parameter is IBrush brushParam) return brushParam;
-                if (parameter is string s)
-                {
-                    try
-                    {
-                        return Brush.Parse(s);
-                    }
-                    catch
-                    {
-                        // Fall through to default brush
-                    }
-                }
-                return new SolidColorBrush(Color.FromArgb(0x22, 0x88, 0x88, 0x88));
+                return TrueBrush ?? new SolidColorBrush(Color.FromArgb(0xFF, 0x20, 0x79, 0xFF));
             }
-            return Brushes.Transparent;
+            
+            return FalseBrush ?? new SolidColorBrush(Color.FromArgb(0xFF, 0x55, 0x55, 0x55));
         }
 
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

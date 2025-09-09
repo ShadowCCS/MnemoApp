@@ -7,9 +7,8 @@
     "Title": "Dashboard",
     "Description": "Welcome to Mnemo! This is your main hub for all your learning and content creation needs. It's currently under development and will be updated soon."
   },
-  "Flashcards": {
-    "Title": "Flashcards",
-    "Coming Soon": "Flashcards coming soon"
+  "Paths": {
+    "Title": "Learning Paths"
   },
   "Sidebar": {
     "Main Hub": "Main Hub",
@@ -26,6 +25,28 @@
     "LanguageSectionDescription": "Choose the language of your application",
     "ToggleTheme": "Change Theme",
     "ToggleLanguage": "Change Language"
+  },
+  "InputBuilder": {
+    "Title": "Generate Path",
+    "Description": "Turn your content into step-by-step lessons with AI",
+    "TextTab": "Text",
+    "FilesTab": "Files",
+    "LinksTab": "Links",
+    "TextPlaceholder": "Enter your text content here...",
+    "FilesPlaceholder": "Drop files here or",
+    "FilesSupportedFormats": "Supports PDF, DOCX, TXT and more",
+    "LinksPlaceholder": "Enter URL, e.g. https://example.com/article",
+    "AddButton": "Add",
+    "ContentSummary": "CONTENT SUMMARY",
+    "TextFormatted": "Text Entered",
+    "Characters": "CHARACTERS",
+    "Words": "Words",
+    "Context": "CONTEXT",
+    "FilesProcessed": "Files Processed",
+    "LinksScraped": "Links Scraped",
+    "Chars": "chars",
+    "ReadyToGenerate": "Ready to generate •",
+    "Generate": "Generate"
   },
   "Core": {
     "Ok": "OK",

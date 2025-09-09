@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MnemoApp.Modules.Paths"
+        xmlns:i18n="clr-namespace:MnemoApp.UI.Markup"
+        xmlns:vm="clr-namespace:MnemoApp.Modules.Paths"
+        mc:Ignorable="d"
+        x:Class="MnemoApp.Modules.Paths.PathsView"
+        x:DataType="vm:PathsViewModel">
+    <Grid>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock i18n:Localization.Namespace="Paths" i18n:Localization.TextKey="Title" FontSize="{DynamicResource FontSize.Heading4}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+            <Button Content="Create Path" Command="{Binding CreatePathCommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
+
+        </StackPanel>
+    </Grid>
+</UserControl> 

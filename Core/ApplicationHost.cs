@@ -10,7 +10,7 @@ using MnemoApp.Core.Services;
 using MnemoApp.Core.Shell;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
-using MnemoApp.Modules.Learning;
+using MnemoApp.Modules.Paths;
 using MnemoApp.Modules.Settings;
 using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Storage;
@@ -60,7 +60,7 @@ namespace MnemoApp.Core
             
             // Register modules
             services.AddTransient<DashboardViewModel>();
-            services.AddTransient<FlashcardsViewModel>();
+            services.AddTransient<PathsViewModel>();
             services.AddTransient<SettingsViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
@@ -107,10 +107,10 @@ namespace MnemoApp.Core
             
             // Register Learning modules
             api.sidebar.Register(
-                api.ui.language.get("Flashcards", "Title"),
-                typeof(FlashcardsViewModel),
+                api.ui.language.get("Paths", "Learning Paths"),
+                typeof(PathsViewModel),
                 api.ui.language.get("Sidebar", "Main Hub"),
-                "avares://MnemoApp/UI/Icons/Tabler/outline/layout-cards.svg"
+                "avares://MnemoApp/UI/Icons/Tabler/outline/route-alt-left.svg"
             );
 
             // Register Settings module

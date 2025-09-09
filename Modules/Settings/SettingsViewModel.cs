@@ -14,6 +14,7 @@ public class SettingsViewModel : ViewModelBase
     public ICommand ToggleLanguageCommand { get; }
     public string CurrentTheme => _mnemoAPI.ui.themes.getCurrentTheme()?.Name ?? "Error";
     public string CurrentLanguage => _mnemoAPI.ui.language.getCurrentLanguageManifest()?.NativeName ?? "Error";
+    public string CurrentModel => _mnemoAPI.ui.ai.getCurrentModel()?.Name ?? "Error";
     public SettingsViewModel(IMnemoAPI mnemoAPI)
     {
         _mnemoAPI = mnemoAPI;

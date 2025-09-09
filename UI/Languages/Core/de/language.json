@@ -7,9 +7,8 @@
     "Title": "Dashboard",
     "Description": "Willkommen bei Mnemo! Dies ist dein Haupt-Hub für all deine Lern- und Inhaltserstellungsanforderungen. Es wird derzeit entwickelt und wird bald aktualisiert."
   },
-  "Flashcards": {
-    "Title": "Lernkarten",
-    "Coming Soon": "Flashcards kommen bald"
+  "Paths": {
+    "Title": "Lernpfade"
   },
   "Sidebar": {
     "Main Hub": "Haupt Hub",
