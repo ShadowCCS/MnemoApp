@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using System;
 
 namespace MnemoApp.Core.MnemoAPI
 {
@@ -35,12 +36,24 @@ namespace MnemoApp.Core.MnemoAPI
             }
         }
 
-        public void exit()
+        public async void exit()
         {
             var desktop = GetDesktopLifetime();
             if (desktop != null)
             {
-                desktop.Shutdown();
+                // Clean shutdown of all services before terminating
+                try
+                {
+                    await ApplicationHost.ShutdownAsync();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error during application shutdown: {ex.Message}");
+                }
+                finally
+                {
+                    desktop.Shutdown();
+                }
             }
         }
     }

@@ -14,5 +14,6 @@ namespace MnemoApp.Core.MnemoAPI
         SystemApi system { get; set; }
         MnemoDataApi data { get; set; }
         MnemoApp.Data.Packaged.MnemoStorageManager storage { get; set; }
+        AIApi ai { get; set; }
     }
 }

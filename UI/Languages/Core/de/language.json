@@ -24,7 +24,9 @@
     "ThemeSectionDescription": "Wähle das Design deiner Anwendung",
     "LanguageSectionDescription": "Wähle die Sprache deiner Anwendung",
     "ToggleTheme": "Design ändern",
-    "ToggleLanguage": "Sprache ändern"
+    "ToggleLanguage": "Sprache ändern",
+    "AISectionTitle": "AI Modell",
+    "AISectionDescription": "Wähle das AI Modell für deine Anwendung"
   },
   "Core": {
     "Ok": "OK",

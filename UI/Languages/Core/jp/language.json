@@ -24,7 +24,9 @@
     "ThemeSectionDescription": "アプリケーションのテーマを選択します",
     "LanguageSectionDescription": "アプリケーションの言語を選択します",
     "ToggleTheme": "テーマの変更",
-    "ToggleLanguage": "言語の変更"
+    "ToggleLanguage": "言語の変更",
+    "AISectionTitle": "AIモデル",
+    "AISectionDescription": "アプリケーションのAIモデルを選択します"
   },
   "Core": {
     "Ok": "OK",

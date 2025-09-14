@@ -8,6 +8,7 @@ using MnemoApp.Core.Navigation;
 using MnemoApp.Core.MnemoAPI;
 using MnemoApp.Core.Services;
 using MnemoApp.Core.Shell;
+using MnemoApp.Core.AI.Services;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 using MnemoApp.Modules.Paths;
@@ -41,6 +42,8 @@ namespace MnemoApp.Core
             services.AddSingleton<IToastService, ToastService>();
             services.AddSingleton<IOverlayService, OverlayManager>();
             services.AddSingleton<IDropdownItemRegistry, DropdownItemRegistry>();
+            services.AddSingleton<IAIService, AIService>();
+            services.AddSingleton<IModelSelectionService, ModelSelectionService>();
             
             // Storage
             services.AddSingleton<IRuntimeStorage>(sp =>
@@ -49,6 +52,12 @@ namespace MnemoApp.Core
                 return new SqliteRuntimeStorage(baseDir);
             });
             services.AddSingleton<MnemoStorageManager>();
+            services.AddSingleton<MnemoDataApi>(sp =>
+            {
+                var runtime = sp.GetRequiredService<IRuntimeStorage>();
+                var packaged = sp.GetRequiredService<MnemoStorageManager>();
+                return new MnemoDataApi(runtime, packaged);
+            });
             
             // Register MnemoAPI
             services.AddSingleton<IMnemoAPI, MnemoApp.Core.MnemoAPI.MnemoAPI>();
@@ -68,6 +77,19 @@ namespace MnemoApp.Core
             // Initialize localization first and await it fully
             var localization = _serviceProvider.GetRequiredService<ILocalizationService>();
             await localization.InitializeAsync();
+
+            // Initialize AI services in background to avoid blocking UI startup
+            var aiService = _serviceProvider.GetRequiredService<IAIService>();
+            _ = Task.Run(async () =>
+            {
+                try { await aiService.InitializeAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"AI init failed: {ex.Message}"); }
+            });
+
+            var modelSelectionService = _serviceProvider.GetRequiredService<IModelSelectionService>();
+            _ = Task.Run(async () =>
+            {
+                try { await modelSelectionService.InitializeAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"ModelSelection init failed: {ex.Message}"); }
+            });
 
             // Initialize MnemoAPI
             var api = _serviceProvider.GetRequiredService<IMnemoAPI>();
@@ -120,6 +142,54 @@ namespace MnemoApp.Core
                 api.ui.language.get("Sidebar", "Utility & Personalization"),
                 "avares://MnemoApp/UI/Icons/Tabler/outline/adjustments-alt.svg"
             );
+        }
+
+        /// <summary>
+        /// Clean shutdown of all services, especially AI services
+        /// </summary>
+        public static async ValueTask ShutdownAsync()
+        {
+            if (_serviceProvider != null)
+            {
+                try
+                {
+                    // Dispose AI services first to ensure clean process termination
+                    var aiService = _serviceProvider.GetService<IAIService>();
+                    if (aiService is IAsyncDisposable aiDisposable)
+                    {
+                        await aiDisposable.DisposeAsync();
+                    }
+
+                    // Dispose storage services
+                    var runtimeStorage = _serviceProvider.GetService<IRuntimeStorage>();
+                    if (runtimeStorage is IAsyncDisposable storageDisposable)
+                    {
+                        await storageDisposable.DisposeAsync();
+                    }
+                    else if (runtimeStorage is IDisposable storageSync)
+                    {
+                        storageSync.Dispose();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error during service shutdown: {ex.Message}");
+                }
+                finally
+                {
+                    // Always dispose the service provider
+                    if (_serviceProvider is IAsyncDisposable asyncDisposable)
+                    {
+                        await asyncDisposable.DisposeAsync();
+                    }
+                    else if (_serviceProvider is IDisposable disposable)
+                    {
+                        disposable.Dispose();
+                    }
+                    
+                    _serviceProvider = null;
+                }
+            }
         }
         
     }

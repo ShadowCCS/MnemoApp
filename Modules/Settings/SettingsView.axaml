@@ -46,8 +46,12 @@
                                        TitleKey="AISectionTitle" 
                                        DescriptionKey="AISectionDescription">
                     <components:SettingsCard.RightContent>
+                        <StackPanel Orientation="Vertical" Spacing="2">
                         <ComboBox ItemsSource="{Binding AvailableModels}" SelectedItem="{Binding CurrentModel}" />
-                            <TextBlock Text="{Binding CurrentModel}" FontSize="{DynamicResource FontSize.Body.Small}" FontFamily="{DynamicResource Font.Medium}" Foreground="{DynamicResource TextFadedBrush}" VerticalAlignment="Center" Margin="2"/>  
+                        <Button Command="{Binding RefreshModelsCommand}" Background="Transparent" BorderThickness="0">
+                                <TextBlock Text="Refresh Models" FontSize="{DynamicResource FontSize.Body.ExtraSmall}" FontFamily="{DynamicResource Font.Medium}" Foreground="{DynamicResource TextFadedBrush}" VerticalAlignment="Center" Margin="2"/>
+                            </Button>
+                        </StackPanel>
                     </components:SettingsCard.RightContent>
                 </components:SettingsCard>
             </StackPanel>

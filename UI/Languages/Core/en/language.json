@@ -24,7 +24,9 @@
     "ThemeSectionDescription": "Choose the theme of your application",
     "LanguageSectionDescription": "Choose the language of your application",
     "ToggleTheme": "Change Theme",
-    "ToggleLanguage": "Change Language"
+    "ToggleLanguage": "Change Language",
+    "AISectionTitle": "AI Model",
+    "AISectionDescription": "Choose the AI model for your application"
   },
   "InputBuilder": {
     "Title": "Generate Path",
