@@ -1,16 +1,20 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="using:MnemoApp.UI.Components.Overlays"
+             xmlns:local="using:MnemoApp.Modules.Paths.Overlays"
              xmlns:core="using:MnemoApp.Core.Services"
              xmlns:conv="using:MnemoApp.UI.Converters"
              xmlns:ui="using:MnemoApp.UI.Components"
-             x:Class="MnemoApp.UI.Components.Overlays.CreatePathOverlay"
+             x:Class="MnemoApp.Modules.Paths.Overlays.CreatePathOverlay"
              x:DataType="local:CreatePathOverlay"
              Width="820"
              Height="480"
             >
-      <ui:InputBuilder Name="InputBuilderControl" UsableContext="2060" InputMethods="Text,Files" />
+      <ui:InputBuilder Name="InputBuilderControl"
+                       InputMethods="Text,Files"
+                       HeaderNamespace="Paths"
+                       TitleKey="Title"
+                       DescriptionKey="InputBuilderDescription" />
 </UserControl>
 
 
- 
+

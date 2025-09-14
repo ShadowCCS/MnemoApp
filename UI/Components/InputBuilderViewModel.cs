@@ -1,16 +1,35 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MnemoApp.Core.Common;
+using MnemoApp.Core.AI.Services;
+using MnemoApp.Core.MnemoAPI;
 
 namespace MnemoApp.UI.Components
 {
     public partial class InputBuilderViewModel : ViewModelBase
     {
+        private readonly IMnemoAPI _mnemoAPI;
+        
+        // Header localization (configurable by parent control)
         [ObservableProperty]
-        private int usableContext = 0;
+        private string headerNamespace = string.Empty; // e.g. "Paths" or "InputBuilder"
+
+        [ObservableProperty]
+        private string titleKey = string.Empty; // e.g. "Title"
+
+        [ObservableProperty]
+        private string descriptionKey = string.Empty; // e.g. "InputBuilderDescription"
+
+        [ObservableProperty]
+        private int currentTokenCount = 0;
+        
+        [ObservableProperty]
+        private int maxTokens = 0;
 
         [ObservableProperty]
         private bool showTextTab = true;
@@ -54,6 +73,9 @@ namespace MnemoApp.UI.Components
         [ObservableProperty]
         private string totalSourcesText = "Content from 3 sources combined";
 
+        [ObservableProperty]
+        private int reservedContext = 1800; // Need to reserve x tokens for the output of the model, this is just a guess for now, we will need to see how big the outputs are. Might dynamically change it depending on the max tokens we allow during call.
+
         // Badge counts
         [ObservableProperty]
         private int textEntryCount = 0;
@@ -67,8 +89,10 @@ namespace MnemoApp.UI.Components
         public ICommand AddLinkCommand { get; }
         public ICommand GenerateCommand { get; }
         
-        public InputBuilderViewModel()
+        public InputBuilderViewModel(IMnemoAPI mnemoAPI)
         {
+            _mnemoAPI = mnemoAPI ?? throw new ArgumentNullException(nameof(mnemoAPI));
+            
             SelectTextTabCommand = new RelayCommand(SelectTextTab);
             SelectFilesTabCommand = new RelayCommand(SelectFilesTab);
             SelectLinksTabCommand = new RelayCommand(SelectLinksTab);
@@ -78,12 +102,12 @@ namespace MnemoApp.UI.Components
             // Initialize with default tab selection based on visibility
             EnsureValidTabSelection();
             
-            // Listen to text content changes for character/word count
-            PropertyChanged += (_, e) =>
+            // Listen to text content changes for token count updates
+            PropertyChanged += async (_, e) =>
             {
                 if (e.PropertyName == nameof(TextContent))
                 {
-                    UpdateTextMetrics();
+                    await UpdateTextMetricsAsync();
                     UpdateBadgeCounts();
                 }
                 if (e.PropertyName == nameof(NewLinkUrl))
@@ -94,11 +118,16 @@ namespace MnemoApp.UI.Components
 
             Files.CollectionChanged += (_, __) => UpdateBadgeCounts();
             Links.CollectionChanged += (_, __) => UpdateBadgeCounts();
+            
+            // Subscribe to model selection changes
+            _mnemoAPI.ai.SubscribeToSelectedModelChanges(async _ => await UpdateModelContextAsync());
+            
+            // Initialize model context
+            _ = Task.Run(UpdateModelContextAsync);
         }
 
-        public void ApplyConfigurationFromControl(int usableContext, string inputMethodsCsv)
+        public void ApplyConfigurationFromControl(string inputMethodsCsv)
         {
-            UsableContext = usableContext;
             // Configure tabs by input methods list
             var methods = (inputMethodsCsv ?? string.Empty)
                 .Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries)
@@ -187,20 +216,89 @@ namespace MnemoApp.UI.Components
             return !string.IsNullOrEmpty(TextContent) || Files.Any() || Links.Any();
         }
         
-        private void UpdateTextMetrics()
+        private async Task UpdateTextMetricsAsync()
         {
             CharacterCount = TextContent?.Length ?? 0;
             WordCount = string.IsNullOrWhiteSpace(TextContent) 
                 ? 0 
                 : TextContent.Split(' ', System.StringSplitOptions.RemoveEmptyEntries).Length;
-            // If usable context provided, compute percent
-            if (UsableContext > 0)
+            
+            // Update token count using the AI service
+            await UpdateTokenCountAsync();
+            
+            // Calculate percentage based on tokens vs max context
+            if (MaxTokens > 0)
             {
-                var pct = (int)System.Math.Round((double)System.Math.Min(CharacterCount, UsableContext) / System.Math.Max(1, UsableContext) * 100.0);
+                var pct = (int)Math.Round((double)Math.Min(CurrentTokenCount, MaxTokens) / Math.Max(1, MaxTokens) * 100.0);
                 PercentComplete = pct;
+            }
+            else
+            {
+                PercentComplete = 0;
             }
 
             ((RelayCommand)GenerateCommand).NotifyCanExecuteChanged();
+        }
+        
+        private async Task UpdateTokenCountAsync()
+        {
+            if (string.IsNullOrWhiteSpace(TextContent))
+            {
+                CurrentTokenCount = 0;
+                return;
+            }
+            
+            var selectedModel = _mnemoAPI.ai.GetSelectedModel();
+            if (string.IsNullOrWhiteSpace(selectedModel))
+            {
+                CurrentTokenCount = 0;
+                return;
+            }
+            
+            try
+            {
+                var result = await _mnemoAPI.ai.CountTokensAsync(TextContent, selectedModel);
+                CurrentTokenCount = result.Success ? result.TokenCount : 0;
+            }
+            catch
+            {
+                // Fallback to 0 if tokenization fails
+                CurrentTokenCount = 0;
+            }
+        }
+        
+        private async Task UpdateModelContextAsync()
+        {
+            var selectedModel = _mnemoAPI.ai.GetSelectedModel();
+            if (string.IsNullOrWhiteSpace(selectedModel))
+            {
+                MaxTokens = 0;
+                return;
+            }
+            
+            try
+            {
+                var model = await _mnemoAPI.ai.GetModelAsync(selectedModel);
+                MaxTokens = (model?.Capabilities?.MaxContextLength ?? 0) - ReservedContext; // Subtract the reserved context from the max context length
+                
+                // Update current token count as well since model changed
+                await UpdateTokenCountAsync();
+                
+                // Recalculate percentage
+                if (MaxTokens > 0)
+                {
+                    var pct = (int)Math.Round((double)Math.Min(CurrentTokenCount, MaxTokens) / Math.Max(1, MaxTokens) * 100.0);
+                    PercentComplete = pct;
+                }
+                else
+                {
+                    PercentComplete = 0;
+                }
+            }
+            catch
+            {
+                MaxTokens = 0;
+            }
         }
 
         private void UpdateBadgeCounts()

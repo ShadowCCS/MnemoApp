@@ -8,7 +8,9 @@
     "Description": "Willkommen bei Mnemo! Dies ist dein Haupt-Hub für all deine Lern- und Inhaltserstellungsanforderungen. Es wird derzeit entwickelt und wird bald aktualisiert."
   },
   "Paths": {
-    "Title": "Lernpfade"
+    "Title": "Lernpfade",
+    "InputBuilderTitle": "Pfad generieren",
+    "InputBuilderDescription": "Verwandle deine Inhalte mit KI in Schritt-für-Schritt-Lektionen"
   },
   "Sidebar": {
     "Main Hub": "Haupt Hub",
@@ -27,6 +29,26 @@
     "ToggleLanguage": "Sprache ändern",
     "AISectionTitle": "AI Modell",
     "AISectionDescription": "Wähle das AI Modell für deine Anwendung"
+  },
+    "InputBuilder": {
+      "TextTab": "Text",
+      "FilesTab": "Dateien",
+      "LinksTab": "Links",
+      "TextPlaceholder": "Gib hier deinen Textinhalt ein...",
+      "FilesPlaceholder": "Dateien hier ablegen oder",
+      "FilesSupportedFormats": "Unterstützt PDF, DOCX, TXT und mehr",
+      "LinksPlaceholder": "URL eingeben, z.B. https://beispiel.de/artikel",
+      "AddButton": "Hinzufügen",
+      "ContentSummary": "INHALTSZUSAMMENFASSUNG",
+      "TextFormatted": "Eingegebener Text",
+      "Characters": "ZEICHEN",
+      "Words": "Wörter",
+      "Context": "KONTEXT",
+      "FilesProcessed": "Verarbeitete Dateien",
+      "LinksScraped": "Gescrapte Links",
+      "Chars": "Zeichen",
+      "ReadyToGenerate": "Bereit zum Generieren •",
+      "Generate": "Generieren"
   },
   "Core": {
     "Ok": "OK",

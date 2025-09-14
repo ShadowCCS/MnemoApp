@@ -8,7 +8,9 @@
     "Description": "Welcome to Mnemo! This is your main hub for all your learning and content creation needs. It's currently under development and will be updated soon."
   },
   "Paths": {
-    "Title": "Learning Paths"
+    "Title": "Learning Paths",
+    "InputBuilderTitle": "Generate Path",
+    "InputBuilderDescription": "Turn your content into step-by-step lessons with AI"
   },
   "Sidebar": {
     "Main Hub": "Main Hub",
@@ -29,8 +31,6 @@
     "AISectionDescription": "Choose the AI model for your application"
   },
   "InputBuilder": {
-    "Title": "Generate Path",
-    "Description": "Turn your content into step-by-step lessons with AI",
     "TextTab": "Text",
     "FilesTab": "Files",
     "LinksTab": "Links",
@@ -48,7 +48,8 @@
     "LinksScraped": "Links Scraped",
     "Chars": "chars",
     "ReadyToGenerate": "Ready to generate •",
-    "Generate": "Generate"
+    "Generate": "Generate",
+    "ContextUsedToolTip": "The maximum amount of text the model can process at once. Exceeding it causes the AI to 'forget' the earliest information."
   },
   "Core": {
     "Ok": "OK",

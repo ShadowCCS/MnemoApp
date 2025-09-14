@@ -73,6 +73,9 @@
     <Color x:Key="ProgressBarFill">#2079ff</Color>
     <Color x:Key="ProgressBarSecondaryBackground">#C0C0C0</Color>
     <Color x:Key="ProgressBarSecondaryFill">#8B8B8B</Color>
+    <Color x:Key="ProgressBarPhaseLow">#4CAF50</Color>
+    <Color x:Key="ProgressBarPhaseMedium">#FF9800</Color>
+    <Color x:Key="ProgressBarPhaseHigh">#F44336</Color>
     <Color x:Key="MainButtonBackground">#D7D7D7</Color>
     <Color x:Key="MainButtonTextColor">#676767</Color>
     <Color x:Key="InstallButtonBackground">#2079FF</Color>

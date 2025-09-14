@@ -13,9 +13,9 @@ obj/
 *.dll
 *.exe
 
+Core/AI/README.md
+
 # Icon libraries - Ignoring for now
 UI/Icons/Tabler/filled/
 UI/Icons/Tabler/outline/
-Core\AI\README.md
-
 

@@ -27,12 +27,12 @@
   <converters:StringFormatConverter x:Key="StringFormatConverter"/>
 
   <ControlTheme x:Key="{x:Type ProgressBar}" TargetType="ProgressBar">
-    <Setter Property="Foreground" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
-    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
-    <Setter Property="BorderThickness" Value="{DynamicResource ProgressBarBorderThemeThickness}" />
+    <Setter Property="Foreground" Value="{DynamicResource ProgressBarFillBrush}" />
+    <Setter Property="Background" Value="{DynamicResource ProgressBarBackgroundBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightTransparentBrush}" />
-    <Setter Property="MinHeight" Value="{DynamicResource ProgressBarThemeMinHeight}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="MinHeight" Value="4" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="Template">
       <ControlTemplate TargetType="ProgressBar">
@@ -78,7 +78,7 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 IsVisible="{TemplateBinding ShowProgressText}">
-              <TextBlock Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}">
+              <TextBlock Foreground="{DynamicResource TextPrimaryBrush}">
                   <TextBlock.Text>
                     <MultiBinding Converter="{StaticResource StringFormatConverter}">
                       <TemplateBinding Property="ProgressTextFormat"/>

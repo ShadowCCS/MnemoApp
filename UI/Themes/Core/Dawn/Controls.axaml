@@ -73,6 +73,9 @@
     <SolidColorBrush x:Key="ProgressBarFillBrush" Color="{DynamicResource ProgressBarFill}"/>
     <SolidColorBrush x:Key="ProgressBarSecondaryBackgroundBrush" Color="{DynamicResource ProgressBarSecondaryBackground}"/>
     <SolidColorBrush x:Key="ProgressBarSecondaryFillBrush" Color="{DynamicResource ProgressBarSecondaryFill}"/>
+    <SolidColorBrush x:Key="ProgressBarPhaseLowBrush" Color="{DynamicResource ProgressBarPhaseLow}"/>
+    <SolidColorBrush x:Key="ProgressBarPhaseMediumBrush" Color="{DynamicResource ProgressBarPhaseMedium}"/>
+    <SolidColorBrush x:Key="ProgressBarPhaseHighBrush" Color="{DynamicResource ProgressBarPhaseHigh}"/>
     <SolidColorBrush x:Key="MainButtonBackgroundBrush" Color="{DynamicResource MainButtonBackground}"/>
     <SolidColorBrush x:Key="MainButtonTextColorBrush" Color="{DynamicResource MainButtonTextColor}"/>
     <SolidColorBrush x:Key="InstallButtonBackgroundBrush" Color="{DynamicResource InstallButtonBackground}"/>

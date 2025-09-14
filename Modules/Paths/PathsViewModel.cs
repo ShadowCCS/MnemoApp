@@ -20,7 +20,8 @@ public class PathsViewModel : ViewModelBase
 
     private void CreatePath()
     {
-        // TODO: Implement create path
-        _mnemoAPI.ui.overlay.Show<string?>("UI/Components/Overlays/CreatePathOverlay.axaml", name: "CreatePathOverlay");
+        // Create the overlay with dependencies
+        var overlay = new Modules.Paths.Overlays.CreatePathOverlay(_mnemoAPI);
+        _mnemoAPI.ui.overlay.Show<string?>(overlay, name: "CreatePathOverlay");
     }
 }

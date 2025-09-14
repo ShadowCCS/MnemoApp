@@ -329,9 +329,10 @@ namespace MnemoApp.Core.AI.Services
                 }
             }
 
-            // Check for tokenizer
-            var tokenizerPath = Path.Combine(modelDirectory, "tokenizer.model");
-            var hasTokenizer = File.Exists(tokenizerPath);
+            // Check for tokenizer (.model or .json)
+            var tokenizerModelPath = Path.Combine(modelDirectory, "tokenizer.model");
+            var tokenizerJsonPath = Path.Combine(modelDirectory, "tokenizer.json");
+            var hasTokenizer = File.Exists(tokenizerModelPath) || File.Exists(tokenizerJsonPath);
 
             // Get available LoRA adapters for this model
             var modelAdapters = await GetModelSpecificAdaptersAsync(Path.GetFileName(modelDirectory));

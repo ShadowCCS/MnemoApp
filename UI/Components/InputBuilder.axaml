@@ -11,6 +11,7 @@
         <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" 
                                          TrueBrush="{DynamicResource AccentButtonForeground}"
                                          FalseBrush="{DynamicResource TextPrimary}"/>
+        <converters:ProgressPhaseBrushConverter x:Key="ProgressPhaseBrushConverter"/>
         
         <!-- Horizontal InputTab ToggleButton Style (kept for reference, no longer used) -->
         <ControlTheme x:Key="InputTabTheme" TargetType="ToggleButton">
@@ -93,29 +94,34 @@
             <!-- Header with Title/Description (left) and Counters (right) -->
             <Grid Grid.Row="0" Margin="0,0,0,8" ColumnDefinitions="*,Auto">
                 <StackPanel Grid.Column="0" Spacing="2">
-                    <TextBlock Text="{ui:T Ns=InputBuilder, Key=Title}" 
+                    <TextBlock ui:Localization.Namespace="{Binding HeaderNamespace}"
+                               ui:Localization.TextKey="{Binding TitleKey}"
                                FontFamily="{DynamicResource Font.SemiBold}" 
                                FontSize="{DynamicResource FontSize.Body.Large}"
                                Foreground="{DynamicResource TextPrimary}"/>
-                    <TextBlock Text="{ui:T Ns=InputBuilder, Key=Description}" 
+                    <TextBlock ui:Localization.Namespace="{Binding HeaderNamespace}"
+                               ui:Localization.TextKey="{Binding DescriptionKey}"
                                FontFamily="{DynamicResource Font.Regular}" 
                                FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>
 
                 <!-- Top-right counters -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Top">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Top" ToolTip.Tip="{ui:T Ns=InputBuilder, Key=ContextUsedToolTip}">
                     <StackPanel Spacing="0" HorizontalAlignment="Right">
-                        <TextBlock Text="{Binding CharacterCount}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}"/>
-                        <TextBlock Text="{ui:T Ns=InputBuilder, Key=Characters}" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
+                        <TextBlock Text="{Binding CurrentTokenCount}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}"/>
+                        <TextBlock Text="Tokens" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
                     </StackPanel>
                     <StackPanel Spacing="0" HorizontalAlignment="Right">
-                        <TextBlock Text="{Binding WordCount}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}"/>
-                        <TextBlock Text="{ui:T Ns=InputBuilder, Key=Words}" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
+                        <TextBlock Text="{Binding MaxTokens}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}"/>
+                        <TextBlock Text="Max Tokens" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
                     </StackPanel>
                     <StackPanel Spacing="0" HorizontalAlignment="Right">
-                        <TextBlock Text="{Binding PercentComplete}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}"/>
-                        <TextBlock Text="{ui:T Ns=InputBuilder, Key=Context}" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
+                        <TextBlock FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}">
+                            <Run Text="{Binding PercentComplete}"/><Run Text="%"/>
+                        </TextBlock>
+                        <TextBlock Text="Context Used" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
+                        <ProgressBar Value="{Binding PercentComplete}" Height="2" Width="65" Foreground="{Binding PercentComplete, Converter={StaticResource ProgressPhaseBrushConverter}, ConverterParameter=33|66}" MinWidth="2" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>
@@ -202,7 +208,7 @@
                     </ToggleButton>
                     </StackPanel>
 
-                    <!-- Content Summary moved to sidebar (deduped: no characters/words/context here) -->
+                    <!-- Content Summary -->
                     <StackPanel Orientation="Vertical" Spacing="4">
                         <TextBlock Text="{ui:T Ns=InputBuilder, Key=ContentSummary}"
                                    FontFamily="{DynamicResource Font.SemiBold}"

@@ -43,8 +43,8 @@ namespace MnemoApp.Core.AI.Services
                     };
                 }
 
-                var tokenizerPath = Path.Combine(model.DirectoryPath, "tokenizer.model");
-                if (!File.Exists(tokenizerPath))
+                var tokenizerPath = GetTokenizerPath(model.DirectoryPath);
+                if (tokenizerPath == null)
                 {
                     return new TokenCountResult
                     {
@@ -82,7 +82,7 @@ namespace MnemoApp.Core.AI.Services
                 throw new InvalidOperationException($"Tokenizer not available for model '{modelName}'");
 
             // EXPERIMENTAL: Placeholder implementation
-            // Real tokenization would use the model's tokenizer.model file
+            // Real tokenization would use the model's tokenizer.model or tokenizer.json file
             throw new NotImplementedException("Actual tokenization not yet implemented. Use CountTokensAsync for estimates.");
         }
 
@@ -93,7 +93,7 @@ namespace MnemoApp.Core.AI.Services
                 throw new InvalidOperationException($"Tokenizer not available for model '{modelName}'");
 
             // EXPERIMENTAL: Placeholder implementation  
-            // Real detokenization would use the model's tokenizer.model file
+            // Real detokenization would use the model's tokenizer.model or tokenizer.json file
             throw new NotImplementedException("Actual detokenization not yet implemented.");
         }
 
@@ -110,7 +110,7 @@ namespace MnemoApp.Core.AI.Services
                 throw new InvalidOperationException($"Tokenizer not available for model '{modelName}'");
 
             // EXPERIMENTAL: Returning common default vocabulary size
-            // Real implementation would read from tokenizer.model metadata
+            // Real implementation would read from tokenizer.model or tokenizer.json metadata
             return 32000; // Common vocabulary size for many models (estimate)
         }
 
@@ -138,6 +138,30 @@ namespace MnemoApp.Core.AI.Services
             estimatedTokens += punctuationCount / 2;
 
             return Math.Max(1, estimatedTokens);
+        }
+
+        /// <summary>
+        /// Get the tokenizer file path for a model directory, checking both .model and .json formats
+        /// </summary>
+        /// <param name="modelDirectoryPath">Path to the model directory</param>
+        /// <returns>Path to the tokenizer file if found, null otherwise. Prefers .model over .json</returns>
+        private string? GetTokenizerPath(string modelDirectoryPath)
+        {
+            // Check for .model file first (original format)
+            var tokenizerModelPath = Path.Combine(modelDirectoryPath, "tokenizer.model");
+            if (File.Exists(tokenizerModelPath))
+            {
+                return tokenizerModelPath;
+            }
+
+            // Check for .json file as fallback
+            var tokenizerJsonPath = Path.Combine(modelDirectoryPath, "tokenizer.json");
+            if (File.Exists(tokenizerJsonPath))
+            {
+                return tokenizerJsonPath;
+            }
+
+            return null;
         }
     }
 }
