@@ -13,6 +13,7 @@ namespace MnemoApp.Core.AI.Services
         private readonly IAIService _aiService;
         private readonly MnemoDataApi _dataApi;
         private string? _selectedModel;
+        private bool _isInitializing;
 
         public ObservableCollection<string> AvailableModels { get; } = new();
 
@@ -24,8 +25,14 @@ namespace MnemoApp.Core.AI.Services
                 if (_selectedModel == value) return;
                 _selectedModel = value;
                 SelectedModelChanged?.Invoke(_selectedModel);
-                
-                // Persist selection
+
+                // During initialization we do not persist to avoid overwriting saved value
+                if (_isInitializing)
+                {
+                    return;
+                }
+
+                // Persist selection after initialization
                 if (!string.IsNullOrWhiteSpace(_selectedModel))
                 {
                     _dataApi.SetProperty("AI.SelectedModel", _selectedModel);
@@ -48,18 +55,28 @@ namespace MnemoApp.Core.AI.Services
 
         public async Task InitializeAsync()
         {
-            await RefreshModelsAsync();
-            
-            // Restore saved selection
-            var saved = _dataApi.GetProperty<string>("AI.SelectedModel");
-            if (!string.IsNullOrWhiteSpace(saved) && AvailableModels.Contains(saved))
+            _isInitializing = true;
+            try
             {
-                _selectedModel = saved;
-                SelectedModelChanged?.Invoke(_selectedModel);
+                await RefreshModelsAsync();
+
+                // Restore saved selection (do not persist again)
+                var saved = _dataApi.GetProperty<string>("AI.SelectedModel");
+                if (!string.IsNullOrWhiteSpace(saved) && AvailableModels.Contains(saved))
+                {
+                    _selectedModel = saved;
+                    SelectedModelChanged?.Invoke(_selectedModel);
+                }
+                else if (AvailableModels.Count > 0)
+                {
+                    // Choose a default without persisting during init
+                    _selectedModel = AvailableModels[0];
+                    SelectedModelChanged?.Invoke(_selectedModel);
+                }
             }
-            else if (AvailableModels.Count > 0)
+            finally
             {
-                SelectedModel = AvailableModels[0];
+                _isInitializing = false;
             }
         }
 
@@ -71,7 +88,7 @@ namespace MnemoApp.Core.AI.Services
 
         private void OnModelsUpdated(System.Collections.Generic.IReadOnlyList<Models.AIModel> models)
         {
-            var currentSelection = SelectedModel;
+            var currentSelection = _selectedModel;
             
             AvailableModels.Clear();
             foreach (var model in models)
@@ -82,18 +99,35 @@ namespace MnemoApp.Core.AI.Services
             // Maintain selection if still valid, otherwise pick first available
             if (!string.IsNullOrWhiteSpace(currentSelection) && AvailableModels.Contains(currentSelection))
             {
-                // Selection is still valid, keep it
+                // Selection is still valid
                 return;
             }
 
             // Either no selection or invalid selection, pick first available
             if (AvailableModels.Count > 0)
             {
-                SelectedModel = AvailableModels[0];
+                if (_isInitializing)
+                {
+                    // Avoid persisting during initialization
+                    _selectedModel = AvailableModels[0];
+                    SelectedModelChanged?.Invoke(_selectedModel);
+                }
+                else
+                {
+                    SelectedModel = AvailableModels[0];
+                }
             }
             else
             {
-                SelectedModel = null;
+                if (_isInitializing)
+                {
+                    _selectedModel = null;
+                    SelectedModelChanged?.Invoke(_selectedModel);
+                }
+                else
+                {
+                    SelectedModel = null;
+                }
             }
         }
     }

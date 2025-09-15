@@ -26,14 +26,20 @@
             </Grid.RowDefinitions>
             
             <!-- Header Section -->
-            <StackPanel Grid.Row="0" 
-                        Orientation="Horizontal" 
-                        Spacing="10"
-                        Margin="0,0,0,20">
-                <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_full.svg" 
+            <Grid Grid.Row="0" 
+                  Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <services:MnemoSvg Grid.Column="0"
+                                  SvgPath="avares://MnemoApp/UI/Assets/Branding/logo_full.svg" 
                                   Width="100" Height="20" 
-                                  Fill="{DynamicResource SidebarLogoBrush}"/>
-                <Button Background="Transparent" 
+                                  Fill="{DynamicResource SidebarLogoBrush}"
+                                  HorizontalAlignment="Left"/>
+                <Button Grid.Column="1"
+                        Background="Transparent" 
                         BorderThickness="0" 
                         Command="{Binding ToggleSidebarCommand}"
                         ToolTip.Tip="Collapse sidebar"
@@ -43,7 +49,7 @@
                                       Stroke="{DynamicResource ChevronSidebarBrush}"
                                       StrokeWidth="2"/>
                 </Button>
-            </StackPanel>
+            </Grid>
             
             <!-- Navigation Section -->
             <ScrollViewer Grid.Row="1" 
