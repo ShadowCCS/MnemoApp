@@ -47,6 +47,24 @@ namespace MnemoApp.UI.Components
             InitializeComponent();
 
             this.DataContextChanged += (_, __) => ApplyPropsToViewModel();
+
+            // Ensure initial styling/bindings evaluate after load
+            this.AttachedToVisualTree += (_, __) =>
+            {
+                if (DataContext is InputBuilderViewModel vm)
+                {
+                    // Nudge active tab state to force initial converter evaluation
+                    vm.ConfigureTabs(vm.ShowTextTab, vm.ShowFilesTab, vm.ShowLinksTab);
+                }
+            };
+
+            this.DetachedFromVisualTree += (_, __) =>
+            {
+                if (DataContext is InputBuilderViewModel vm)
+                {
+                    vm.Dispose();
+                }
+            };
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

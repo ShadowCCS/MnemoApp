@@ -282,4 +282,30 @@
 
     <!-- Generate Path -->
     <Color x:Key="GeneratePathText">#616161</Color>
+    
+    <!-- Tab Control / Tab Item Colors -->
+    <Color x:Key="TabControlBackground">Transparent</Color>
+    
+    <!-- Unselected States -->
+    <Color x:Key="TabItemHeaderBackgroundUnselected">Transparent</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselected">#555555</Color>
+    <Color x:Key="TabItemHeaderBackgroundUnselectedPointerOver">#DBDBDB</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselectedPointerOver">#555555</Color>
+    <Color x:Key="TabItemHeaderBackgroundUnselectedPressed">#C5C5C5</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselectedPressed">#555555</Color>
+    
+    <!-- Selected States -->
+    <Color x:Key="TabItemHeaderBackgroundSelected">#C5C5C5</Color>
+    <Color x:Key="TabItemHeaderForegroundSelected">#555555</Color>
+    <Color x:Key="TabItemHeaderBackgroundSelectedPointerOver">#DBDBDB</Color>
+    <Color x:Key="TabItemHeaderForegroundSelectedPointerOver">#555555</Color>
+    <Color x:Key="TabItemHeaderBackgroundSelectedPressed">#C5C5C5</Color>
+    <Color x:Key="TabItemHeaderForegroundSelectedPressed">#555555</Color>
+    
+    <!-- Disabled State -->
+    <Color x:Key="TabItemHeaderBackgroundDisabled">#F0F0F0</Color>
+    <Color x:Key="TabItemHeaderForegroundDisabled">#999999</Color>
+    
+    <!-- Selected Pipe Indicator -->
+    <Color x:Key="TabItemHeaderSelectedPipeFill">#555555</Color>
 </ResourceDictionary>

@@ -263,4 +263,30 @@
     <Color x:Key="SearchBarTextHover">#AAAAAA</Color>
     <Color x:Key="SearchBarText">#888888</Color>
     <Color x:Key="SearchBarTextDisabled">#666666</Color>
+
+    <!-- Tab Control / Tab Item Colors -->
+    <Color x:Key="TabControlBackground">Transparent</Color>
+    
+    <!-- Unselected States -->
+    <Color x:Key="TabItemHeaderBackgroundUnselected">#2D2D2D</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselected">#AAAAAA</Color>
+    <Color x:Key="TabItemHeaderBackgroundUnselectedPointerOver">#242424</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselectedPointerOver">#AAAAAA</Color>
+    <Color x:Key="TabItemHeaderBackgroundUnselectedPressed">#3A3A3A</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselectedPressed">#AAAAAA</Color>
+    
+    <!-- Selected States -->
+    <Color x:Key="TabItemHeaderBackgroundSelected">#3a3a3a</Color>
+    <Color x:Key="TabItemHeaderForegroundSelected">#AAAAAA</Color>
+    <Color x:Key="TabItemHeaderBackgroundSelectedPointerOver">#242424</Color>
+    <Color x:Key="TabItemHeaderForegroundSelectedPointerOver">#AAAAAA</Color>
+    <Color x:Key="TabItemHeaderBackgroundSelectedPressed">#3A3A3A</Color>
+    <Color x:Key="TabItemHeaderForegroundSelectedPressed">#AAAAAA</Color>
+    
+    <!-- Disabled State -->
+    <Color x:Key="TabItemHeaderBackgroundDisabled">#0F0F0F</Color>
+    <Color x:Key="TabItemHeaderForegroundDisabled">#666666</Color>
+    
+    <!-- Selected Pipe Indicator -->
+    <Color x:Key="TabItemHeaderSelectedPipeFill">#AAAAAA</Color>
 </ResourceDictionary>

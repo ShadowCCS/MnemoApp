@@ -118,6 +118,32 @@
     <SolidColorBrush x:Key="AnswerWrongBrush" Color="{DynamicResource AnswerWrong}"/>
     <SolidColorBrush x:Key="SidebarLogoBrush" Color="{DynamicResource SidebarLogo}"/>
     
+    <!-- Tab Control / Tab Item Brushes -->
+    <SolidColorBrush x:Key="TabControlBackgroundBrush" Color="{DynamicResource TabControlBackground}"/>
+    
+    <!-- Unselected States -->
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedBrush" Color="{DynamicResource TabItemHeaderBackgroundUnselected}"/>
+    <SolidColorBrush x:Key="TabItemHeaderForegroundUnselectedBrush" Color="{DynamicResource TabItemHeaderForegroundUnselected}"/>
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOverBrush" Color="{DynamicResource TabItemHeaderBackgroundUnselectedPointerOver}"/>
+    <SolidColorBrush x:Key="TabItemHeaderForegroundUnselectedPointerOverBrush" Color="{DynamicResource TabItemHeaderForegroundUnselectedPointerOver}"/>
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPressedBrush" Color="{DynamicResource TabItemHeaderBackgroundUnselectedPressed}"/>
+    <SolidColorBrush x:Key="TabItemHeaderForegroundUnselectedPressedBrush" Color="{DynamicResource TabItemHeaderForegroundUnselectedPressed}"/>
+    
+    <!-- Selected States -->
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundSelectedBrush" Color="{DynamicResource TabItemHeaderBackgroundSelected}"/>
+    <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedBrush" Color="{DynamicResource TabItemHeaderForegroundSelected}"/>
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundSelectedPointerOverBrush" Color="{DynamicResource TabItemHeaderBackgroundSelectedPointerOver}"/>
+    <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPointerOverBrush" Color="{DynamicResource TabItemHeaderForegroundSelectedPointerOver}"/>
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundSelectedPressedBrush" Color="{DynamicResource TabItemHeaderBackgroundSelectedPressed}"/>
+    <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPressedBrush" Color="{DynamicResource TabItemHeaderForegroundSelectedPressed}"/>
+    
+    <!-- Disabled State -->
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundDisabledBrush" Color="{DynamicResource TabItemHeaderBackgroundDisabled}"/>
+    <SolidColorBrush x:Key="TabItemHeaderForegroundDisabledBrush" Color="{DynamicResource TabItemHeaderForegroundDisabled}"/>
+    
+    <!-- Selected Pipe Indicator -->
+    <SolidColorBrush x:Key="TabItemHeaderSelectedPipeFillBrush" Color="{DynamicResource TabItemHeaderSelectedPipeFill}"/>
+    
     <!-- Standard Avalonia Control Brushes -->
     <!-- Button Brushes -->
     <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="{DynamicResource ButtonBackground}"/>

@@ -8,9 +8,10 @@
              x:DataType="local:InputBuilderViewModel">
 
     <UserControl.Resources>
+        <!-- Use static brushes to avoid initial DynamicResource timing glitches -->
         <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" 
-                                         TrueBrush="{DynamicResource AccentButtonForeground}"
-                                         FalseBrush="{DynamicResource TextPrimary}"/>
+                                         TrueBrush="{StaticResource TextPrimaryBrush}"
+                                         FalseBrush="{StaticResource TextSecondaryBrush}"/>
         <converters:ProgressPhaseBrushConverter x:Key="ProgressPhaseBrushConverter"/>
         
         <!-- Horizontal InputTab ToggleButton Style (kept for reference, no longer used) -->
@@ -53,7 +54,8 @@
 
         <!-- Vertical Nav ToggleButton Style -->
         <ControlTheme x:Key="InputTabVerticalTheme" TargetType="ToggleButton">
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundUnselected}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TabItemHeaderForegroundUnselected}"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="CornerRadius" Value="6"/>
@@ -75,10 +77,20 @@
             </Setter>
 
             <Style Selector="^:pointerover">
-                <Setter Property="Background" Value="{DynamicResource NavElementHoverBackground}"/>
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundUnselectedPointerOver}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundUnselectedPointerOver}"/>
             </Style>
             <Style Selector="^:checked">
-                <Setter Property="Background" Value="{DynamicResource NavElementActiveBackground}"/>
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundSelected}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundSelected}"/>
+            </Style>
+            <Style Selector="^:checked:pointerover">
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundSelectedPointerOver}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundSelectedPointerOver}"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundDisabled}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundDisabled}"/>
             </Style>
         </ControlTheme>
     </UserControl.Resources>

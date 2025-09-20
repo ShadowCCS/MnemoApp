@@ -10,7 +10,7 @@
              Height="480"
             >
       <ui:InputBuilder Name="InputBuilderControl"
-                       InputMethods="Text,Files"
+                       InputMethods="Text,Files,Links"
                        HeaderNamespace="Paths"
                        TitleKey="Title"
                        DescriptionKey="InputBuilderDescription" />

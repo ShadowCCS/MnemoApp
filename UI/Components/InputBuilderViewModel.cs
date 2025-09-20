@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -11,9 +12,11 @@ using MnemoApp.Core.MnemoAPI;
 
 namespace MnemoApp.UI.Components
 {
-    public partial class InputBuilderViewModel : ViewModelBase
+    public partial class InputBuilderViewModel : ViewModelBase, IDisposable
     {
         private readonly IMnemoAPI _mnemoAPI;
+        private Action<string?>? _modelChangedHandler;
+        private CancellationTokenSource? _textMetricsCts;
         
         // Header localization (configurable by parent control)
         [ObservableProperty]
@@ -107,8 +110,12 @@ namespace MnemoApp.UI.Components
             {
                 if (e.PropertyName == nameof(TextContent))
                 {
-                    await UpdateTextMetricsAsync();
-                    UpdateBadgeCounts();
+                    try
+                    {
+                        await DebounceUpdateTextMetricsAsync();
+                        UpdateBadgeCounts();
+                    }
+                    catch { /* ignore */ }
                 }
                 if (e.PropertyName == nameof(NewLinkUrl))
                 {
@@ -119,11 +126,36 @@ namespace MnemoApp.UI.Components
             Files.CollectionChanged += (_, __) => UpdateBadgeCounts();
             Links.CollectionChanged += (_, __) => UpdateBadgeCounts();
             
-            // Subscribe to model selection changes
-            _mnemoAPI.ai.SubscribeToSelectedModelChanges(async _ => await UpdateModelContextAsync());
+            // Subscribe to model selection changes with stored handler for cleanup
+            _modelChangedHandler = async _ =>
+            {
+                try { await UpdateModelContextAsync(); }
+                catch { /* ignore */ }
+            };
+            _mnemoAPI.ai.SubscribeToSelectedModelChanges(_modelChangedHandler);
             
-            // Initialize model context
-            _ = Task.Run(UpdateModelContextAsync);
+            // Initialize model context without Task.Run; rely on method-level try/catch
+            _ = UpdateModelContextAsync();
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                if (_modelChangedHandler != null)
+                {
+                    _mnemoAPI.ai.UnsubscribeFromSelectedModelChanges(_modelChangedHandler);
+                    _modelChangedHandler = null;
+                }
+            }
+            catch { /* ignore */ }
+            finally
+            {
+                _textMetricsCts?.Cancel();
+                _textMetricsCts?.Dispose();
+                _textMetricsCts = null;
+            }
+            GC.SuppressFinalize(this);
         }
 
         public void ApplyConfigurationFromControl(string inputMethodsCsv)
@@ -157,39 +189,37 @@ namespace MnemoApp.UI.Components
                 (IsLinksTabActive && !ShowLinksTab))
             {
                 if (ShowTextTab)
-                    SelectTextTab();
+                    SetActiveTab(TabKind.Text);
                 else if (ShowFilesTab)
-                    SelectFilesTab();
+                    SetActiveTab(TabKind.Files);
                 else if (ShowLinksTab)
-                    SelectLinksTab();
+                    SetActiveTab(TabKind.Links);
             }
         }
         
         private void SelectTextTab()
         {
             if (!ShowTextTab) return;
-            
-            IsTextTabActive = true;
-            IsFilesTabActive = false;
-            IsLinksTabActive = false;
+            SetActiveTab(TabKind.Text);
         }
         
         private void SelectFilesTab()
         {
             if (!ShowFilesTab) return;
-            
-            IsTextTabActive = false;
-            IsFilesTabActive = true;
-            IsLinksTabActive = false;
+            SetActiveTab(TabKind.Files);
         }
         
         private void SelectLinksTab()
         {
             if (!ShowLinksTab) return;
-            
-            IsTextTabActive = false;
-            IsFilesTabActive = false;
-            IsLinksTabActive = true;
+            SetActiveTab(TabKind.Links);
+        }
+
+        private void SetActiveTab(TabKind tab)
+        {
+            IsTextTabActive = tab == TabKind.Text;
+            IsFilesTabActive = tab == TabKind.Files;
+            IsLinksTabActive = tab == TabKind.Links;
         }
         
         private void AddLink()
@@ -238,6 +268,20 @@ namespace MnemoApp.UI.Components
             }
 
             ((RelayCommand)GenerateCommand).NotifyCanExecuteChanged();
+        }
+
+        private async Task DebounceUpdateTextMetricsAsync(int delayMs = 200)
+        {
+            _textMetricsCts?.Cancel();
+            _textMetricsCts = new CancellationTokenSource();
+            var token = _textMetricsCts.Token;
+            try
+            {
+                await Task.Delay(delayMs, token);
+                if (token.IsCancellationRequested) return;
+                await UpdateTextMetricsAsync();
+            }
+            catch (TaskCanceledException) { /* ignore */ }
         }
         
         private async Task UpdateTokenCountAsync()
@@ -306,6 +350,13 @@ namespace MnemoApp.UI.Components
             // Treat any non-empty content as a single entry similar to the design's summary
             TextEntryCount = string.IsNullOrWhiteSpace(TextContent) ? 0 : 1;
         }
+    }
+    
+    public enum TabKind
+    {
+        Text,
+        Files,
+        Links
     }
     
     public partial class FileItemViewModel : ViewModelBase
