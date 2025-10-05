@@ -25,8 +25,16 @@ namespace MnemoApp.UI.Components
             InitializeComponent();
             this.AttachedToVisualTree += (_, __) =>
             {
-                var svc = OverlayService ?? ApplicationHost.Services.GetService<IOverlayService>();
-                if (svc != null) { OverlayService = svc; DataContext = svc; }
+                if (OverlayService != null) 
+                { 
+                    DataContext = OverlayService;
+                }
+                else
+                {
+                    // Fallback for dynamic creation (e.g., OverlayHostBehavior)
+                    var svc = ApplicationHost.GetServiceProvider().GetService<IOverlayService>();
+                    if (svc != null) { OverlayService = svc; DataContext = svc; }
+                }
                 this.Focus();
             };
         }

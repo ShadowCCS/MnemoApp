@@ -22,6 +22,9 @@ namespace MnemoApp.UI.Components.Overlays
     public partial class ThemeSelectOverlay : UserControl, System.ComponentModel.INotifyPropertyChanged
     {
         public string OverlayName { get; set; } = "ThemeSelectOverlay";
+        
+        public IMnemoAPI? MnemoAPI { get; set; }
+        
         private string _selectedTheme = "Dawn";
         public string SelectedTheme
         {
@@ -66,17 +69,17 @@ namespace MnemoApp.UI.Components.Overlays
         {
             try
             {
-                var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+                var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
                 await api.ui.themes.applyTheme(SelectedTheme);
             }
             catch (Exception ex)
             {
-                var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+                var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
                 await api.ui.overlay.CreateDialog("Apply failed", ex.Message, "OK", "", null, null);
             }
             finally
             {
-                //var overlays = ApplicationHost.Services.GetRequiredService<IOverlayService>();
+                //var overlays = ApplicationHost.GetServiceProvider().GetRequiredService<IOverlayService>();
                 //overlays.CloseOverlay(OverlayName, SelectedTheme);
             }
         }
@@ -89,7 +92,7 @@ namespace MnemoApp.UI.Components.Overlays
 
         private async Task LoadAsync()
         {
-            var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+            var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
             var themes = await api.ui.themes.getAllThemes();
             var current = api.ui.themes.getCurrentTheme();
             if (current != null) SelectedTheme = current.Name;
@@ -144,7 +147,7 @@ namespace MnemoApp.UI.Components.Overlays
             base.OnDetachedFromVisualTree(e);
             try
             {
-                var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+                var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
                 api.ui.themes.stopWatching();
             }
             catch { }
@@ -152,7 +155,7 @@ namespace MnemoApp.UI.Components.Overlays
 
         private async Task ImportAsync()
         {
-            var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+            var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
             var topLevel = TopLevel.GetTopLevel(this);
             var folders = await topLevel!.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
@@ -176,7 +179,7 @@ namespace MnemoApp.UI.Components.Overlays
         private async Task ExportAsync()
         {
             if (string.IsNullOrWhiteSpace(SelectedTheme)) return;
-            var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+            var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
             var topLevel = TopLevel.GetTopLevel(this);
             var folders = await topLevel!.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
@@ -198,7 +201,7 @@ namespace MnemoApp.UI.Components.Overlays
 
         private async Task RefreshAsync()
         {
-            var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+            var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
             var themes = await api.ui.themes.getAllThemes();
             _all.Clear();
             _all.AddRange(themes);

@@ -16,6 +16,7 @@ using Avalonia.Controls;
 using Avalonia.Styling;
 using MnemoApp.Data.Runtime;
 using MnemoApp.Core.MnemoAPI;
+using MnemoApp.Core.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MnemoApp.Core.Services
@@ -25,6 +26,7 @@ namespace MnemoApp.Core.Services
     /// </summary>
     public class ThemeService : IThemeService
     {
+        private readonly MnemoDataApi _dataApi;
         private List<ThemeManifest> _cachedThemes = new();
         private ThemeManifest? _currentTheme;
         private const string CoreThemeBasePath = "avares://MnemoApp/UI/Themes/Core/";
@@ -33,8 +35,9 @@ namespace MnemoApp.Core.Services
         private Task? _cacheWarmupTask;
 
 
-        public ThemeService()
+        public ThemeService(MnemoDataApi dataApi)
         {
+            _dataApi = dataApi;
         }
 
         public async Task<List<ThemeManifest>> GetAllThemesAsync()
@@ -100,9 +103,7 @@ namespace MnemoApp.Core.Services
                 var unified = TryGetUnifiedTheme();
                 var selected = !string.IsNullOrWhiteSpace(unified)
                     ? unified
-                    : ApplicationHost.Services
-                        .GetRequiredService<IMnemoAPI>()
-                        .data.GetProperty<string>("Theme");
+                    : _dataApi.GetProperty<string>("Theme");
 
                 await ApplyThemeAsync(string.IsNullOrWhiteSpace(selected) ? "Dawn" : selected!);
             }
@@ -117,7 +118,7 @@ namespace MnemoApp.Core.Services
             try
             {
                 // Known core themes (add any new embedded core themes here)
-                var coreThemeNames = new[] { "Dawn", "Dusk"};
+                var coreThemeNames = new[] { "Dawn", "Dusk", "Lumina"};
                 
                 foreach (var themeName in coreThemeNames)
                 {
@@ -216,8 +217,7 @@ namespace MnemoApp.Core.Services
         {
             try
             {
-                var _mnemoAPI = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
-                _mnemoAPI.data.SetProperty("Theme", themeName);
+                _dataApi.SetProperty("Theme", themeName);
                 return Task.CompletedTask;
             }
             catch (Exception ex)
@@ -253,14 +253,11 @@ namespace MnemoApp.Core.Services
             return true;
         }
 
-        private static string? TryGetUnifiedTheme()
+        private string? TryGetUnifiedTheme()
         {
             try
             {
-                // Resolve IMnemoAPI via ApplicationHost.Services if ready
-                var provider = MnemoApp.Core.ApplicationHost.Services;
-                var api = (MnemoApp.Core.MnemoAPI.IMnemoAPI?)provider.GetService(typeof(MnemoApp.Core.MnemoAPI.IMnemoAPI));
-                return api?.data.GetProperty<string>("Theme", MnemoApp.Data.Runtime.StorageScope.Runtime);
+                return _dataApi.GetProperty<string>("Theme", StorageScope.Runtime);
             }
             catch
             {
@@ -268,13 +265,11 @@ namespace MnemoApp.Core.Services
             }
         }
 
-        private static void TrySetUnifiedTheme(string value)
+        private void TrySetUnifiedTheme(string value)
         {
             try
             {
-                var provider = MnemoApp.Core.ApplicationHost.Services;
-                var api = (MnemoApp.Core.MnemoAPI.IMnemoAPI?)provider.GetService(typeof(MnemoApp.Core.MnemoAPI.IMnemoAPI));
-                api?.data.SetProperty("Theme", value, MnemoApp.Data.Runtime.StorageScope.Runtime);
+                _dataApi.SetProperty("Theme", value, StorageScope.Runtime);
             }
             catch
             {

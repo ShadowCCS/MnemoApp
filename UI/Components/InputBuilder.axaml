@@ -40,22 +40,22 @@
             </Setter>
             
             <Style Selector="^:pointerover">
-                <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOver}"/>
+                <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOverBrush}"/>
             </Style>
             
             <Style Selector="^:checked">
-                <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}"/>
+                <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundBrush}"/>
             </Style>
             
             <Style Selector="^:checked:pointerover">
-                <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundPointerOver}"/>
+                <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundPointerOverBrush}"/>
             </Style>
         </ControlTheme>
 
         <!-- Vertical Nav ToggleButton Style -->
         <ControlTheme x:Key="InputTabVerticalTheme" TargetType="ToggleButton">
-            <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundUnselected}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TabItemHeaderForegroundUnselected}"/>
+            <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundUnselectedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TabItemHeaderForegroundUnselectedBrush}"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="CornerRadius" Value="6"/>
@@ -77,26 +77,26 @@
             </Setter>
 
             <Style Selector="^:pointerover">
-                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundUnselectedPointerOver}"/>
-                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundUnselectedPointerOver}"/>
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundUnselectedPointerOverBrush}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundUnselectedPointerOverBrush}"/>
             </Style>
             <Style Selector="^:checked">
-                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundSelected}"/>
-                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundSelected}"/>
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundSelectedBrush}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundSelectedBrush}"/>
             </Style>
             <Style Selector="^:checked:pointerover">
-                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundSelectedPointerOver}"/>
-                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundSelectedPointerOver}"/>
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundSelectedPointerOverBrush}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundSelectedPointerOverBrush}"/>
             </Style>
             <Style Selector="^:disabled">
-                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundDisabled}"/>
-                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundDisabled}"/>
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundDisabledBrush}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundDisabledBrush}"/>
             </Style>
         </ControlTheme>
     </UserControl.Resources>
 
-    <Border Background="{DynamicResource CardBackgroundPrimary}" 
-            BorderBrush="{DynamicResource TextControlBorder}" 
+    <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" 
+            BorderBrush="{DynamicResource TextControlBorderBrush}" 
             BorderThickness="1" 
             CornerRadius="8"
             Padding="12">
@@ -110,29 +110,29 @@
                                ui:Localization.TextKey="{Binding TitleKey}"
                                FontFamily="{DynamicResource Font.SemiBold}" 
                                FontSize="{DynamicResource FontSize.Body.Large}"
-                               Foreground="{DynamicResource TextPrimary}"/>
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
                     <TextBlock ui:Localization.Namespace="{Binding HeaderNamespace}"
                                ui:Localization.TextKey="{Binding DescriptionKey}"
                                FontFamily="{DynamicResource Font.Regular}" 
                                FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
-                               Foreground="{DynamicResource TextSecondary}"/>
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
 
                 <!-- Top-right counters -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Top" ToolTip.Tip="{ui:T Ns=InputBuilder, Key=ContextUsedToolTip}">
                     <StackPanel Spacing="0" HorizontalAlignment="Right">
-                        <TextBlock Text="{Binding CurrentTokenCount}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}"/>
-                        <TextBlock Text="Tokens" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
+                        <TextBlock Text="{Binding CurrentTokenCount}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Tokens" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiaryBrush}"/>
                     </StackPanel>
                     <StackPanel Spacing="0" HorizontalAlignment="Right">
-                        <TextBlock Text="{Binding MaxTokens}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}"/>
-                        <TextBlock Text="Max Tokens" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
+                        <TextBlock Text="{Binding MaxTokens}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Max Tokens" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiaryBrush}"/>
                     </StackPanel>
                     <StackPanel Spacing="0" HorizontalAlignment="Right">
-                        <TextBlock FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimary}">
+                        <TextBlock FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}">
                             <Run Text="{Binding PercentComplete}"/><Run Text="%"/>
                         </TextBlock>
-                        <TextBlock Text="Context Used" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiary}"/>
+                        <TextBlock Text="Context Used" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiaryBrush}"/>
                         <ProgressBar Value="{Binding PercentComplete}" Height="2" Width="65" Foreground="{Binding PercentComplete, Converter={StaticResource ProgressPhaseBrushConverter}, ConverterParameter=33|66}" MinWidth="2" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
@@ -160,11 +160,11 @@
                                        FontFamily="{DynamicResource Font.Medium}" 
                                        FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                        Foreground="{Binding IsTextTabActive, Converter={StaticResource BoolToBrushConverter}}"/>
-                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackground}" CornerRadius="10" Padding="6,2">
+                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackgroundBrush}" CornerRadius="10" Padding="6,2">
                                 <TextBlock Text="{Binding TextEntryCount}" 
                                            FontFamily="{DynamicResource Font.SemiBold}"
                                            FontSize="{DynamicResource FontSize.Caption}"
-                                           Foreground="{DynamicResource AccentButtonForeground}"/>
+                                           Foreground="{DynamicResource AccentButtonForegroundBrush}"/>
                             </Border>
                         </Grid>
                     </ToggleButton>
@@ -185,11 +185,11 @@
                                        FontFamily="{DynamicResource Font.Medium}" 
                                        FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                        Foreground="{Binding IsFilesTabActive, Converter={StaticResource BoolToBrushConverter}}"/>
-                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackground}" CornerRadius="10" Padding="6,2">
+                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackgroundBrush}" CornerRadius="10" Padding="6,2">
                                 <TextBlock Text="{Binding Files.Count}" 
                                            FontFamily="{DynamicResource Font.SemiBold}"
                                            FontSize="{DynamicResource FontSize.Caption}"
-                                           Foreground="{DynamicResource AccentButtonForeground}"/>
+                                           Foreground="{DynamicResource AccentButtonForegroundBrush}"/>
                             </Border>
                         </Grid>
                     </ToggleButton>
@@ -210,11 +210,11 @@
                                        FontFamily="{DynamicResource Font.Medium}" 
                                        FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                        Foreground="{Binding IsLinksTabActive, Converter={StaticResource BoolToBrushConverter}}"/>
-                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackground}" CornerRadius="10" Padding="6,2">
+                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackgroundBrush}" CornerRadius="10" Padding="6,2">
                                 <TextBlock Text="{Binding Links.Count}" 
                                            FontFamily="{DynamicResource Font.SemiBold}"
                                            FontSize="{DynamicResource FontSize.Caption}"
-                                           Foreground="{DynamicResource AccentButtonForeground}"/>
+                                           Foreground="{DynamicResource AccentButtonForegroundBrush}"/>
                             </Border>
                         </Grid>
                     </ToggleButton>
@@ -225,18 +225,18 @@
                         <TextBlock Text="{ui:T Ns=InputBuilder, Key=ContentSummary}"
                                    FontFamily="{DynamicResource Font.SemiBold}"
                                    FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
-                                   Foreground="{DynamicResource TextSecondary}"/>
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <StackPanel Orientation="Vertical" Spacing="2">
                             <TextBlock FontFamily="{DynamicResource Font.Regular}"
                                        FontSize="{DynamicResource FontSize.Caption}"
-                                       Foreground="{DynamicResource TextTertiary}">
+                                       Foreground="{DynamicResource TextTertiaryBrush}">
                                 <Run Text="{ui:T Ns=InputBuilder, Key=FilesProcessed}"/>
                                 <Run Text="{Binding FilesProcessedCount}" FontFamily="{DynamicResource Font.Medium}"/>
                                 <Run Text="{ui:T Ns=InputBuilder, Key=Chars}"/>
                             </TextBlock>
                             <TextBlock FontFamily="{DynamicResource Font.Regular}"
                                        FontSize="{DynamicResource FontSize.Caption}"
-                                       Foreground="{DynamicResource TextTertiary}">
+                                       Foreground="{DynamicResource TextTertiaryBrush}">
                                 <Run Text="{ui:T Ns=InputBuilder, Key=LinksScraped}"/>
                                 <Run Text="{Binding LinksScrapedCount}" FontFamily="{DynamicResource Font.Medium}"/>
                                 <Run Text="{ui:T Ns=InputBuilder, Key=Chars}"/>
@@ -247,8 +247,8 @@
 
                 <!-- Right content area -->
                 <Border Grid.Column="1"
-                        Background="{DynamicResource CardBackgroundSecondary}"
-                        BorderBrush="{DynamicResource TextControlBorder}"
+                        Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                        BorderBrush="{DynamicResource TextControlBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="6"
                         Padding="8"
@@ -266,8 +266,8 @@
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                      Watermark="{ui:T Ns=InputBuilder, Key=TextPlaceholder}"
-                                     Background="{DynamicResource TextControlBackground}"
-                                     BorderBrush="{DynamicResource TextControlBorder}"
+                                     Background="{DynamicResource TextControlBackgroundBrush}"
+                                     BorderBrush="{DynamicResource TextControlBorderBrush}"
                                      BorderThickness="1"
                                      CornerRadius="4"
                                      Padding="8"/>
@@ -276,8 +276,8 @@
                         <!-- Files Tab Content -->
                         <StackPanel IsVisible="{Binding IsFilesTabActive}" Spacing="8">
                             <!-- File Drop Zone -->
-                            <Border Background="{DynamicResource OverlayBackground}" 
-                                    BorderBrush="{DynamicResource TextControlBorder}" 
+                            <Border Background="{DynamicResource OverlayBackgroundBrush}" 
+                                    BorderBrush="{DynamicResource TextControlBorderBrush}" 
                                     BorderThickness="2" 
                                     CornerRadius="6" 
                                     Padding="12" 
@@ -285,17 +285,17 @@
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
                                     <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/file-plus.svg" 
                                                        Width="20" Height="20" 
-                                                       Stroke="{DynamicResource TextTertiary}" 
+                                                       Stroke="{DynamicResource TextTertiaryBrush}" 
                                                        StrokeWidth="1.5"/>
                                     <TextBlock Text="{ui:T Ns=InputBuilder, Key=FilesPlaceholder}" 
                                                FontFamily="{DynamicResource Font.Medium}" 
                                                FontSize="{DynamicResource FontSize.Caption}"
-                                               Foreground="{DynamicResource TextTertiary}"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{ui:T Ns=InputBuilder, Key=FilesSupportedFormats}" 
                                                FontFamily="{DynamicResource Font.Regular}" 
                                                FontSize="{DynamicResource FontSize.Caption}"
-                                               Foreground="{DynamicResource TextFaded}"
+                                               Foreground="{DynamicResource TextFadedBrush}"
                                                HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
@@ -304,8 +304,8 @@
                             <ItemsControl ItemsSource="{Binding Files}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{DynamicResource WidgetBackgroundPrimary}" 
-                                                BorderBrush="{DynamicResource TextControlBorder}" 
+                                        <Border Background="{DynamicResource WidgetBackgroundPrimaryBrush}" 
+                                                BorderBrush="{DynamicResource TextControlBorderBrush}" 
                                                 BorderThickness="1" 
                                                 CornerRadius="4" 
                                                 Padding="8" 
@@ -314,14 +314,14 @@
                                                 <services:MnemoSvg Grid.Column="0"
                                                                    SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/file-text.svg" 
                                                                    Width="16" Height="16" 
-                                                                   Stroke="{DynamicResource TextSecondary}" 
+                                                                   Stroke="{DynamicResource TextSecondaryBrush}" 
                                                                    StrokeWidth="2"
                                                                    Margin="0,0,8,0"/>
                                                 <TextBlock Grid.Column="1" 
                                                            Text="{Binding FileName}" 
                                                            FontFamily="{DynamicResource Font.Medium}" 
                                                            FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
-                                                           Foreground="{DynamicResource TextPrimary}"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                                            VerticalAlignment="Center"/>
                                                 <Button Grid.Column="2" 
                                                         Command="{Binding RemoveCommand}"
@@ -329,7 +329,7 @@
                                                         Padding="4">
                                                     <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/x.svg" 
                                                                        Width="14" Height="14" 
-                                                                       Stroke="{DynamicResource TextTertiary}" 
+                                                                       Stroke="{DynamicResource TextTertiaryBrush}" 
                                                                        StrokeWidth="2"/>
                                                 </Button>
                                             </Grid>
@@ -354,8 +354,8 @@
                                 <TextBox Grid.Column="0"
                                          Text="{Binding NewLinkUrl}"
                                          Watermark="{ui:T Ns=InputBuilder, Key=LinksPlaceholder}"
-                                         Background="{DynamicResource TextControlBackground}"
-                                         BorderBrush="{DynamicResource TextControlBorder}"
+                                         Background="{DynamicResource TextControlBackgroundBrush}"
+                                         BorderBrush="{DynamicResource TextControlBorderBrush}"
                                          BorderThickness="1"
                                          CornerRadius="4"
                                          Padding="10"/>
@@ -373,8 +373,8 @@
                             <ItemsControl ItemsSource="{Binding Links}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{DynamicResource WidgetBackgroundPrimary}" 
-                                                BorderBrush="{DynamicResource TextControlBorder}" 
+                                        <Border Background="{DynamicResource WidgetBackgroundPrimaryBrush}" 
+                                                BorderBrush="{DynamicResource TextControlBorderBrush}" 
                                                 BorderThickness="1" 
                                                 CornerRadius="4" 
                                                 Padding="8" 
@@ -383,14 +383,14 @@
                                                 <services:MnemoSvg Grid.Column="0"
                                                                    SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/link.svg" 
                                                                    Width="16" Height="16" 
-                                                                   Stroke="{DynamicResource TextSecondary}" 
+                                                                   Stroke="{DynamicResource TextSecondaryBrush}" 
                                                                    StrokeWidth="2"
                                                                    Margin="0,0,8,0"/>
                                                 <TextBlock Grid.Column="1" 
                                                            Text="{Binding Url}" 
                                                            FontFamily="{DynamicResource Font.Medium}" 
                                                            FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
-                                                           Foreground="{DynamicResource Links}"
+                                                           Foreground="{DynamicResource LinksBrush}"
                                                            VerticalAlignment="Center"/>
                                                 <Button Grid.Column="2" 
                                                         Command="{Binding RemoveCommand}"
@@ -398,7 +398,7 @@
                                                         Padding="4">
                                                     <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/x.svg" 
                                                                        Width="14" Height="14" 
-                                                                       Stroke="{DynamicResource TextTertiary}" 
+                                                                       Stroke="{DynamicResource TextTertiaryBrush}" 
                                                                        StrokeWidth="2"/>
                                                 </Button>
                                             </Grid>

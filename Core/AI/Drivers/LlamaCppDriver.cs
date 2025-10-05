@@ -25,6 +25,7 @@ namespace MnemoApp.Core.AI.Drivers
         private readonly Dictionary<string, Process> _runningProcesses = new();
         private readonly Dictionary<string, string> _modelEndpoints = new();
         private readonly Services.IAILogger _logger;
+        private readonly IntPtr _windowsJobHandle = IntPtr.Zero; // Windows-only: ensures child processes die with parent
 
         public LlamaCppDriver(Services.IAILogger? logger = null)
         {
@@ -35,6 +36,38 @@ namespace MnemoApp.Core.AI.Drivers
             _httpClient = new HttpClient(handler);
             _httpClient.Timeout = TimeSpan.FromMinutes(5);
             _logger = logger ?? new Services.DebugAILogger();
+
+            // On Windows, create a Job Object that will automatically kill all assigned
+            // child processes when this process exits. This makes llama-server a true child.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                try
+                {
+                    _windowsJobHandle = CreateJobObject(IntPtr.Zero, null);
+                    if (_windowsJobHandle != IntPtr.Zero)
+                    {
+                        var info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+                        {
+                            BasicLimitInformation = new JOBOBJECT_BASIC_LIMIT_INFORMATION
+                            {
+                                LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                            }
+                        };
+                        int length = Marshal.SizeOf<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>();
+                        IntPtr infoPtr = Marshal.AllocHGlobal(length);
+                        try
+                        {
+                            Marshal.StructureToPtr(info, infoPtr, false);
+                            SetInformationJobObject(_windowsJobHandle, JobObjectInfoType.ExtendedLimitInformation, infoPtr, (uint)length);
+                        }
+                        finally
+                        {
+                            Marshal.FreeHGlobal(infoPtr);
+                        }
+                    }
+                }
+                catch { /* best-effort */ }
+            }
         }
 
         public bool CanHandle(AIModel model)
@@ -48,6 +81,13 @@ namespace MnemoApp.Core.AI.Drivers
         {
             try
             {
+                // Reuse existing running process for this model if present
+                if (_runningProcesses.TryGetValue(model.Manifest.Name, out var existing) && existing != null && !existing.HasExited)
+                {
+                    if (_modelEndpoints.ContainsKey(model.Manifest.Name))
+                        return true;
+                }
+
                 if (model.Capabilities?.HttpEndpoint != null)
                 {
                     // Use existing HTTP endpoint; trust and defer validation to first request
@@ -297,6 +337,15 @@ namespace MnemoApp.Core.AI.Drivers
         private async Task<bool> StartLlamaCppServerAsync(AIModel model)
         {
             System.Diagnostics.Debug.WriteLine("StartLlamaCppServerAsync: Entry");
+            // Guard: if already running for this model, just reuse
+            if (_runningProcesses.TryGetValue(model.Manifest.Name, out var alreadyRunning) && alreadyRunning != null && !alreadyRunning.HasExited)
+            {
+                if (_modelEndpoints.ContainsKey(model.Manifest.Name))
+                {
+                    System.Diagnostics.Debug.WriteLine("StartLlamaCppServerAsync: Reusing existing process");
+                    return true;
+                }
+            }
             if (model.Capabilities?.ExecutionConfig == null)
             {
                 System.Diagnostics.Debug.WriteLine("StartLlamaCppServerAsync: No ExecutionConfig");
@@ -378,12 +427,27 @@ namespace MnemoApp.Core.AI.Drivers
 
                 process.OutputDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) stdoutBuffer.Enqueue(e.Data); };
                 process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) stderrBuffer.Enqueue(e.Data); };
+                process.Exited += (_, __) =>
+                {
+                    try
+                    {
+                        _runningProcesses.Remove(model.Manifest.Name);
+                        _modelEndpoints.Remove(model.Manifest.Name);
+                    }
+                    catch { }
+                };
 
                 System.Diagnostics.Debug.WriteLine($"LlamaCpp starting process: '{resolvedExecutable}' {processInfo.Arguments}");
                 if (!process.Start())
                 {
                     System.Diagnostics.Debug.WriteLine("LlamaCpp process failed to start");
                     return false;
+                }
+
+                // On Windows, assign child process to the job so it dies with parent
+                if (_windowsJobHandle != IntPtr.Zero)
+                {
+                    try { AssignProcessToJobObject(_windowsJobHandle, process.Handle); } catch { }
                 }
 
                 process.BeginOutputReadLine();
@@ -435,6 +499,21 @@ namespace MnemoApp.Core.AI.Drivers
                         System.Diagnostics.Debug.WriteLine("llama.cpp stderr (first lines):" + Environment.NewLine + string.Join(Environment.NewLine, errPreview));
                     }
 
+                    try
+                    {
+                        if (!process.HasExited)
+                        {
+                            process.Kill();
+                            await process.WaitForExitAsync();
+                        }
+                    }
+                    catch { }
+                    finally
+                    {
+                        try { process.Dispose(); } catch { }
+                        _runningProcesses.Remove(model.Manifest.Name);
+                        _modelEndpoints.Remove(model.Manifest.Name);
+                    }
                     return false;
                 }
 
@@ -664,6 +743,74 @@ namespace MnemoApp.Core.AI.Drivers
             _runningProcesses.Clear();
             _modelEndpoints.Clear();
             _httpClient?.Dispose();
+
+            // Close Windows Job handle (this will kill any remaining assigned children)
+            if (_windowsJobHandle != IntPtr.Zero)
+            {
+                try { CloseHandle(_windowsJobHandle); } catch { }
+            }
         }
+
+        // ===================== Windows Job Object interop =====================
+        private const int JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+
+        private enum JobObjectInfoType
+        {
+            ExtendedLimitInformation = 9
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct IO_COUNTERS
+        {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LARGE_INTEGER
+        {
+            public long QuadPart;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+        {
+            public LARGE_INTEGER PerProcessUserTimeLimit;
+            public LARGE_INTEGER PerJobUserTimeLimit;
+            public int LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public int ActiveProcessLimit;
+            public UIntPtr Affinity;
+            public int PriorityClass;
+            public int SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+        {
+            public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+            public IO_COUNTERS IoInfo;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string? lpName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetInformationJobObject(IntPtr hJob, JobObjectInfoType infoType, IntPtr lpJobObjectInfo, uint cbJobObjectInfoLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
     }
 }

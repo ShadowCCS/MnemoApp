@@ -26,7 +26,7 @@ namespace MnemoApp.Core.Overlays
 
                     var host = new UI.Components.OverlayPopupHost
                     {
-                        OverlayService = ApplicationHost.Services.GetService<IOverlayService>()
+                        OverlayService = ApplicationHost.GetServiceProvider().GetService<IOverlayService>()
                     };
                     panel.Children.Add(host);
                 }

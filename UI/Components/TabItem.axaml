@@ -8,7 +8,7 @@
       <StackPanel Spacing="20">
         <TabItem Header="Leaf" />
         <TabItem Header="Arch" IsSelected="True" />
-        <TabItem Header="Background" Background="Yellow"/>
+        <TabItem Header="Background" Background="{DynamicResource CardBackgroundSecondaryBrush}"/>
       </StackPanel>
     </Border>
   </Design.PreviewWith>

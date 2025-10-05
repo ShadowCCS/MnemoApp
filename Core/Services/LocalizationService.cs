@@ -37,17 +37,8 @@ namespace MnemoApp.Core.Services
                 // Load core languages embedded in resources if present
                 LoadPackagedCoreLanguages();
 
-                // Load persisted preference via MnemoAPI
-                try
-                {
-                    var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
-                    var saved = api.data.GetProperty<string>("Language");
-                    if (!string.IsNullOrWhiteSpace(saved))
-                    {
-                        CurrentLanguage = saved!;
-                    }
-                }
-                catch { /* ignore */ }
+                // Initial language is set by ApplicationHost after loading settings
+                // No need to access ApplicationHost.Services here
 
                 // Ensure English exists as baseline
                 if (!_dict.ContainsKey("en"))
@@ -90,12 +81,7 @@ namespace MnemoApp.Core.Services
                 return true;
 
             CurrentLanguage = languageCode;
-            try
-            {
-                var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
-                api.data.SetProperty("Language", languageCode);
-            }
-            catch { /* ignore */ }
+            // Language preference is saved by ApplicationHost after language change event
 
             LanguageChanged?.Invoke(this, CurrentLanguage);
             return await Task.FromResult(true);

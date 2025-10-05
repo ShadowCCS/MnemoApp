@@ -3,7 +3,7 @@
                     x:ClassModifier="internal"
                     x:CompileBindings="True">
   <Design.PreviewWith>
-    <Border Padding="0" Background="White">
+    <Border Padding="0" Background="{DynamicResource CardBackgroundPrimaryBrush}">
       <NotificationCard Content="Testing" />
     </Border>
   </Design.PreviewWith>

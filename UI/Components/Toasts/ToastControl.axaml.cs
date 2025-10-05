@@ -9,6 +9,15 @@ namespace MnemoApp.UI.Components.Toasts
 {
     public partial class ToastControl : UserControl
     {
+        public static readonly StyledProperty<IToastService?> ToastServiceProperty =
+            AvaloniaProperty.Register<ToastControl, IToastService?>(nameof(ToastService));
+
+        public IToastService? ToastService
+        {
+            get => GetValue(ToastServiceProperty);
+            set => SetValue(ToastServiceProperty, value);
+        }
+
         public ToastControl()
         {
             InitializeComponent();
@@ -19,8 +28,8 @@ namespace MnemoApp.UI.Components.Toasts
                 {
                     if (DataContext is ToastNotification toast)
                     {
-                        var svc = ApplicationHost.Services.GetService<IToastService>();
-                        svc?.Remove(toast.Id);
+                        var service = ToastService ?? ApplicationHost.GetServiceProvider().GetService<IToastService>();
+                        service?.Remove(toast.Id);
                     }
                 };
             }

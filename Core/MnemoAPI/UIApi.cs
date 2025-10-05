@@ -7,6 +7,8 @@ using Avalonia.Controls;
 using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Services;
 using MnemoApp.Core.Models;
+using MnemoApp.Core.Tasks.Models;
+using MnemoApp.Core.Tasks.Services;
 using MnemoApp.UI.Components.Overlays;
 
 namespace MnemoApp.Core.MnemoAPI
@@ -22,32 +24,24 @@ namespace MnemoApp.Core.MnemoAPI
         public ToastApi toast { get; }
         public OverlayApi overlay { get; }
         public DropdownApi dropdown { get; }
+        public LoadingOverlayApi loading { get; }
 
-        public UIApi(IThemeService themeService, ITopbarService topbarService, IOverlayService overlayService)
+        public UIApi(
+            IThemeService themeService, 
+            ITopbarService topbarService, 
+            IOverlayService overlayService,
+            ILocalizationService localizationService,
+            IToastService toastService,
+            IDropdownItemRegistry dropdownRegistry,
+            ITaskSchedulerService taskScheduler)
         {
             themes = new ThemeApi(themeService);
-            var loc = Core.ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
-            if (loc == null)
-            {
-                loc = new LocalizationService();
-            }
-            language = new LanguageApi(loc);
+            language = new LanguageApi(localizationService);
             topbar = new TopbarApi(topbarService);
             overlay = new OverlayApi(overlayService);
-            var toastService = Core.ApplicationHost.Services.GetService(typeof(IToastService)) as IToastService;
-            if (toastService == null)
-            {
-                // Fallback for design-time
-                toastService = new ToastService();
-            }
-            toast = new ToastApi(toastService);
-            
-            var dropdownRegistry = Core.ApplicationHost.Services.GetService(typeof(IDropdownItemRegistry)) as IDropdownItemRegistry;
-            if (dropdownRegistry == null)
-            {
-                dropdownRegistry = new DropdownItemRegistry();
-            }
+            toast = new ToastApi(toastService, taskScheduler, overlayService);
             dropdown = new DropdownApi(dropdownRegistry, overlayService);
+            loading = new LoadingOverlayApi(overlayService, taskScheduler);
         }
     }
 
@@ -183,6 +177,7 @@ namespace MnemoApp.Core.MnemoAPI
     public class OverlayApi
     {
         private readonly IOverlayService _overlayService;
+        public IOverlayService Service => _overlayService;
 
         public OverlayApi(IOverlayService overlayService)
         {
@@ -282,10 +277,15 @@ namespace MnemoApp.Core.MnemoAPI
     public class ToastApi
     {
         private readonly IToastService _toastService;
+        public IToastService Service => _toastService;
+        private readonly TaskToastService _taskToastService;
+        private readonly ITaskSchedulerService _taskScheduler;
 
-        public ToastApi(IToastService toastService)
+        public ToastApi(IToastService toastService, ITaskSchedulerService taskScheduler, IOverlayService overlayService)
         {
             _toastService = toastService;
+            _taskScheduler = taskScheduler;
+            _taskToastService = new TaskToastService(_toastService, taskScheduler, overlayService);
         }
 
         public System.Collections.ObjectModel.ReadOnlyObservableCollection<ToastNotification> passive => _toastService.PassiveToasts;
@@ -305,6 +305,47 @@ namespace MnemoApp.Core.MnemoAPI
         public bool remove(System.Guid id) => _toastService.Remove(id);
 
         public void clear() => _toastService.Clear();
+
+        // Task integration methods
+        public System.Guid showForTask(System.Guid taskId, bool showProgress = true)
+        {
+            var task = _taskScheduler.GetTask(taskId);
+            if (task == null)
+                throw new ArgumentException($"Task with ID {taskId} not found", nameof(taskId));
+
+            // Check if a toast already exists for this task
+            var existingToastId = _taskToastService.GetToastIdForTask(taskId);
+            if (existingToastId.HasValue)
+            {
+                // Update existing toast if needed
+                _taskToastService.UpdateTaskToast(task);
+                _toastService.AttachTask(existingToastId.Value, task.Id);
+                return existingToastId.Value;
+            }
+
+            // Create new toast if none exists
+            var id = _taskToastService.CreateTaskToast(task, showProgress);
+            _toastService.AttachTask(id, task.Id);
+            return id;
+        }
+
+        public bool updateForTask(System.Guid taskId)
+        {
+            var task = _taskScheduler.GetTask(taskId);
+            if (task == null) return false;
+
+            return _taskToastService.UpdateTaskToast(task);
+        }
+
+        public bool removeForTask(System.Guid taskId)
+        {
+            return _taskToastService.RemoveTaskToast(taskId);
+        }
+
+        public System.Guid? getToastIdForTask(System.Guid taskId)
+        {
+            return _taskToastService.GetToastIdForTask(taskId);
+        }
     }
 
     public class DropdownApi

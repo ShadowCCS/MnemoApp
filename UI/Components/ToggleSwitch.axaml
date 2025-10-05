@@ -12,7 +12,7 @@
                       Content="Header"
                       OffContent="Off"
                       OnContent="On"/>
-        <ToggleSwitch Background="Yellow"/>
+        <ToggleSwitch Background="{DynamicResource CardBackgroundSecondaryBrush}"/>
       </StackPanel>
     </StackPanel>
   </Design.PreviewWith>

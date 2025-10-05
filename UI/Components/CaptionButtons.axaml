@@ -10,7 +10,7 @@
     <Border Padding="20">
       <StackPanel Spacing="20">
         <ThemeVariantScope RequestedThemeVariant="Dark">
-          <Border Background="Black">
+          <Border Background="{DynamicResource WorkspaceBackgroundBrush}">
             <CaptionButtons Height="30"/>
           </Border>
         </ThemeVariantScope>
@@ -86,8 +86,8 @@
             </Viewbox>
           </Button>
           <Button x:Name="PART_CloseButton"
-                  Background="#ffe81123"
-                  BorderBrush="#fff1707a"
+                  Background="{DynamicResource DestructiveButtonColorBrush}"
+                  BorderBrush="{DynamicResource DestructiveButtonHoverColorBrush}"
                   Theme="{StaticResource FluentCaptionButton}"
                   AutomationProperties.Name="Close"
                   Win32Properties.NonClientHitTestResult="Close">

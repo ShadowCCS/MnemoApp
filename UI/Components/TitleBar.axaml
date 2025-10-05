@@ -4,7 +4,7 @@
                     x:CompileBindings="True">
     <Design.PreviewWith>
       <Border Height="30" Width="300">
-        <TitleBar Background="SkyBlue" Foreground="Black" />
+        <TitleBar Background="{DynamicResource TopbarBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" />
       </Border>
     </Design.PreviewWith>
 

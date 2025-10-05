@@ -23,6 +23,10 @@ namespace MnemoApp.Core.Shell
         public ViewModelBase? CurrentPage => _mnemoAPI?.navigate?.CurrentViewModel;
         public SidebarViewModel? SidebarViewModel { get; }
         public UIApi? ui => _mnemoAPI?.ui;
+        
+        // Expose services for binding
+        public IToastService? ToastService => _mnemoAPI?.ui?.toast.Service;
+        public IOverlayService? OverlayService => _mnemoAPI?.ui?.overlay.Service;
 
         private readonly IMnemoAPI? _mnemoAPI;
 
@@ -40,12 +44,12 @@ namespace MnemoApp.Core.Shell
         {
             _mnemoAPI = null;
             SidebarViewModel = null;
-            ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
-            ShowNotificationsCommand = new RelayCommand(() => { });
-            MinimizeCommand = new RelayCommand(() => { });
-            MaximizeCommand = new RelayCommand(() => { });
-            CloseCommand = new RelayCommand(() => { });
-            OptionsCommand = new RelayCommand(() => { });
+            ToggleSidebarCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ToggleSidebar);
+            ShowNotificationsCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { });
+            MinimizeCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { });
+            MaximizeCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { });
+            CloseCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { });
+            OptionsCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { });
             
         }
         
@@ -54,16 +58,16 @@ namespace MnemoApp.Core.Shell
             _mnemoAPI = mnemoAPI;
             SidebarViewModel = sidebarViewModel;
             _mnemoAPI.navigate.ViewModelChanged += OnViewModelChanged;
-            ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
+            ToggleSidebarCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ToggleSidebar);
 
             // Initialize Topbar Commands for runtime
-            ShowNotificationsCommand = new RelayCommand(ShowNotifications);
-            MinimizeCommand = new RelayCommand(Minimize);
-            MaximizeCommand = new RelayCommand(Maximize);
+            ShowNotificationsCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ShowNotifications);
+            MinimizeCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(Minimize);
+            MaximizeCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(Maximize);
             
             
-            CloseCommand = new RelayCommand(Close);
-            OptionsCommand = new RelayCommand(Options);
+            CloseCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(Close);
+            OptionsCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(Options);
             
             // Navigate to default page (Dashboard)
             NavigateToDefaultPage();
@@ -155,9 +159,9 @@ namespace MnemoApp.Core.Shell
             var items = new List<DropdownItemBase>
             {
                 new DropdownHeader { Text = "Notifications" },
-                new DropdownOption { Text = "Notification 1", Command = new RelayCommand(() => { }) },
-                new DropdownOption { Text = "Notification 2", Command = new RelayCommand(() => { }) },
-                new DropdownOption { Text = "Notification 3", Command = new RelayCommand(() => { }) }
+                new DropdownOption { Text = "Notification 1", Command = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }) },
+                new DropdownOption { Text = "Notification 2", Command = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }) },
+                new DropdownOption { Text = "Notification 3", Command = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }) }
             };
 
             var dropdown = new UI.Components.Overlays.DropdownOverlay();
@@ -197,9 +201,9 @@ namespace MnemoApp.Core.Shell
         { 
             var items = new List<DropdownItemBase>
             {
-                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/clipboard-text.svg", Text = "Documentation", Command = new RelayCommand(() => { /* TODO: open settings */ }) },
-                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/progress-down.svg", Text = "Check Update", Command = new RelayCommand(() => { /* TODO: open preferences */ }) },
-                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/help-square.svg", Text = "Get Help", Command = new RelayCommand(() => { /* TODO: show about */ }) }
+                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/clipboard-text.svg", Text = "Documentation", Command = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { /* TODO: open settings */ }) },
+                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/progress-down.svg", Text = "Check Update", Command = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { /* TODO: open preferences */ }) },
+                new DropdownOption { Icon="avares://MnemoApp/UI/Icons/Tabler/outline/help-square.svg", Text = "Get Help", Command = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { /* TODO: show about */ }) }
             };
 
             var dropdown = new UI.Components.Overlays.DropdownOverlay();

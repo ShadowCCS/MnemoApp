@@ -6,12 +6,12 @@
     <Border Width="400">
       <TabControl>
         <TabItem Header="Arch">
-          <Border Background="AntiqueWhite" Height="100">
-            <TextBlock Text="Content" Foreground="Black" FontSize="{DynamicResource FontSize.Heading4}"/>
+          <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" Height="100">
+            <TextBlock Text="Content" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="{DynamicResource FontSize.Heading4}"/>
           </Border>
         </TabItem>
         <TabItem Header="Leaf">
-          <Border Background="Green" Height="100" />
+          <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" Height="100" />
         </TabItem>
         <TabItem Header="Disabled" IsEnabled="False" />
       </TabControl>
@@ -23,7 +23,7 @@
   <ControlTheme x:Key="{x:Type TabControl}" TargetType="TabControl">
     <Setter Property="Margin" Value="0" />
     <Setter Property="Padding" Value="{DynamicResource TabItemMargin}" />
-    <Setter Property="Background" Value="{DynamicResource TabControlBackground}" />
+    <Setter Property="Background" Value="{DynamicResource TabControlBackgroundBrush}" />
     <Setter Property="Template">
       <ControlTemplate>
         <Border BorderBrush="{TemplateBinding BorderBrush}"

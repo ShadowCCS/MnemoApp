@@ -18,9 +18,9 @@ namespace MnemoApp.UI.Components.Overlays
             DataContext = new DropdownOverlayViewModel(items, anchorControl);
         }
 
-        public void SetItemsFromRegistry(DropdownType dropdownType, Control? anchorControl = null, string? category = null)
+        public void SetItemsFromRegistry(DropdownType dropdownType, Control? anchorControl = null, string? category = null, IDropdownItemRegistry? registry = null)
         {
-            var registry = Core.ApplicationHost.Services.GetService(typeof(IDropdownItemRegistry)) as IDropdownItemRegistry;
+            registry ??= Core.ApplicationHost.GetServiceProvider().GetService(typeof(IDropdownItemRegistry)) as IDropdownItemRegistry;
             if (registry == null) return;
 
             var items = string.IsNullOrEmpty(category) 

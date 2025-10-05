@@ -9,6 +9,7 @@ using MnemoApp.Core.MnemoAPI;
 using MnemoApp.Core.Services;
 using MnemoApp.Core.Shell;
 using MnemoApp.Core.AI.Services;
+using MnemoApp.Core.Tasks.Services;
 using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 using MnemoApp.Modules.Paths;
@@ -24,7 +25,9 @@ namespace MnemoApp.Core
     {
         private static IServiceProvider? _serviceProvider;
 
-        public static IServiceProvider Services => _serviceProvider ?? throw new InvalidOperationException("Host not initialized");
+        // Internal accessor for App.axaml.cs only - do not use elsewhere
+        internal static IServiceProvider GetServiceProvider() 
+            => _serviceProvider ?? throw new InvalidOperationException("Host not initialized");
 
         public static async Task InitializeAsync()
         {
@@ -44,6 +47,7 @@ namespace MnemoApp.Core
             services.AddSingleton<IDropdownItemRegistry, DropdownItemRegistry>();
             services.AddSingleton<IAIService, AIService>();
             services.AddSingleton<IModelSelectionService, ModelSelectionService>();
+            services.AddSingleton<ITaskSchedulerService, TaskSchedulerService>();
             
             // Storage
             services.AddSingleton<IRuntimeStorage>(sp =>
@@ -91,6 +95,10 @@ namespace MnemoApp.Core
                 try { await modelSelectionService.InitializeAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"ModelSelection init failed: {ex.Message}"); }
             });
 
+            // Initialize and start task scheduler
+            var taskScheduler = _serviceProvider.GetRequiredService<ITaskSchedulerService>();
+            await taskScheduler.StartAsync();
+
             // Initialize MnemoAPI
             var api = _serviceProvider.GetRequiredService<IMnemoAPI>();
             
@@ -106,9 +114,9 @@ namespace MnemoApp.Core
             catch { /* ignore */ }
             
             // Rebuild sidebar when language changes
+            var sidebar = _serviceProvider.GetRequiredService<ISidebarService>();
             localization.LanguageChanged += (sender, code) =>
             {
-                var sidebar = _serviceProvider.GetRequiredService<ISidebarService>();
                 sidebar.ClearAll();
                 RegisterModulesWithSidebar(api);
             };
@@ -153,6 +161,13 @@ namespace MnemoApp.Core
             {
                 try
                 {
+                    // Stop task scheduler first
+                    var taskScheduler = _serviceProvider.GetService<ITaskSchedulerService>();
+                    if (taskScheduler != null)
+                    {
+                        await taskScheduler.StopAsync();
+                    }
+
                     // Dispose AI services first to ensure clean process termination
                     var aiService = _serviceProvider.GetService<IAIService>();
                     if (aiService is IAsyncDisposable aiDisposable)

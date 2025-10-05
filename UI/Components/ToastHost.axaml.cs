@@ -23,8 +23,16 @@ namespace MnemoApp.UI.Components
             InitializeComponent();
             this.AttachedToVisualTree += (_, __) =>
             {
-                var svc = ToastService ?? ApplicationHost.Services.GetService<IToastService>();
-                if (svc != null) { ToastService = svc; DataContext = svc; }
+                if (ToastService != null) 
+                { 
+                    DataContext = ToastService;
+                }
+                else
+                {
+                    // Fallback for dynamic creation
+                    var svc = ApplicationHost.GetServiceProvider().GetService<IToastService>();
+                    if (svc != null) { ToastService = svc; DataContext = svc; }
+                }
             };
         }
 

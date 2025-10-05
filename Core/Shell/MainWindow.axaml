@@ -89,10 +89,10 @@
             </Border>
             
             <!-- Toast host outside overlay, anchored bottom-right -->
-            <ui:ToastHost Grid.ColumnSpan="2" />
+            <ui:ToastHost Grid.ColumnSpan="2" DataContext="{Binding ToastService}" />
 
             <!-- Global overlays host (stays on top) -->
-            <Grid Grid.ColumnSpan="2" ov:OverlayHostBehavior.IsOverlayHost="True" />
+            <Grid Grid.ColumnSpan="2" ov:OverlayHostBehavior.IsOverlayHost="True" DataContext="{Binding OverlayService}" />
         </Grid>
     </Border>
 </Window>

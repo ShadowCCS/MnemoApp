@@ -39,7 +39,7 @@ namespace MnemoApp.UI.Markup
 
         public override object ProvideValue(IServiceProvider serviceProvider)
         {
-            var loc = ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
+            var loc = ApplicationHost.GetServiceProvider().GetService(typeof(ILocalizationService)) as ILocalizationService;
             if (loc == null || string.IsNullOrWhiteSpace(Ns) || string.IsNullOrWhiteSpace(Key))
                 return new Binding();
 
@@ -81,7 +81,7 @@ namespace MnemoApp.UI.Markup
         {
             if (_languageChangeHandlerRegistered) return;
             
-            var loc = ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
+            var loc = ApplicationHost.GetServiceProvider().GetService(typeof(ILocalizationService)) as ILocalizationService;
             if (loc != null)
             {
                 loc.LanguageChanged += (_, __) => BroadcastUpdate();
@@ -112,7 +112,7 @@ namespace MnemoApp.UI.Markup
             var key = GetTextKey(tb);
             if (string.IsNullOrWhiteSpace(ns) || string.IsNullOrWhiteSpace(key)) return;
 
-            var loc = ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
+            var loc = ApplicationHost.GetServiceProvider().GetService(typeof(ILocalizationService)) as ILocalizationService;
             if (loc == null) return;
             tb.Text = loc.T(ns!, key!);
         }

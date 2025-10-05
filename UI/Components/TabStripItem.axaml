@@ -8,7 +8,7 @@
       <StackPanel Spacing="20">
         <TabStripItem>Leaf</TabStripItem>
         <TabStripItem IsSelected="True">Arch</TabStripItem>
-        <TabStripItem Background="Yellow">Background</TabStripItem>
+        <TabStripItem Background="{DynamicResource CardBackgroundSecondaryBrush}">Background</TabStripItem>
       </StackPanel>
     </Border>
   </Design.PreviewWith>

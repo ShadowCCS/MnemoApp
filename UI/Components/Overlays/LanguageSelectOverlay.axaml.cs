@@ -20,6 +20,9 @@ namespace MnemoApp.UI.Components.Overlays
     public partial class LanguageSelectOverlay : UserControl, INotifyPropertyChanged
     {
         public string OverlayName { get; set; } = "LanguageSelectOverlay";
+        
+        public ILocalizationService? LocalizationService { get; set; }
+        public IMnemoAPI? MnemoAPI { get; set; }
 
         public ObservableCollection<LanguageManifest> Languages { get; } = new();
         public ObservableCollection<LanguageManifest> PagedLanguages { get; } = new();
@@ -78,7 +81,7 @@ namespace MnemoApp.UI.Components.Overlays
 
         private async Task LoadAsync()
         {
-            var loc = ApplicationHost.Services.GetRequiredService<ILocalizationService>();
+            var loc = LocalizationService ?? ApplicationHost.GetServiceProvider().GetRequiredService<ILocalizationService>();
             var items = await loc.GetAvailableLanguagesAsync();
             Languages.Clear();
             foreach (var m in items)
@@ -114,8 +117,8 @@ namespace MnemoApp.UI.Components.Overlays
             foreach (var t in _filtered.Skip(_currentPage * PageSize).Take(PageSize))
                 PagedLanguages.Add(t);
             OnPropertyChanged(nameof(PageInfo));
-            ((RelayCommand)NextPageCommand).NotifyCanExecuteChanged();
-            ((RelayCommand)PrevPageCommand).NotifyCanExecuteChanged();
+            ((RelayCommand)NextPageCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)PrevPageCommand).RaiseCanExecuteChanged();
         }
 
         private void NextPage()
@@ -143,22 +146,22 @@ namespace MnemoApp.UI.Components.Overlays
             if (string.IsNullOrWhiteSpace(SelectedCode)) return;
             try
             {
-                var loc = ApplicationHost.Services.GetRequiredService<ILocalizationService>();
+                var loc = LocalizationService ?? ApplicationHost.GetServiceProvider().GetRequiredService<ILocalizationService>();
                 var ok = await loc.SetLanguageAsync(SelectedCode!);
                 if (!ok)
                 {
-                    var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+                    var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
                     await api.ui.overlay.CreateDialog("Apply failed", "Failed to set language", "OK", "", null, null);
                 }
             }
             catch (Exception ex)
             {
-                var api = ApplicationHost.Services.GetRequiredService<IMnemoAPI>();
+                var api = MnemoAPI ?? ApplicationHost.GetServiceProvider().GetRequiredService<IMnemoAPI>();
                 await api.ui.overlay.CreateDialog("Apply failed", ex.Message, "OK", "", null, null);
             }
             finally
             {
-                var overlays = ApplicationHost.Services.GetRequiredService<IOverlayService>();
+                var overlays = ApplicationHost.GetServiceProvider().GetRequiredService<IOverlayService>();
                 overlays.CloseOverlay(OverlayName, SelectedCode);
             }
         }

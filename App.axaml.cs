@@ -37,8 +37,9 @@ public partial class App : Application
             _ = InitializeThemeSystemAsync();
             
             // Get services from the host AFTER everything is ready
-            var mainWindow = ApplicationHost.Services.GetRequiredService<MainWindow>();
-            var mainWindowViewModel = ApplicationHost.Services.GetRequiredService<MainWindowViewModel>();
+            var serviceProvider = ApplicationHost.GetServiceProvider();
+            var mainWindow = serviceProvider.GetRequiredService<MainWindow>();
+            var mainWindowViewModel = serviceProvider.GetRequiredService<MainWindowViewModel>();
             
             mainWindow.DataContext = mainWindowViewModel;
             desktop.MainWindow = mainWindow;
@@ -64,7 +65,7 @@ public partial class App : Application
     {
         try
         {
-            var themeService = ApplicationHost.Services.GetRequiredService<IThemeService>();
+            var themeService = ApplicationHost.GetServiceProvider().GetRequiredService<IThemeService>();
             if (themeService != null)
             {
                 // Load theme from settings on startup

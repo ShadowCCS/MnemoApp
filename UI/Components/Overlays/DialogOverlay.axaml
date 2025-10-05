@@ -3,7 +3,7 @@
              xmlns:local="using:MnemoApp.UI.Components.Overlays"
              x:Class="MnemoApp.UI.Components.Overlays.DialogOverlay"
              x:DataType="local:DialogOverlay">
-  <Border Background="{DynamicResource WorkspaceBackgroundBrush}"
+  <Border Background="{DynamicResource OverlayBackgroundBrush}"
           BorderBrush="{DynamicResource IconsSeparationBarBrush}"
           BorderThickness="1"
           CornerRadius="12"
@@ -11,13 +11,15 @@
           MinWidth="360">
     <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
       <TextBlock Text="{Binding Title}"
-                 FontSize="{DynamicResource FontSize.Heading4}" FontFamily="{DynamicResource Font.Bold}"/>
+                 FontSize="{DynamicResource FontSize.Heading4}" 
+                 FontFamily="{DynamicResource Font.Bold}"
+                 Foreground="{DynamicResource TextPrimaryBrush}"/>
       <TextBlock Grid.Row="1"
                   Text="{Binding Description}"
                   FontFamily="{DynamicResource Font.Medium}"
                   FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
-                 TextWrapping="Wrap"
-                 Opacity="0.85"/>
+                  Foreground="{DynamicResource TextSecondaryBrush}"
+                 TextWrapping="Wrap"/>
       <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <Button Content="{Binding SecondaryText}"
                 Classes="Subtle"

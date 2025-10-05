@@ -83,11 +83,14 @@ namespace MnemoApp.Core.Services
             var toast = _status.FirstOrDefault(t => t.Id == id);
             if (toast == null) return false;
 
-            if (title != null) toast.Title = title;
-            if (message != null) toast.Message = message;
-            if (type != null) toast.Type = type.Value;
-            if (progress != null) toast.Progress = progress;
-            if (progressText != null) toast.ProgressText = progressText;
+            RunOnUIThread(() =>
+            {
+                if (title != null) toast.Title = title;
+                if (message != null) toast.Message = message;
+                if (type != null) toast.Type = type.Value;
+                if (progress != null) toast.Progress = progress;
+                if (progressText != null) toast.ProgressText = progressText;
+            });
             return true;
         }
 
@@ -97,6 +100,14 @@ namespace MnemoApp.Core.Services
             if (toast == null) return false;
             // Remove status and do not convert to passive unless explicitly shown again by the caller
             RunOnUIThread(() => _status.Remove(toast));
+            return true;
+        }
+
+        public bool AttachTask(Guid toastId, Guid taskId)
+        {
+            var toast = _status.FirstOrDefault(t => t.Id == toastId);
+            if (toast == null) return false;
+            RunOnUIThread(() => toast.TaskId = taskId);
             return true;
         }
 

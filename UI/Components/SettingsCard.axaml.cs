@@ -70,16 +70,18 @@ namespace MnemoApp.UI.Components
             set => SetValue(NamespaceProperty, value);
         }
 
+        private ILocalizationService? _locService;
+
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnAttachedToVisualTree(e);
             UpdateLocalizedTexts();
             
             // Subscribe to language changes
-            var locService = ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
-            if (locService != null)
+            _locService = ApplicationHost.GetServiceProvider().GetService(typeof(ILocalizationService)) as ILocalizationService;
+            if (_locService != null)
             {
-                locService.LanguageChanged += OnLanguageChanged;
+                _locService.LanguageChanged += OnLanguageChanged;
             }
         }
 
@@ -88,10 +90,9 @@ namespace MnemoApp.UI.Components
             base.OnDetachedFromVisualTree(e);
             
             // Unsubscribe from language changes
-            var locService = ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
-            if (locService != null)
+            if (_locService != null)
             {
-                locService.LanguageChanged -= OnLanguageChanged;
+                _locService.LanguageChanged -= OnLanguageChanged;
             }
         }
 
@@ -102,7 +103,7 @@ namespace MnemoApp.UI.Components
 
         private void UpdateLocalizedTexts()
         {
-            var locService = ApplicationHost.Services.GetService(typeof(ILocalizationService)) as ILocalizationService;
+            var locService = _locService ?? ApplicationHost.GetServiceProvider().GetService(typeof(ILocalizationService)) as ILocalizationService;
             if (locService == null || string.IsNullOrWhiteSpace(Namespace)) return;
 
             if (!string.IsNullOrWhiteSpace(TitleKey))

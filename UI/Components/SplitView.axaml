@@ -8,10 +8,10 @@
       <SplitView DisplayMode="Inline"
                  IsPaneOpen="True">
         <SplitView.Pane>
-          <Border Background="Green" />
+          <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" />
         </SplitView.Pane>
         <SplitView.Content>
-          <Border Background="Blue" />
+          <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" />
         </SplitView.Content>
       </SplitView>
     </Border>

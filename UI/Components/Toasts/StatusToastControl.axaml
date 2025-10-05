@@ -44,6 +44,8 @@
 
         <ProgressBar Width="140"
                      Height="6"
+                     Minimum="0"
+                     Maximum="1"
                      Value="{Binding Progress}"
                      IsVisible="{Binding Progress, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
                      Background="{DynamicResource ProgressBarBackgroundBrush}"

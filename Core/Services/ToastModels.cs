@@ -48,6 +48,13 @@ namespace MnemoApp.Core.Services
 
         public bool IsStatus { get; set; }
 
+        private Guid? _taskId;
+        public Guid? TaskId
+        {
+            get => _taskId;
+            set { if (_taskId != value) { _taskId = value; OnPropertyChanged(); } }
+        }
+
         private double? _progress;
         public double? Progress
         {
@@ -89,6 +96,9 @@ namespace MnemoApp.Core.Services
         bool RemovePassive(Guid id);
         bool RemoveStatus(Guid id);
         void Clear();
+
+        // Associate a status toast with a task for deep-link actions (e.g., open overlay)
+        bool AttachTask(System.Guid toastId, System.Guid taskId);
     }
 }
 
