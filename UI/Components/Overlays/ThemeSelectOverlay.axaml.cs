@@ -35,8 +35,9 @@ namespace MnemoApp.UI.Components.Overlays
         public ICommand ImportCommand { get; }
         public ICommand ExportCommand { get; }
         public ICommand SelectThemeCommand { get; }
-        public ICommand NextPageCommand { get; }
-        public ICommand PrevPageCommand { get; }
+        public ICommand PageChangedCommand { get; }
+        
+        private Paginator? _paginator;
 
         private string? _searchQuery;
         public string? SearchQuery
@@ -46,7 +47,9 @@ namespace MnemoApp.UI.Components.Overlays
         }
 
         public ObservableCollection<ThemeManifest> PagedThemes { get; } = new();
-        public string PageInfo => $"{_currentPage + 1}/{Math.Max(1, (int)Math.Ceiling((double)_filtered.Count / PageSize))}";
+        
+        public int CurrentPageDisplay => _currentPage + 1;
+        public int TotalPagesDisplay => Math.Max(1, (int)Math.Ceiling((double)_filtered.Count / PageSize));
 
         public ThemeSelectOverlay()
         {
@@ -55,15 +58,25 @@ namespace MnemoApp.UI.Components.Overlays
             ImportCommand = new AsyncRelayCommand(ImportAsync);
             ExportCommand = new AsyncRelayCommand(ExportAsync);
             SelectThemeCommand = new RelayCommand<ThemeManifest>(OnSelectTheme);
-            NextPageCommand = new RelayCommand(NextPage);
-            PrevPageCommand = new RelayCommand(PrevPage);
+            PageChangedCommand = new RelayCommand<int>(OnPageChanged);
             DataContext = this;
             this.AttachedToVisualTree += async (_, __) => await LoadAsync();
+            this.Loaded += OnLoaded;
         }
 
         private void InitializeComponent()
         {
             AvaloniaXamlLoader.Load(this);
+        }
+        
+        private void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            // Find the Paginator control
+            _paginator = this.FindControl<Paginator>("PaginatorControl");
+            if (_paginator != null)
+            {
+                UpdatePaginator();
+            }
         }
         public async void ConfirmSelection()
         {
@@ -86,7 +99,7 @@ namespace MnemoApp.UI.Components.Overlays
 
         private readonly List<ThemeManifest> _all = new();
         private readonly List<ThemeManifest> _filtered = new();
-        private const int PageSize = 8; // 2x4
+        private const int PageSize = 2; // 2x4
         private int _currentPage = 0;
         
 
@@ -114,6 +127,8 @@ namespace MnemoApp.UI.Components.Overlays
             }
             _filtered.AddRange(s.OrderByDescending(t => t.LastUsed.GetValueOrDefault(System.DateTimeOffset.MinValue)));
             _currentPage = 0;
+            
+            
             Repage();
         }
 
@@ -122,18 +137,30 @@ namespace MnemoApp.UI.Components.Overlays
             PagedThemes.Clear();
             foreach (var t in _filtered.Skip(_currentPage * PageSize).Take(PageSize))
                 PagedThemes.Add(t);
-            OnPropertyChanged(nameof(PageInfo));
+            OnPropertyChanged(nameof(CurrentPageDisplay));
+            OnPropertyChanged(nameof(TotalPagesDisplay));
+            
+            // Explicitly update the Paginator if it exists
+            UpdatePaginator();
+        }
+        
+        private void UpdatePaginator()
+        {
+            if (_paginator != null)
+            {
+                _paginator.CurrentPage = CurrentPageDisplay;
+                _paginator.TotalPages = TotalPagesDisplay;
+                
+                // Manually trigger property change notifications for the calculated properties
+                _paginator.RefreshButtonStates();
+                _paginator.RefreshPageNumbers();
+            }
         }
 
-        private void NextPage()
+        private void OnPageChanged(int page)
         {
-            var pages = (int)Math.Ceiling((double)_filtered.Count / PageSize);
-            if (_currentPage + 1 < pages) { _currentPage++; Repage(); }
-        }
-
-        private void PrevPage()
-        {
-            if (_currentPage > 0) { _currentPage--; Repage(); }
+            _currentPage = page - 1; // Convert from 1-based to 0-based
+            Repage();
         }
 
         private void OnSelectTheme(ThemeManifest? manifest)

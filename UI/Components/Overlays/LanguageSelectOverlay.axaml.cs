@@ -41,10 +41,11 @@ namespace MnemoApp.UI.Components.Overlays
 
         public ICommand SelectLanguageCommand { get; }
         public ICommand ConfirmCommand { get; }
-        public ICommand NextPageCommand { get; }
-        public ICommand PrevPageCommand { get; }
+        public ICommand PageChangedCommand { get; }
         public ICommand ImportCommand { get; }
         public ICommand ExportCommand { get; }
+        
+        private Paginator? _paginator;
 
         private string? _searchQuery;
         public string? SearchQuery
@@ -53,30 +54,41 @@ namespace MnemoApp.UI.Components.Overlays
             set { _searchQuery = value; OnPropertyChanged(nameof(SearchQuery)); UpdateFiltered(); }
         }
 
-        public string PageInfo => $"{_currentPage + 1}/{Math.Max(1, (int)System.Math.Ceiling((double)_filtered.Count / PageSize))}";
+        public int CurrentPageDisplay => _currentPage + 1;
+        public int TotalPagesDisplay => Math.Max(1, (int)Math.Ceiling((double)_filtered.Count / PageSize));
 
         public LanguageSelectOverlay()
         {
             InitializeComponent();
             SelectLanguageCommand = new RelayCommand<LanguageManifest>(OnSelectLanguage);
             ConfirmCommand = new AsyncRelayCommand(ConfirmAsync);
-            NextPageCommand = new RelayCommand(NextPage, CanGoNext);
-            PrevPageCommand = new RelayCommand(PrevPage, CanGoPrev);
+            PageChangedCommand = new RelayCommand<int>(OnPageChanged);
             // Hidden in XAML but define to avoid binding errors
             ImportCommand = new RelayCommand(() => { });
             ExportCommand = new RelayCommand(() => { });
             DataContext = this;
             this.AttachedToVisualTree += async (_, __) => await LoadAsync();
+            this.Loaded += OnLoaded;
         }
 
         private void InitializeComponent()
         {
             AvaloniaXamlLoader.Load(this);
         }
+        
+        private void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            // Find the Paginator control
+            _paginator = this.FindControl<Paginator>("PaginatorControl");
+            if (_paginator != null)
+            {
+                UpdatePaginator();
+            }
+        }
 
         private readonly List<LanguageManifest> _all = new();
         private readonly List<LanguageManifest> _filtered = new();
-        private const int PageSize = 8;
+        private const int PageSize = 2; // Temporarily reduced for testing
         private int _currentPage = 0;
 
         private async Task LoadAsync()
@@ -108,6 +120,8 @@ namespace MnemoApp.UI.Components.Overlays
             }
             _filtered.AddRange(s);
             _currentPage = 0;
+            
+            
             Repage();
         }
 
@@ -116,24 +130,31 @@ namespace MnemoApp.UI.Components.Overlays
             PagedLanguages.Clear();
             foreach (var t in _filtered.Skip(_currentPage * PageSize).Take(PageSize))
                 PagedLanguages.Add(t);
-            OnPropertyChanged(nameof(PageInfo));
-            ((RelayCommand)NextPageCommand).RaiseCanExecuteChanged();
-            ((RelayCommand)PrevPageCommand).RaiseCanExecuteChanged();
+            OnPropertyChanged(nameof(CurrentPageDisplay));
+            OnPropertyChanged(nameof(TotalPagesDisplay));
+            
+            // Explicitly update the Paginator if it exists
+            UpdatePaginator();
         }
-
-        private void NextPage()
+        
+        private void UpdatePaginator()
         {
-            var pages = (int)System.Math.Ceiling((double)_filtered.Count / PageSize);
-            if (_currentPage + 1 < pages) { _currentPage++; Repage(); }
+            if (_paginator != null)
+            {
+                _paginator.CurrentPage = CurrentPageDisplay;
+                _paginator.TotalPages = TotalPagesDisplay;
+                
+                // Manually trigger property change notifications for the calculated properties
+                _paginator.RefreshButtonStates();
+                _paginator.RefreshPageNumbers();
+            }
         }
 
-        private void PrevPage()
+        private void OnPageChanged(int page)
         {
-            if (_currentPage > 0) { _currentPage--; Repage(); }
+            _currentPage = page - 1; // Convert from 1-based to 0-based
+            Repage();
         }
-
-        private bool CanGoNext() => _currentPage + 1 < Math.Max(1, (int)Math.Ceiling((double)_filtered.Count / PageSize));
-        private bool CanGoPrev() => _currentPage > 0;
 
         private void OnSelectLanguage(LanguageManifest? manifest)
         {

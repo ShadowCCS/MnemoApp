@@ -113,10 +113,13 @@ namespace MnemoApp.Core
             }
             catch { /* ignore */ }
             
-            // Rebuild sidebar when language changes
+            // Rebuild sidebar when language changes and save language preference
             var sidebar = _serviceProvider.GetRequiredService<ISidebarService>();
             localization.LanguageChanged += (sender, code) =>
             {
+                // Save language preference to storage
+                api.data.SetProperty("Language", code);
+                
                 sidebar.ClearAll();
                 RegisterModulesWithSidebar(api);
             };

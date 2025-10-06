@@ -142,6 +142,9 @@
     </Setter>
 
     <!--  PointerOver State  -->
+    <Style Selector="^:pointerover">
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
     <Style Selector="^:pointerover /template/ Border#Background">
       <Setter Property="Background" Value="{DynamicResource ComboBoxBackgroundPointerOver}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderPointerOverBrush}" />

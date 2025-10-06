@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:MnemoApp.UI.Components.Overlays"
+             xmlns:cmp="using:MnemoApp.UI.Components"
              xmlns:core="using:MnemoApp.Core.Services"
              xmlns:conv="using:MnemoApp.UI.Converters"
              x:Class="MnemoApp.UI.Components.Overlays.LanguageSelectOverlay"
@@ -77,10 +78,11 @@
 
       <!-- Bottom-->
       <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,12,0,0">
-        <TextBlock Text="{Binding PageInfo}" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextFaded}"/>
-        <Button Content="Prev" Command="{Binding PrevPageCommand}"/>
-        <Button Content="Next" Command="{Binding NextPageCommand}"/>
-        <Button Content="Apply" Command="{Binding ConfirmCommand}"/>
+        <cmp:Paginator x:Name="PaginatorControl"
+                       CurrentPage="{Binding CurrentPageDisplay}"
+                       TotalPages="{Binding TotalPagesDisplay}"
+                       PageChangedCommand="{Binding PageChangedCommand}"/>
+        <Button Content="Apply" Command="{Binding ConfirmCommand}" Margin="8,0,0,0"/>
       </StackPanel>
     </Grid>
   </Border>

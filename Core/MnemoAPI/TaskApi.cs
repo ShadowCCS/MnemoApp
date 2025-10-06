@@ -4,8 +4,10 @@ using System.Threading.Tasks;
 using MnemoApp.Core.Tasks.Models;
 using MnemoApp.Core.Tasks.Services;
 using MnemoApp.Core.Tasks.Examples;
+using MnemoApp.Core.Tasks;
 using MnemoApp.Core.AI.Services;
 using MnemoApp.Core.AI.Models;
+using MnemoApp.Data.Runtime;
 
 namespace MnemoApp.Core.MnemoAPI
 {
@@ -17,12 +19,14 @@ namespace MnemoApp.Core.MnemoAPI
         private readonly ITaskSchedulerService _taskScheduler;
         private readonly IAIService? _aiService;
         private readonly IModelSelectionService? _modelSelectionService;
+        private readonly IRuntimeStorage? _storage;
 
-        public TaskApi(ITaskSchedulerService taskScheduler, IAIService? aiService = null, IModelSelectionService? modelSelectionService = null)
+        public TaskApi(ITaskSchedulerService taskScheduler, IAIService? aiService = null, IModelSelectionService? modelSelectionService = null, IRuntimeStorage? storage = null)
         {
             _taskScheduler = taskScheduler ?? throw new ArgumentNullException(nameof(taskScheduler));
             _aiService = aiService;
             _modelSelectionService = modelSelectionService;
+            _storage = storage;
         }
 
         /// <summary>
@@ -190,6 +194,21 @@ namespace MnemoApp.Core.MnemoAPI
                 throw new InvalidOperationException("AI service is not available");
 
             var task = new GeneratePathTask(_aiService, pathTopic, unitCount, _modelSelectionService);
+            return _taskScheduler.ScheduleTask(task);
+        }
+
+        /// <summary>
+        /// Schedule a learning path creation task from notes (core feature)
+        /// </summary>
+        public Guid scheduleCreatePath(string notes)
+        {
+            if (_aiService == null)
+                throw new InvalidOperationException("AI service is not available");
+            
+            if (_storage == null)
+                throw new InvalidOperationException("Storage service is not available");
+
+            var task = new CreateLearningPathTask(_aiService, _storage, notes, _modelSelectionService);
             return _taskScheduler.ScheduleTask(task);
         }
 

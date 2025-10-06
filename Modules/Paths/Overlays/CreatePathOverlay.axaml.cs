@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using MnemoApp.UI.Components;
 using MnemoApp.Core.MnemoAPI;
+using System;
+using System.Threading.Tasks;
 
 namespace MnemoApp.Modules.Paths.Overlays
 {
@@ -23,7 +25,58 @@ namespace MnemoApp.Modules.Paths.Overlays
                 vm.HeaderNamespace = inputBuilder.HeaderNamespace;
                 vm.TitleKey = inputBuilder.TitleKey;
                 vm.DescriptionKey = inputBuilder.DescriptionKey;
+                vm.Generated += OnGeneratePath;
                 inputBuilder.DataContext = vm;
+            }
+        }
+
+        private void OnGeneratePath(string notes)
+        {
+            if (string.IsNullOrWhiteSpace(notes))
+            {
+                _mnemoAPI.ui.toast.show("Error", "No notes provided");
+                return;
+            }
+
+            try
+            {
+                // Schedule the learning path creation task
+                var taskId = _mnemoAPI.tasks.scheduleCreatePath(notes);
+                
+                // Show progress notifications
+                _mnemoAPI.ui.toast.showForTask(taskId, showProgress: true);
+                _mnemoAPI.ui.loading.showForTask(taskId);
+                
+                // Subscribe to task completion to show result
+                _mnemoAPI.tasks.onTaskCompleted(task =>
+                {
+                    if (task.Id == taskId)
+                    {
+                        var pathData = task.Result?.Data;
+                        if (pathData != null)
+                        {
+                            _mnemoAPI.ui.toast.show("Learning path created successfully!", "success");
+                            System.Diagnostics.Debug.WriteLine($"[CREATE_PATH_OVERLAY] Path created: {pathData}");
+                        }
+                    }
+                });
+                
+                // Subscribe to task failure
+                _mnemoAPI.tasks.onTaskFailed(task =>
+                {
+                    if (task.Id == taskId)
+                    {
+                        _mnemoAPI.ui.toast.show("Error", $"{task.ErrorMessage}");
+                    }
+                });
+                
+                // Close the overlay
+                _mnemoAPI.ui.overlay.CloseOverlay("CreatePathOverlay", null);
+            }
+            catch (Exception ex)
+            {
+                _mnemoAPI.ui.toast.show("Error", $"{ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[CREATE_PATH_OVERLAY] Error: {ex}");
             }
         }
 

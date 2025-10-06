@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:MnemoApp.Modules.Paths.UnitOverview"
+        mc:Ignorable="d"
+        x:Class="MnemoApp.Modules.Paths.UnitOverview.UnitOverview"
+        x:DataType="vm:UnitOverviewViewModel">
+    <Grid>
+        <StackPanel Orientation="Vertical" Spacing="12">
+        <TextBlock Text="A Journey Through The Respiratory System" FontSize="{DynamicResource FontSize.Heading4}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+        <Button Height="380" Width="80" IsEnabled="True">
+            <StackPanel Orientation="Vertical" Spacing="4">
+                <TextBlock Text="Unit 1" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource SecondaryBrush}"/>
+                <TextBlock Text="Anatomy of the Respiratory Tract" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            </StackPanel>
+        </Button>
+
+        <Button Height="380" Width="80" IsEnabled="False">
+            <StackPanel Orientation="Vertical" Spacing="4">
+                <TextBlock Text="Unit 2" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource SecondaryBrush}"/>
+                <TextBlock Text="Inhalation and Exhalation" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            </StackPanel>
+        </Button>
+
+        <Button Height="380" Width="80">
+        </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>
+

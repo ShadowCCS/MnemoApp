@@ -34,14 +34,15 @@ namespace MnemoApp.Core.MnemoAPI
             MnemoStorageManager storageManager,
             ILocalizationService localizationService,
             IToastService toastService,
-            IDropdownItemRegistry dropdownRegistry)
+            IDropdownItemRegistry dropdownRegistry,
+            IRuntimeStorage runtimeStorage)
         {
             navigate = navigationService;
             sidebar = sidebarService;
             ui = new UIApi(themeService, topbarService, overlayService, localizationService, toastService, dropdownRegistry, taskSchedulerService);
             system = new SystemApi();
             ai = new AIApi(aiService, modelSelectionService);
-            tasks = new TaskApi(taskSchedulerService, aiService, modelSelectionService);
+            tasks = new TaskApi(taskSchedulerService, aiService, modelSelectionService, runtimeStorage);
             data = dataApi;
             storage = storageManager;
         }

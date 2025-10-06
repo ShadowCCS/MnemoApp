@@ -94,7 +94,7 @@
     <Color x:Key="GhostButtonText">#777777</Color>
     <Color x:Key="ViewSwitchButton">#BBBBBB</Color>
     <Color x:Key="ViewSwitchButtonActive">#2079FF</Color>
-    <Color x:Key="PaginatorBackground">#EBEBEB</Color>
+    <Color x:Key="PaginatorBackground">#ebebeb</Color>
     <Color x:Key="PaginatorActive">#2079FF</Color>
     <Color x:Key="PaginatorText">#6A6A6A</Color>
     <Color x:Key="OverlayIconBackground">#CBCBCB</Color>

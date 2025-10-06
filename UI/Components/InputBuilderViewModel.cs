@@ -17,6 +17,7 @@ namespace MnemoApp.UI.Components
         private readonly IMnemoAPI _mnemoAPI;
         private Action<string?>? _modelChangedHandler;
         private CancellationTokenSource? _textMetricsCts;
+        public event Action<string>? Generated;
         
         // Header localization (configurable by parent control)
         [ObservableProperty]
@@ -237,8 +238,39 @@ namespace MnemoApp.UI.Components
         
         private void Generate()
         {
-            // Implementation would be handled by parent component
-            // This is just the UI canvas as requested
+            var parts = new System.Collections.Generic.List<string>(4);
+
+            if (!string.IsNullOrWhiteSpace(TextContent))
+            {
+                parts.Add(TextContent.Trim());
+            }
+
+            if (Files.Any())
+            {
+                var fileLines = Files
+                    .Select(f => string.IsNullOrWhiteSpace(f.FileName) ? null : $"- {f.FileName}")
+                    .Where(s => s != null);
+                var filesBlock = string.Join('\n', fileLines);
+                if (!string.IsNullOrWhiteSpace(filesBlock))
+                {
+                    parts.Add("Files:\n" + filesBlock);
+                }
+            }
+
+            if (Links.Any())
+            {
+                var linkLines = Links
+                    .Select(l => string.IsNullOrWhiteSpace(l.Url) ? null : $"- {l.Url}")
+                    .Where(s => s != null);
+                var linksBlock = string.Join('\n', linkLines);
+                if (!string.IsNullOrWhiteSpace(linksBlock))
+                {
+                    parts.Add("Links:\n" + linksBlock);
+                }
+            }
+
+            var result = string.Join("\n\n", parts);
+            Generated?.Invoke(result);
         }
         
         private bool CanGenerate()
