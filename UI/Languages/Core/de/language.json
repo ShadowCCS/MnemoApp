@@ -50,6 +50,10 @@
       "ReadyToGenerate": "Bereit zum Generieren •",
       "Generate": "Generieren"
   },
+  "TestModule": {
+    "Title": "Test Modul",
+    "Description": "Ein Test-Spielplatz für neue Komponenten und Funktionen. Verwende dieses Modul, um mit UI-Komponenten zu experimentieren, Funktionalität zu testen und neue Ideen zu prototypen."
+  },
   "Core": {
     "Ok": "OK",
     "Cancel": "Abbrechen",

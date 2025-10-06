@@ -15,10 +15,6 @@
 
             <Button Content="Create Path" Command="{Binding CreatePathCommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
 
-            <Button Content="TestAI" Command="{Binding TestAICommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
-
-            <components:GlobalSearchBar/>
-            <components:LocalSearchBar/>
         </StackPanel>
     </Grid>
 </UserControl> 

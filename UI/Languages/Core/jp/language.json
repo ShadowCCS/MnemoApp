@@ -28,6 +28,10 @@
     "AISectionTitle": "AIモデル",
     "AISectionDescription": "アプリケーションのAIモデルを選択します"
   },
+  "TestModule": {
+    "Title": "テストモジュール",
+    "Description": "新しいコンポーネントや機能のテストプレイグラウンド。このモジュールを使用してUIコンポーネントを実験し、機能をテストし、新しいアイデアをプロトタイプします。"
+  },
   "Core": {
     "Ok": "OK",
     "Cancel": "キャンセル",

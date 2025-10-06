@@ -51,6 +51,10 @@
     "Generate": "Generate",
     "ContextUsedToolTip": "The maximum amount of text the model can process at once. Exceeding it causes the AI to 'forget' the earliest information."
   },
+  "TestModule": {
+    "Title": "Test Module",
+    "Description": "A testing playground for new components and features. Use this module to experiment with UI components, test functionality, and prototype new ideas."
+  },
   "Core": {
     "Ok": "OK",
     "Cancel": "Cancel",

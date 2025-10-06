@@ -14,6 +14,7 @@ using MnemoApp.UI.Components.Sidebar;
 using MnemoApp.Modules.Dashboard;
 using MnemoApp.Modules.Paths;
 using MnemoApp.Modules.Settings;
+using MnemoApp.Modules.TestModule;
 using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Storage;
 using MnemoApp.Data.Runtime;
@@ -75,6 +76,7 @@ namespace MnemoApp.Core
             services.AddTransient<DashboardViewModel>();
             services.AddTransient<PathsViewModel>();
             services.AddTransient<SettingsViewModel>();
+            services.AddTransient<TestModuleViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
 
@@ -144,6 +146,14 @@ namespace MnemoApp.Core
                 typeof(PathsViewModel),
                 api.ui.language.get("Sidebar", "Main Hub"),
                 "avares://MnemoApp/UI/Icons/Tabler/outline/route-alt-left.svg"
+            );
+
+            // Register Test Module
+            api.sidebar.Register(
+                api.ui.language.get("TestModule", "Title"),
+                typeof(TestModuleViewModel),
+                api.ui.language.get("Sidebar", "Main Hub"),
+                "avares://MnemoApp/UI/Icons/Tabler/outline/test-pipe.svg"
             );
 
             // Register Settings module
