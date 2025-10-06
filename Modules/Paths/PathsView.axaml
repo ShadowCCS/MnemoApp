@@ -4,17 +4,21 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MnemoApp.Modules.Paths"
         xmlns:i18n="clr-namespace:MnemoApp.UI.Markup"
+        xmlns:components="clr-namespace:MnemoApp.UI.Components"
         xmlns:vm="clr-namespace:MnemoApp.Modules.Paths"
         mc:Ignorable="d"
         x:Class="MnemoApp.Modules.Paths.PathsView"
         x:DataType="vm:PathsViewModel">
     <Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
             <TextBlock i18n:Localization.Namespace="Paths" i18n:Localization.TextKey="Title" FontSize="{DynamicResource FontSize.Heading4}" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
             <Button Content="Create Path" Command="{Binding CreatePathCommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
 
             <Button Content="TestAI" Command="{Binding TestAICommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
+
+            <components:GlobalSearchBar/>
+            <components:LocalSearchBar/>
         </StackPanel>
     </Grid>
 </UserControl> 

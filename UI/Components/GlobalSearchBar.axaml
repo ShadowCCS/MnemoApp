@@ -1,0 +1,204 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="36"
+             x:Class="MnemoApp.UI.Components.GlobalSearchBar">
+  <UserControl.Resources>
+    <!-- Context menu for GlobalSearchBar -->
+  <MenuFlyout x:Key="GlobalSearchBarContextFlyout" ShowMode="{OnFormFactor Desktop=Standard, Mobile=Transient}">
+    <MenuItem Header="{DynamicResource StringTextFlyoutCutText}" Command="{Binding $parent[TextBox].Cut}" IsEnabled="{Binding $parent[TextBox].CanCut}" InputGesture="{x:Static TextBox.CutGesture}" />
+    <MenuItem Header="{DynamicResource StringTextFlyoutCopyText}" Command="{Binding $parent[TextBox].Copy}" IsEnabled="{Binding $parent[TextBox].CanCopy}" InputGesture="{x:Static TextBox.CopyGesture}"/>
+    <MenuItem Header="{DynamicResource StringTextFlyoutPasteText}" Command="{Binding $parent[TextBox].Paste}" IsEnabled="{Binding $parent[TextBox].CanPaste}" InputGesture="{x:Static TextBox.PasteGesture}"/>
+  </MenuFlyout>
+
+  <!-- GlobalSearchBar Button Theme -->
+  <ControlTheme x:Key="GlobalSearchBarButton" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource SearchBarBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SearchBarBorderBrush}" />
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="MinWidth" Value="32" />
+    <Setter Property="Padding" Value="{DynamicResource SearchBarPadding}" />
+    <Setter Property="Width" Value="{Binding $self.Bounds.Height}"/>
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource SearchBarTextColorBrush}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <ContentPresenter x:Name="PART_ContentPresenter"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Content="{TemplateBinding Content}"
+                            Padding="{TemplateBinding Padding}">
+          </ContentPresenter>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+
+    <Style Selector="^:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SearchBarTextHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SearchBarTextColorBrush}" />
+    </Style>
+
+    <Style Selector="^:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SearchBarTextBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SearchBarTextColorBrush}" />
+    </Style>
+
+    <Style Selector="^:disabled /template/ ContentPresenter">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+  </ControlTheme>
+
+  <!-- GlobalSearchBar Control Theme -->
+  <ControlTheme x:Key="GlobalSearchBarTheme" TargetType="TextBox">
+    <Setter Property="Foreground" Value="{DynamicResource SearchBarTextColorBrush}" />
+    <Setter Property="Background" Value="{DynamicResource SearchBarBackgroundBrush}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource SearchBarTextColorBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SearchBarBorderBrush}" />
+    <Setter Property="SelectionBrush" Value="{DynamicResource SearchBarTextHoverBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Width" Value="180" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="50" />
+    <Setter Property="Padding" Value="4,0" /> 
+    <Setter Property="FontFamily" Value="{DynamicResource Font.Medium}" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+    <Setter Property="ScrollViewer.IsScrollChainingEnabled" Value="True" />
+    <Setter Property="ContextFlyout" Value="{DynamicResource GlobalSearchBarContextFlyout}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate>
+          <DataValidationErrors>
+            <Border
+              Name="PART_BorderElement"
+              Background="{TemplateBinding Background}"
+              BorderBrush="{TemplateBinding BorderBrush}"
+              BorderThickness="{TemplateBinding BorderThickness}"
+              CornerRadius="{TemplateBinding CornerRadius}"
+              MinWidth="{TemplateBinding MinWidth}"
+              MinHeight="{TemplateBinding MinHeight}">
+              <Grid ColumnDefinitions="Auto,*">
+                
+                <!-- Text Input Area -->
+                <DockPanel x:Name="PART_InnerDockPanel"
+                           Grid.Column="1"
+                           Margin="{TemplateBinding Padding}">
+                  <ScrollViewer Name="PART_ScrollViewer"
+                                HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                                VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}"
+                                IsScrollChainingEnabled="{TemplateBinding (ScrollViewer.IsScrollChainingEnabled)}"
+                                AllowAutoHide="{TemplateBinding (ScrollViewer.AllowAutoHide)}"
+                                BringIntoViewOnFocusChange="{TemplateBinding (ScrollViewer.BringIntoViewOnFocusChange)}">
+                    <Panel>
+                      <TextBlock Name="PART_Watermark"
+                              Opacity="0.6"
+                              Text="{TemplateBinding Watermark}"
+                              TextAlignment="{TemplateBinding TextAlignment}"
+                              TextWrapping="{TemplateBinding TextWrapping}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              Foreground="{DynamicResource SearchBarTextColorBrush}">
+                        <TextBlock.IsVisible>
+                          <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding ElementName="PART_TextPresenter" Path="PreeditText" Converter="{x:Static StringConverters.IsNullOrEmpty}"/>
+                            <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Text" Converter="{x:Static StringConverters.IsNullOrEmpty}"/>
+                          </MultiBinding>
+                        </TextBlock.IsVisible>
+                      </TextBlock>
+                      <TextPresenter Name="PART_TextPresenter"
+                                    Text="{TemplateBinding Text, Mode=TwoWay}"
+                                    CaretBlinkInterval="{TemplateBinding CaretBlinkInterval}"
+                                    CaretIndex="{TemplateBinding CaretIndex}"
+                                    SelectionStart="{TemplateBinding SelectionStart}"
+                                    SelectionEnd="{TemplateBinding SelectionEnd}"
+                                    TextAlignment="{TemplateBinding TextAlignment}"
+                                    TextWrapping="{TemplateBinding TextWrapping}"
+                                    LineHeight="{TemplateBinding LineHeight}"
+                                    LetterSpacing="{TemplateBinding LetterSpacing}"
+                                    SelectionBrush="{TemplateBinding SelectionBrush}"
+                                    SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                                    CaretBrush="{TemplateBinding CaretBrush}"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Panel>
+                    <ScrollViewer.Styles>
+                      <Style Selector="ScrollContentPresenter#PART_ContentPresenter">
+                        <Setter Property="Cursor" Value="IBeam" />
+                      </Style>
+                    </ScrollViewer.Styles>
+                  </ScrollViewer>
+                </DockPanel>
+              </Grid>
+            </Border>
+          </DataValidationErrors>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+
+    <!-- Disabled State -->
+    <Style Selector="^:disabled">
+      <Setter Property="Foreground" Value="{DynamicResource SearchBarTextDisabledBrush}" />
+
+      <Style Selector="^ /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource SearchBarDisabledBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SearchBarDisabledBrush}" />
+      </Style>
+
+      <Style Selector="^ /template/ TextBlock#PART_Watermark">
+        <Setter Property="Foreground" Value="{DynamicResource SearchBarTextDisabledBrush}" />
+      </Style>
+      
+      <Style Selector="^ /template/ PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource SearchBarTextDisabledBrush}" />
+      </Style>
+    </Style>
+
+    <!-- PointerOver State-->
+    <Style Selector="^:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource SearchBarTextHoverBrush}" />
+
+      <Style Selector="^ /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush" Value="{DynamicResource SearchBarBorderBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SearchBarHoverBrush}" />
+      </Style>
+
+      <Style Selector="^ /template/ TextBlock#PART_Watermark">
+        <Setter Property="Foreground" Value="{DynamicResource SearchBarTextHoverBrush}" />
+      </Style>
+      
+      <Style Selector="^ /template/ PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource SearchBarTextHoverBrush}" />
+      </Style>
+    </Style>
+
+    <!-- Focused State -->
+    <Style Selector="^:focus">
+      <Setter Property="Foreground" Value="{DynamicResource SearchBarTextBrush}" />
+
+      <Style Selector="^ /template/ TextBlock#PART_Watermark">
+        <Setter Property="Foreground" Value="{DynamicResource SearchBarTextBrush}" />
+      </Style>
+
+      <Style Selector="^ /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource SearchBarHoverBrush}"/>
+        <Setter Property="BorderThickness" Value="0" />
+      </Style>
+      
+      <Style Selector="^ /template/ PathIcon">
+        <Setter Property="Foreground" Value="{DynamicResource SearchBarTextBrush}" />
+      </Style>
+    </Style>
+
+  </ControlTheme>
+
+  </UserControl.Resources>
+
+  <TextBox Theme="{DynamicResource GlobalSearchBarTheme}"
+           Watermark="Search ..."
+           Width="180" 
+           Height="28" 
+           Padding="16,0" 
+           VerticalContentAlignment="Center"/>
+</UserControl>

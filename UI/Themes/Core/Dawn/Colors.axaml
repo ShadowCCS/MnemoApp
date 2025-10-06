@@ -259,7 +259,7 @@
     <!-- Search Bar -->
     <Color x:Key="SearchBarBackground">#D2D2D2</Color>
     <Color x:Key="SearchBarTextColor">#777777</Color>
-    <Color x:Key="SearchBarBorder">#CCCCCC</Color>
+    <Color x:Key="SearchBarBorder">Transparent</Color>
     <Color x:Key="SearchBarHover">#BBBBBB</Color>
     <Color x:Key="SearchBarDisabled">#DDDDDD</Color>
     <Color x:Key="SearchBarTextHover">#555555</Color>

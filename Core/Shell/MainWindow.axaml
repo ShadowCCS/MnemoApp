@@ -55,7 +55,9 @@
                                 <!-- Breadcrumb -->
                             </Border>
                             <Border Grid.Column="1" Padding="5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="2">
-                                <ItemsControl ItemsSource="{Binding ui.topbar.items}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ui:GlobalSearchBar/>
+                                    <ItemsControl ItemsSource="{Binding ui.topbar.items}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <StackPanel Orientation="Horizontal" Spacing="4"/>
@@ -76,6 +78,7 @@
                                         </DataTemplate>
                                     </ItemsControl.DataTemplates>
                                 </ItemsControl>
+                                </StackPanel>
                             </Border>
                     </Grid>
 
