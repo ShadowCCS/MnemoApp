@@ -8,12 +8,36 @@
         xmlns:vm="clr-namespace:MnemoApp.Modules.Paths"
         mc:Ignorable="d"
         x:Class="MnemoApp.Modules.Paths.PathsView"
-        x:DataType="vm:PathsViewModel">
+        x:DataType="vm:PathsViewModel"
+        x:Name="Root">
     <Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-            <TextBlock i18n:Localization.Namespace="Paths" i18n:Localization.TextKey="Title" FontSize="{DynamicResource FontSize.Heading4}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+        <StackPanel Spacing="12">
+            <TextBlock Text="Your Paths" FontSize="{DynamicResource FontSize.Heading2}" Foreground="{DynamicResource TextPrimaryBrush}" FontFamily="{DynamicResource Font.Bold}" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+            
+            <ItemsControl ItemsSource="{Binding Paths}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PathInfo">
+                        <Button Height="60" Width="140" Margin="0,0,12,12"
+                                Command="{Binding $parent[UserControl].((vm:PathsViewModel)DataContext).NavigateToPathCommand}"
+                                CommandParameter="{Binding}">
+                            <TextBlock Text="{Binding Title}" 
+                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
+                                       Foreground="{DynamicResource TextPrimaryBrush}" 
+                                       HorizontalAlignment="Center" 
+                                       VerticalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"/>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
-            <Button Content="Create Path" Command="{Binding CreatePathCommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
+            <Button Content="Create New Path" Command="{Binding CreatePathCommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
 
         </StackPanel>
     </Grid>

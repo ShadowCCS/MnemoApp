@@ -3,11 +3,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:MnemoApp.Modules.Paths.UnitView"
+        xmlns:components="clr-namespace:MnemoApp.UI.Components"
         mc:Ignorable="d"
         x:Class="MnemoApp.Modules.Paths.UnitView.UnitView"
         x:DataType="vm:UnitViewViewModel">
-    <Grid>
-
+    <Grid Margin="24">
+        <components:RichContentView Source="{Binding Content}" />
     </Grid>
 </UserControl>
 

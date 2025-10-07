@@ -10,6 +10,9 @@
     
     <!-- Default font family for all controls with fallbacks -->
     <FontFamily x:Key="DefaultFontFamily">avares://MnemoApp/UI/Themes/Fonts/Lexend/Lexend-Regular.ttf#Lexend, Segoe UI, Arial, sans-serif</FontFamily>
+    
+    <!-- Math font for LaTeX rendering -->
+    <FontFamily x:Key="MathFontFamily">avares://MnemoApp/UI/Themes/Fonts/STIXTwoMath/STIXTwoMath-Regular.ttf#STIX Two Math</FontFamily>
 
     <!-- Font Sizes - Refined for professional appearance -->
     <!-- Headings -->

@@ -11,52 +11,70 @@
         x:Class="MnemoApp.Modules.TestModule.TestModuleView"
         x:DataType="vm:TestModuleViewModel">
     <Grid Margin="10">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
         <StackPanel>
-            <TextBlock i18n:Localization.Namespace="TestModule" 
-                       i18n:Localization.TextKey="Title" 
-                       FontSize="{DynamicResource FontSize.Heading3}" 
-                       Foreground="{DynamicResource TextPrimaryBrush}" 
-                       FontFamily="{DynamicResource Font.Bold}"/>
-            
-            <TextBlock i18n:Localization.Namespace="TestModule" 
-                       i18n:Localization.TextKey="Description" 
-                       FontSize="{DynamicResource FontSize.Body.Small}" 
-                       Foreground="{DynamicResource TextSecondaryBrush}" 
-                       Margin="0,10,0,20" 
-                       TextWrapping="Wrap"/>
+            <TextBlock i18n:Localization.Namespace="TestModule"
+                       i18n:Localization.TextKey="Title"
+                       FontSize="{DynamicResource FontSize.Heading3}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       FontFamily="{DynamicResource Font.Bold}" />
 
-            <Border Background="{DynamicResource SurfaceSecondaryBrush}" 
-                    CornerRadius="8" 
+            <TextBlock i18n:Localization.Namespace="TestModule"
+                       i18n:Localization.TextKey="Description"
+                       FontSize="{DynamicResource FontSize.Body.Small}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Margin="0,10,0,20"
+                       TextWrapping="Wrap" />
+
+            <Border Background="{DynamicResource SurfaceSecondaryBrush}"
+                    CornerRadius="8"
                     Padding="20">
                 <StackPanel Spacing="15">
-                    <TextBlock Text="Component Testing Area" 
-                               FontSize="{DynamicResource FontSize.Heading5}" 
+                    <TextBlock Text="Component Testing Area"
+                               FontSize="{DynamicResource FontSize.Heading5}"
                                FontFamily="{DynamicResource Font.SemiBold}"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    
-                    <TextBlock Text="This is your testing playground for new components and features. Add your test components here." 
-                               FontSize="{DynamicResource FontSize.Body.Small}" 
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                    <TextBlock Text="This is your testing playground for new components and features. Add your test components here."
+                               FontSize="{DynamicResource FontSize.Body.Small}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               TextWrapping="Wrap"/>
-                    
-                    <Button Content="Test Button" 
+                               TextWrapping="Wrap" />
+
+                    <Button Content="Test Button"
                             Classes="primary"
-                            HorizontalAlignment="Left"/>
-                    
-                    <TextBox Watermark="Test input field" 
-                             Width="300" 
-                             HorizontalAlignment="Left"/>
-                    
-                     <components:LocalSearchBar HorizontalAlignment="Left"/>
-                     <components:GlobalSearchBar HorizontalAlignment="Left"/>
-                     
-                     <Button Content="TestAI" 
-                             Command="{Binding TestAICommand}" 
-                             FontSize="{DynamicResource FontSize.Body.Small}"
-                             Classes="primary"
-                             HorizontalAlignment="Left"/>
+                            HorizontalAlignment="Left" />
+
+                    <TextBox Watermark="Test input field"
+                             Width="300"
+                             HorizontalAlignment="Left" />
+
+                    <components:LocalSearchBar HorizontalAlignment="Left" />
+                    <components:GlobalSearchBar HorizontalAlignment="Left" />
+
+                    <Button Content="Test AI Task"
+                            Command="{Binding TestAICommand}"
+                            FontSize="{DynamicResource FontSize.Body.Small}"
+                            Classes="primary"
+                            HorizontalAlignment="Left" />
+
+                    <StackPanel Margin="20" Spacing="20">
+                        <TextBlock Text="LaTeX Rendering Test" FontSize="24" FontWeight="Bold" />
+
+                        <TextBlock Text="Inline Math Examples:" FontSize="16" FontWeight="Bold" />
+                        <components:RichContentView Source="This is inline math: $x^2 + y^2 = z^2$ and $E = mc^2$" />
+
+                        <TextBlock Text="Display Math Examples:" FontSize="16" FontWeight="Bold" />
+                        <components:RichContentView Source="$$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$" />
+                        <components:RichContentView Source="$$\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}$$" />
+                        <components:RichContentView Source="$$\sum_{i=1}^{n} i = \frac{n(n+1)}{2}$$" />
+
+                        <TextBlock Text="Complex Expressions:" FontSize="16" FontWeight="Bold" />
+                        <components:RichContentView Source="$$\frac{\partial f}{\partial x} = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h}$$" />
+                        <components:RichContentView Source="$$\alpha + \beta = \gamma \quad \text{where} \quad \alpha, \beta, \gamma \in \mathbb{R}$$" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

@@ -18,7 +18,26 @@ public class ViewLocator : IDataTemplate
 
         if (type != null)
         {
-            return (Control)Activator.CreateInstance(type)!;
+            var control = (Control)Activator.CreateInstance(type)!;
+            if (control.DataContext == null)
+            {
+                control.DataContext = param;
+            }
+            return control;
+        }
+        
+        // Try alternative naming: remove "View" suffix and look for exact match
+        var altName = param.GetType().FullName!.Replace("ViewModel", "", StringComparison.Ordinal);
+        var altType = Type.GetType(altName);
+        
+        if (altType != null)
+        {
+            var control = (Control)Activator.CreateInstance(altType)!;
+            if (control.DataContext == null)
+            {
+                control.DataContext = param;
+            }
+            return control;
         }
         
         return new TextBlock { Text = "Not Found: " + name };
