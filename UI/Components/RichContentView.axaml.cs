@@ -81,7 +81,7 @@ public partial class RichContentView : UserControl
             _contentHost.Content = new TextBlock
             {
                 Text = "Loading...",
-                Foreground = Brushes.Gray,
+                Foreground = (IBrush)Application.Current!.FindResource("TextTertiaryBrush")!,
                 FontStyle = FontStyle.Italic
             };
 
@@ -112,7 +112,7 @@ public partial class RichContentView : UserControl
             _contentHost.Content = new TextBlock
             {
                 Text = $"Error rendering content: {ex.Message}",
-                Foreground = Brushes.Red,
+                Foreground = (IBrush)Application.Current!.FindResource("SystemErrorBackgroundBrush")!,
                 TextWrapping = TextWrapping.Wrap
             };
         }
@@ -169,7 +169,8 @@ public partial class RichContentView : UserControl
     {
         var textBlock = new TextBlock
         {
-            TextWrapping = TextWrapping.Wrap
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
         };
 
         if (paragraph.Inline != null && textBlock.Inlines != null)
@@ -183,13 +184,13 @@ public partial class RichContentView : UserControl
         return textBlock;
     }
 
-    private async Task RenderInlineToInlinesAsync(Markdig.Syntax.Inlines.Inline inline, InlineCollection inlines, Dictionary<string, (string expr, bool isDisplay)> mathExpressions)
+    private async Task RenderInlineToInlinesAsync(Markdig.Syntax.Inlines.Inline inline, InlineCollection inlines, Dictionary<string, (string expr, bool isDisplay)> mathExpressions, bool isHeading = false)
     {
         switch (inline)
         {
             case LiteralInline literal:
                 var text = literal.Content.ToString();
-                await ReplaceMathPlaceholdersAsync(text, inlines, mathExpressions);
+                await ReplaceMathPlaceholdersAsync(text, inlines, mathExpressions, isHeading);
                 break;
 
             case EmphasisInline emphasis:
@@ -201,7 +202,7 @@ public partial class RichContentView : UserControl
 
                 foreach (var child in emphasis)
                 {
-                    await RenderInlineToInlinesAsync(child, span.Inlines, mathExpressions);
+                    await RenderInlineToInlinesAsync(child, span.Inlines, mathExpressions, isHeading);
                 }
                 inlines.Add(span);
                 break;
@@ -211,19 +212,19 @@ public partial class RichContentView : UserControl
                 {
                     Text = code.Content,
                     FontFamily = new FontFamily("Consolas,monospace"),
-                    Background = new SolidColorBrush(Color.Parse("#20FFFFFF"))
+                    Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!
                 });
                 break;
 
             case LinkInline link:
                 var linkSpan = new Span
                 {
-                    Foreground = new SolidColorBrush(Color.Parse("#60A5FA")),
+                    Foreground = (IBrush)Application.Current!.FindResource("LinksBrush")!,
                     TextDecorations = TextDecorations.Underline
                 };
                 foreach (var child in link)
                 {
-                    await RenderInlineToInlinesAsync(child, linkSpan.Inlines, mathExpressions);
+                    await RenderInlineToInlinesAsync(child, linkSpan.Inlines, mathExpressions, isHeading);
                 }
                 inlines.Add(linkSpan);
                 break;
@@ -235,19 +236,19 @@ public partial class RichContentView : UserControl
             case ContainerInline container:
                 foreach (var child in container)
                 {
-                    await RenderInlineToInlinesAsync(child, inlines, mathExpressions);
+                    await RenderInlineToInlinesAsync(child, inlines, mathExpressions, isHeading);
                 }
                 break;
         }
     }
 
     // OPTIMIZED: O(n) single-pass placeholder search instead of O(n×m)
-    private async Task ReplaceMathPlaceholdersAsync(string text, InlineCollection inlines, Dictionary<string, (string expr, bool isDisplay)> mathExpressions)
+    private async Task ReplaceMathPlaceholdersAsync(string text, InlineCollection inlines, Dictionary<string, (string expr, bool isDisplay)> mathExpressions, bool isHeading = false)
     {
         if (string.IsNullOrEmpty(text) || mathExpressions.Count == 0)
         {
             if (!string.IsNullOrWhiteSpace(text))
-                inlines.Add(new Run { Text = text });
+                inlines.Add(new Run { Text = text, Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")! });
             return;
         }
 
@@ -260,10 +261,10 @@ public partial class RichContentView : UserControl
             var markerIndex = text.IndexOf("Ⓜ", position, StringComparison.Ordinal);
             if (markerIndex < 0)
             {
-                // No more placeholders, add remaining text
-                var remainingText = text.Substring(position);
-                if (!string.IsNullOrWhiteSpace(remainingText))
-                    inlines.Add(new Run { Text = remainingText });
+            // No more placeholders, add remaining text
+            var remainingText = text.Substring(position);
+            if (!string.IsNullOrWhiteSpace(remainingText))
+                inlines.Add(new Run { Text = remainingText, Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")! });
                 break;
             }
 
@@ -274,7 +275,7 @@ public partial class RichContentView : UserControl
                 // Incomplete marker, treat as text
                 var remainingText = text.Substring(position);
                 if (!string.IsNullOrWhiteSpace(remainingText))
-                    inlines.Add(new Run { Text = remainingText });
+                    inlines.Add(new Run { Text = remainingText, Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")! });
                 break;
             }
 
@@ -288,7 +289,7 @@ public partial class RichContentView : UserControl
                 {
                     var beforeText = text.Substring(position, markerIndex - position);
                     if (!string.IsNullOrWhiteSpace(beforeText))
-                        inlines.Add(new Run { Text = beforeText });
+                        inlines.Add(new Run { Text = beforeText, Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")! });
                 }
 
                 // Render math asynchronously
@@ -312,7 +313,8 @@ public partial class RichContentView : UserControl
         {
             TextWrapping = TextWrapping.Wrap,
             FontWeight = FontWeight.Bold,
-            Margin = new Thickness(0, heading.Level == 1 ? 16 : 12, 0, 8)
+            Margin = new Thickness(0, heading.Level == 1 ? 16 : 12, 0, 8),
+            Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!
         };
 
         textBlock.FontSize = heading.Level switch
@@ -330,7 +332,7 @@ public partial class RichContentView : UserControl
         {
             foreach (var inline in heading.Inline)
             {
-                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, mathExpressions);
+                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, mathExpressions, isHeading: true);
             }
         }
 
@@ -343,7 +345,7 @@ public partial class RichContentView : UserControl
 
         var border = new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#1A000000")),
+            Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
             CornerRadius = new CornerRadius(4),
             Padding = new Thickness(12),
             Margin = new Thickness(0, 4)
@@ -353,7 +355,8 @@ public partial class RichContentView : UserControl
         {
             Text = code,
             FontFamily = new FontFamily("Consolas,monospace"),
-            TextWrapping = TextWrapping.Wrap
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!
         };
 
         border.Child = textBlock;
@@ -364,7 +367,7 @@ public partial class RichContentView : UserControl
     {
         var border = new Border
         {
-            BorderBrush = new SolidColorBrush(Color.Parse("#60FFFFFF")),
+            BorderBrush = (IBrush)Application.Current!.FindResource("RichTextSeparationLineBrush")!,
             BorderThickness = new Thickness(4, 0, 0, 0),
             Padding = new Thickness(12, 0, 0, 0),
             Margin = new Thickness(0, 4)
@@ -396,7 +399,8 @@ public partial class RichContentView : UserControl
             {
                 Text = list.IsOrdered ? $"{index++}." : "•",
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
-                MinWidth = 20
+                MinWidth = 20,
+                Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
             };
 
             var content = new StackPanel { Spacing = 4 };
