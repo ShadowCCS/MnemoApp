@@ -65,7 +65,7 @@ namespace MnemoApp.UI.Components.Sidebar
                 // Set current item as selected
                 item.IsSelected = true;
 
-                // Navigate using the navigation service
+                // Navigate using the navigation service with breadcrumb
                 try
                 {
                     var navigateMethod = typeof(INavigationService).GetMethod("Navigate", new Type[0]);
@@ -85,11 +85,12 @@ namespace MnemoApp.UI.Components.Sidebar
             if (_disposed) return;
             
             // Update selection based on current view model
+            var currentViewModelType = viewModel.GetType();
             foreach (var category in Categories)
             {
                 foreach (var item in category.Items)
                 {
-                    item.IsSelected = item.ViewModelType == viewModel.GetType();
+                    item.IsSelected = item.IsViewModelTypeMatch(currentViewModelType);
                 }
             }
         }

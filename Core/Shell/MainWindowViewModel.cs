@@ -27,6 +27,7 @@ namespace MnemoApp.Core.Shell
         // Expose services for binding
         public IToastService? ToastService => _mnemoAPI?.ui?.toast.Service;
         public IOverlayService? OverlayService => _mnemoAPI?.ui?.overlay.Service;
+        public UI.Components.BreadcrumbViewModel? BreadcrumbViewModel { get; }
 
         private readonly IMnemoAPI? _mnemoAPI;
 
@@ -44,6 +45,7 @@ namespace MnemoApp.Core.Shell
         {
             _mnemoAPI = null;
             SidebarViewModel = null;
+            BreadcrumbViewModel = null;
             ToggleSidebarCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ToggleSidebar);
             ShowNotificationsCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { });
             MinimizeCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { });
@@ -57,6 +59,7 @@ namespace MnemoApp.Core.Shell
         {
             _mnemoAPI = mnemoAPI;
             SidebarViewModel = sidebarViewModel;
+            BreadcrumbViewModel = new UI.Components.BreadcrumbViewModel(_mnemoAPI.navigate);
             _mnemoAPI.navigate.ViewModelChanged += OnViewModelChanged;
             ToggleSidebarCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ToggleSidebar);
 

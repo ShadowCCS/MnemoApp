@@ -129,7 +129,7 @@ public partial class RichContentView : UserControl
             {
                 Height = 1,
                 Margin = new Thickness(0, 8),
-                Background = new SolidColorBrush(Color.Parse("#40FFFFFF"))
+                Background = (SolidColorBrush)Application.Current!.FindResource("RichTextSeparationLineBrush")!
             },
             _ => null
         };
@@ -137,37 +137,47 @@ public partial class RichContentView : UserControl
 
     private Control RenderParagraph(ParagraphBlock paragraph, Dictionary<string, (string expr, bool isDisplay)> mathExpressions)
     {
-        var panel = new WrapPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
+        var textBlock = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap
+        };
 
-        if (paragraph.Inline != null)
+        if (paragraph.Inline != null && textBlock.Inlines != null)
         {
             foreach (var inline in paragraph.Inline)
             {
-                RenderInlineToPanel(inline, panel, mathExpressions);
+                RenderInlineToInlines(inline, textBlock.Inlines, mathExpressions);
             }
         }
 
-        return panel;
+        return textBlock;
     }
 
-    private void RenderInlineToPanel(Markdig.Syntax.Inlines.Inline inline, WrapPanel panel, Dictionary<string, (string expr, bool isDisplay)> mathExpressions)
+    private void RenderInlineToInlines(Markdig.Syntax.Inlines.Inline inline, InlineCollection inlines, Dictionary<string, (string expr, bool isDisplay)> mathExpressions)
     {
         switch (inline)
         {
             case LiteralInline literal:
                 var text = literal.Content.ToString();
-                ReplaceMathPlaceholders(text, panel, mathExpressions);
+                ReplaceMathPlaceholders(text, inlines, mathExpressions);
                 break;
 
             case EmphasisInline emphasis:
+                var span = new Span();
+                if (emphasis.DelimiterCount == 2)
+                    span.FontWeight = FontWeight.Bold;
+                else if (emphasis.DelimiterCount == 1)
+                    span.FontStyle = FontStyle.Italic;
+
                 foreach (var child in emphasis)
                 {
-                    RenderInlineToPanel(child, panel, mathExpressions);
+                    RenderInlineToInlines(child, span.Inlines, mathExpressions);
                 }
+                inlines.Add(span);
                 break;
 
             case CodeInline code:
-                panel.Children.Add(new TextBlock
+                inlines.Add(new Run
                 {
                     Text = code.Content,
                     FontFamily = new FontFamily("Consolas,monospace"),
@@ -175,20 +185,33 @@ public partial class RichContentView : UserControl
                 });
                 break;
 
+            case LinkInline link:
+                var linkSpan = new Span
+                {
+                    Foreground = new SolidColorBrush(Color.Parse("#60A5FA")),
+                    TextDecorations = TextDecorations.Underline
+                };
+                foreach (var child in link)
+                {
+                    RenderInlineToInlines(child, linkSpan.Inlines, mathExpressions);
+                }
+                inlines.Add(linkSpan);
+                break;
+
             case LineBreakInline:
-                panel.Children.Add(new TextBlock { Text = " " });
+                inlines.Add(new LineBreak());
                 break;
 
             case ContainerInline container:
                 foreach (var child in container)
                 {
-                    RenderInlineToPanel(child, panel, mathExpressions);
+                    RenderInlineToInlines(child, inlines, mathExpressions);
                 }
                 break;
         }
     }
 
-    private void ReplaceMathPlaceholders(string text, WrapPanel panel, Dictionary<string, (string expr, bool isDisplay)> mathExpressions)
+    private void ReplaceMathPlaceholders(string text, InlineCollection inlines, Dictionary<string, (string expr, bool isDisplay)> mathExpressions)
     {
         if (string.IsNullOrEmpty(text))
             return;
@@ -218,13 +241,14 @@ public partial class RichContentView : UserControl
                 {
                     var beforeText = text.Substring(position, nearestIndex - position);
                     if (!string.IsNullOrWhiteSpace(beforeText))
-                        panel.Children.Add(new TextBlock { Text = beforeText });
+                        inlines.Add(new Run { Text = beforeText });
                 }
 
                 // Render math
                 var mathData = mathExpressions[nearestKey];
                 var fontSize = mathData.isDisplay ? 18.0 : 16.0;
-                panel.Children.Add(MnemoApp.Core.LaTeX.LaTeXEngine.Render(mathData.expr, fontSize));
+                var mathControl = MnemoApp.Core.LaTeX.LaTeXEngine.Render(mathData.expr, fontSize);
+                inlines.Add(new InlineUIContainer { Child = mathControl });
 
                 position = nearestIndex + nearestKey.Length;
             }
@@ -233,7 +257,7 @@ public partial class RichContentView : UserControl
                 // No more placeholders, add remaining text
                 var remainingText = text.Substring(position);
                 if (!string.IsNullOrWhiteSpace(remainingText))
-                    panel.Children.Add(new TextBlock { Text = remainingText });
+                    inlines.Add(new Run { Text = remainingText });
                 break;
             }
         }

@@ -339,5 +339,8 @@
 
     <!-- Generate Path -->
     <SolidColorBrush x:Key="GeneratePathTextBrush" Color="{DynamicResource GeneratePathText}" />
+    
+    <!-- Rich Text Separation Line -->
+    <SolidColorBrush x:Key="RichTextSeparationLineBrush" Color="{DynamicResource RichTextSeparationLineColor}" />
 
 </ResourceDictionary>

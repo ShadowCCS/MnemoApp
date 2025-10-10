@@ -37,7 +37,11 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <Button Content="Create New Path" Command="{Binding CreatePathCommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Create New Path" Command="{Binding CreatePathCommand}" FontSize="{DynamicResource FontSize.Body.Small}"/>
+                <Button Content="Wipe All Paths" Command="{Binding WipePathsCommand}" FontSize="{DynamicResource FontSize.Body.Small}" 
+                        Foreground="{DynamicResource TextDangerBrush}" Background="{DynamicResource BackgroundSecondaryBrush}"/>
+            </StackPanel>
 
         </StackPanel>
     </Grid>

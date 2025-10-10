@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using MnemoApp.Core.Common;
 
@@ -35,11 +36,19 @@ namespace MnemoApp.Core.Services
             set => SetProperty(ref _isSelected, value); 
         }
 
+        // Child ViewModels that should keep this sidebar item selected
+        public List<Type> ChildViewModelTypes { get; } = new();
+
         public SidebarItem(string title, Type viewModelType, string iconPath = "")
         {
             Title = title;
             ViewModelType = viewModelType;
             IconPath = iconPath;
+        }
+
+        public bool IsViewModelTypeMatch(Type viewModelType)
+        {
+            return ViewModelType == viewModelType || ChildViewModelTypes.Contains(viewModelType);
         }
     }
 

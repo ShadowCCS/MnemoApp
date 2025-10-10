@@ -308,4 +308,7 @@
     
     <!-- Selected Pipe Indicator -->
     <Color x:Key="TabItemHeaderSelectedPipeFill">#555555</Color>
+    
+    <!-- Rich Text Separation Line -->
+    <Color x:Key="RichTextSeparationLineColor">#CECECE</Color>
 </ResourceDictionary>

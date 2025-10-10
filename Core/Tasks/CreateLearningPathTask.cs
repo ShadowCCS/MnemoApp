@@ -67,6 +67,7 @@ namespace MnemoApp.Core.Tasks
                 }
 
                 System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Structure generated: {structureResponse.Response?.Substring(0, Math.Min(100, structureResponse.Response?.Length ?? 0))}...");
+                System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Full structure response: {structureResponse.Response}");
 
                 // Clean and parse the JSON response
                 PathStructure? pathStructure;
@@ -89,6 +90,16 @@ namespace MnemoApp.Core.Tasks
                         AllowTrailingCommas = true,
                         NumberHandling = JsonNumberHandling.AllowReadingFromString
                     });
+                    
+                    System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Parsed structure - Title: '{pathStructure?.Title}', Units count: {pathStructure?.LearningPath?.Length}");
+                    if (pathStructure?.LearningPath != null)
+                    {
+                        for (int i = 0; i < pathStructure.LearningPath.Length; i++)
+                        {
+                            var unit = pathStructure.LearningPath[i];
+                            System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Unit {i}: Order={unit.Order}, Title='{unit.Title}', Notes='{unit.Notes}'");
+                        }
+                    }
                     
                     if (pathStructure == null || pathStructure.LearningPath == null || pathStructure.LearningPath.Length == 0)
                     {
@@ -117,8 +128,12 @@ namespace MnemoApp.Core.Tasks
                 // Step 2: Generate content for the first unit
                 var firstUnit = pathStructure.LearningPath[0];
                 System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Generating content for first unit: {firstUnit.Title}");
+                System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] First unit notes: '{firstUnit.Notes}'");
 
                 var contentPrompt = BuildContentPrompt(firstUnit.Notes ?? "");
+                System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Content prompt length: {contentPrompt.Length}");
+                System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Content prompt preview: {contentPrompt.Substring(0, Math.Min(200, contentPrompt.Length))}...");
+                
                 var contentRequest = new AIInferenceRequest
                 {
                     ModelName = effectiveModelName,
@@ -128,6 +143,10 @@ namespace MnemoApp.Core.Tasks
 
                 progress.Report(new TaskProgress(0.5, "Generating educational content..."));
                 var contentResponse = await _aiService.InferAsync(contentRequest, cancellationToken);
+                
+                System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Content response success: {contentResponse.Success}");
+                System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Content response length: {contentResponse.Response?.Length ?? 0}");
+                System.Diagnostics.Debug.WriteLine($"[CREATE_PATH] Content response preview: {contentResponse.Response?.Substring(0, Math.Min(200, contentResponse.Response?.Length ?? 0))}...");
                 
                 if (!contentResponse.Success || string.IsNullOrWhiteSpace(contentResponse.Response))
                 {
@@ -238,7 +257,7 @@ JSON Schema Required:
     {{
       ""order"": ""integer - sequence number"",
       ""title"": ""string - descriptive unit title"",
-      ""notes"": ""string - subset of original notes""
+      ""notes"": ""string - subset of original notes- what to talk about in the unit""
     }}
   ]
 }}
@@ -276,44 +295,88 @@ Ensure each output is self-contained, educational, and well-formatted.
 
 Output Format Template:
 
-# [Concept Title]
+# [Module Title]
 
-## Learning Objectives
-- [Objective 1]
-- [Objective 2]
-- [Objective 3]
+[Start with an engaging paragraph that introduces the topic naturally.]
+Explain what this lesson or section covers and why it’s worth learning. You can begin with a short scenario, question, or everyday example that motivates curiosity.  
 
-## 1. Overview / Motivation
-[Explain why this concept matters and where it's used.]
 
-## 2. Core Concepts / Theory
+## Understanding the Concept
 
-### 2.1 Statement of the Principle
-[Provide the main formula or relationship in LaTeX.]
-Example:  
-$$a^2 + b^2 = c^2$$
+Begin with a **clear explanation** of the main idea.  
+Use full sentences and narrative flow — not just definitions. Imagine you’re talking to an intelligent learner encountering the topic for the first time.
 
-### 2.2 Explanation and Visualization
-[Describe the meaning behind the formula, intuitive visualization, and conceptual depth.]
+> **Example:** Instead of saying “Momentum is mass times velocity,” you might write:  
+> “Momentum describes how much motion an object carries — it depends on both how heavy it is and how fast it’s moving.”
 
-### 2.3 Applications and Examples
-[Show how it's applied. Include at least one numeric example.]
-Example:  
-If $a=3$ and $b=4$, then:  
-$$3^2 + 4^2 = 25 = 5^2$$
+When useful, include a **short formula** or relationship:
+$$
+p = m \times v
+$$
 
-| Example | Side a | Side b | Side c |
-|----------|---------|---------|---------|
-| 1 | 3 | 4 | 5 |
-| 2 | 5 | 12 | 13 |
+You can follow it with a quick intuitive interpretation or short real-world example.
 
-### 2.4 Limitations and Extensions
-[Explain any constraints and how the concept generalizes to other cases.]
 
-## 3. Summary & Key Takeaways
-- [Key Point 1]
-- [Key Point 2]
-- [Key Point 3]
+## Digging Deeper
+
+Explore **key principles, mechanisms, or relationships** that define the topic.  
+Use natural transitions between ideas rather than subheadings for every detail. When comparisons or lists help, use simple formatting:
+
+- Concept A — [brief explanation]
+- Concept B — [brief explanation]
+
+When math or structure matters, present it cleanly and explain what each part means.
+
+> 💡 **Tip:** Blend examples directly into the explanation rather than isolating them in long sections.
+
+
+## Example in Action
+
+Walk through one **well-chosen example** that shows how the concept is applied.  
+Explain your reasoning step by step in prose form — like a teacher thinking aloud — and include small equations or tables only when they clarify meaning.
+
+**Example:**  
+Let’s say we want to find the force needed to accelerate a 2 kg object at 3 m/s².  
+Using $F = ma$,  
+a 6-newton force would be required.
+
+Keep tone conversational yet precise.
+
+
+## How It Connects and Why It Matters
+
+After understanding the mechanics, discuss **real-world significance or interdisciplinary links**.  
+Show how this topic appears in science, technology, everyday life, or even history.  
+Use one or two short paragraphs to make the learner see the bigger picture.
+
+You can include a simple comparison or visual table when relevant:
+
+| Application | Field | Example |
+|--------------|--------|----------|
+| Energy | Physics | Kinetic energy of a moving car |
+| Economics | Finance | Momentum investing trend |
+
+
+## Quick Recap
+
+End with a **short, narrative summary** — two or three sentences reminding the learner of the essence of the lesson.  
+Optionally include:
+- Key formula(s)
+- One-sentence “why it matters”
+
+> **In short:** This section helped us understand [main idea], why it’s useful, and how to apply it in real situations.
+
+## Reflect & Practice (Optional)
+
+Offer 1–3 thoughtful questions or short prompts for reflection.  
+Keep them open-ended to encourage thinking rather than rote memorization.
+
+**Try this:**
+- How would you apply this concept in a different context?
+- What assumptions does this idea rely on?
+- Can you find a counterexample or limitation?
+
+
 
 Input Notes:
 {unitNotes}";

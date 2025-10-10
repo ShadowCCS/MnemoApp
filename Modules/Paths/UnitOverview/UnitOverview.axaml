@@ -7,7 +7,7 @@
         x:Class="MnemoApp.Modules.Paths.UnitOverview.UnitOverview"
         x:DataType="vm:UnitOverviewViewModel">
     <Grid>
-        <StackPanel Orientation="Vertical" Spacing="12">
+        <StackPanel Orientation="Vertical" Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0">
             <TextBlock Text="{Binding PathTitle}" 
                        FontSize="{DynamicResource FontSize.Heading4}" 
                        Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -21,7 +21,8 @@
                             <StackPanel Orientation="Vertical" Spacing="4">
                                 <TextBlock Text="{Binding Order, StringFormat='Unit {0}'}" 
                                            FontSize="{DynamicResource FontSize.Body.Small}" 
-                                           Foreground="{DynamicResource SecondaryBrush}"/>
+                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                           HorizontalAlignment="Center"/>
                                 <TextBlock Text="{Binding Title}" 
                                            FontSize="{DynamicResource FontSize.Body.Medium}" 
                                            Foreground="{DynamicResource TextPrimaryBrush}"
@@ -32,6 +33,10 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <Button Content="Generate All Units" 
+                    FontSize="{DynamicResource FontSize.Body.Small}" 
+                    HorizontalAlignment="Center"
+                    Command="{Binding GenerateAllUnitsCommand}"/>
         </StackPanel>
     </Grid>
 </UserControl>

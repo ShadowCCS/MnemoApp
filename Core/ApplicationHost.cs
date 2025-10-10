@@ -147,6 +147,14 @@ namespace MnemoApp.Core
                 api.ui.language.get("Sidebar", "Main Hub"),
                 "avares://MnemoApp/UI/Icons/Tabler/outline/route-alt-left.svg"
             );
+            
+            // Register child ViewModels for Learning Paths
+            var pathsItem = api.sidebar.GetItem(api.ui.language.get("Paths", "Learning Paths"), api.ui.language.get("Sidebar", "Main Hub"));
+            if (pathsItem != null)
+            {
+                pathsItem.ChildViewModelTypes.Add(typeof(Modules.Paths.UnitOverview.UnitOverviewViewModel));
+                pathsItem.ChildViewModelTypes.Add(typeof(Modules.Paths.UnitView.UnitViewViewModel));
+            }
 
             // Register Test Module
             api.sidebar.Register(

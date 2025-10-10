@@ -213,6 +213,21 @@ namespace MnemoApp.Core.MnemoAPI
         }
 
         /// <summary>
+        /// Schedule a unit generation task
+        /// </summary>
+        public Guid scheduleGenerateUnit(string pathId, int unitOrder)
+        {
+            if (_aiService == null)
+                throw new InvalidOperationException("AI service is not available");
+            
+            if (_storage == null)
+                throw new InvalidOperationException("Storage service is not available");
+
+            var task = new GenerateUnitTask(_aiService, _storage, pathId, unitOrder, _modelSelectionService);
+            return _taskScheduler.ScheduleTask(task);
+        }
+
+        /// <summary>
         /// Start the task scheduler
         /// </summary>
         public async Task start()

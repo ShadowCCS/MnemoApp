@@ -55,7 +55,7 @@ namespace MnemoApp.Modules.Paths.Overlays
                         var pathData = task.Result?.Data;
                         if (pathData != null)
                         {
-                            _mnemoAPI.ui.toast.show("Learning path created successfully!", "success");
+                            _mnemoAPI.ui.toast.show("Success!", "Learning path created successfully!");
                             System.Diagnostics.Debug.WriteLine($"[CREATE_PATH_OVERLAY] Path created: {pathData}");
                         }
                     }
