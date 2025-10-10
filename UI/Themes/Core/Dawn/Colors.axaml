@@ -311,4 +311,16 @@
     
     <!-- Rich Text Separation Line -->
     <Color x:Key="RichTextSeparationLineColor">#CECECE</Color>
+    
+    <!-- Syntax Highlighting Colors -->
+    <Color x:Key="SyntaxKeyword">#0000FF</Color>
+    <Color x:Key="SyntaxComment">#008000</Color>
+    <Color x:Key="SyntaxString">#A31515</Color>
+    <Color x:Key="SyntaxTag">#800080</Color>
+    <Color x:Key="SyntaxEntity">#FF0000</Color>
+    <Color x:Key="SyntaxSelector">#800000</Color>
+    <Color x:Key="SyntaxProperty">#FF8C00</Color>
+    
+    <!-- Rich Text Highlighting -->
+    <Color x:Key="HighlightedText">#FFF4A3</Color>
 </ResourceDictionary>

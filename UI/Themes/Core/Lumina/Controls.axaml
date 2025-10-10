@@ -340,5 +340,20 @@
 
     <!-- Generate Path -->
     <SolidColorBrush x:Key="GeneratePathTextBrush" Color="{DynamicResource GeneratePathText}" />
+    
+    <!-- Rich Text Separation Line -->
+    <SolidColorBrush x:Key="RichTextSeparationLineBrush" Color="{DynamicResource RichTextSeparationLineColor}" />
+    
+    <!-- Syntax Highlighting Brushes -->
+    <SolidColorBrush x:Key="KeywordBrush" Color="{DynamicResource SyntaxKeyword}"/>
+    <SolidColorBrush x:Key="CommentBrush" Color="{DynamicResource SyntaxComment}"/>
+    <SolidColorBrush x:Key="StringBrush" Color="{DynamicResource SyntaxString}"/>
+    <SolidColorBrush x:Key="TagBrush" Color="{DynamicResource SyntaxTag}"/>
+    <SolidColorBrush x:Key="EntityBrush" Color="{DynamicResource SyntaxEntity}"/>
+    <SolidColorBrush x:Key="SelectorBrush" Color="{DynamicResource SyntaxSelector}"/>
+    <SolidColorBrush x:Key="PropertyBrush" Color="{DynamicResource SyntaxProperty}"/>
+    
+    <!-- Rich Text Highlighting Brushes -->
+    <SolidColorBrush x:Key="HighlightedTextBrush" Color="{DynamicResource HighlightedText}"/>
 
 </ResourceDictionary>

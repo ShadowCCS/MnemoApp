@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:nav="using:MnemoApp.Core.Navigation"
              xmlns:ui="using:MnemoApp.UI.Components"
+             xmlns:services="using:MnemoApp.Core.Services"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="40"
              x:Class="MnemoApp.UI.Components.Breadcrumb"
              x:DataType="ui:BreadcrumbViewModel"
@@ -36,12 +37,14 @@
                         </Button.Styles>
                     </Button>
                     
-                    <!-- Separator -->
-                    <TextBlock Text=">"
-                               FontSize="{DynamicResource FontSize.Body.Small}"
-                               Foreground="{DynamicResource TextTertiaryBrush}"
-                               VerticalAlignment="Center"
-                               Margin="0,0,0,0"/>
+                    <!-- Separator - only show if not the last item -->
+                    <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/chevron-right.svg"
+                                       Stroke="{DynamicResource TextTertiaryBrush}"
+                                       Width="12"
+                                       Height="12"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0,4,0"
+                                       IsVisible="{Binding !IsLast}"/>
                 </StackPanel>
             </DataTemplate>
         </ItemsControl.ItemTemplate>

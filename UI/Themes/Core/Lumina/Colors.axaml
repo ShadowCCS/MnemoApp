@@ -330,4 +330,19 @@
     
     <!-- Selected Pipe Indicator -->
     <Color x:Key="TabItemHeaderSelectedPipeFill">#4A4A4A</Color>
+    
+    <!-- Rich Text Separation Line -->
+    <Color x:Key="RichTextSeparationLineColor">#E8E8E3</Color>
+    
+    <!-- Syntax Highlighting Colors -->
+    <Color x:Key="SyntaxKeyword">#2563EB</Color>
+    <Color x:Key="SyntaxComment">#6B6B6B</Color>
+    <Color x:Key="SyntaxString">#DC2626</Color>
+    <Color x:Key="SyntaxTag">#7C3AED</Color>
+    <Color x:Key="SyntaxEntity">#EA580C</Color>
+    <Color x:Key="SyntaxSelector">#059669</Color>
+    <Color x:Key="SyntaxProperty">#D97706</Color>
+    
+    <!-- Rich Text Highlighting -->
+    <Color x:Key="HighlightedText">#FEF3C7</Color>
 </ResourceDictionary>

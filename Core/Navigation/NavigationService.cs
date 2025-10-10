@@ -87,6 +87,9 @@ namespace MnemoApp.Core.Navigation
                 var breadcrumb = new BreadcrumbItem(breadcrumbTitle, vm, () => NavigateToBreadcrumb(new BreadcrumbItem(breadcrumbTitle, vm)));
                 Breadcrumbs.Add(breadcrumb);
                 
+                // Update IsLast property for all breadcrumbs
+                UpdateBreadcrumbIsLastProperty();
+                
                 ViewModelChanged?.Invoke(vm);
             }
             else
@@ -109,6 +112,9 @@ namespace MnemoApp.Core.Navigation
                         Breadcrumbs.RemoveAt(Breadcrumbs.Count - 1);
                     }
                 }
+                
+                // Update IsLast property for all breadcrumbs
+                UpdateBreadcrumbIsLastProperty();
                 
                 _currentViewModel = breadcrumb.ViewModel;
                 ViewModelChanged?.Invoke(breadcrumb.ViewModel);
@@ -139,6 +145,14 @@ namespace MnemoApp.Core.Navigation
                 "TestModuleViewModel" => "Test Module",
                 _ => string.Empty
             };
+        }
+
+        private void UpdateBreadcrumbIsLastProperty()
+        {
+            for (int i = 0; i < Breadcrumbs.Count; i++)
+            {
+                Breadcrumbs[i].IsLast = (i == Breadcrumbs.Count - 1);
+            }
         }
     }
 }
