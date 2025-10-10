@@ -81,6 +81,21 @@ public class LaTeXLexer
                 tokens.Add(new LaTeXToken(LaTeXTokenType.Ampersand, "&", _position));
                 _position++;
             }
+            else if (IsBinaryOperator(ch))
+            {
+                tokens.Add(new LaTeXToken(LaTeXTokenType.BinaryOperator, ch.ToString(), _position));
+                _position++;
+            }
+            else if (IsRelationOperator(ch))
+            {
+                tokens.Add(new LaTeXToken(LaTeXTokenType.RelationOperator, ch.ToString(), _position));
+                _position++;
+            }
+            else if (IsPunctuation(ch))
+            {
+                tokens.Add(new LaTeXToken(LaTeXTokenType.Punctuation, ch.ToString(), _position));
+                _position++;
+            }
             else if (char.IsWhiteSpace(ch))
             {
                 _position++;
@@ -135,6 +150,21 @@ public class LaTeXLexer
         }
 
         return new LaTeXToken(LaTeXTokenType.Text, sb.ToString(), start);
+    }
+
+    private static bool IsBinaryOperator(char ch)
+    {
+        return ch is '+' or '-' or '*' or '/' or '×' or '÷' or '⋅' or '∘' or '±' or '∓' or '∧' or '∨' or '⊕' or '⊗';
+    }
+
+    private static bool IsRelationOperator(char ch)
+    {
+        return ch is '=' or '≠' or '<' or '>' or '≤' or '≥' or '≈' or '≡' or '∼' or '∝' or '≪' or '≫' or '∈' or '∉' or '⊂' or '⊃' or '⊆' or '⊇';
+    }
+
+    private static bool IsPunctuation(char ch)
+    {
+        return ch is ',' or ';' or ':' or '!' or '?' or '.' or '…' or '(' or ')' or '[' or ']' or '{' or '}';
     }
 }
 

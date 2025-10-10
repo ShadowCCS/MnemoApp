@@ -16,6 +16,9 @@ public enum LaTeXTokenType
     Superscript,    // ^
     Ampersand,      // & (for matrix columns)
     NewLine,        // \\ (for matrix rows)
+    BinaryOperator, // +, -, *, /, etc.
+    RelationOperator, // =, <, >, etc.
+    Punctuation,    // ,, ;, :, etc.
     EOF
 }
 

@@ -66,6 +66,21 @@ public class LaTeXParser
             return new TextNode(Previous().Value);
         }
 
+        if (Match(LaTeXTokenType.BinaryOperator))
+        {
+            return new TextNode(Previous().Value);
+        }
+
+        if (Match(LaTeXTokenType.RelationOperator))
+        {
+            return new TextNode(Previous().Value);
+        }
+
+        if (Match(LaTeXTokenType.Punctuation))
+        {
+            return new TextNode(Previous().Value);
+        }
+
         if (Match(LaTeXTokenType.Command))
         {
             var cmd = Previous().Value;

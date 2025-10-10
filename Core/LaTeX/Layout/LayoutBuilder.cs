@@ -10,6 +10,11 @@ namespace MnemoApp.Core.LaTeX.Layout;
 public class LayoutBuilder
 {
     private readonly double _fontSize;
+    
+    // Spacing constants for mathematical operators
+    private const double ThinSpace = 0.1667; // 1/6 em
+    private const double MediumSpace = 0.2222; // 2/9 em
+    private const double ThickSpace = 0.2778; // 5/18 em
 
     public LayoutBuilder(double fontSize = 16.0)
     {
@@ -41,10 +46,24 @@ public class LayoutBuilder
             return new SpaceBox(0);
 
         var hbox = new HBox();
-        foreach (var ch in text.Content)
+        var content = text.Content;
+        
+        for (int i = 0; i < content.Length; i++)
         {
-            var (width, height, depth) = FontMetrics.Instance.MeasureChar(ch.ToString(), _fontSize);
-            var charBox = new CharBox(ch.ToString(), _fontSize)
+            var ch = content[i].ToString();
+            
+            // Add spacing before operators (but not at the start)
+            if (i > 0)
+            {
+                var spacing = GetOperatorSpacing(ch);
+                if (spacing > 0)
+                {
+                    hbox.Add(new SpaceBox(spacing));
+                }
+            }
+            
+            var (width, height, depth) = FontMetrics.Instance.MeasureChar(ch, _fontSize);
+            var charBox = new CharBox(ch, _fontSize)
             {
                 Width = width,
                 Height = height,
@@ -119,9 +138,32 @@ public class LayoutBuilder
             return BuildLayout(group.Children[0]);
 
         var hbox = new HBox();
-        foreach (var child in group.Children)
+        for (int i = 0; i < group.Children.Count; i++)
         {
-            hbox.Add(BuildLayout(child));
+            var child = group.Children[i];
+            var childBox = BuildLayout(child);
+            
+            // Add spacing before this child if it's an operator
+            if (i > 0)
+            {
+                var spacing = GetSpacingBeforeChild(child);
+                if (spacing > 0)
+                {
+                    hbox.Add(new SpaceBox(spacing));
+                }
+            }
+            
+            hbox.Add(childBox);
+            
+            // Add spacing after this child if it's an operator (but not at the end)
+            if (i < group.Children.Count - 1)
+            {
+                var spacing = GetSpacingAfterChild(child);
+                if (spacing > 0)
+                {
+                    hbox.Add(new SpaceBox(spacing));
+                }
+            }
         }
         return hbox;
     }
@@ -216,6 +258,74 @@ public class LayoutBuilder
         }
 
         return new MatrixBox(cellBoxes, matrix.MatrixType);
+    }
+
+    private bool IsBinaryOperator(string character)
+    {
+        return character is "+" or "-" or "*" or "/" or "×" or "÷" or "⋅" or "∘" or "±" or "∓" or "∧" or "∨" or "⊕" or "⊗";
+    }
+
+    private bool IsRelationOperator(string character)
+    {
+        return character is "=" or "≠" or "<" or ">" or "≤" or "≥" or "≈" or "≡" or "∼" or "∝" or "≪" or "≫" or "∈" or "∉" or "⊂" or "⊃" or "⊆" or "⊇";
+    }
+
+    private bool IsPunctuation(string character)
+    {
+        return character is "," or ";" or ":" or "!" or "?" or "." or "…" or "(" or ")" or "[" or "]" or "{" or "}";
+    }
+
+    private double GetOperatorSpacing(string character)
+    {
+        if (IsBinaryOperator(character))
+            return MediumSpace * _fontSize;
+        if (IsRelationOperator(character))
+            return ThickSpace * _fontSize;
+        if (IsPunctuation(character))
+            return ThinSpace * _fontSize;
+        return 0;
+    }
+
+    private double GetSpacingBeforeChild(LaTeXNode child)
+    {
+        // Check if this child starts with an operator
+        if (child is TextNode textNode && !string.IsNullOrEmpty(textNode.Content))
+        {
+            var firstChar = textNode.Content[0].ToString();
+            return GetOperatorSpacing(firstChar);
+        }
+        
+        if (child is SymbolNode symbolNode)
+        {
+            var symbolChar = SymbolRegistry.GetSymbol(symbolNode.Symbol);
+            if (symbolChar != null)
+            {
+                return GetOperatorSpacing(symbolChar);
+            }
+        }
+        
+        return 0;
+    }
+
+    private double GetSpacingAfterChild(LaTeXNode child)
+    {
+        // Check if this child ends with an operator
+        if (child is TextNode textNode && !string.IsNullOrEmpty(textNode.Content))
+        {
+            var lastChar = textNode.Content[^1].ToString();
+            return GetOperatorSpacing(lastChar);
+        }
+        
+        if (child is SymbolNode symbolNode)
+        {
+            var symbolChar = SymbolRegistry.GetSymbol(symbolNode.Symbol);
+            if (symbolChar != null)
+            {
+                return GetOperatorSpacing(symbolChar);
+            }
+        }
+        
+        return 0;
     }
 }
 
