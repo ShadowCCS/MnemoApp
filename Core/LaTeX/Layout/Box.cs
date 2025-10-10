@@ -121,7 +121,8 @@ public class ScriptBox : Box
         
         if (superscript != null)
         {
-            Height = Math.Max(baseBox.Height, superscript.TotalHeight - baseBox.Height * 0.5);
+            // Superscript is positioned above the base, so total height is base height + superscript height
+            Height = baseBox.Height + superscript.TotalHeight;
         }
         else
         {
@@ -130,7 +131,8 @@ public class ScriptBox : Box
 
         if (subscript != null)
         {
-            Depth = Math.Max(baseBox.Depth, subscript.TotalHeight + baseBox.Height * 0.5);
+            // Subscript is positioned below the base, so total depth is base depth + subscript height
+            Depth = baseBox.Depth + subscript.TotalHeight;
         }
         else
         {
@@ -228,7 +230,7 @@ public class MatrixBox : Box
         // Add delimiter width for parentheses/brackets
         if (matrixType != "matrix")
         {
-            Width += 20; // Space for delimiters
+            Width += 35; // Space for delimiters (increased to account for better spacing)
         }
 
         var totalRowHeight = 0.0;

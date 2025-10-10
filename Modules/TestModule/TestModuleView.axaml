@@ -71,7 +71,86 @@
                         <TextBlock Text="Complex Expressions:" FontSize="16" FontWeight="Bold" />
                         <components:RichContentView Source="$$\frac{\partial f}{\partial x} = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h}$$" />
                         <components:RichContentView Source="$$\alpha + \beta = \gamma \quad \text{where} \quad \alpha, \beta, \gamma \in \mathbb{R}$$" />
+
+                        <TextBlock Text="Matrix Examples:" FontSize="16" FontWeight="Bold" />
+                        <components:RichContentView Source="$$\begin{bmatrix} a &amp; b \\ c &amp; d \end{bmatrix}$$" />
+                        <components:RichContentView Source="$$\begin{pmatrix} 1 &amp; 2 &amp; 3 \\ 4 &amp; 5 &amp; 6 \\ 7 &amp; 8 &amp; 9 \end{pmatrix}$$" />
                     </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{DynamicResource SurfaceSecondaryBrush}"
+                    CornerRadius="8"
+                    Padding="20"
+                    Margin="0,20,0,0">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="Manual Learning Path Generator"
+                               FontSize="{DynamicResource FontSize.Heading5}"
+                               FontFamily="{DynamicResource Font.SemiBold}"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                    <TextBlock Text="Create a blank learning path with custom units for testing purposes."
+                               FontSize="{DynamicResource FontSize.Body.Small}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" />
+
+                    <TextBox Watermark="Enter path title..."
+                             Text="{Binding PathTitle}"
+                             Width="400"
+                             HorizontalAlignment="Left" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="Add Unit"
+                                Command="{Binding AddUnitCommand}"
+                                Classes="primary"
+                                FontSize="{DynamicResource FontSize.Body.Small}" />
+                        
+                        <Button Content="Save Path"
+                                Command="{Binding SavePathCommand}"
+                                Classes="primary"
+                                FontSize="{DynamicResource FontSize.Body.Small}" />
+                    </StackPanel>
+
+                    <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Units}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource SurfaceTertiaryBrush}"
+                                            CornerRadius="6"
+                                            Padding="15"
+                                            Margin="0,0,0,10">
+                                        <StackPanel Spacing="10">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <TextBlock Text="{Binding Order, StringFormat='Unit {0}'}"
+                                                           FontFamily="{DynamicResource Font.SemiBold}"
+                                                           FontSize="{DynamicResource FontSize.Body}"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           VerticalAlignment="Center" />
+                                                <Button Content="Remove"
+                                                        Command="{Binding RemoveCommand}"
+                                                        Classes="danger"
+                                                        FontSize="{DynamicResource FontSize.Body.Small}"
+                                                        Padding="8,4" />
+                                            </StackPanel>
+
+                                            <TextBox Watermark="Unit title..."
+                                                     Text="{Binding Title}"
+                                                     Width="350"
+                                                     HorizontalAlignment="Left" />
+
+                                            <TextBox Watermark="Unit content (supports Markdown and LaTeX)..."
+                                                     Text="{Binding Content}"
+                                                     Width="350"
+                                                     MinHeight="100"
+                                                     AcceptsReturn="True"
+                                                     TextWrapping="Wrap"
+                                                     HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </StackPanel>
             </Border>
         </StackPanel>
