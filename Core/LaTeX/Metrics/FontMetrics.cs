@@ -8,12 +8,33 @@ namespace MnemoApp.Core.LaTeX.Metrics;
 
 public class FontMetrics
 {
+    private static FontMetrics? _instance;
+    private static readonly object _lock = new object();
+
     private readonly Typeface _typeface;
     private readonly Dictionary<(string, double), (double, double, double)> _measurementCache = new();
     private readonly SKTypeface? _skTypeface;
     private const double EmSize = 16.0; // Base font size
 
-    public FontMetrics()
+    public static FontMetrics Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                lock (_lock)
+                {
+                    if (_instance == null)
+                    {
+                        _instance = new FontMetrics();
+                    }
+                }
+            }
+            return _instance;
+        }
+    }
+
+    private FontMetrics()
     {
         // Try to load STIX Two Math from embedded resources
         try
@@ -42,11 +63,15 @@ public class FontMetrics
     {
         // Check cache first
         var cacheKey = (character, fontSize);
-        if (_measurementCache.TryGetValue(cacheKey, out var cached))
+        lock (_measurementCache)
         {
-            return cached;
+            if (_measurementCache.TryGetValue(cacheKey, out var cached))
+            {
+                return cached;
+            }
         }
 
+        // FormattedText must be created on UI thread
         var formattedText = new FormattedText(
             character,
             System.Globalization.CultureInfo.CurrentCulture,
@@ -100,7 +125,10 @@ public class FontMetrics
         }
 
         var result = (width, height, depth);
-        _measurementCache[cacheKey] = result;
+        lock (_measurementCache)
+        {
+            _measurementCache[cacheKey] = result;
+        }
         return result;
     }
 
@@ -141,7 +169,10 @@ public class FontMetrics
 
     public void ClearCache()
     {
-        _measurementCache.Clear();
+        lock (_measurementCache)
+        {
+            _measurementCache.Clear();
+        }
     }
 }
 

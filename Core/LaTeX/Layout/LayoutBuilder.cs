@@ -9,12 +9,10 @@ namespace MnemoApp.Core.LaTeX.Layout;
 
 public class LayoutBuilder
 {
-    private readonly FontMetrics _metrics;
     private readonly double _fontSize;
 
     public LayoutBuilder(double fontSize = 16.0)
     {
-        _metrics = new FontMetrics();
         _fontSize = fontSize;
     }
 
@@ -45,7 +43,7 @@ public class LayoutBuilder
         var hbox = new HBox();
         foreach (var ch in text.Content)
         {
-            var (width, height, depth) = _metrics.MeasureChar(ch.ToString(), _fontSize);
+            var (width, height, depth) = FontMetrics.Instance.MeasureChar(ch.ToString(), _fontSize);
             var charBox = new CharBox(ch.ToString(), _fontSize)
             {
                 Width = width,
@@ -66,7 +64,7 @@ public class LayoutBuilder
             return BuildText(new TextNode(symbol.Symbol));
         }
 
-        var (width, height, depth) = _metrics.MeasureChar(symbolChar, _fontSize);
+        var (width, height, depth) = FontMetrics.Instance.MeasureChar(symbolChar, _fontSize);
         return new CharBox(symbolChar, _fontSize)
         {
             Width = width,
@@ -83,9 +81,9 @@ public class LayoutBuilder
         var numerator = numBuilder.BuildLayout(fraction.Numerator);
         var denominator = denomBuilder.BuildLayout(fraction.Denominator);
 
-        var thickness = _metrics.GetFractionRuleThickness(_fontSize);
-        var numeratorSpacing = _metrics.GetFractionNumeratorShift(_fontSize);
-        var denominatorSpacing = _metrics.GetFractionDenominatorShift(_fontSize);
+        var thickness = FontMetrics.Instance.GetFractionRuleThickness(_fontSize);
+        var numeratorSpacing = FontMetrics.Instance.GetFractionNumeratorShift(_fontSize);
+        var denominatorSpacing = FontMetrics.Instance.GetFractionDenominatorShift(_fontSize);
         return new FractionBox(numerator, denominator, thickness, numeratorSpacing, denominatorSpacing);
     }
 
@@ -96,17 +94,17 @@ public class LayoutBuilder
         Box? subscriptBox = null;
         if (script.Subscript != null)
         {
-            var subBuilder = new LayoutBuilder(_metrics.GetScriptSize(_fontSize));
+            var subBuilder = new LayoutBuilder(FontMetrics.Instance.GetScriptSize(_fontSize));
             subscriptBox = subBuilder.BuildLayout(script.Subscript);
-            subscriptBox.Shift = -_metrics.GetScriptShiftDown(_fontSize);
+            subscriptBox.Shift = -FontMetrics.Instance.GetScriptShiftDown(_fontSize);
         }
 
         Box? superscriptBox = null;
         if (script.Superscript != null)
         {
-            var supBuilder = new LayoutBuilder(_metrics.GetScriptSize(_fontSize));
+            var supBuilder = new LayoutBuilder(FontMetrics.Instance.GetScriptSize(_fontSize));
             superscriptBox = supBuilder.BuildLayout(script.Superscript);
-            superscriptBox.Shift = _metrics.GetScriptShiftUp(_fontSize);
+            superscriptBox.Shift = FontMetrics.Instance.GetScriptShiftUp(_fontSize);
         }
 
         return new ScriptBox(baseBox, subscriptBox, superscriptBox);
@@ -141,7 +139,7 @@ public class LayoutBuilder
         var hbox = new HBox();
         
         // Add left delimiter
-        var (leftWidth, leftHeight, leftDepth) = _metrics.MeasureChar(delim.LeftDelim, _fontSize * 1.2);
+        var (leftWidth, leftHeight, leftDepth) = FontMetrics.Instance.MeasureChar(delim.LeftDelim, _fontSize * 1.2);
         var leftBox = new CharBox(delim.LeftDelim, _fontSize * 1.2)
         {
             Width = leftWidth,
@@ -154,7 +152,7 @@ public class LayoutBuilder
         hbox.Add(content);
         
         // Add right delimiter
-        var (rightWidth, rightHeight, rightDepth) = _metrics.MeasureChar(delim.RightDelim, _fontSize * 1.2);
+        var (rightWidth, rightHeight, rightDepth) = FontMetrics.Instance.MeasureChar(delim.RightDelim, _fontSize * 1.2);
         var rightBox = new CharBox(delim.RightDelim, _fontSize * 1.2)
         {
             Width = rightWidth,
@@ -188,7 +186,7 @@ public class LayoutBuilder
             var symbol = SymbolRegistry.GetSymbol(symbolKey);
             if (symbol != null)
             {
-                var (width, height, depth) = _metrics.MeasureChar(symbol, _fontSize);
+                var (width, height, depth) = FontMetrics.Instance.MeasureChar(symbol, _fontSize);
                 return new CharBox(symbol, _fontSize)
                 {
                     Width = width,
