@@ -1,19 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using MnemoApp.Core.AI.Models;
+using MnemoApp.Core.AI.Services.Tokenizers;
 
 namespace MnemoApp.Core.AI.Services
 {
     /// <summary>
     /// Implementation of tokenizer service for handling tokenization operations
-    /// EXPERIMENTAL: Currently uses heuristic estimation, not actual tokenization
+    /// Uses custom tokenizers for real tokenization with tokenizer.model and tokenizer.json
     /// </summary>
     public class TokenizerService : ITokenizerService
     {
         private readonly IAIService _aiService;
-        private readonly Dictionary<string, object> _tokenizerCache = new();
+        private readonly Dictionary<string, ITokenizer> _tokenizerCache = new();
+        private readonly object _cacheLock = new();
 
         public TokenizerService(IAIService aiService)
         {
@@ -24,45 +27,31 @@ namespace MnemoApp.Core.AI.Services
         {
             try
             {
-                var model = await _aiService.GetModelAsync(modelName);
-                if (model == null)
+                var tokenizer = await GetTokenizerAsync(modelName);
+                if (tokenizer == null)
                 {
+                    // Fallback to estimation if tokenizer can't be loaded
+                    var estimatedCount = EstimateTokenCount(text);
+                    System.Diagnostics.Debug.WriteLine($"Tokenizer not available for model '{modelName}'");
                     return new TokenCountResult
                     {
-                        Success = false,
-                        ErrorMessage = $"Model '{modelName}' not found"
+                        Success = true,
+                        TokenCount = estimatedCount,
+                        IsEstimate = true
                     };
                 }
 
-                if (!model.HasTokenizer)
-                {
-                    return new TokenCountResult
-                    {
-                        Success = false,
-                        ErrorMessage = $"Model '{modelName}' does not have a tokenizer available"
-                    };
-                }
-
-                var tokenizerPath = GetTokenizerPath(model.DirectoryPath);
-                if (tokenizerPath == null)
-                {
-                    return new TokenCountResult
-                    {
-                        Success = false,
-                        ErrorMessage = $"Tokenizer file not found for model '{modelName}'"
-                    };
-                }
-
-                // EXPERIMENTAL: Using heuristic estimation instead of actual tokenization
-                // This would typically involve loading a SentencePiece model or similar
-                // For production use, integrate a proper tokenizer library
-                var approximateTokens = EstimateTokenCount(text);
-
+                var tokens = await tokenizer.TokenizeAsync(text);
+                var tokenIds = await tokenizer.TokenizeToIdsAsync(text);
+                
+                System.Diagnostics.Debug.WriteLine($"Tokenized '{text.Substring(0, Math.Min(50, text.Length))}...' into {tokenIds.Length} tokens");
+                System.Diagnostics.Debug.WriteLine($"Tokens: [{string.Join(", ", tokens.Take(20).Select(t => $"\"{t}\""))}]");
+                
                 return new TokenCountResult
                 {
                     Success = true,
-                    TokenCount = approximateTokens,
-                    IsEstimate = true // Flag this as an estimate
+                    TokenCount = tokenIds.Length,
+                    IsEstimate = false
                 };
             }
             catch (Exception ex)
@@ -77,24 +66,20 @@ namespace MnemoApp.Core.AI.Services
 
         public async Task<string[]> TokenizeAsync(string text, string modelName)
         {
-            var model = await _aiService.GetModelAsync(modelName);
-            if (model == null || !model.HasTokenizer)
+            var tokenizer = await GetTokenizerAsync(modelName);
+            if (tokenizer == null)
                 throw new InvalidOperationException($"Tokenizer not available for model '{modelName}'");
 
-            // EXPERIMENTAL: Placeholder implementation
-            // Real tokenization would use the model's tokenizer.model or tokenizer.json file
-            throw new NotImplementedException("Actual tokenization not yet implemented. Use CountTokensAsync for estimates.");
+            return await tokenizer.TokenizeAsync(text);
         }
 
         public async Task<string> DetokenizeAsync(string[] tokens, string modelName)
         {
-            var model = await _aiService.GetModelAsync(modelName);
-            if (model == null || !model.HasTokenizer)
+            var tokenizer = await GetTokenizerAsync(modelName);
+            if (tokenizer == null)
                 throw new InvalidOperationException($"Tokenizer not available for model '{modelName}'");
 
-            // EXPERIMENTAL: Placeholder implementation  
-            // Real detokenization would use the model's tokenizer.model or tokenizer.json file
-            throw new NotImplementedException("Actual detokenization not yet implemented.");
+            return await tokenizer.DetokenizeAsync(tokens);
         }
 
         public async Task<bool> IsTokenizerAvailableAsync(string modelName)
@@ -105,13 +90,11 @@ namespace MnemoApp.Core.AI.Services
 
         public async Task<int> GetVocabSizeAsync(string modelName)
         {
-            var model = await _aiService.GetModelAsync(modelName);
-            if (model == null || !model.HasTokenizer)
+            var tokenizer = await GetTokenizerAsync(modelName);
+            if (tokenizer == null)
                 throw new InvalidOperationException($"Tokenizer not available for model '{modelName}'");
 
-            // EXPERIMENTAL: Returning common default vocabulary size
-            // Real implementation would read from tokenizer.model or tokenizer.json metadata
-            return 32000; // Common vocabulary size for many models (estimate)
+            return tokenizer.GetVocabularySize();
         }
 
         /// <summary>
@@ -141,27 +124,69 @@ namespace MnemoApp.Core.AI.Services
         }
 
         /// <summary>
-        /// Get the tokenizer file path for a model directory, checking both .model and .json formats
+        /// Get or load a tokenizer for the specified model
         /// </summary>
-        /// <param name="modelDirectoryPath">Path to the model directory</param>
-        /// <returns>Path to the tokenizer file if found, null otherwise. Prefers .model over .json</returns>
-        private string? GetTokenizerPath(string modelDirectoryPath)
+        private async Task<ITokenizer?> GetTokenizerAsync(string modelName)
         {
-            // Check for .model file first (original format)
-            var tokenizerModelPath = Path.Combine(modelDirectoryPath, "tokenizer.model");
-            if (File.Exists(tokenizerModelPath))
+            // Check cache first
+            lock (_cacheLock)
             {
-                return tokenizerModelPath;
+                if (_tokenizerCache.TryGetValue(modelName, out var cachedTokenizer))
+                {
+                    System.Diagnostics.Debug.WriteLine($"Tokenizer cache hit for model '{modelName}'");
+                    return cachedTokenizer;
+                }
             }
 
-            // Check for .json file as fallback
-            var tokenizerJsonPath = Path.Combine(modelDirectoryPath, "tokenizer.json");
-            if (File.Exists(tokenizerJsonPath))
+            // Load model info
+            var model = await _aiService.GetModelAsync(modelName);
+            if (model == null)
             {
-                return tokenizerJsonPath;
+                System.Diagnostics.Debug.WriteLine($"Model '{modelName}' not found");
+                return null;
             }
 
-            return null;
+            if (!model.HasTokenizer)
+            {
+                System.Diagnostics.Debug.WriteLine($"Model '{modelName}' HasTokenizer=false (DirectoryPath: '{model.DirectoryPath}')");
+                return null;
+            }
+
+            var tokenizerPath = TokenizerFactory.GetTokenizerPath(model.DirectoryPath);
+            if (tokenizerPath == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"No tokenizer file found in '{model.DirectoryPath}'");
+                return null;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Found tokenizer file at '{tokenizerPath}' for model '{modelName}'");
+
+            try
+            {
+                var tokenizer = await TokenizerFactory.CreateTokenizerAsync(tokenizerPath);
+                if (tokenizer == null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to create tokenizer for model '{modelName}' from '{tokenizerPath}'");
+                    return null;
+                }
+
+                // Cache the tokenizer
+                lock (_cacheLock)
+                {
+                    _tokenizerCache[modelName] = tokenizer;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Successfully loaded tokenizer for model '{modelName}' from '{tokenizerPath}'");
+                return tokenizer;
+            }
+            catch (Exception ex)
+            {
+                // If loading fails, log and return null to fallback to estimation
+                System.Diagnostics.Debug.WriteLine($"Failed to load tokenizer for model '{modelName}' from '{tokenizerPath}': {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Exception details: {ex}");
+                return null;
+            }
         }
+
     }
 }
