@@ -305,5 +305,5 @@
     <Color x:Key="SyntaxProperty">#9CDCFE</Color>
     
     <!-- Rich Text Highlighting -->
-    <Color x:Key="HighlightedText">#6B4E1F</Color>
+    <Color x:Key="HighlightedText">#323B48</Color>
 </ResourceDictionary>
