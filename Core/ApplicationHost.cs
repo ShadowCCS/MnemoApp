@@ -19,6 +19,7 @@ using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Storage;
 using MnemoApp.Data.Runtime;
 using MnemoApp.Data.Packaged;
+using MnemoApp.Core.Services.FileProcessing;
 
 namespace MnemoApp.Core
 {
@@ -49,6 +50,10 @@ namespace MnemoApp.Core
             services.AddSingleton<IAIService, AIService>();
             services.AddSingleton<IModelSelectionService, ModelSelectionService>();
             services.AddSingleton<ITaskSchedulerService, TaskSchedulerService>();
+            
+            // File Processing
+            services.AddSingleton<FileProcessorRegistry>();
+            services.AddSingleton<IFileProcessingService, FileProcessingService>();
             
             // Storage
             services.AddSingleton<IRuntimeStorage>(sp =>

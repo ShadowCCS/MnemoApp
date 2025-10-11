@@ -7,6 +7,7 @@ using MnemoApp.Core.AI.Services;
 using MnemoApp.Core.Tasks.Services;
 using MnemoApp.Data.Runtime;
 using MnemoApp.Data.Packaged;
+using MnemoApp.Core.Services.FileProcessing;
 
 namespace MnemoApp.Core.MnemoAPI
 {
@@ -20,6 +21,7 @@ namespace MnemoApp.Core.MnemoAPI
         public required MnemoApp.Data.Packaged.MnemoStorageManager storage { get; set; }
         public required AIApi ai { get; set; }
         public required TaskApi tasks { get; set; }
+        public required FileApi files { get; set; }
 
         public MnemoAPI(
             INavigationService navigationService, 
@@ -35,7 +37,9 @@ namespace MnemoApp.Core.MnemoAPI
             ILocalizationService localizationService,
             IToastService toastService,
             IDropdownItemRegistry dropdownRegistry,
-            IRuntimeStorage runtimeStorage)
+            IRuntimeStorage runtimeStorage,
+            IFileProcessingService fileProcessingService,
+            FileProcessorRegistry fileProcessorRegistry)
         {
             navigate = navigationService;
             sidebar = sidebarService;
@@ -45,6 +49,7 @@ namespace MnemoApp.Core.MnemoAPI
             tasks = new TaskApi(taskSchedulerService, aiService, modelSelectionService, runtimeStorage);
             data = dataApi;
             storage = storageManager;
+            files = new FileApi(fileProcessingService, fileProcessorRegistry);
         }
     }
 }

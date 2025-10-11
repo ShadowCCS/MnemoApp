@@ -91,6 +91,7 @@ namespace MnemoApp.UI.Components
         public ICommand SelectFilesTabCommand { get; }
         public ICommand SelectLinksTabCommand { get; }
         public ICommand AddLinkCommand { get; }
+        public ICommand AddFileCommand { get; }
         public ICommand GenerateCommand { get; }
         
         public InputBuilderViewModel(IMnemoAPI mnemoAPI)
@@ -101,6 +102,7 @@ namespace MnemoApp.UI.Components
             SelectFilesTabCommand = new RelayCommand(SelectFilesTab);
             SelectLinksTabCommand = new RelayCommand(SelectLinksTab);
             AddLinkCommand = new RelayCommand(AddLink, CanAddLink);
+            AddFileCommand = new RelayCommand(async () => await AddFileAsync());
             GenerateCommand = new RelayCommand(Generate, CanGenerate);
             
             // Initialize with default tab selection based on visibility
@@ -124,8 +126,24 @@ namespace MnemoApp.UI.Components
                 }
             };
 
-            Files.CollectionChanged += (_, __) => UpdateBadgeCounts();
-            Links.CollectionChanged += (_, __) => UpdateBadgeCounts();
+            Files.CollectionChanged += async (_, __) => 
+            {
+                UpdateBadgeCounts();
+                try
+                {
+                    await DebounceUpdateTextMetricsAsync();
+                }
+                catch { /* ignore */ }
+            };
+            Links.CollectionChanged += async (_, __) => 
+            {
+                UpdateBadgeCounts();
+                try
+                {
+                    await DebounceUpdateTextMetricsAsync();
+                }
+                catch { /* ignore */ }
+            };
             
             // Subscribe to model selection changes with stored handler for cleanup
             _modelChangedHandler = async _ =>
@@ -235,6 +253,73 @@ namespace MnemoApp.UI.Components
         }
         
         private bool CanAddLink() => !string.IsNullOrWhiteSpace(NewLinkUrl);
+
+        private async Task AddFileAsync()
+        {
+            try
+            {
+                // Get supported extensions for file picker filter
+                var supportedExtensions = _mnemoAPI.files.GetSupportedExtensions();
+                var filterString = string.Join(";", supportedExtensions.Select(ext => $"*{ext}"));
+                
+                // Open file picker (this will be implemented in the view)
+                // For now, we'll create a placeholder that extensions can hook into
+                var filePicker = new Avalonia.Platform.Storage.FilePickerOpenOptions
+                {
+                    Title = "Select Files to Upload",
+                    AllowMultiple = true,
+                    FileTypeFilter = new[]
+                    {
+                        new Avalonia.Platform.Storage.FilePickerFileType("Supported Files")
+                        {
+                            Patterns = supportedExtensions.Select(ext => $"*{ext}").ToArray()
+                        },
+                        new Avalonia.Platform.Storage.FilePickerFileType("All Files")
+                        {
+                            Patterns = new[] { "*.*" }
+                        }
+                    }
+                };
+
+                // Get top level window from visual tree
+                var window = Avalonia.Application.Current?.ApplicationLifetime is 
+                    Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop 
+                    ? desktop.MainWindow 
+                    : null;
+
+                if (window == null)
+                    return;
+
+                var result = await window.StorageProvider.OpenFilePickerAsync(filePicker);
+                
+                if (result != null && result.Count > 0)
+                {
+                    foreach (var file in result)
+                    {
+                        var filePath = file.Path.LocalPath;
+                        if (string.IsNullOrEmpty(filePath))
+                            continue;
+
+                        // Process the file
+                        var processResult = await _mnemoAPI.files.ProcessFile(filePath);
+                        
+                        var fileItem = new FileItemViewModel(
+                            System.IO.Path.GetFileName(filePath),
+                            filePath,
+                            processResult.Success ? processResult.Content ?? string.Empty : string.Empty,
+                            processResult.Success ? null : processResult.ErrorMessage
+                        );
+                        
+                        fileItem.RemoveCommand = new RelayCommand(() => Files.Remove(fileItem));
+                        Files.Add(fileItem);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[INPUT_BUILDER] Failed to add file: {ex.Message}");
+            }
+        }
         
         private void Generate()
         {
@@ -247,13 +332,16 @@ namespace MnemoApp.UI.Components
 
             if (Files.Any())
             {
-                var fileLines = Files
-                    .Select(f => string.IsNullOrWhiteSpace(f.FileName) ? null : $"- {f.FileName}")
-                    .Where(s => s != null);
-                var filesBlock = string.Join('\n', fileLines);
-                if (!string.IsNullOrWhiteSpace(filesBlock))
+                foreach (var file in Files)
                 {
-                    parts.Add("Files:\n" + filesBlock);
+                    if (!string.IsNullOrWhiteSpace(file.ProcessedContent))
+                    {
+                        parts.Add($"=== File: {file.FileName} ===\n{file.ProcessedContent}");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(file.ErrorMessage))
+                    {
+                        parts.Add($"=== File: {file.FileName} (Error) ===\nError: {file.ErrorMessage}");
+                    }
                 }
             }
 
@@ -272,6 +360,45 @@ namespace MnemoApp.UI.Components
             var result = string.Join("\n\n", parts);
             Generated?.Invoke(result);
         }
+
+        private string BuildCompleteContent()
+        {
+            var parts = new System.Collections.Generic.List<string>(4);
+
+            if (!string.IsNullOrWhiteSpace(TextContent))
+            {
+                parts.Add(TextContent.Trim());
+            }
+
+            if (Files.Any())
+            {
+                foreach (var file in Files)
+                {
+                    if (!string.IsNullOrWhiteSpace(file.ProcessedContent))
+                    {
+                        parts.Add($"=== File: {file.FileName} ===\n{file.ProcessedContent}");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(file.ErrorMessage))
+                    {
+                        parts.Add($"=== File: {file.FileName} (Error) ===\nError: {file.ErrorMessage}");
+                    }
+                }
+            }
+
+            if (Links.Any())
+            {
+                var linkLines = Links
+                    .Select(l => string.IsNullOrWhiteSpace(l.Url) ? null : $"- {l.Url}")
+                    .Where(s => s != null);
+                var linksBlock = string.Join('\n', linkLines);
+                if (!string.IsNullOrWhiteSpace(linksBlock))
+                {
+                    parts.Add("Links:\n" + linksBlock);
+                }
+            }
+
+            return string.Join("\n\n", parts);
+        }
         
         private bool CanGenerate()
         {
@@ -280,10 +407,13 @@ namespace MnemoApp.UI.Components
         
         private async Task UpdateTextMetricsAsync()
         {
-            CharacterCount = TextContent?.Length ?? 0;
-            WordCount = string.IsNullOrWhiteSpace(TextContent) 
+            // Build complete content for metrics
+            var completeContent = BuildCompleteContent();
+            
+            CharacterCount = completeContent?.Length ?? 0;
+            WordCount = string.IsNullOrWhiteSpace(completeContent) 
                 ? 0 
-                : TextContent.Split(' ', System.StringSplitOptions.RemoveEmptyEntries).Length;
+                : completeContent.Split(' ', System.StringSplitOptions.RemoveEmptyEntries).Length;
             
             // Update token count using the AI service
             await UpdateTokenCountAsync();
@@ -318,7 +448,10 @@ namespace MnemoApp.UI.Components
         
         private async Task UpdateTokenCountAsync()
         {
-            if (string.IsNullOrWhiteSpace(TextContent))
+            // Build the complete content string that will be sent to AI
+            var completeContent = BuildCompleteContent();
+            
+            if (string.IsNullOrWhiteSpace(completeContent))
             {
                 CurrentTokenCount = 0;
                 return;
@@ -333,7 +466,7 @@ namespace MnemoApp.UI.Components
             
             try
             {
-                var result = await _mnemoAPI.ai.CountTokensAsync(TextContent, selectedModel);
+                var result = await _mnemoAPI.ai.CountTokensAsync(completeContent, selectedModel);
                 CurrentTokenCount = result.Success ? result.TokenCount : 0;
             }
             catch
@@ -395,12 +528,28 @@ namespace MnemoApp.UI.Components
     {
         [ObservableProperty]
         private string fileName = string.Empty;
+
+        [ObservableProperty]
+        private string filePath = string.Empty;
+
+        [ObservableProperty]
+        private string processedContent = string.Empty;
+
+        [ObservableProperty]
+        private string? errorMessage;
+
+        [ObservableProperty]
+        private bool hasError = false;
         
         public ICommand? RemoveCommand { get; set; }
         
-        public FileItemViewModel(string fileName)
+        public FileItemViewModel(string fileName, string filePath = "", string processedContent = "", string? errorMessage = null)
         {
             FileName = fileName;
+            FilePath = filePath;
+            ProcessedContent = processedContent;
+            ErrorMessage = errorMessage;
+            HasError = !string.IsNullOrEmpty(errorMessage);
         }
     }
     

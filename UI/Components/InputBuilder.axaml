@@ -276,12 +276,16 @@
                         <!-- Files Tab Content -->
                         <StackPanel IsVisible="{Binding IsFilesTabActive}" Spacing="8">
                             <!-- File Drop Zone -->
-                            <Border Background="{DynamicResource OverlayBackgroundBrush}" 
+                            <Button Background="{DynamicResource OverlayBackgroundBrush}" 
                                     BorderBrush="{DynamicResource TextControlBorderBrush}" 
                                     BorderThickness="2" 
                                     CornerRadius="6" 
                                     Padding="12" 
-                                    MinHeight="70">
+                                    MinHeight="70"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Command="{Binding AddFileCommand}"
+                                    Cursor="Hand">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
                                     <services:MnemoSvg SvgPath="avares://MnemoApp/UI/Icons/Tabler/outline/file-plus.svg" 
                                                        Width="20" Height="20" 
@@ -298,7 +302,7 @@
                                                Foreground="{DynamicResource TextFadedBrush}"
                                                HorizontalAlignment="Center"/>
                                 </StackPanel>
-                            </Border>
+                            </Button>
 
                             <!-- File List -->
                             <ItemsControl ItemsSource="{Binding Files}">
