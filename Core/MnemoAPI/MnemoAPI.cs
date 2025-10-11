@@ -22,6 +22,8 @@ namespace MnemoApp.Core.MnemoAPI
         public required AIApi ai { get; set; }
         public required TaskApi tasks { get; set; }
         public required FileApi files { get; set; }
+        public required LaTeXApi latex { get; set; }
+        public required SettingsApi settings { get; set; }
 
         public MnemoAPI(
             INavigationService navigationService, 
@@ -50,6 +52,8 @@ namespace MnemoApp.Core.MnemoAPI
             data = dataApi;
             storage = storageManager;
             files = new FileApi(fileProcessingService, fileProcessorRegistry);
+            latex = new LaTeXApi();
+            settings = new SettingsApi(runtimeStorage);
         }
     }
 }

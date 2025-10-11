@@ -17,5 +17,7 @@ namespace MnemoApp.Core.MnemoAPI
         AIApi ai { get; set; }
         TaskApi tasks { get; set; }
         FileApi files { get; set; }
+        LaTeXApi latex { get; set; }
+        SettingsApi settings { get; set; }
     }
 }

@@ -254,5 +254,25 @@ public static class SymbolRegistry
     {
         return _symbols.ContainsKey(command);
     }
+
+    public static bool TryGetSymbol(string command, out string? symbol)
+    {
+        return _symbols.TryGetValue(command, out symbol);
+    }
+
+    public static IEnumerable<string> GetAllSymbolNames()
+    {
+        return _symbols.Keys;
+    }
+
+    public static IReadOnlyDictionary<string, string> GetAllSymbols()
+    {
+        return _symbols;
+    }
+
+    public static void RegisterSymbol(string command, string unicode)
+    {
+        _symbols[command] = unicode;
+    }
 }
 
