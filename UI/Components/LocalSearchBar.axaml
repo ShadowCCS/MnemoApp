@@ -3,7 +3,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="28"
-             x:Class="MnemoApp.UI.Components.LocalSearchBar">
+             x:Class="MnemoApp.UI.Components.LocalSearchBar"
+             x:Name="localSearchBar">
   <UserControl.Resources>
     <!-- Context menu for LocalSearchBar -->
   <MenuFlyout x:Key="LocalSearchBarContextFlyout" ShowMode="{OnFormFactor Desktop=Standard, Mobile=Transient}">
@@ -59,7 +60,6 @@
     <Setter Property="SelectionBrush" Value="{DynamicResource SearchBarTextHoverBrush}" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
-    <Setter Property="Width" Value="350" />
     <Setter Property="Height" Value="28" />
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="4,0" /> 
@@ -198,8 +198,9 @@
 
   <TextBox Theme="{DynamicResource LocalSearchBarTheme}"
            Watermark="Search ..."
-           Width="350" 
            Height="28" 
            Padding="10,0" 
-           VerticalContentAlignment="Center"/>
+           VerticalContentAlignment="Center"
+           HorizontalAlignment="Stretch"
+           Text="{Binding #localSearchBar.Text, Mode=TwoWay}"/>
 </UserControl>

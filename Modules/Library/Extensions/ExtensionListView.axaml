@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:MnemoApp.Modules.Library.Extensions"
+             xmlns:components="clr-namespace:MnemoApp.UI.Components"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="MnemoApp.Modules.Library.Extensions.ExtensionListView"
              x:DataType="local:ExtensionListViewModel">
@@ -11,10 +12,9 @@
         <!-- Toolbar -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,16">
             <!-- Search Box -->
-            <TextBox Grid.Column="0"
-                     Watermark="Search extensions..."
-                     Text="{Binding SearchText}"
-                     Margin="0,0,12,0" />
+            <components:LocalSearchBar Grid.Column="0"
+                                     Text="{Binding SearchText}"
+                                     Margin="0,0,12,0" />
 
             <!-- Refresh Button -->
             <Button Grid.Column="1"

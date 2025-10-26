@@ -8,12 +8,12 @@
              x:Class="MnemoApp.Modules.Library.LibraryView"
              x:DataType="local:LibraryViewModel">
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,Auto,*">
         <!-- Header -->
         <Border Grid.Row="0" 
                 Background="{DynamicResource BackgroundLevel2}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="0,0,0,1"
+                BorderThickness="0"
                 Padding="24,16">
             <TextBlock Text="Library"
                        FontSize="24"
@@ -21,28 +21,56 @@
                        Foreground="{DynamicResource TextPrimaryBrush}" />
         </Border>
 
-        <!-- Content Area -->
-        <TabControl Grid.Row="1"
-                    SelectedIndex="{Binding SelectedTabIndex}"
-                    Background="{DynamicResource BackgroundLevel1}"
-                    BorderThickness="0">
-            
-            <!-- Extensions Tab -->
-            <TabItem Header="Extensions">
-                <extensions:ExtensionListView />
-            </TabItem>
+        <!-- Tab Navigation -->
+        <Border Grid.Row="1" 
+                Background="{DynamicResource BackgroundLevel1}"
+                Padding="24,16,24,0">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Extensions"
+                        Classes="tab-button"
+                        Classes.selected="{Binding SelectedTabIndex, Converter={x:Static local:LibraryViewModel.ExtensionsTabConverter}}"
+                        Command="{Binding SelectExtensionsCommand}" />
+                <Button Content="Content"
+                        Classes="tab-button"
+                        Classes.selected="{Binding SelectedTabIndex, Converter={x:Static local:LibraryViewModel.ContentTabConverter}}"
+                        Command="{Binding SelectContentCommand}" />
+            </StackPanel>
+        </Border>
 
-            <!-- Content Tab (Placeholder) -->
-            <TabItem Header="Content">
-                <Border Background="{DynamicResource BackgroundLevel1}">
-                    <TextBlock Text="Content management coming soon..."
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                </Border>
-            </TabItem>
-        </TabControl>
+        <!-- Content Area -->
+        <Border Grid.Row="2" 
+                Background="{DynamicResource BackgroundLevel1}"
+                Padding="24">
+            <ContentControl Content="{Binding CurrentContent}" />
+        </Border>
     </Grid>
+
+    <UserControl.Styles>
+        <Style Selector="Button.tab-button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        
+        <Style Selector="Button.tab-button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}" />
+        </Style>
+        
+        <Style Selector="Button.tab-button.selected">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        
+        <Style Selector="Button.tab-button.selected:pointerover">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}" />
+        </Style>
+    </UserControl.Styles>
 
 </UserControl>
 
