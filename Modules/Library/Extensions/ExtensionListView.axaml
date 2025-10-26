@@ -1,0 +1,127 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:MnemoApp.Modules.Library.Extensions"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="MnemoApp.Modules.Library.Extensions.ExtensionListView"
+             x:DataType="local:ExtensionListViewModel">
+
+    <Grid RowDefinitions="Auto,*" Margin="24">
+        <!-- Toolbar -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,16">
+            <!-- Search Box -->
+            <TextBox Grid.Column="0"
+                     Watermark="Search extensions..."
+                     Text="{Binding SearchText}"
+                     Margin="0,0,12,0" />
+
+            <!-- Refresh Button -->
+            <Button Grid.Column="1"
+                    Content="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    Margin="0,0,8,0" />
+
+            <!-- Install Button -->
+            <Button Grid.Column="2"
+                    Content="Install Extension"
+                    Command="{Binding InstallCommand}"
+                    Classes="accent" />
+        </Grid>
+
+        <!-- Extensions List -->
+        <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding Extensions}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="16"
+                                Margin="0,0,0,12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <!-- Extension Info -->
+                                <StackPanel Grid.Column="0" Spacing="8">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding DisplayName}"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Version, StringFormat=' v{0}'}"
+                                                   FontSize="14"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="8,0,0,0" />
+                                    </Grid>
+
+                                    <TextBlock Text="{Binding Author, StringFormat='by {0}'}"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               IsVisible="{Binding Author, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                                    <TextBlock Text="{Binding Description}"
+                                               FontSize="14"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap"
+                                               IsVisible="{Binding Description, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Border Background="{DynamicResource AccentBrush}"
+                                                CornerRadius="4"
+                                                Padding="6,2">
+                                            <TextBlock Text="{Binding State}"
+                                                       FontSize="11"
+                                                       Foreground="White" />
+                                        </Border>
+
+                                        <Border Background="{DynamicResource ErrorBrush}"
+                                                CornerRadius="4"
+                                                Padding="6,2"
+                                                IsVisible="{Binding HasErrors}">
+                                            <TextBlock Text="Has Errors"
+                                                       FontSize="11"
+                                                       Foreground="White" />
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Actions -->
+                                <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+                                    <ToggleSwitch IsChecked="{Binding IsEnabled}"
+                                                  IsEnabled="{Binding !IsWorking}"
+                                                  OnContent="Enabled"
+                                                  OffContent="Disabled"
+                                                  Background="{DynamicResource ButtonBackgroundBrush}"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  BorderBrush="{DynamicResource BorderBrush}"
+                                                  BorderThickness="1"
+                                                  Padding="8,4" />
+
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <Button Content="Reload"
+                                                Command="{Binding ReloadCommand}"
+                                                IsEnabled="{Binding !IsWorking}"
+                                                Width="80" />
+                                        <Button Content="Details"
+                                                Command="{Binding ViewDetailsCommand}"
+                                                Width="80" />
+                                        <Button Content="Uninstall"
+                                                Command="{Binding UninstallCommand}"
+                                                IsEnabled="{Binding !IsWorking}"
+                                                Classes="danger"
+                                                Width="90" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+
+</UserControl>
+

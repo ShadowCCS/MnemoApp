@@ -18,6 +18,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Modules\Extensions\**\*.*" CopyToOutputDirectory="PreserveNewest" LinkBase="Modules\Extensions" />
+    <AvaloniaResource Include="Modules\Extensions\**\*.svg" />
+    <AvaloniaResource Include="Modules\Extensions\**\*.png" />
+    <AvaloniaResource Include="Modules\Extensions\**\*.jpg" />
+    <AvaloniaResource Include="Modules\Extensions\**\*.jpeg" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.0" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
     <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="11.3.0" />
@@ -36,5 +44,7 @@
     <PackageReference Include="Markdown.Avalonia" Version="11.0.3-a1" />
     <PackageReference Include="PdfPig" Version="0.1.9" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.1.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.11.0" />
   </ItemGroup>
 </Project>

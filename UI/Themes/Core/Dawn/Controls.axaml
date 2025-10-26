@@ -5,6 +5,8 @@
     <SolidColorBrush x:Key="WorkspaceBackgroundBrush" Color="{DynamicResource WorkspaceBackground}"/>
     <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="{DynamicResource OverlayBackground}"/>
     <SolidColorBrush x:Key="TopbarBackgroundBrush" Color="{DynamicResource TopbarBackground}"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource CardAccent}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource ButtonBorder}"/>
     
     <!-- Text Brushes -->
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimary}"/>
@@ -108,6 +110,46 @@
     <SolidColorBrush x:Key="ToggleButtonHoverBackgroundBrush" Color="{DynamicResource ToggleButtonHoverBackground}"/>
     <SolidColorBrush x:Key="ToggleButtonActiveBackgroundBrush" Color="{DynamicResource ToggleButtonActiveBackground}"/>
     <SolidColorBrush x:Key="ToggleButtonEyeBrush" Color="{DynamicResource ToggleButtonEye}"/>
+    
+    <!-- Toggle Switch Brushes -->
+    <SolidColorBrush x:Key="ToggleSwitchTrackBackgroundBrush" Color="{DynamicResource ToggleSwitchTrackBackground}"/>
+    <SolidColorBrush x:Key="ToggleSwitchTrackBackgroundCheckedBrush" Color="{DynamicResource ToggleSwitchTrackBackgroundChecked}"/>
+    <SolidColorBrush x:Key="ToggleSwitchTrackBackgroundDisabledBrush" Color="{DynamicResource ToggleSwitchTrackBackgroundDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchThumbBackgroundBrush" Color="{DynamicResource ToggleSwitchThumbBackground}"/>
+    <SolidColorBrush x:Key="ToggleSwitchThumbBackgroundDisabledBrush" Color="{DynamicResource ToggleSwitchThumbBackgroundDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchThumbShadowBrush" Color="{DynamicResource ToggleSwitchThumbShadow}"/>
+    
+    <!-- Additional ToggleSwitch Brushes -->
+    <SolidColorBrush x:Key="ToggleSwitchContentForegroundBrush" Color="{DynamicResource ToggleSwitchContentForeground}"/>
+    <SolidColorBrush x:Key="ToggleSwitchContainerBackgroundBrush" Color="{DynamicResource ToggleSwitchContainerBackground}"/>
+    <SolidColorBrush x:Key="ToggleSwitchContainerBackgroundPointerOverBrush" Color="{DynamicResource ToggleSwitchContainerBackgroundPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchContainerBackgroundPressedBrush" Color="{DynamicResource ToggleSwitchContainerBackgroundPressed}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffBrush" Color="{DynamicResource ToggleSwitchFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOverBrush" Color="{DynamicResource ToggleSwitchFillOffPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPressedBrush" Color="{DynamicResource ToggleSwitchFillOffPressed}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffDisabledBrush" Color="{DynamicResource ToggleSwitchFillOffDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnBrush" Color="{DynamicResource ToggleSwitchFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOverBrush" Color="{DynamicResource ToggleSwitchFillOnPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPressedBrush" Color="{DynamicResource ToggleSwitchFillOnPressed}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnDisabledBrush" Color="{DynamicResource ToggleSwitchFillOnDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffBrush" Color="{DynamicResource ToggleSwitchStrokeOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOverBrush" Color="{DynamicResource ToggleSwitchStrokeOffPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressedBrush" Color="{DynamicResource ToggleSwitchStrokeOffPressed}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffDisabledBrush" Color="{DynamicResource ToggleSwitchStrokeOffDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnBrush" Color="{DynamicResource ToggleSwitchStrokeOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOverBrush" Color="{DynamicResource ToggleSwitchStrokeOnPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressedBrush" Color="{DynamicResource ToggleSwitchStrokeOnPressed}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnDisabledBrush" Color="{DynamicResource ToggleSwitchStrokeOnDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOffBrush" Color="{DynamicResource ToggleSwitchKnobFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOverBrush" Color="{DynamicResource ToggleSwitchKnobFillOffPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPressedBrush" Color="{DynamicResource ToggleSwitchKnobFillOffPressed}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOffDisabledBrush" Color="{DynamicResource ToggleSwitchKnobFillOffDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnBrush" Color="{DynamicResource ToggleSwitchKnobFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOverBrush" Color="{DynamicResource ToggleSwitchKnobFillOnPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressedBrush" Color="{DynamicResource ToggleSwitchKnobFillOnPressed}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnDisabledBrush" Color="{DynamicResource ToggleSwitchKnobFillOnDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchHeaderForegroundDisabledBrush" Color="{DynamicResource ToggleSwitchHeaderForegroundDisabled}"/>
+    
     <SolidColorBrush x:Key="TextHighlightColorBrush" Color="{DynamicResource TextHighlightColor}"/>
     <SolidColorBrush x:Key="LineColorBrush" Color="{DynamicResource LineColor}"/>
     <SolidColorBrush x:Key="ListItemBackgroundBrush" Color="{DynamicResource ListItemBackground}"/>
@@ -322,6 +364,10 @@
     <CornerRadius x:Key="ComboBoxCornerRadius">4</CornerRadius>
     <Thickness x:Key="ButtonPadding">6</Thickness>
     <Thickness x:Key="ComboBoxBorderBrushThickness">1</Thickness>
+    
+    <!-- ToggleSwitch Resources -->
+    <Thickness x:Key="ToggleSwitchOuterBorderStrokeThickness">0</Thickness>
+    <Thickness x:Key="ToggleSwitchOnStrokeThickness">0</Thickness>
 
     <!-- Dropdown -->
     <SolidColorBrush x:Key="DropdownBackgroundBrush" Color="{DynamicResource DropdownBackground}" />

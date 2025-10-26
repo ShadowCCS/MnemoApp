@@ -8,6 +8,7 @@ using MnemoApp.Core.Tasks.Services;
 using MnemoApp.Data.Runtime;
 using MnemoApp.Data.Packaged;
 using MnemoApp.Core.Services.FileProcessing;
+using MnemoApp.Core.Extensions.Services;
 
 namespace MnemoApp.Core.MnemoAPI
 {
@@ -24,6 +25,7 @@ namespace MnemoApp.Core.MnemoAPI
         public required FileApi files { get; set; }
         public required LaTeXApi latex { get; set; }
         public required SettingsApi settings { get; set; }
+        public required ExtensionApi extensions { get; set; }
 
         public MnemoAPI(
             INavigationService navigationService, 
@@ -41,7 +43,8 @@ namespace MnemoApp.Core.MnemoAPI
             IDropdownItemRegistry dropdownRegistry,
             IRuntimeStorage runtimeStorage,
             IFileProcessingService fileProcessingService,
-            FileProcessorRegistry fileProcessorRegistry)
+            FileProcessorRegistry fileProcessorRegistry,
+            IExtensionService extensionService)
         {
             navigate = navigationService;
             sidebar = sidebarService;
@@ -54,6 +57,7 @@ namespace MnemoApp.Core.MnemoAPI
             files = new FileApi(fileProcessingService, fileProcessorRegistry);
             latex = new LaTeXApi();
             settings = new SettingsApi(runtimeStorage);
+            extensions = new ExtensionApi(extensionService);
         }
     }
 }

@@ -19,5 +19,6 @@ namespace MnemoApp.Core.MnemoAPI
         FileApi files { get; set; }
         LaTeXApi latex { get; set; }
         SettingsApi settings { get; set; }
+        ExtensionApi extensions { get; set; }
     }
 }

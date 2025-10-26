@@ -2,6 +2,16 @@
     "name": "SampleExtension",
     "version": "1.0.0",
     "apiVersion": "1.0.0",
-    "description": "This is an example extension for the MnemoApp.",
-    "author": "Mnemo"
+    "displayName": "Sample Extension",
+    "description": "A comprehensive example extension demonstrating MnemoApp's extension system capabilities including UI, tasks, storage, and AI integration.",
+    "author": "Mnemo",
+    "mainClass": "MnemoApp.Extensions.SampleExtension.SampleExtension",
+    "icon": "icon.svg",
+    "loadMode": "CompiledAssembly",
+    "permissions": [
+        "UIAccess",
+        "FileAccess",
+        "ApiRegistration"
+    ],
+    "tags": ["example", "demo", "ui", "tasks", "ai"]
 }

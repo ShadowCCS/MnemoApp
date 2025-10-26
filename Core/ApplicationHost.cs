@@ -15,11 +15,14 @@ using MnemoApp.Modules.Dashboard;
 using MnemoApp.Modules.Paths;
 using MnemoApp.Modules.Settings;
 using MnemoApp.Modules.TestModule;
+using MnemoApp.Modules.Library;
 using MnemoApp.Core.Overlays;
 using MnemoApp.Core.Storage;
 using MnemoApp.Data.Runtime;
 using MnemoApp.Data.Packaged;
 using MnemoApp.Core.Services.FileProcessing;
+using MnemoApp.Core.Extensions.Services;
+using MnemoApp.Core.Extensions.Security;
 
 namespace MnemoApp.Core
 {
@@ -39,7 +42,7 @@ namespace MnemoApp.Core
             var services = new ServiceCollection();
 
             // Register core services
-            services.AddSingleton<INavigationService, NavigationService>();
+            services.AddSingleton<INavigationService>(sp => new NavigationService(sp, sp.GetRequiredService<IExtensionService>()));
             services.AddSingleton<ISidebarService, SidebarService>();
             services.AddSingleton<IThemeService, ThemeService>();
             services.AddSingleton<ILocalizationService, LocalizationService>();
@@ -54,6 +57,10 @@ namespace MnemoApp.Core
             // File Processing
             services.AddSingleton<FileProcessorRegistry>();
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
+            
+            // Extension System
+            services.AddSingleton<PermissionPromptService>();
+            services.AddSingleton<IExtensionService, ExtensionService>();
             
             // Storage
             services.AddSingleton<IRuntimeStorage>(sp =>
@@ -82,6 +89,9 @@ namespace MnemoApp.Core
             services.AddTransient<PathsViewModel>();
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<TestModuleViewModel>();
+            services.AddTransient<LibraryViewModel>();
+            services.AddTransient<MnemoApp.Modules.Library.Extensions.ExtensionListViewModel>();
+            services.AddTransient<MnemoApp.Extensions.SampleExtension.SampleExtensionViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
 
@@ -108,6 +118,17 @@ namespace MnemoApp.Core
 
             // Initialize MnemoAPI
             var api = _serviceProvider.GetRequiredService<IMnemoAPI>();
+            
+            // Initialize extension system (after MnemoAPI is available)
+            var extensionService = _serviceProvider.GetRequiredService<IExtensionService>();
+            
+            // Initialize ViewLocator with extension service
+            ViewLocator.SetExtensionService(extensionService);
+            
+            _ = Task.Run(async () =>
+            {
+                try { await extensionService.InitializeAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Extension init failed: {ex.Message}"); }
+            });
             
             // Load saved language preference and apply it
             try
@@ -167,6 +188,14 @@ namespace MnemoApp.Core
                 typeof(TestModuleViewModel),
                 api.ui.language.get("Sidebar", "Main Hub"),
                 "avares://MnemoApp/UI/Icons/Tabler/outline/test-pipe.svg"
+            );
+
+            // Register Library module
+            api.sidebar.Register(
+                "Library",
+                typeof(LibraryViewModel),
+                api.ui.language.get("Sidebar", "Utility & Personalization"),
+                "avares://MnemoApp/UI/Icons/Tabler/outline/package.svg"
             );
 
             // Register Settings module

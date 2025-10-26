@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:MnemoApp.Modules.Library"
+             xmlns:extensions="clr-namespace:MnemoApp.Modules.Library.Extensions"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="MnemoApp.Modules.Library.LibraryView"
+             x:DataType="local:LibraryViewModel">
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Header -->
+        <Border Grid.Row="0" 
+                Background="{DynamicResource BackgroundLevel2}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="24,16">
+            <TextBlock Text="Library"
+                       FontSize="24"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+        </Border>
+
+        <!-- Content Area -->
+        <TabControl Grid.Row="1"
+                    SelectedIndex="{Binding SelectedTabIndex}"
+                    Background="{DynamicResource BackgroundLevel1}"
+                    BorderThickness="0">
+            
+            <!-- Extensions Tab -->
+            <TabItem Header="Extensions">
+                <extensions:ExtensionListView />
+            </TabItem>
+
+            <!-- Content Tab (Placeholder) -->
+            <TabItem Header="Content">
+                <Border Background="{DynamicResource BackgroundLevel1}">
+                    <TextBlock Text="Content management coming soon..."
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                </Border>
+            </TabItem>
+        </TabControl>
+    </Grid>
+
+</UserControl>
+

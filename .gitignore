@@ -4,6 +4,7 @@ bin/
 obj/
 .cursor/
 .vscode/
+.docs/
 
 # Other common .NET ignored files
 *.suo

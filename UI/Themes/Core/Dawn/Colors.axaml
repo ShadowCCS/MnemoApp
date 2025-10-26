@@ -89,7 +89,7 @@
     <Color x:Key="DestructiveButtonColor">#ff5050</Color>
     <Color x:Key="DestructiveButtonHoverColor">#FF6868</Color>
     <Color x:Key="NewButtonBackground">#2079FF</Color>
-    <Color x:Key="AccentButtonText">#9E9E9E</Color>
+    <Color x:Key="AccentButtonText">#FFFFFF</Color>
     <Color x:Key="GhostButtonBackground">Transparent</Color>
     <Color x:Key="GhostButtonText">#777777</Color>
     <Color x:Key="ViewSwitchButton">#BBBBBB</Color>
@@ -108,6 +108,46 @@
     <Color x:Key="ToggleButtonHoverBackground">#B1B1B1</Color>
     <Color x:Key="ToggleButtonActiveBackground">#2079FF</Color>
     <Color x:Key="ToggleButtonEye">#D9D9D9</Color>
+    
+    <!-- Toggle Switch Colors -->
+    <Color x:Key="ToggleSwitchTrackBackground">#C8C8C8</Color>
+    <Color x:Key="ToggleSwitchTrackBackgroundChecked">#2079FF</Color>
+    <Color x:Key="ToggleSwitchTrackBackgroundDisabled">#E0E0E0</Color>
+    <Color x:Key="ToggleSwitchThumbBackground">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchThumbBackgroundDisabled">#F5F5F5</Color>
+    <Color x:Key="ToggleSwitchThumbShadow">#00000020</Color>
+    
+    <!-- Additional ToggleSwitch Colors -->
+    <Color x:Key="ToggleSwitchContentForeground">#222222</Color>
+    <Color x:Key="ToggleSwitchContainerBackground">Transparent</Color>
+    <Color x:Key="ToggleSwitchContainerBackgroundPointerOver">Transparent</Color>
+    <Color x:Key="ToggleSwitchContainerBackgroundPressed">Transparent</Color>
+    <Color x:Key="ToggleSwitchFillOff">#C8C8C8</Color>
+    <Color x:Key="ToggleSwitchFillOffPointerOver">#B8B8B8</Color>
+    <Color x:Key="ToggleSwitchFillOffPressed">#A8A8A8</Color>
+    <Color x:Key="ToggleSwitchFillOffDisabled">#E0E0E0</Color>
+    <Color x:Key="ToggleSwitchFillOn">#2079FF</Color>
+    <Color x:Key="ToggleSwitchFillOnPointerOver">#1C6DD6</Color>
+    <Color x:Key="ToggleSwitchFillOnPressed">#1861C2</Color>
+    <Color x:Key="ToggleSwitchFillOnDisabled">#E0E0E0</Color>
+    <Color x:Key="ToggleSwitchStrokeOff">Transparent</Color>
+    <Color x:Key="ToggleSwitchStrokeOffPointerOver">Transparent</Color>
+    <Color x:Key="ToggleSwitchStrokeOffPressed">Transparent</Color>
+    <Color x:Key="ToggleSwitchStrokeOffDisabled">Transparent</Color>
+    <Color x:Key="ToggleSwitchStrokeOn">Transparent</Color>
+    <Color x:Key="ToggleSwitchStrokeOnPointerOver">Transparent</Color>
+    <Color x:Key="ToggleSwitchStrokeOnPressed">Transparent</Color>
+    <Color x:Key="ToggleSwitchStrokeOnDisabled">Transparent</Color>
+    <Color x:Key="ToggleSwitchKnobFillOff">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchKnobFillOffPointerOver">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchKnobFillOffPressed">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchKnobFillOffDisabled">#F5F5F5</Color>
+    <Color x:Key="ToggleSwitchKnobFillOn">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchKnobFillOnPointerOver">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchKnobFillOnPressed">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchKnobFillOnDisabled">#F5F5F5</Color>
+    <Color x:Key="ToggleSwitchHeaderForegroundDisabled">#999999</Color>
+    
     <Color x:Key="TextHighlightColor">#A4C8E8</Color>
     <Color x:Key="LineColor">#828282</Color>
     <Color x:Key="ListItemBackground">Transparent</Color>

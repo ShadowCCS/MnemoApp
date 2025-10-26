@@ -1,0 +1,284 @@
+<UserControl x:Class="MnemoApp.Extensions.SampleExtension.SampleExtensionView"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ui="using:Avalonia.Controls"
+             xmlns:vm="clr-namespace:MnemoApp.Extensions.SampleExtension"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:DataType="vm:SampleExtensionViewModel">
+  
+  <ScrollViewer>
+    <StackPanel Margin="20" Spacing="20">
+      <ToggleSwitch/>
+      
+      <!-- Header Section -->
+      <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+              BorderBrush="{DynamicResource CardAccentBrush}"
+              BorderThickness="2"
+              CornerRadius="8"
+              Padding="20">
+        <StackPanel Spacing="10">
+          <TextBlock Text="{Binding ExtensionName}"
+                     FontSize="24"
+                     FontWeight="Bold"
+                     Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <TextBlock Text="Demonstrates MnemoApp Extension System Capabilities"
+                     FontSize="14"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     Opacity="0.9"/>
+          <TextBlock Text="{Binding ExtensionVersion, StringFormat='Version {0}'}"
+                     FontSize="12"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     Opacity="0.8"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Status Section -->
+      <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+              BorderBrush="{DynamicResource LineColorBrush}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Padding="15">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Status"
+                     FontWeight="SemiBold"
+                     FontSize="14"
+                     Margin="0,0,0,10"
+                     Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <TextBlock Text="{Binding StatusMessage}"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <TextBlock Text="{Binding LoadCount, StringFormat='Extension loaded {0} times'}"
+                     FontSize="12"
+                     Opacity="0.7"
+                     Foreground="{DynamicResource TextSecondaryBrush}"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Task Section -->
+      <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+              BorderBrush="{DynamicResource LineColorBrush}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Padding="15">
+        <StackPanel Spacing="15">
+          <TextBlock Text="Task Management"
+                     FontWeight="SemiBold"
+                     FontSize="14"
+                     Margin="0,0,0,10"
+                     Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBox Text="{Binding InputText}"
+                     Watermark="Enter text to process..."
+                     Width="300"
+                     Background="{DynamicResource TextControlBackgroundBrush}"
+                     Foreground="{DynamicResource TextControlForegroundBrush}"
+                     BorderBrush="{DynamicResource TextControlBorderBrush}"/>
+            <Button Content="Schedule Task"
+                    Command="{Binding ScheduleTaskCommand}"
+                    IsEnabled="{Binding !IsProcessing}"
+                    Classes="accent"/>
+            <Button Content="Refresh Tasks"
+                    Command="{Binding RefreshTasksCommand}"
+                    Background="{DynamicResource SecondaryButtonBackgroundBrush}"
+                    Foreground="{DynamicResource SecondaryButtonTextColorBrush}"/>
+          </StackPanel>
+
+          <TextBlock Text="This will create a sample task that processes your input text and stores the result."
+                     FontSize="12"
+                     Opacity="0.7"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource TextSecondaryBrush}"/>
+        </StackPanel>
+      </Border>
+
+      <!-- API Testing Section -->
+      <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+              BorderBrush="{DynamicResource LineColorBrush}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Padding="15">
+        <StackPanel Spacing="15">
+          <TextBlock Text="API Testing"
+                     FontWeight="SemiBold"
+                     FontSize="14"
+                     Margin="0,0,0,10"
+                     Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="15" RowSpacing="15">
+
+            <!-- Toast API -->
+            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="10">
+              <TextBlock Text="Toast Notifications" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <Button Content="Show Sample Toast"
+                      Command="{Binding ShowToastCommand}"
+                      HorizontalAlignment="Stretch"/>
+              <TextBlock Text="Demonstrates the toast notification system"
+                         FontSize="12"
+                         Opacity="0.7"
+                         Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- Overlay API -->
+            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="10">
+              <TextBlock Text="Overlay System" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <Button Content="Show Sample Overlay"
+                      Command="{Binding ShowOverlayCommand}"
+                      HorizontalAlignment="Stretch"/>
+              <TextBlock Text="Opens a custom overlay window"
+                         FontSize="12"
+                         Opacity="0.7"
+                         Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- AI API -->
+            <StackPanel Grid.Row="1" Grid.Column="0" Spacing="10">
+              <TextBlock Text="AI Integration" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <Button Content="Test AI Models"
+                      Command="{Binding TestAICommand}"
+                      IsEnabled="{Binding !IsProcessing}"
+                      HorizontalAlignment="Stretch"/>
+              <TextBlock Text="Tests AI model availability and inference"
+                         FontSize="12"
+                         Opacity="0.7"
+                         Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- Storage API -->
+            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="10">
+              <TextBlock Text="Data Storage" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <Button Content="Test Storage"
+                      Command="{Binding TestStorageCommand}"
+                      HorizontalAlignment="Stretch"/>
+              <TextBlock Text="Tests extension data storage capabilities"
+                         FontSize="12"
+                         Opacity="0.7"
+                         Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Recent Tasks Section -->
+      <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+              BorderBrush="{DynamicResource LineColorBrush}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Padding="15">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Recent Tasks"
+                     FontWeight="SemiBold"
+                     FontSize="14"
+                     Margin="0,0,0,10"
+                     Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="{Binding RecentTasks.Count, StringFormat='{}{0} recent sample tasks'}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <Button Content="Clear"
+                    Command="{Binding ClearTasksCommand}"
+                    Classes="danger"
+                    Background="{DynamicResource DestructiveButtonColorBrush}"
+                    Foreground="White"/>
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding RecentTasks}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                        CornerRadius="4"
+                        Padding="10"
+                        Margin="0,2">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="{Binding Name}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1"
+                               Text="{Binding Status}"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Grid.Row="0" Grid.Column="2"
+                               Text="{Binding CreatedAt, StringFormat='HH:mm:ss'}"
+                               FontSize="12"
+                               Opacity="0.7"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <ProgressBar Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                                 Value="{Binding Progress}"
+                                 Maximum="1"
+                                 Height="4"
+                                 Margin="0,5,0,0"
+                                 Background="{DynamicResource ProgressBarBackgroundBrush}"
+                                 Foreground="{DynamicResource ProgressBarFillBrush}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="Recent sample tasks created by this extension"
+                     FontSize="12"
+                     Opacity="0.7"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource TextSecondaryBrush}"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Features Section -->
+      <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+              BorderBrush="{DynamicResource LineColorBrush}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Padding="15">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Extension Features Demonstrated"
+                     FontWeight="SemiBold"
+                     FontSize="14"
+                     Margin="0,0,0,10"
+                     Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="15" RowSpacing="10">
+
+            <StackPanel Grid.Row="0" Grid.Column="0">
+              <TextBlock Text="✓ Sidebar Integration" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <TextBlock Text="Registered in Extensions category" FontSize="12" Opacity="0.7" Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="0" Grid.Column="1">
+              <TextBlock Text="✓ Topbar Button" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <TextBlock Text="Quick access from main interface" FontSize="12" Opacity="0.7" Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Grid.Column="0">
+              <TextBlock Text="✓ Task System" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <TextBlock Text="Custom task creation and scheduling" FontSize="12" Opacity="0.7" Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Grid.Column="1">
+              <TextBlock Text="✓ Data Storage" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <TextBlock Text="Extension-scoped persistent storage" FontSize="12" Opacity="0.7" Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Grid.Column="0">
+              <TextBlock Text="✓ UI Components" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <TextBlock Text="Toasts, overlays, and custom views" FontSize="12" Opacity="0.7" Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Grid.Column="1">
+              <TextBlock Text="✓ AI Integration" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+              <TextBlock Text="Access to AI models and inference" FontSize="12" Opacity="0.7" Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Footer -->
+      <TextBlock Text="This extension demonstrates the full capabilities of MnemoApp's extension system. Check the console output for detailed logging information."
+                 FontSize="12"
+                 Opacity="0.6"
+                 TextWrapping="Wrap"
+                 HorizontalAlignment="Center"
+                 Foreground="{DynamicResource TextTertiaryBrush}"/>
+      
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

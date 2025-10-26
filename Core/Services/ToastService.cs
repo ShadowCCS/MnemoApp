@@ -36,7 +36,7 @@ namespace MnemoApp.Core.Services
                 Type = type,
                 IsStatus = false,
                 Dismissable = dismissable,
-                Duration = duration
+                Duration = duration ?? TimeSpan.FromSeconds(2) // Use default duration if null
             };
 
             // Enforce max only for passive

@@ -51,6 +51,36 @@
                     <components:LocalSearchBar HorizontalAlignment="Left" />
                     <components:GlobalSearchBar HorizontalAlignment="Left" />
 
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Toggle Switch Test"
+                                   FontSize="{DynamicResource FontSize.Heading6}"
+                                   FontFamily="{DynamicResource Font.SemiBold}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="20">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Basic Toggle Switch:" 
+                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <ToggleSwitch />
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Checked Toggle Switch:" 
+                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <ToggleSwitch IsChecked="True" />
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="With Labels:" 
+                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <ToggleSwitch/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
                     <Button Content="Test AI Task"
                             Command="{Binding TestAICommand}"
                             FontSize="{DynamicResource FontSize.Body.Small}"
