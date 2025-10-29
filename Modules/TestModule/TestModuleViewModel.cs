@@ -5,6 +5,7 @@ using System.Windows.Input;
 using MnemoApp.Core.Common;
 using MnemoApp.Core.MnemoAPI;
 using MnemoApp.Data.Runtime;
+using MnemoApp.Modules.Notes.Models;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -28,11 +29,13 @@ public partial class TestModuleViewModel : ViewModelBase
         TestAICommand = new RelayCommand(TestAI);
         AddUnitCommand = new RelayCommand(AddUnit);
         SavePathCommand = new RelayCommand(SavePath);
+        WipeNotesCommand = new RelayCommand(WipeNotes);
     }
 
     public ICommand TestAICommand { get; }
     public ICommand AddUnitCommand { get; }
     public ICommand SavePathCommand { get; }
+    public ICommand WipeNotesCommand { get; }
 
     private async void TestAI()
     {
@@ -135,6 +138,39 @@ public partial class TestModuleViewModel : ViewModelBase
         catch (Exception ex)
         {
             _mnemoAPI.ui.toast.show("Error", $"Failed to save path: {ex.Message}");
+        }
+    }
+
+    private void WipeNotes()
+    {
+        if (_storage == null || _mnemoAPI == null) return;
+
+        try
+        {
+            // Get all notes using ListContent
+            var notes = _storage.ListContent<NoteData>("Notes");
+            int count = 0;
+
+            // Delete each note
+            foreach (var noteItem in notes)
+            {
+                _storage.RemoveProperty($"Content/Notes/{noteItem.ContentId}");
+                count++;
+            }
+
+            // Also delete any folders if needed
+            var folders = _storage.ListContent<FolderData>("Folders");
+            foreach (var folderItem in folders)
+            {
+                _storage.RemoveProperty($"Content/Folders/{folderItem.ContentId}");
+                count++;
+            }
+
+            _mnemoAPI.ui.toast.show("Success", $"Deleted {count} note(s) and folder(s)");
+        }
+        catch (Exception ex)
+        {
+            _mnemoAPI.ui.toast.show("Error", $"Failed to wipe notes: {ex.Message}");
         }
     }
 }

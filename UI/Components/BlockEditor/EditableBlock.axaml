@@ -1,0 +1,291 @@
+<UserControl
+    x:Class="MnemoApp.UI.Components.BlockEditor.EditableBlock"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:MnemoApp.Modules.Notes.Models"
+    x:CompileBindings="False"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d">
+    <Grid>
+        <Border
+            x:Name="BlockContainer"
+            Padding="8"
+            Background="Transparent"
+            CornerRadius="4"
+            DragDrop.AllowDrop="True">
+        <Grid ColumnDefinitions="24,*">
+            <!--  Drag Handle  -->
+            <Border
+                Grid.Column="0"
+                Margin="0,0,8,0"
+                VerticalAlignment="Top"
+                Background="Transparent"
+                Cursor="Hand"
+                Opacity="0"
+                PointerEntered="DragHandle_PointerEntered"
+                PointerExited="DragHandle_PointerExited"
+                PointerPressed="DragHandle_PointerPressed">
+                <Path
+                    Width="16"
+                    Height="16"
+                    Data="M9 5L9 7L7 7L7 5L9 5ZM11 5L11 7L13 7L13 5L11 5ZM9 9L9 11L7 11L7 9L9 9ZM11 9L11 11L13 11L13 9L11 9ZM9 13L9 15L7 15L7 13L9 13ZM11 13L11 15L13 15L13 13L11 13Z"
+                    Fill="{DynamicResource TextControlForeground}"
+                    Opacity="0.4"
+                    Stretch="Uniform" />
+            </Border>
+
+            <!--  Block Content  -->
+            <Panel Grid.Column="1">
+                <!--  Text/Default  -->
+                <TextBox
+                    AcceptsReturn="False"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    FontSize="14"
+                    GotFocus="TextBox_GotFocus"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.Text}}"
+                    KeyDown="TextBox_KeyDown"
+                    LostFocus="TextBox_LostFocus"
+                    Padding="0"
+                    Text="{Binding Content, Mode=TwoWay}"
+                    TextChanged="TextBox_TextChanged"
+                    TextWrapping="Wrap"
+                    Watermark="{Binding Watermark}" />
+
+                <!--  Heading 1  -->
+                <TextBox
+                    AcceptsReturn="False"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    FontSize="32"
+                    FontWeight="Bold"
+                    GotFocus="TextBox_GotFocus"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.Heading1}}"
+                    KeyDown="TextBox_KeyDown"
+                    LostFocus="TextBox_LostFocus"
+                    Padding="0"
+                    Text="{Binding Content, Mode=TwoWay}"
+                    TextChanged="TextBox_TextChanged"
+                    TextWrapping="Wrap"
+                    Watermark="{Binding Watermark}" />
+
+                <!--  Heading 2  -->
+                <TextBox
+                    AcceptsReturn="False"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    FontSize="24"
+                    FontWeight="SemiBold"
+                    GotFocus="TextBox_GotFocus"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.Heading2}}"
+                    KeyDown="TextBox_KeyDown"
+                    LostFocus="TextBox_LostFocus"
+                    Padding="0"
+                    Text="{Binding Content, Mode=TwoWay}"
+                    TextChanged="TextBox_TextChanged"
+                    TextWrapping="Wrap"
+                    Watermark="{Binding Watermark}" />
+
+                <!--  Heading 3  -->
+                <TextBox
+                    AcceptsReturn="False"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    FontSize="18"
+                    FontWeight="Medium"
+                    GotFocus="TextBox_GotFocus"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.Heading3}}"
+                    KeyDown="TextBox_KeyDown"
+                    LostFocus="TextBox_LostFocus"
+                    Padding="0"
+                    Text="{Binding Content, Mode=TwoWay}"
+                    TextChanged="TextBox_TextChanged"
+                    TextWrapping="Wrap"
+                    Watermark="{Binding Watermark}" />
+
+                <!--  Quote  -->
+                <Border
+                    BorderBrush="{DynamicResource SystemAccentColor}"
+                    BorderThickness="3,0,0,0"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.Quote}}"
+                    Padding="12,4,0,4">
+                    <TextBox
+                        AcceptsReturn="False"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontSize="14"
+                        FontStyle="Italic"
+                        GotFocus="TextBox_GotFocus"
+                        KeyDown="TextBox_KeyDown"
+                        LostFocus="TextBox_LostFocus"
+                        Opacity="0.8"
+                        Padding="0"
+                        Text="{Binding Content, Mode=TwoWay}"
+                        TextChanged="TextBox_TextChanged"
+                        TextWrapping="Wrap"
+                        Watermark="{Binding Watermark}" />
+                </Border>
+
+                <!--  Code Block  -->
+                <Border
+                    Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                    CornerRadius="4"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.Code}}"
+                    Padding="12">
+                    <TextBox
+                        AcceptsReturn="True"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontFamily="Cascadia Code,Consolas,Courier New"
+                        FontSize="13"
+                        GotFocus="TextBox_GotFocus"
+                        KeyDown="TextBox_KeyDown"
+                        LostFocus="TextBox_LostFocus"
+                        Padding="0"
+                        Text="{Binding Content, Mode=TwoWay}"
+                        TextChanged="TextBox_TextChanged"
+                        TextWrapping="NoWrap"
+                        Watermark="{Binding Watermark}" />
+                </Border>
+
+                <!--  Divider  -->
+                <Border
+                    Height="1"
+                    Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.Divider}}"
+                    Margin="0,8" />
+
+                <!--  Bullet List  -->
+                <Grid
+                    ColumnDefinitions="Auto,*"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.BulletList}}">
+                    <TextBlock
+                        Grid.Column="0"
+                        Margin="0,0,8,0"
+                        FontSize="14"
+                        Text="•"
+                        VerticalAlignment="Top" />
+                    <TextBox
+                        Grid.Column="1"
+                        AcceptsReturn="False"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontSize="14"
+                        GotFocus="TextBox_GotFocus"
+                        KeyDown="TextBox_KeyDown"
+                        LostFocus="TextBox_LostFocus"
+                        Padding="0"
+                        Text="{Binding Content, Mode=TwoWay}"
+                        TextChanged="TextBox_TextChanged"
+                        TextWrapping="Wrap"
+                        Watermark="{Binding Watermark}" />
+                </Grid>
+
+                <!--  Numbered List  -->
+                <Grid
+                    ColumnDefinitions="Auto,*"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.NumberedList}}">
+                    <TextBlock
+                        Grid.Column="0"
+                        Margin="0,0,8,0"
+                        FontSize="14"
+                        Text="{Binding ListNumber}"
+                        VerticalAlignment="Top" />
+                    <TextBox
+                        Grid.Column="1"
+                        AcceptsReturn="False"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontSize="14"
+                        GotFocus="TextBox_GotFocus"
+                        KeyDown="TextBox_KeyDown"
+                        LostFocus="TextBox_LostFocus"
+                        Padding="0"
+                        Text="{Binding Content, Mode=TwoWay}"
+                        TextChanged="TextBox_TextChanged"
+                        TextWrapping="Wrap"
+                        Watermark="{Binding Watermark}" />
+                </Grid>
+
+                <!--  Checklist  -->
+                <Grid
+                    ColumnDefinitions="Auto,*"
+                    IsVisible="{Binding Type, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:BlockType.Checklist}}">
+                    <CheckBox
+                        Grid.Column="0"
+                        Margin="0,0,8,0"
+                        IsChecked="{Binding IsChecked}"
+                        VerticalAlignment="Top" />
+                    <TextBox
+                        Grid.Column="1"
+                        AcceptsReturn="False"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontSize="14"
+                        GotFocus="TextBox_GotFocus"
+                        KeyDown="TextBox_KeyDown"
+                        LostFocus="TextBox_LostFocus"
+                        Padding="0"
+                        Text="{Binding Content, Mode=TwoWay}"
+                        TextChanged="TextBox_TextChanged"
+                        TextWrapping="Wrap"
+                        Watermark="{Binding Watermark}" />
+                </Grid>
+            </Panel>
+        </Grid>
+    </Border>
+
+        <!--  Slash Command Menu  -->
+        <Border
+            x:Name="SlashCommandMenu"
+            MinWidth="250"
+            MaxHeight="300"
+            Margin="32,0,0,0"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            BorderThickness="1"
+            BoxShadow="0 4 8 0 #40000000"
+            CornerRadius="8"
+            IsVisible="False"
+            Padding="4">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="CommandItems">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border
+                                Background="Transparent"
+                                CornerRadius="4"
+                                Cursor="Hand"
+                                Padding="12,8"
+                                PointerPressed="CommandItem_PointerPressed">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock
+                                        FontSize="18"
+                                        Margin="0,0,12,0"
+                                        Text="{Binding Icon}"
+                                        VerticalAlignment="Center" />
+                                    <StackPanel>
+                                        <TextBlock
+                                            FontSize="14"
+                                            FontWeight="Medium"
+                                            Text="{Binding Name}" />
+                                        <TextBlock
+                                            FontSize="11"
+                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                            Text="{Binding Description}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>
+

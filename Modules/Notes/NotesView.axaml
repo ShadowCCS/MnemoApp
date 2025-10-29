@@ -1,0 +1,186 @@
+<UserControl
+    x:Class="MnemoApp.Modules.Notes.NotesView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:MnemoApp.Modules.Notes"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:components="clr-namespace:MnemoApp.UI.Components"
+    x:CompileBindings="False"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d">
+    <Grid ColumnDefinitions="2*,5*">
+        <!--  Left Panel: Folders and Notes List  -->
+        <Border
+            Grid.Column="0"
+            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto,*">
+                <!--  Header with Search and Create Button  -->
+                <Grid
+                    Grid.Row="0"
+                    Margin="16,16,16,8"
+                    RowDefinitions="Auto,Auto">
+                    <TextBlock
+                        Grid.Row="0"
+                        Margin="0,0,0,12"
+                        FontSize="24"
+                        FontWeight="Bold"
+                        Text="All Notes" />
+
+                    <Grid
+                        Grid.Row="1"
+                        RowDefinitions="Auto,Auto,Auto"
+                        Margin="0,0,0,0">
+                        <components:LocalSearchBar   
+                            Grid.Row="0"
+                            Margin="0,0,0,8"
+                            HorizontalAlignment="Stretch"
+                            Text="{Binding SearchText, Mode=TwoWay}" />
+
+                        <Button
+                            Grid.Row="1"
+                            Margin="0,0,0,4"
+                            HorizontalAlignment="Stretch"
+                            Click="CreateNote_Click"
+                            Content="Create Note"
+                            Padding="8"
+                            ToolTip.Tip="Create Note" />
+
+                        <Button
+                            Grid.Row="2"
+                            HorizontalAlignment="Stretch"
+                            Click="CreateFolder_Click"
+                            Content="Create Folder"
+                            Padding="8"
+                            ToolTip.Tip="Create Folder" />
+                    </Grid>
+                </Grid>
+
+                <!--  Folder Tree and Notes List  -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="0">
+                        <!--  Folder Tree  -->
+                        <TreeView
+                            Margin="8,0,8,0"
+                            MinHeight="0"
+                            Background="Transparent"
+                            ItemsSource="{Binding FolderTree}"
+                            SelectedItem="{Binding SelectedFolder, Mode=TwoWay}">
+                            <TreeView.Styles>
+                                <Style Selector="TreeViewItem">
+                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                </Style>
+                            </TreeView.Styles>
+                            <TreeView.ItemTemplate>
+                                <TreeDataTemplate ItemsSource="{Binding Children}">
+                                    <StackPanel Orientation="Horizontal" Margin="0,4" Background="Transparent">
+                                        <TextBlock
+                                            Margin="0,0,8,0"
+                                            Text="📂"
+                                            VerticalAlignment="Center"
+                                            FontSize="14" />
+                                        <TextBlock 
+                                            Text="{Binding Name}" 
+                                            VerticalAlignment="Center"
+                                            FontSize="14" />
+                                    </StackPanel>
+                                </TreeDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+
+                        <!--  Notes List  -->
+                        <ItemsControl Margin="8,8,8,8" ItemsSource="{Binding NotesList}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border
+                                        Margin="0,0,0,8"
+                                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                                        CornerRadius="8"
+                                        Cursor="Hand"
+                                        Padding="12"
+                                        PointerPressed="NoteCard_PointerPressed">
+                                        <StackPanel>
+                                            <TextBlock
+                                                FontSize="16"
+                                                FontWeight="SemiBold"
+                                                Text="{Binding Title}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                Margin="0,4,0,0"
+                                                FontSize="12"
+                                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                Text="{Binding CreatedAt, StringFormat='Created: {0:MMM dd, yyyy hh:mm tt}'}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                Margin="0,4,0,0"
+                                                FontSize="13"
+                                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                MaxLines="2"
+                                                Text="{Binding Preview}"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="Wrap" />
+                                            <ItemsControl
+                                                Margin="0,4,0,0"
+                                                ItemsSource="{Binding Tags}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border
+                                                            Margin="0,0,4,4"
+                                                            Background="{DynamicResource SystemAccentColor}"
+                                                            CornerRadius="4"
+                                                            Opacity="0.7"
+                                                            Padding="6,2">
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="White"
+                                                                Text="{Binding}" />
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!--  Right Panel: Editor or Empty State  -->
+        <Grid Grid.Column="1">
+            <!--  Empty State  -->
+            <StackPanel
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsVisible="{Binding !IsNoteSelected}">
+                <TextBlock
+                    FontSize="48"
+                    HorizontalAlignment="Center"
+                    Opacity="0.3"
+                    Text="📝" />
+                <TextBlock
+                    Margin="0,16,0,0"
+                    FontSize="18"
+                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                    HorizontalAlignment="Center"
+                    Text="Select a note to start editing" />
+            </StackPanel>
+
+            <!--  Note Editor  -->
+            <ContentControl
+                Content="{Binding EditorViewModel}"
+                IsVisible="{Binding IsNoteSelected}" />
+        </Grid>
+    </Grid>
+</UserControl>
+

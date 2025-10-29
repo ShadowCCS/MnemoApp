@@ -1,0 +1,99 @@
+<UserControl
+    x:Class="MnemoApp.Modules.Notes.Editor.NoteEditorView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:blockeditor="using:MnemoApp.UI.Components.BlockEditor"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    x:CompileBindings="False"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d">
+    <Grid RowDefinitions="Auto,*">
+        <!--  Header with note metadata  -->
+        <Border
+            Grid.Row="0"
+            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="24,16">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0">
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}">
+                        <Run Text="🕒" />
+                        <Run Text="Created Time" />
+                    </TextBlock>
+                    <TextBlock
+                        Margin="0,2,0,0"
+                        FontSize="13"
+                        Text="{Binding CreatedAt}" />
+
+                    <!--  Tags  -->
+                    <ItemsControl
+                        Margin="0,8,0,0"
+                        IsVisible="{Binding Tags.Length}"
+                        ItemsSource="{Binding Tags}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Margin="0,0,4,4"
+                                    Background="{DynamicResource SystemAccentColor}"
+                                    CornerRadius="4"
+                                    Opacity="0.7"
+                                    Padding="8,4">
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="White"
+                                        Text="{Binding}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!--  2 more properties placeholder  -->
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        FontSize="11"
+                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                        IsVisible="False"
+                        Text="▽ 2 more properties" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock
+                        Margin="0,0,8,0"
+                        FontSize="13"
+                        Foreground="{DynamicResource SystemAccentColor}"
+                        IsVisible="{Binding HasUnsavedChanges}"
+                        Text="●  Unsaved"
+                        VerticalAlignment="Center" />
+
+                    <Button
+                        Content="Delete"
+                        Click="Delete_Click"
+                        Foreground="Red"
+                        Padding="12,6" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!--  Block Editor  -->
+        <ScrollViewer
+            Grid.Row="1"
+            Padding="24,16"
+            VerticalScrollBarVisibility="Auto">
+            <blockeditor:BlockEditor
+                x:Name="BlockEditorControl"
+                MaxWidth="900"
+                HorizontalAlignment="Left" />
+        </ScrollViewer>
+    </Grid>
+</UserControl>
+

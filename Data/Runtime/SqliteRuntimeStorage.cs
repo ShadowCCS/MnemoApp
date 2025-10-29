@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using Microsoft.Data.Sqlite;
@@ -12,39 +13,65 @@ namespace MnemoApp.Data.Runtime
     public class SqliteRuntimeStorage : IRuntimeStorage, IDisposable
     {
         private readonly string _dbPath;
-        private readonly SqliteConnection _connection;
+        private readonly object _schemaLock = new object();
+        private bool _schemaInitialized;
 
         public SqliteRuntimeStorage(string baseDirectory)
         {
             Directory.CreateDirectory(baseDirectory);
             _dbPath = Path.Combine(baseDirectory, "runtime.db");
-            _connection = new SqliteConnection($"Data Source={_dbPath}");
-            _connection.Open();
             EnsureSchema();
+        }
+
+        private SqliteConnection CreateConnection()
+        {
+            var conn = new SqliteConnection($"Data Source={_dbPath};Cache=Shared");
+            conn.Open();
+            
+            // Configure pragmas for better concurrency and performance
+            using var pragma = conn.CreateCommand();
+            pragma.CommandText = @"
+                PRAGMA journal_mode=WAL;
+                PRAGMA synchronous=NORMAL;
+                PRAGMA foreign_keys=ON;
+                PRAGMA busy_timeout=5000;
+            ";
+            pragma.ExecuteNonQuery();
+            
+            return conn;
         }
 
         private void EnsureSchema()
         {
-            using var cmd = _connection.CreateCommand();
-            cmd.CommandText = @"
-                CREATE TABLE IF NOT EXISTS Settings (
-                    key TEXT PRIMARY KEY,
-                    type TEXT NOT NULL,
-                    value TEXT NULL
-                );
-                CREATE TABLE IF NOT EXISTS Content (
-                    content_type TEXT NOT NULL,
-                    content_id TEXT NOT NULL,
-                    metadata TEXT NULL,
-                    data TEXT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (content_type, content_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_content_type ON Content(content_type);
-                CREATE INDEX IF NOT EXISTS idx_content_created ON Content(created_at);
-            ";
-            cmd.ExecuteNonQuery();
+            lock (_schemaLock)
+            {
+                if (_schemaInitialized) return;
+                
+                using var conn = CreateConnection();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS Settings (
+                        key TEXT PRIMARY KEY,
+                        type TEXT NOT NULL,
+                        value TEXT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS Content (
+                        content_type TEXT NOT NULL,
+                        content_id TEXT NOT NULL,
+                        metadata TEXT NULL,
+                        data TEXT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        PRIMARY KEY (content_type, content_id)
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_content_type ON Content(content_type);
+                    CREATE INDEX IF NOT EXISTS idx_content_created ON Content(created_at);
+                    CREATE INDEX IF NOT EXISTS idx_content_updated ON Content(updated_at);
+                ";
+                cmd.ExecuteNonQuery();
+                
+                _schemaInitialized = true;
+            }
         }
 
         private static (string table, string pureKey) ResolveTableAndKey(string key)
@@ -71,7 +98,8 @@ namespace MnemoApp.Data.Runtime
                 return GetContentProperty<T>(pureKey);
             }
             
-            using var cmd = _connection.CreateCommand();
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = $"SELECT value FROM {table} WHERE key = @key LIMIT 1";
             cmd.Parameters.AddWithValue("@key", pureKey);
             var result = cmd.ExecuteScalar();
@@ -100,7 +128,8 @@ namespace MnemoApp.Data.Runtime
             }
             
             var (typeName, serialized) = Serialize(value);
-            using var cmd = _connection.CreateCommand();
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
                 INSERT INTO {table}(key, type, value) VALUES(@key, @type, @value)
                 ON CONFLICT(key) DO UPDATE SET type = excluded.type, value = excluded.value;
@@ -120,7 +149,8 @@ namespace MnemoApp.Data.Runtime
                 return HasContentProperty(pureKey);
             }
             
-            using var cmd = _connection.CreateCommand();
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = $"SELECT 1 FROM {table} WHERE key = @key LIMIT 1";
             cmd.Parameters.AddWithValue("@key", pureKey);
             using var reader = cmd.ExecuteReader(CommandBehavior.SingleRow);
@@ -137,7 +167,8 @@ namespace MnemoApp.Data.Runtime
                 return;
             }
             
-            using var cmd = _connection.CreateCommand();
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = $"DELETE FROM {table} WHERE key = @key";
             cmd.Parameters.AddWithValue("@key", pureKey);
             cmd.ExecuteNonQuery();
@@ -176,7 +207,8 @@ namespace MnemoApp.Data.Runtime
         private T? GetContentProperty<T>(string key)
         {
             var (contentType, contentId) = ParseContentKey(key);
-            using var cmd = _connection.CreateCommand();
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT data FROM Content WHERE content_type = @type AND content_id = @id LIMIT 1";
             cmd.Parameters.AddWithValue("@type", contentType);
             cmd.Parameters.AddWithValue("@id", contentId);
@@ -195,7 +227,8 @@ namespace MnemoApp.Data.Runtime
             var (typeName, serialized) = Serialize(value);
             var now = DateTime.UtcNow.ToString("O");
             
-            using var cmd = _connection.CreateCommand();
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO Content(content_type, content_id, metadata, data, created_at, updated_at) 
                 VALUES(@type, @id, @meta, @data, @created, @updated)
@@ -216,7 +249,8 @@ namespace MnemoApp.Data.Runtime
         private bool HasContentProperty(string key)
         {
             var (contentType, contentId) = ParseContentKey(key);
-            using var cmd = _connection.CreateCommand();
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT 1 FROM Content WHERE content_type = @type AND content_id = @id LIMIT 1";
             cmd.Parameters.AddWithValue("@type", contentType);
             cmd.Parameters.AddWithValue("@id", contentId);
@@ -227,7 +261,8 @@ namespace MnemoApp.Data.Runtime
         private void RemoveContentProperty(string key)
         {
             var (contentType, contentId) = ParseContentKey(key);
-            using var cmd = _connection.CreateCommand();
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = "DELETE FROM Content WHERE content_type = @type AND content_id = @id";
             cmd.Parameters.AddWithValue("@type", contentType);
             cmd.Parameters.AddWithValue("@id", contentId);
@@ -251,9 +286,88 @@ namespace MnemoApp.Data.Runtime
             throw new ArgumentException($"Invalid content key format: {key}");
         }
 
+        public IEnumerable<ContentItem<T>> ListContent<T>(string contentType)
+        {
+            var results = new List<ContentItem<T>>();
+            
+            using var conn = CreateConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT content_id, data, created_at, updated_at 
+                FROM Content 
+                WHERE content_type = @type AND content_id != 'list'
+                ORDER BY updated_at DESC
+            ";
+            cmd.Parameters.AddWithValue("@type", contentType);
+            
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                string? contentId = null;
+                try
+                {
+                    contentId = reader.GetString(0);
+                    var dataJson = reader.IsDBNull(1) ? null : reader.GetString(1);
+                    
+                    if (string.IsNullOrEmpty(dataJson))
+                        continue;
+                    
+                    var createdAtStr = reader.IsDBNull(2) ? DateTime.UtcNow.ToString("O") : reader.GetString(2);
+                    var updatedAtStr = reader.IsDBNull(3) ? DateTime.UtcNow.ToString("O") : reader.GetString(3);
+                    
+                    DateTime createdAt;
+                    DateTime updatedAt;
+                    
+                    try
+                    {
+                        createdAt = DateTime.Parse(createdAtStr);
+                    }
+                    catch
+                    {
+                        createdAt = DateTime.UtcNow;
+                    }
+                    
+                    try
+                    {
+                        updatedAt = DateTime.Parse(updatedAtStr);
+                    }
+                    catch
+                    {
+                        updatedAt = DateTime.UtcNow;
+                    }
+                    
+                    var data = Deserialize<T>(dataJson);
+                    if (data != null)
+                    {
+                        results.Add(new ContentItem<T>
+                        {
+                            ContentId = contentId,
+                            Data = data,
+                            CreatedAt = createdAt,
+                            UpdatedAt = updatedAt
+                        });
+                    }
+                }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    // Skip entries that can't be deserialized (likely wrong type or corrupted data)
+                    System.Diagnostics.Debug.WriteLine($"Skipping invalid content entry {contentId ?? "unknown"}: {ex.Message}");
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    // Skip entries with other errors
+                    System.Diagnostics.Debug.WriteLine($"Error processing content entry {contentId ?? "unknown"}: {ex.Message}");
+                    continue;
+                }
+            }
+            
+            return results;
+        }
+
         public void Dispose()
         {
-            _connection.Dispose();
+            // No persistent connection to dispose; connections are per-operation
         }
     }
 }

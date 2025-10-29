@@ -10,8 +10,6 @@
   
   <ScrollViewer>
     <StackPanel Margin="20" Spacing="20">
-      <ToggleSwitch/>
-      
       <!-- Header Section -->
       <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
               BorderBrush="{DynamicResource CardAccentBrush}"

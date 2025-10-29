@@ -92,6 +92,8 @@ namespace MnemoApp.Core
             services.AddTransient<LibraryViewModel>();
             services.AddTransient<MnemoApp.Modules.Library.Extensions.ExtensionListViewModel>();
             services.AddTransient<MnemoApp.Extensions.SampleExtension.SampleExtensionViewModel>();
+            services.AddTransient<MnemoApp.Modules.Notes.NotesViewModel>();
+            services.AddTransient<MnemoApp.Modules.Notes.Editor.NoteEditorViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
 
@@ -180,6 +182,21 @@ namespace MnemoApp.Core
             {
                 pathsItem.ChildViewModelTypes.Add(typeof(Modules.Paths.UnitOverview.UnitOverviewViewModel));
                 pathsItem.ChildViewModelTypes.Add(typeof(Modules.Paths.UnitView.UnitViewViewModel));
+            }
+
+            // Register Notes module
+            api.sidebar.Register(
+                "Notes",
+                typeof(MnemoApp.Modules.Notes.NotesViewModel),
+                api.ui.language.get("Sidebar", "Main Hub"),
+                "avares://MnemoApp/UI/Icons/Tabler/outline/notes.svg"
+            );
+
+            // Register child ViewModels for Notes
+            var notesItem = api.sidebar.GetItem("Notes", api.ui.language.get("Sidebar", "Main Hub"));
+            if (notesItem != null)
+            {
+                notesItem.ChildViewModelTypes.Add(typeof(Modules.Notes.Editor.NoteEditorViewModel));
             }
 
             // Register Test Module
