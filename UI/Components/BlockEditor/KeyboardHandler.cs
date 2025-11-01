@@ -35,7 +35,6 @@ public class KeyboardHandler
     public event Action<BlockType>? RequestNewBlockOfType;
     public event Action<BlockType>? ConvertToBlockType;
     public event Action? EscapePressed;
-    public event Action? SlashDetected;
     public event Action? EnterPressed;
 
     public void HandleKeyDown(KeyEventArgs e, TextBox textBox, BlockViewModel? viewModel)
@@ -74,10 +73,6 @@ public class KeyboardHandler
             case Key.Space:
                 // Markdown shortcuts are handled separately
                 break;
-                
-            default:
-                HandleSlashDetection(text);
-                break;
         }
     }
 
@@ -113,14 +108,6 @@ public class KeyboardHandler
         {
             e.Handled = true;
             BackspaceOnEmpty?.Invoke();
-        }
-    }
-
-    private void HandleSlashDetection(string text)
-    {
-        if (text == "/")
-        {
-            SlashDetected?.Invoke();
         }
     }
 

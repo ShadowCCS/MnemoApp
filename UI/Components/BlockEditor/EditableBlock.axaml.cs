@@ -54,7 +54,6 @@ public partial class EditableBlock : UserControl
         _keyboardHandler.RequestNewBlockOfType += HandleRequestNewBlockOfType;
         _keyboardHandler.ConvertToBlockType += ConvertToBlockType;
         _keyboardHandler.EscapePressed += OnEscapePressed;
-        _keyboardHandler.SlashDetected += OnSlashDetected;
 
         // Wire up markdown detector
         _markdownDetector.ShortcutDetected += OnMarkdownShortcutDetected;
@@ -92,10 +91,9 @@ public partial class EditableBlock : UserControl
             _keyboardHandler.RequestFocusPrevious -= HandleRequestFocusPrevious;
             _keyboardHandler.RequestFocusNext -= HandleRequestFocusNext;
             _keyboardHandler.EnterPressed -= HandleEnterPressed;
-            _keyboardHandler.RequestNewBlockOfType -= HandleRequestNewBlockOfType;
-            _keyboardHandler.ConvertToBlockType -= ConvertToBlockType;
-            _keyboardHandler.EscapePressed -= OnEscapePressed;
-            _keyboardHandler.SlashDetected -= OnSlashDetected;
+        _keyboardHandler.RequestNewBlockOfType -= HandleRequestNewBlockOfType;
+        _keyboardHandler.ConvertToBlockType -= ConvertToBlockType;
+        _keyboardHandler.EscapePressed -= OnEscapePressed;
         }
         
         if (_markdownDetector != null)
@@ -130,11 +128,8 @@ public partial class EditableBlock : UserControl
 
     private void SetupKeyboardHandling()
     {
-        this.AddHandler(
-            KeyDownEvent, 
-            UserControl_KeyDown, 
-            RoutingStrategies.Tunnel | RoutingStrategies.Bubble
-        );
+        // Keyboard handling is done via TextBox_KeyDown which delegates to KeyboardHandler
+        // No need for UserControl-level handler
     }
 
     #region DataContext and ViewModel Management
@@ -243,8 +238,11 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
+        BlockEditorLogger.Log($"TextBox_TextChanged called");
+        
         if (sender is not TextBox textBox || _viewModel == null || _stateManager == null)
         {
+            BlockEditorLogger.Log("TextBox_TextChanged: early return - null check");
             return;
         }
         
@@ -257,13 +255,19 @@ public partial class EditableBlock : UserControl
         var text = textBox.Text ?? string.Empty;
         var previousText = _stateManager.PreviousText;
         
-        // Skip if text hasn't actually changed (e.g., programmatic updates)
+        // Always sync slash menu state FIRST - it's independent of whether text changed
+        // This ensures menu state is correct even if PreviousText tracking is off
+        HandleSlashMenuToggle(text, textBox);
+        
+        // Skip other handlers if text hasn't actually changed (e.g., programmatic updates)
         if (text == previousText)
+        {
+            BlockEditorLogger.Log($"TextBox_TextChanged: text unchanged '{text}' == '{previousText}'");
             return;
+        }
         
         BlockEditorLogger.LogTextChanged(text, previousText, _slashMenuManager?.IsVisible ?? false);
         
-        HandleSlashMenuToggle(text, textBox);
         HandleEmptyBlockBackspace(text);
         
         // Update ViewModel content - always update to ensure binding is in sync
@@ -293,6 +297,41 @@ public partial class EditableBlock : UserControl
             _markdownDetector?.TryDetectShortcut(textBox);
         }
 
+        // Optimistic slash menu handling: show immediately on slash key when textbox is empty
+        // TextChanged will validate and correct state if needed (handles all edge cases)
+        var isSlashKey = e.Key == Key.Divide || e.Key == Key.OemQuestion || e.Key == Key.Oem2;
+        if (isSlashKey && string.IsNullOrWhiteSpace(textBox.Text) && _slashMenuManager != null && _stateManager != null && !_slashMenuManager.IsVisible)
+        {
+            // Text will become "/" after this keypress - show menu optimistically for immediate feedback
+            // TextChanged will validate this and correct if needed
+            Dispatcher.UIThread.Post(() =>
+            {
+                var currentText = textBox.Text ?? string.Empty;
+                if (currentText == "/" && _slashMenuManager != null && !_slashMenuManager.IsVisible)
+                {
+                    BlockEditorLogger.Log("Optimistically showing slash menu from KeyDown");
+                    _slashMenuManager.Show(textBox);
+                    _stateManager?.SetShowingSlashMenu();
+                }
+            }, DispatcherPriority.Input);
+        }
+
+        // Fallback: Hide menu if visible and any non-slash key is pressed (covers cases where TextChanged doesn't fire)
+        // This ensures menu state is always correct regardless of event timing
+        if (_slashMenuManager?.IsVisible == true && !isSlashKey && e.Key != Key.Escape && e.Key != Key.Enter && e.Key != Key.Up && e.Key != Key.Down)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                var currentText = textBox.Text ?? string.Empty;
+                if (currentText != "/" && _slashMenuManager != null && _stateManager != null)
+                {
+                    BlockEditorLogger.Log($"Hiding slash menu (KeyDown fallback) - text is '{currentText}'");
+                    _slashMenuManager.Hide();
+                    _stateManager.SetNormal();
+                }
+            }, DispatcherPriority.Input);
+        }
+
         // Delegate to keyboard handler
         _keyboardHandler.HandleKeyDown(e, textBox, _viewModel);
     }
@@ -300,27 +339,6 @@ public partial class EditableBlock : UserControl
     #endregion
 
     #region Keyboard and Input Handling
-
-    private void UserControl_KeyDown(object? sender, KeyEventArgs e)
-    {
-        BlockEditorLogger.LogKeyEvent(e.Key.ToString(), e.Handled);
-        
-        if (e.Handled || _viewModel == null) return;
-        
-        var textBox = _focusManager?.GetFocusedTextBox();
-        if (textBox == null) return;
-
-        var text = textBox.Text ?? string.Empty;
-        var isTextBoxEmpty = string.IsNullOrWhiteSpace(text);
-        var isContentEmpty = string.IsNullOrWhiteSpace(_viewModel.Content);
-
-        // Handle backspace on empty block
-        if (e.Key == Key.Back && (isTextBoxEmpty || isContentEmpty))
-        {
-            e.Handled = true;
-            HandleBackspaceOnEmptyBlock();
-        }
-    }
 
     private void HandleBackspaceOnEmptyBlock()
     {
@@ -330,19 +348,34 @@ public partial class EditableBlock : UserControl
 
     private void HandleSlashMenuToggle(string text, TextBox textBox)
     {
-        if (_slashMenuManager == null || _stateManager == null) return;
-
-        if (_slashMenuManager.IsVisible && text != "/")
+        if (_slashMenuManager == null || _stateManager == null)
         {
-            BlockEditorLogger.Log("Hiding slash menu");
+            BlockEditorLogger.Log("HandleSlashMenuToggle: managers null");
+            return;
+        }
+
+        // Source of truth: menu should be visible if and only if text is exactly "/"
+        var isSlashOnly = text == "/";
+        var menuIsVisible = _slashMenuManager.IsVisible;
+
+        BlockEditorLogger.Log($"HandleSlashMenuToggle: text='{text}', isSlashOnly={isSlashOnly}, menuIsVisible={menuIsVisible}");
+
+        // Always ensure state matches reality - correct any mismatches
+        if (isSlashOnly && !menuIsVisible)
+        {
+            BlockEditorLogger.Log("Showing slash menu (TextChanged)");
+            _slashMenuManager.Show(textBox);
+            _stateManager.SetShowingSlashMenu();
+        }
+        else if (!isSlashOnly && menuIsVisible)
+        {
+            BlockEditorLogger.Log($"Hiding slash menu (TextChanged) - text changed to '{text}'");
             _slashMenuManager.Hide();
             _stateManager.SetNormal();
         }
-        else if (!_slashMenuManager.IsVisible && text == "/")
+        else
         {
-            BlockEditorLogger.Log("Showing slash menu");
-            _slashMenuManager.Show(textBox);
-            _stateManager.SetShowingSlashMenu();
+            BlockEditorLogger.Log($"HandleSlashMenuToggle: no state change needed");
         }
     }
 
@@ -367,18 +400,6 @@ public partial class EditableBlock : UserControl
         {
             _slashMenuManager.Hide();
             _stateManager.SetNormal();
-        }
-    }
-
-    private void OnSlashDetected()
-    {
-        if (_focusManager == null || _slashMenuManager == null || _stateManager == null) return;
-
-        var textBox = _focusManager.GetCurrentTextBox();
-        if (textBox != null)
-        {
-            _slashMenuManager.Show(textBox);
-            _stateManager.SetShowingSlashMenu();
         }
     }
 
