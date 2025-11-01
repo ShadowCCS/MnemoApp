@@ -15,6 +15,7 @@ public class BlockViewModel : INotifyPropertyChanged
     private int _order;
     private bool _isFocused;
     private bool _isSelected;
+    private string? _cachedWatermark;
 
     public string Id
     {
@@ -27,10 +28,14 @@ public class BlockViewModel : INotifyPropertyChanged
         get => _type;
         set 
         { 
-            _type = value; 
-            EnsureMetaKeys();
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(Watermark)); // Update watermark when type changes
+            if (_type != value)
+            {
+                _type = value; 
+                EnsureMetaKeys();
+                _cachedWatermark = null; // Invalidate watermark cache
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Watermark));
+            }
         }
     }
 
@@ -39,9 +44,13 @@ public class BlockViewModel : INotifyPropertyChanged
         get => _content;
         set 
         { 
-            _content = value; 
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(Watermark)); // Update watermark when content changes
+            if (_content != value)
+            {
+                _content = value; 
+                _cachedWatermark = null; // Invalidate watermark cache
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Watermark));
+            }
         }
     }
 
@@ -74,9 +83,13 @@ public class BlockViewModel : INotifyPropertyChanged
         get => _isFocused;
         set 
         { 
-            _isFocused = value; 
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(Watermark)); // Update watermark when focus changes
+            if (_isFocused != value)
+            {
+                _isFocused = value; 
+                _cachedWatermark = null; // Invalidate watermark cache
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Watermark));
+            }
         }
     }
 
@@ -100,13 +113,18 @@ public class BlockViewModel : INotifyPropertyChanged
     {
         get
         {
+            // Use cached value if available
+            if (_cachedWatermark != null)
+                return _cachedWatermark;
+
             // Only show the slash command hint for empty, focused Text blocks
             if (Type == BlockType.Text && IsFocused && string.IsNullOrEmpty(Content))
             {
-                return "Type '/' for commands...";
+                _cachedWatermark = "Type '/' for commands...";
+                return _cachedWatermark;
             }
             
-            return Type switch
+            _cachedWatermark = Type switch
             {
                 BlockType.Text => string.Empty,
                 BlockType.Heading1 => "Heading 1",
@@ -119,6 +137,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 BlockType.Checklist => "To-do",
                 _ => string.Empty
             };
+            return _cachedWatermark;
         }
     }
 
@@ -144,9 +163,9 @@ public class BlockViewModel : INotifyPropertyChanged
 
     public BlockViewModel(Block block)
     {
-        _id = block.Id;
+        _id = string.IsNullOrEmpty(block.Id) ? Guid.NewGuid().ToString() : block.Id;
         _type = block.Type;
-        _content = block.Content;
+        _content = block.Content ?? string.Empty;
         _meta = new Dictionary<string, object>(block.Meta ?? new Dictionary<string, object>());
         _order = block.Order;
         
@@ -197,7 +216,12 @@ public class BlockViewModel : INotifyPropertyChanged
 
     public void NotifyContentChanged()
     {
+        System.Diagnostics.Debug.WriteLine($"[BlockViewModel] NotifyContentChanged called for block {Id}");
         ContentChanged?.Invoke(this);
+        if (ContentChanged == null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[BlockViewModel] WARNING: ContentChanged event has no subscribers for block {Id}");
+        }
     }
 
     public void RequestDelete()

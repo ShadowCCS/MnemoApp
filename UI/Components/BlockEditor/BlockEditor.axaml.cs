@@ -39,32 +39,50 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             UnsubscribeFromBlock(block);
         }
 
-        Blocks.Clear();
-
+        // Create new collection to ensure proper UI notification
+        var newBlocks = new ObservableCollection<BlockViewModel>();
+        
         if (blocks == null || blocks.Length == 0)
         {
-            AddBlock(BlockType.Text);
-            return;
+            var defaultBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
+            SubscribeToBlock(defaultBlock);
+            newBlocks.Add(defaultBlock);
         }
-
-        // Use a HashSet to track block IDs and prevent duplicates
-        var seenIds = new HashSet<string>();
-        foreach (var block in blocks.OrderBy(b => b.Order))
+        else
         {
-            // Skip duplicate blocks with the same ID
-            if (!string.IsNullOrEmpty(block.Id) && seenIds.Contains(block.Id))
+            // Use HashSet to track block IDs and prevent duplicates
+            var seenIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var block in blocks.Where(b => b != null).OrderBy(b => b.Order))
             {
-                continue;
-            }
+                // Skip duplicate blocks with the same ID
+                if (!string.IsNullOrEmpty(block.Id) && !seenIds.Add(block.Id))
+                {
+                    continue;
+                }
 
-            if (!string.IsNullOrEmpty(block.Id))
+                var viewModel = new BlockViewModel(block);
+                SubscribeToBlock(viewModel);
+                newBlocks.Add(viewModel);
+            }
+            
+            // If no valid blocks were added, add a default one
+            if (newBlocks.Count == 0)
             {
-                seenIds.Add(block.Id);
+                var defaultBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
+                SubscribeToBlock(defaultBlock);
+                newBlocks.Add(defaultBlock);
             }
-
-            var viewModel = new BlockViewModel(block);
-            SubscribeToBlock(viewModel);
-            Blocks.Add(viewModel);
+        }
+        
+        // Replace entire collection to trigger UI update
+        Blocks = newBlocks;
+        
+        // Focus the first block after UI updates to make it immediately editable
+        if (newBlocks.Count > 0)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => newBlocks[0].IsFocused = true, 
+                Avalonia.Threading.DispatcherPriority.Loaded);
         }
     }
 
@@ -88,16 +106,17 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (position.HasValue && position.Value < Blocks.Count)
         {
             Blocks.Insert(position.Value, block);
-            ReorderBlocks();
         }
         else
         {
             Blocks.Add(block);
         }
+        ReorderBlocks();
     }
 
     private void SubscribeToBlock(BlockViewModel block)
     {
+        System.Diagnostics.Debug.WriteLine($"[BlockEditor] SubscribeToBlock called for block {block.Id}");
         block.ContentChanged += OnBlockContentChanged;
         block.DeleteRequested += OnBlockDeleteRequested;
         block.NewBlockRequested += OnNewBlockRequested;
@@ -120,17 +139,33 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnBlockContentChanged(BlockViewModel block)
     {
+        System.Diagnostics.Debug.WriteLine($"[BlockEditor] OnBlockContentChanged called for block {block.Id}");
         // Trigger save in parent
+        if (BlocksChanged == null)
+        {
+            System.Diagnostics.Debug.WriteLine("[BlockEditor] WARNING: BlocksChanged event has no subscribers");
+        }
         BlocksChanged?.Invoke();
     }
 
     private void OnBlockDeleteRequested(BlockViewModel block)
     {
-        if (Blocks.Count == 1)
+        DeleteBlock(block);
+    }
+
+    private void OnDeleteAndFocusAboveRequested(BlockViewModel block)
+    {
+        DeleteBlock(block);
+    }
+
+    private void DeleteBlock(BlockViewModel block)
+    {
+        // Never delete if it's the only block - just clear it
+        if (Blocks.Count <= 1)
         {
-            // Don't delete the last block, just clear it
             block.Content = string.Empty;
             block.Type = BlockType.Text;
+            block.IsFocused = true; // Keep focus on the cleared block
             return;
         }
 
@@ -140,22 +175,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         UnsubscribeFromBlock(block);
         Blocks.Remove(block);
 
-        // Focus previous block if exists
-        if (index > 0 && Blocks.Count > 0)
+        // Focus previous block (index > 0) or new first block (index == 0)
+        var targetIndex = index > 0 ? index - 1 : 0;
+        if (Blocks.Count > targetIndex)
         {
-            var targetIndex = Math.Min(index - 1, Blocks.Count - 1);
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                Blocks[targetIndex].IsFocused = true;
-            }, Avalonia.Threading.DispatcherPriority.Input);
-        }
-        else if (Blocks.Count > 0)
-        {
-            // If we deleted the first block, focus the new first block
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                Blocks[0].IsFocused = true;
-            }, Avalonia.Threading.DispatcherPriority.Input);
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => Blocks[targetIndex].IsFocused = true, 
+                Avalonia.Threading.DispatcherPriority.Input);
         }
 
         ReorderBlocks();
@@ -168,14 +194,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         AddBlock(BlockType.Text, index + 1);
 
         // Focus new block after UI has updated
-        if (index + 1 < Blocks.Count)
+        var newBlockIndex = index + 1;
+        if (newBlockIndex < Blocks.Count)
         {
-            var newBlock = Blocks[index + 1];
-            // Use dispatcher to ensure the new block is rendered before focusing
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                newBlock.IsFocused = true;
-            }, Avalonia.Threading.DispatcherPriority.Render);
+            var newBlock = Blocks[newBlockIndex];
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => newBlock.IsFocused = true, 
+                Avalonia.Threading.DispatcherPriority.Render);
         }
 
         BlocksChanged?.Invoke();
@@ -187,54 +212,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         AddBlock(type, index + 1);
 
         // Focus new block after UI has updated
-        if (index + 1 < Blocks.Count)
+        var newBlockIndex = index + 1;
+        if (newBlockIndex < Blocks.Count)
         {
-            var newBlock = Blocks[index + 1];
-            // Use dispatcher to ensure the new block is rendered before focusing
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                newBlock.IsFocused = true;
-            }, Avalonia.Threading.DispatcherPriority.Render);
+            var newBlock = Blocks[newBlockIndex];
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => newBlock.IsFocused = true, 
+                Avalonia.Threading.DispatcherPriority.Render);
         }
 
-        BlocksChanged?.Invoke();
-    }
-
-    private void OnDeleteAndFocusAboveRequested(BlockViewModel block)
-    {
-        if (Blocks.Count == 1)
-        {
-            // Don't delete the last block, just clear it
-            block.Content = string.Empty;
-            block.Type = BlockType.Text;
-            return;
-        }
-
-        var index = Blocks.IndexOf(block);
-        if (index == -1) return; // Block not found, safety check
-        
-        UnsubscribeFromBlock(block);
-        Blocks.Remove(block);
-
-        // Focus previous block if exists (should always exist at this point)
-        if (index > 0 && Blocks.Count > 0)
-        {
-            var targetIndex = Math.Min(index - 1, Blocks.Count - 1);
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                Blocks[targetIndex].IsFocused = true;
-            }, Avalonia.Threading.DispatcherPriority.Input);
-        }
-        else if (Blocks.Count > 0)
-        {
-            // If we deleted the first block, focus the new first block
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                Blocks[0].IsFocused = true;
-            }, Avalonia.Threading.DispatcherPriority.Input);
-        }
-
-        ReorderBlocks();
         BlocksChanged?.Invoke();
     }
 
@@ -243,30 +229,24 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var index = Blocks.IndexOf(block);
         if (index > 0)
         {
-            // Clear focus from current block first
             block.IsFocused = false;
-            
-            // Focus previous block with a slight delay to ensure UI updates
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                Blocks[index - 1].IsFocused = true;
-            }, Avalonia.Threading.DispatcherPriority.Input);
+            var previousIndex = index - 1;
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => Blocks[previousIndex].IsFocused = true, 
+                Avalonia.Threading.DispatcherPriority.Input);
         }
     }
 
     private void OnFocusNextRequested(BlockViewModel block)
     {
         var index = Blocks.IndexOf(block);
-        if (index < Blocks.Count - 1)
+        var nextIndex = index + 1;
+        if (nextIndex < Blocks.Count)
         {
-            // Clear focus from current block first
             block.IsFocused = false;
-            
-            // Focus next block with a slight delay to ensure UI updates
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                Blocks[index + 1].IsFocused = true;
-            }, Avalonia.Threading.DispatcherPriority.Input);
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => Blocks[nextIndex].IsFocused = true, 
+                Avalonia.Threading.DispatcherPriority.Input);
         }
     }
 

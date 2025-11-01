@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Timers;
 using MnemoApp.Core.Common;
 using MnemoApp.Core.Navigation;
 using MnemoApp.Modules.Notes.Models;
@@ -16,37 +17,19 @@ public class NotesViewModel : ViewModelBase
     private readonly IRuntimeStorage _storage;
     private readonly INavigationService _navigationService;
     private readonly IOverlayService _overlayManager;
+    private readonly Timer _filterDebounceTimer;
 
-    private ObservableCollection<TreeNodeViewModel> _folderTree = new();
     private ObservableCollection<NoteItemViewModel> _notesList = new();
-    private TreeNodeViewModel? _selectedFolder;
     private NoteItemViewModel? _selectedNote;
     private string _searchText = string.Empty;
     private Editor.NoteEditorViewModel? _editorViewModel;
     private bool _isNoteSelected;
-
-    public ObservableCollection<TreeNodeViewModel> FolderTree
-    {
-        get => _folderTree;
-        set => SetProperty(ref _folderTree, value);
-    }
+    private readonly Dictionary<string, string> _previewCache = new();
 
     public ObservableCollection<NoteItemViewModel> NotesList
     {
         get => _notesList;
         set => SetProperty(ref _notesList, value);
-    }
-
-    public TreeNodeViewModel? SelectedFolder
-    {
-        get => _selectedFolder;
-        set
-        {
-            if (SetProperty(ref _selectedFolder, value))
-            {
-                LoadNotesForFolder(value?.FolderId ?? string.Empty);
-            }
-        }
     }
 
     public NoteItemViewModel? SelectedNote
@@ -68,7 +51,9 @@ public class NotesViewModel : ViewModelBase
         {
             if (SetProperty(ref _searchText, value))
             {
-                FilterNotes();
+                // Debounce filter to avoid excessive queries
+                _filterDebounceTimer.Stop();
+                _filterDebounceTimer.Start();
             }
         }
     }
@@ -91,42 +76,47 @@ public class NotesViewModel : ViewModelBase
         _navigationService = navigationService;
         _overlayManager = overlayManager;
 
-        // Migrate from old list-based storage
-        MigrateLegacyStorage();
+        // Filter debounce timer (300ms delay)
+        _filterDebounceTimer = new Timer(300);
+        _filterDebounceTimer.Elapsed += (s, e) =>
+        {
+            _filterDebounceTimer.Stop();
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => FilterNotesInternal());
+        };
+        _filterDebounceTimer.AutoReset = false;
 
-        LoadFolders();
+        // Load notes asynchronously to avoid blocking UI (includes migration)
+        _ = LoadNotesAsync();
     }
 
-    private void MigrateLegacyStorage()
+    private async Task LoadNotesAsync()
+    {
+        // Migrate from old list-based storage (async, non-blocking)
+        await MigrateLegacyStorageAsync();
+        
+        // Load notes
+        await LoadNotes();
+    }
+
+    private async Task MigrateLegacyStorageAsync()
     {
         try
         {
-            // Remove legacy list keys that conflict with ListContent queries
-            try
+            await Task.Run(() =>
             {
-                if (_storage.HasProperty("Content/Notes/list"))
+                try
                 {
-                    System.Diagnostics.Debug.WriteLine("Migrating: Removing legacy Content/Notes/list");
-                    _storage.RemoveProperty("Content/Notes/list");
+                    if (_storage.HasProperty("Content/Notes/list"))
+                    {
+                        System.Diagnostics.Debug.WriteLine("Migrating: Removing legacy Content/Notes/list");
+                        _storage.RemoveProperty("Content/Notes/list");
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Migration note: {ex.Message}");
-            }
-
-            try
-            {
-                if (_storage.HasProperty("Content/Folders/list"))
+                catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine("Migrating: Removing legacy Content/Folders/list");
-                    _storage.RemoveProperty("Content/Folders/list");
+                    System.Diagnostics.Debug.WriteLine($"Migration note: {ex.Message}");
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Migration note: {ex.Message}");
-            }
+            });
         }
         catch (Exception ex)
         {
@@ -134,99 +124,24 @@ public class NotesViewModel : ViewModelBase
         }
     }
 
-    private void LoadFolders()
+    private async Task LoadNotes()
     {
         try
         {
-            // Load folders using ListContent
-            var contentItems = _storage.ListContent<FolderData>("Folders");
-            var folders = contentItems.Select(item => item.Data).ToList();
-
-            // Always build tree structure (even if folders is empty)
-            BuildFolderTree(folders);
-
-            // Select "All Notes" by default and load notes for it
-            if (FolderTree.Count > 0)
-            {
-                SelectedFolder = FolderTree[0];
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error loading folders: {ex.Message}");
-            
-            // Initialize with default "All Notes" folder
-            FolderTree.Clear();
-            FolderTree.Add(new TreeNodeViewModel
-            {
-                Name = "All Notes",
-                FolderId = string.Empty,
-                IsExpanded = true
-            });
-            SelectedFolder = FolderTree[0];
-        }
-    }
-
-    private void BuildFolderTree(System.Collections.Generic.List<FolderData> folders)
-    {
-        FolderTree.Clear();
-
-        // Always add "All Notes" root - this should always be visible
-        var allNotes = new TreeNodeViewModel
-        {
-            Name = "All Notes",
-            FolderId = string.Empty,
-            IsExpanded = true,
-            IsFolder = false  // Root "All Notes" item is not a folder
-        };
-        FolderTree.Add(allNotes);
-
-        // Add root folders under "All Notes"
-        if (folders != null && folders.Count > 0)
-        {
-            var rootFolders = folders.Where(f => string.IsNullOrEmpty(f.ParentId)).OrderBy(f => f.Name);
-            foreach (var folder in rootFolders)
-            {
-                var node = CreateTreeNode(folder, folders);
-                allNotes.Children.Add(node);
-            }
-        }
-    }
-
-    private TreeNodeViewModel CreateTreeNode(FolderData folder, System.Collections.Generic.List<FolderData> allFolders)
-    {
-        var node = new TreeNodeViewModel
-        {
-            Name = folder.Name,
-            FolderId = folder.Id,
-            IsFolder = true
-        };
-
-        // Add child folders
-        var children = allFolders.Where(f => f.ParentId == folder.Id).OrderBy(f => f.Name);
-        foreach (var child in children)
-        {
-            node.Children.Add(CreateTreeNode(child, allFolders));
-        }
-
-        return node;
-    }
-
-    private void LoadNotesForFolder(string folderId)
-    {
-        try
-        {
-            var contentItems = _storage.ListContent<NoteData>("Notes");
+            var contentItems = await Task.Run(() => _storage.ListContent<NoteData>("Notes"));
             
             var notes = contentItems
-                .Where(item => string.IsNullOrEmpty(folderId) || item.Data.FolderId == folderId)
                 .Select(item => item.Data)
                 .OrderByDescending(n => n.UpdatedAt);
 
-            NotesList.Clear();
-            foreach (var note in notes)
+            // Materialize list to avoid multiple enumerations
+            var notesList = notes.ToList();
+            
+            // Batch update to reduce UI refreshes
+            var newList = new ObservableCollection<NoteItemViewModel>();
+            foreach (var note in notesList)
             {
-                NotesList.Add(new NoteItemViewModel
+                newList.Add(new NoteItemViewModel
                 {
                     NoteId = note.Id,
                     Title = note.Title,
@@ -235,57 +150,89 @@ public class NotesViewModel : ViewModelBase
                     Tags = note.Tags
                 });
             }
+
+            if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => NotesList = newList);
+            }
+            else
+            {
+                NotesList = newList;
+            }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error loading notes for folder {folderId}: {ex.Message}");
-            NotesList.Clear();
+            System.Diagnostics.Debug.WriteLine($"Error loading notes: {ex.Message}");
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                NotesList.Clear();
+            }
+            else
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => NotesList.Clear());
+            }
         }
     }
 
     private string GetPreview(NoteData note)
     {
+        // Use cache if available
+        if (_previewCache.TryGetValue(note.Id, out var cachedPreview))
+            return cachedPreview;
+
         if (note.Blocks == null || note.Blocks.Length == 0)
+        {
+            _previewCache[note.Id] = string.Empty;
             return string.Empty;
+        }
 
         var firstTextBlock = note.Blocks.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.Content));
-        return firstTextBlock?.Content?.Substring(0, Math.Min(100, firstTextBlock.Content.Length)) ?? string.Empty;
+        var preview = firstTextBlock?.Content?.Substring(0, Math.Min(100, firstTextBlock.Content.Length)) ?? string.Empty;
+        _previewCache[note.Id] = preview;
+        return preview;
     }
 
-    private void FilterNotes()
+    private async void FilterNotesInternal()
     {
         try
         {
-            var contentItems = _storage.ListContent<NoteData>("Notes");
-            var folderId = SelectedFolder?.FolderId ?? string.Empty;
-            
-            var notes = contentItems
-                .Select(item => item.Data)
-                .Where(note =>
+            List<NoteData> notes = await Task.Run(() =>
+            {
+                try
                 {
-                    // Filter by folder
-                    if (!string.IsNullOrEmpty(folderId) && note.FolderId != folderId)
-                        return false;
+                    var contentItems = _storage.ListContent<NoteData>("Notes");
                     
-                    // Filter by search text
-                    if (string.IsNullOrWhiteSpace(_searchText))
-                        return true;
-                    
-                    var searchLower = _searchText.ToLowerInvariant();
-                    var titleMatch = note.Title.ToLowerInvariant().Contains(searchLower);
-                    var contentMatch = note.Blocks?.Any(b => 
-                        b.Content?.ToLowerInvariant().Contains(searchLower) ?? false) ?? false;
-                    var tagMatch = note.Tags?.Any(t => 
-                        t.ToLowerInvariant().Contains(searchLower)) ?? false;
-                    
-                    return titleMatch || contentMatch || tagMatch;
-                })
-                .OrderByDescending(n => n.UpdatedAt);
+                    return contentItems
+                        .Select(item => item.Data)
+                        .Where(note =>
+                        {
+                            // Filter by search text
+                            if (string.IsNullOrWhiteSpace(_searchText))
+                                return true;
+                            
+                            var searchLower = _searchText.ToLowerInvariant();
+                            var titleMatch = note.Title.ToLowerInvariant().Contains(searchLower);
+                            var contentMatch = note.Blocks?.Any(b => 
+                                b.Content?.ToLowerInvariant().Contains(searchLower) ?? false) ?? false;
+                            var tagMatch = note.Tags?.Any(t => 
+                                t.ToLowerInvariant().Contains(searchLower)) ?? false;
+                            
+                            return titleMatch || contentMatch || tagMatch;
+                        })
+                        .OrderByDescending(n => n.UpdatedAt)
+                        .ToList();
+                }
+                catch
+                {
+                    return new List<NoteData>();
+                }
+            });
 
-            NotesList.Clear();
+            // Batch update to reduce UI refreshes - back on UI thread now
+            var newList = new ObservableCollection<NoteItemViewModel>();
             foreach (var note in notes)
             {
-                NotesList.Add(new NoteItemViewModel
+                newList.Add(new NoteItemViewModel
                 {
                     NoteId = note.Id,
                     Title = note.Title,
@@ -294,11 +241,18 @@ public class NotesViewModel : ViewModelBase
                     Tags = note.Tags
                 });
             }
+            
+            NotesList = newList;
         }
         catch
         {
             NotesList.Clear();
         }
+    }
+    
+    private void FilterNotes()
+    {
+        FilterNotesInternal();
     }
 
     private void OpenNote(string noteId)
@@ -311,18 +265,20 @@ public class NotesViewModel : ViewModelBase
         IsNoteSelected = true;
     }
 
-    private void CloseNote()
+    private async void CloseNote()
     {
         EditorViewModel = null;
         IsNoteSelected = false;
-        // Refresh the notes list
-        if (SelectedFolder != null)
+        // Clear preview cache for the closed note to refresh preview
+        if (_selectedNote != null)
         {
-            LoadNotesForFolder(SelectedFolder.FolderId ?? string.Empty);
+            _previewCache.Remove(_selectedNote.NoteId);
         }
+        // Refresh the notes list
+        await LoadNotes();
     }
 
-    public void CreateNote()
+    public async void CreateNote()
     {
         try
         {
@@ -339,15 +295,14 @@ public class NotesViewModel : ViewModelBase
             {
                 Id = Guid.NewGuid().ToString(),
                 Title = "Untitled",
-                FolderId = SelectedFolder?.FolderId ?? string.Empty,
                 Blocks = new[] { initialBlock },
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now,
                 Tags = Array.Empty<string>()
             };
 
-            SaveNote(note);
-            LoadNotesForFolder(note.FolderId);
+            await SaveNote(note);
+            await LoadNotes();
             OpenNote(note.Id);
         }
         catch (Exception ex)
@@ -361,65 +316,12 @@ public class NotesViewModel : ViewModelBase
         }
     }
 
-    public async void CreateFolderPrompt()
+
+    private async Task SaveNote(NoteData note)
     {
         try
         {
-            var dialog = new UI.Components.Overlays.InputDialogOverlay
-            {
-                Title = "Create Folder",
-                Placeholder = "Folder name",
-                InputValue = "New Folder",
-                ConfirmText = "Create",
-                CancelText = "Cancel"
-            };
-
-            var (overlayId, resultTask) = _overlayManager.CreateOverlayWithTask<string?>(dialog);
-            dialog.OnResult = result => _overlayManager.CloseOverlay(overlayId, result);
-
-            var name = await resultTask;
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                CreateFolder(name);
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error showing folder dialog: {ex.Message}");
-        }
-    }
-
-    private void CreateFolder(string name)
-    {
-        try
-        {
-            var folder = new FolderData
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = name,
-                ParentId = SelectedFolder?.FolderId ?? string.Empty
-            };
-
-            _storage.SetProperty($"Content/Folders/{folder.Id}", folder);
-
-            LoadFolders();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error creating folder: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-            if (ex.InnerException != null)
-            {
-                System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
-            }
-        }
-    }
-
-    private void SaveNote(NoteData note)
-    {
-        try
-        {
-            _storage.SetProperty($"Content/Notes/{note.Id}", note);
+            await _storage.SetPropertyAsync($"Content/Notes/{note.Id}", note);
         }
         catch (Exception ex)
         {
@@ -430,45 +332,6 @@ public class NotesViewModel : ViewModelBase
                 System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
             }
         }
-    }
-}
-
-public class TreeNodeViewModel : ViewModelBase
-{
-    private string _name = string.Empty;
-    private string? _folderId;
-    private bool _isExpanded;
-    private bool _isFolder;
-    private ObservableCollection<TreeNodeViewModel> _children = new();
-
-    public string Name
-    {
-        get => _name;
-        set => SetProperty(ref _name, value);
-    }
-
-    public string? FolderId
-    {
-        get => _folderId;
-        set => SetProperty(ref _folderId, value);
-    }
-
-    public bool IsExpanded
-    {
-        get => _isExpanded;
-        set => SetProperty(ref _isExpanded, value);
-    }
-
-    public bool IsFolder
-    {
-        get => _isFolder;
-        set => SetProperty(ref _isFolder, value);
-    }
-
-    public ObservableCollection<TreeNodeViewModel> Children
-    {
-        get => _children;
-        set => SetProperty(ref _children, value);
     }
 }
 

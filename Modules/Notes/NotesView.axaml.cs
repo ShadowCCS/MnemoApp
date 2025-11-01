@@ -25,11 +25,5 @@ public partial class NotesView : UserControl
         var viewModel = DataContext as NotesViewModel;
         viewModel?.CreateNote();
     }
-
-    private void CreateFolder_Click(object? sender, RoutedEventArgs e)
-    {
-        var viewModel = DataContext as NotesViewModel;
-        viewModel?.CreateFolderPrompt();
-    }
 }
 

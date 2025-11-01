@@ -11,7 +11,7 @@
     d:DesignWidth="800"
     mc:Ignorable="d">
     <Grid ColumnDefinitions="2*,5*">
-        <!--  Left Panel: Folders and Notes List  -->
+        <!--  Left Panel: Notes List  -->
         <Border
             Grid.Column="0"
             Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
@@ -32,7 +32,7 @@
 
                     <Grid
                         Grid.Row="1"
-                        RowDefinitions="Auto,Auto,Auto"
+                        RowDefinitions="Auto,Auto"
                         Margin="0,0,0,0">
                         <components:LocalSearchBar   
                             Grid.Row="0"
@@ -42,55 +42,17 @@
 
                         <Button
                             Grid.Row="1"
-                            Margin="0,0,0,4"
                             HorizontalAlignment="Stretch"
                             Click="CreateNote_Click"
                             Content="Create Note"
                             Padding="8"
                             ToolTip.Tip="Create Note" />
-
-                        <Button
-                            Grid.Row="2"
-                            HorizontalAlignment="Stretch"
-                            Click="CreateFolder_Click"
-                            Content="Create Folder"
-                            Padding="8"
-                            ToolTip.Tip="Create Folder" />
                     </Grid>
                 </Grid>
 
-                <!--  Folder Tree and Notes List  -->
+                <!--  Notes List  -->
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="0">
-                        <!--  Folder Tree  -->
-                        <TreeView
-                            Margin="8,0,8,0"
-                            MinHeight="0"
-                            Background="Transparent"
-                            ItemsSource="{Binding FolderTree}"
-                            SelectedItem="{Binding SelectedFolder, Mode=TwoWay}">
-                            <TreeView.Styles>
-                                <Style Selector="TreeViewItem">
-                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-                                </Style>
-                            </TreeView.Styles>
-                            <TreeView.ItemTemplate>
-                                <TreeDataTemplate ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal" Margin="0,4" Background="Transparent">
-                                        <TextBlock
-                                            Margin="0,0,8,0"
-                                            Text="📂"
-                                            VerticalAlignment="Center"
-                                            FontSize="14" />
-                                        <TextBlock 
-                                            Text="{Binding Name}" 
-                                            VerticalAlignment="Center"
-                                            FontSize="14" />
-                                    </StackPanel>
-                                </TreeDataTemplate>
-                            </TreeView.ItemTemplate>
-                        </TreeView>
-
                         <!--  Notes List  -->
                         <ItemsControl Margin="8,8,8,8" ItemsSource="{Binding NotesList}">
                             <ItemsControl.ItemTemplate>
@@ -102,51 +64,11 @@
                                         Cursor="Hand"
                                         Padding="12"
                                         PointerPressed="NoteCard_PointerPressed">
-                                        <StackPanel>
-                                            <TextBlock
-                                                FontSize="16"
-                                                FontWeight="SemiBold"
-                                                Text="{Binding Title}"
-                                                TextTrimming="CharacterEllipsis" />
-                                            <TextBlock
-                                                Margin="0,4,0,0"
-                                                FontSize="12"
-                                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                                Text="{Binding CreatedAt, StringFormat='Created: {0:MMM dd, yyyy hh:mm tt}'}"
-                                                TextTrimming="CharacterEllipsis" />
-                                            <TextBlock
-                                                Margin="0,4,0,0"
-                                                FontSize="13"
-                                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                                MaxLines="2"
-                                                Text="{Binding Preview}"
-                                                TextTrimming="CharacterEllipsis"
-                                                TextWrapping="Wrap" />
-                                            <ItemsControl
-                                                Margin="0,4,0,0"
-                                                ItemsSource="{Binding Tags}">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel />
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Border
-                                                            Margin="0,0,4,4"
-                                                            Background="{DynamicResource SystemAccentColor}"
-                                                            CornerRadius="4"
-                                                            Opacity="0.7"
-                                                            Padding="6,2">
-                                                            <TextBlock
-                                                                FontSize="11"
-                                                                Foreground="White"
-                                                                Text="{Binding}" />
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
+                                        <TextBlock
+                                            FontSize="16"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding Title}"
+                                            TextTrimming="CharacterEllipsis" />
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

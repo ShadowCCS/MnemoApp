@@ -14,7 +14,7 @@ public partial class NoteEditorView : UserControl
 
     private NoteEditorViewModel? _currentViewModel;
     
-    private async void OnDataContextChanged(object? sender, EventArgs e)
+    private void OnDataContextChanged(object? sender, EventArgs e)
     {
         // Unsubscribe from previous view model
         if (_currentViewModel != null && BlockEditorControl != null)
@@ -26,22 +26,22 @@ public partial class NoteEditorView : UserControl
         {
             _currentViewModel = viewModel;
             
+            System.Diagnostics.Debug.WriteLine("[NoteEditorView] Subscribing to BlocksChanged event");
+            
             // Wire up block editor instance
+            // This will trigger LoadNoteAsync if NoteId is already set (via the setter)
             viewModel.BlockEditorInstance = BlockEditorControl;
             BlockEditorControl.BlocksChanged += viewModel.OnBlocksChanged;
-
-            // Load note data if noteId is passed
-            if (!string.IsNullOrEmpty(viewModel.NoteId))
-            {
-                await viewModel.LoadNoteAsync(viewModel.NoteId);
-            }
+            
+            System.Diagnostics.Debug.WriteLine("[NoteEditorView] BlocksChanged subscription complete");
         }
     }
 
-    private void Delete_Click(object? sender, RoutedEventArgs e)
+    private async void Delete_Click(object? sender, RoutedEventArgs e)
     {
         var viewModel = DataContext as NoteEditorViewModel;
-        viewModel?.DeleteNote();
+        if (viewModel != null)
+            await viewModel.DeleteNoteAsync();
     }
 }
 

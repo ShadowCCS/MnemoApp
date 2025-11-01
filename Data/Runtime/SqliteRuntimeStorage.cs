@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using Microsoft.Data.Sqlite;
+using System.Threading.Tasks;
 
 namespace MnemoApp.Data.Runtime
 {
@@ -140,6 +141,11 @@ namespace MnemoApp.Data.Runtime
             cmd.ExecuteNonQuery();
         }
 
+        public async Task SetPropertyAsync<T>(string key, T value)
+        {
+            await Task.Run(() => SetProperty(key, value));
+        }
+
         public bool HasProperty(string key)
         {
             var (table, pureKey) = ResolveTableAndKey(key);
@@ -174,12 +180,25 @@ namespace MnemoApp.Data.Runtime
             cmd.ExecuteNonQuery();
         }
 
+        public async Task RemovePropertyAsync(string key)
+        {
+            await Task.Run(() => RemoveProperty(key));
+        }
+
         public void AddProperty<T>(string key, T value)
         {
             if (HasProperty(key))
                 throw new InvalidOperationException($"Key already exists: {key}");
             SetProperty(key, value);
         }
+
+        private static readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+            AllowTrailingCommas = true,
+            ReadCommentHandling = System.Text.Json.JsonCommentHandling.Skip,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        };
 
         private static (string typeName, string json) Serialize<T>(T value)
         {
@@ -190,7 +209,7 @@ namespace MnemoApp.Data.Runtime
             }
 
             // Simple primitives stored as JSON string to keep it uniform
-            var json = System.Text.Json.JsonSerializer.Serialize(value);
+            var json = System.Text.Json.JsonSerializer.Serialize(value, _jsonOptions);
             return (type.FullName ?? type.Name, json);
         }
 
@@ -200,7 +219,7 @@ namespace MnemoApp.Data.Runtime
             {
                 return default;
             }
-            return System.Text.Json.JsonSerializer.Deserialize<T>(json);
+            return System.Text.Json.JsonSerializer.Deserialize<T>(json, _jsonOptions);
         }
 
         // Content table specific methods
@@ -286,6 +305,126 @@ namespace MnemoApp.Data.Runtime
             throw new ArgumentException($"Invalid content key format: {key}");
         }
 
+        private MnemoApp.Modules.Notes.Models.NoteData? TryRepairNoteData(string json)
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                
+                var note = new MnemoApp.Modules.Notes.Models.NoteData();
+                
+                if (root.TryGetProperty("Id", out var idProp) && idProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                    note.Id = idProp.GetString() ?? Guid.NewGuid().ToString();
+                else
+                    note.Id = Guid.NewGuid().ToString();
+                
+                if (root.TryGetProperty("Title", out var titleProp) && titleProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                    note.Title = titleProp.GetString() ?? "Untitled";
+                else
+                    note.Title = "Untitled";
+                
+                if (root.TryGetProperty("Blocks", out var blocksProp) && blocksProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    try
+                    {
+                        note.Blocks = System.Text.Json.JsonSerializer.Deserialize<MnemoApp.Modules.Notes.Models.Block[]>(blocksProp.GetRawText(), _jsonOptions) 
+                            ?? Array.Empty<MnemoApp.Modules.Notes.Models.Block>();
+                    }
+                    catch
+                    {
+                        note.Blocks = Array.Empty<MnemoApp.Modules.Notes.Models.Block>();
+                    }
+                }
+                else
+                {
+                    note.Blocks = Array.Empty<MnemoApp.Modules.Notes.Models.Block>();
+                }
+                
+                if (root.TryGetProperty("CreatedAt", out var createdAtProp))
+                {
+                    try
+                    {
+                        if (createdAtProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            if (DateTime.TryParse(createdAtProp.GetString(), out var createdAt))
+                                note.CreatedAt = createdAt;
+                        }
+                        else if (createdAtProp.ValueKind == System.Text.Json.JsonValueKind.Number)
+                        {
+                            // Handle Unix timestamp
+                            if (createdAtProp.TryGetInt64(out var unixTime))
+                                note.CreatedAt = DateTimeOffset.FromUnixTimeSeconds(unixTime).DateTime;
+                        }
+                        else
+                        {
+                            try { note.CreatedAt = createdAtProp.GetDateTime(); }
+                            catch
+                            {
+                                var dtStr = createdAtProp.GetRawText().Trim('"');
+                                if (DateTime.TryParse(dtStr, out var dt))
+                                    note.CreatedAt = dt;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                
+                if (root.TryGetProperty("UpdatedAt", out var updatedAtProp))
+                {
+                    try
+                    {
+                        if (updatedAtProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            if (DateTime.TryParse(updatedAtProp.GetString(), out var updatedAt))
+                                note.UpdatedAt = updatedAt;
+                        }
+                        else if (updatedAtProp.ValueKind == System.Text.Json.JsonValueKind.Number)
+                        {
+                            // Handle Unix timestamp
+                            if (updatedAtProp.TryGetInt64(out var unixTime))
+                                note.UpdatedAt = DateTimeOffset.FromUnixTimeSeconds(unixTime).DateTime;
+                        }
+                        else
+                        {
+                            try { note.UpdatedAt = updatedAtProp.GetDateTime(); }
+                            catch
+                            {
+                                var dtStr = updatedAtProp.GetRawText().Trim('"');
+                                if (DateTime.TryParse(dtStr, out var dt))
+                                    note.UpdatedAt = dt;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                
+                if (root.TryGetProperty("Tags", out var tagsProp) && tagsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    try
+                    {
+                        note.Tags = System.Text.Json.JsonSerializer.Deserialize<string[]>(tagsProp.GetRawText(), _jsonOptions) 
+                            ?? Array.Empty<string>();
+                    }
+                    catch
+                    {
+                        note.Tags = Array.Empty<string>();
+                    }
+                }
+                else
+                {
+                    note.Tags = Array.Empty<string>();
+                }
+                
+                return note;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+
         public IEnumerable<ContentItem<T>> ListContent<T>(string contentType)
         {
             var results = new List<ContentItem<T>>();
@@ -336,7 +475,26 @@ namespace MnemoApp.Data.Runtime
                         updatedAt = DateTime.UtcNow;
                     }
                     
-                    var data = Deserialize<T>(dataJson);
+                    T? data = default(T);
+                    bool wasRepaired = false;
+                    try
+                    {
+                        data = Deserialize<T>(dataJson);
+                    }
+                    catch (System.Text.Json.JsonException)
+                    {
+                        // Try to repair corrupted entries for Notes and Folders
+                        if (typeof(T) == typeof(MnemoApp.Modules.Notes.Models.NoteData))
+                        {
+                            var repaired = TryRepairNoteData(dataJson);
+                            if (repaired != null)
+                            {
+                                data = (T)(object)repaired;
+                                wasRepaired = true;
+                            }
+                        }
+                    }
+                    
                     if (data != null)
                     {
                         results.Add(new ContentItem<T>
@@ -346,6 +504,24 @@ namespace MnemoApp.Data.Runtime
                             CreatedAt = createdAt,
                             UpdatedAt = updatedAt
                         });
+                        
+                        // Save repaired entry back to database
+                        if (wasRepaired)
+                        {
+                            try
+                            {
+                                string? repairContentType = typeof(T) == typeof(MnemoApp.Modules.Notes.Models.NoteData) ? "Notes" : null;
+                                if (!string.IsNullOrEmpty(repairContentType))
+                                {
+                                    SetContentProperty($"Content/{repairContentType}/{contentId}", data);
+                                    System.Diagnostics.Debug.WriteLine($"Repaired and saved content entry {contentId} ({repairContentType})");
+                                }
+                            }
+                            catch (Exception repairEx)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Failed to save repaired entry {contentId}: {repairEx.Message}");
+                            }
+                        }
                     }
                 }
                 catch (System.Text.Json.JsonException ex)

@@ -158,15 +158,7 @@ public partial class TestModuleViewModel : ViewModelBase
                 count++;
             }
 
-            // Also delete any folders if needed
-            var folders = _storage.ListContent<FolderData>("Folders");
-            foreach (var folderItem in folders)
-            {
-                _storage.RemoveProperty($"Content/Folders/{folderItem.ContentId}");
-                count++;
-            }
-
-            _mnemoAPI.ui.toast.show("Success", $"Deleted {count} note(s) and folder(s)");
+            _mnemoAPI.ui.toast.show("Success", $"Deleted {count} note(s)");
         }
         catch (Exception ex)
         {

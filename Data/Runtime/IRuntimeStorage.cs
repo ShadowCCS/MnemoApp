@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace MnemoApp.Data.Runtime
 {
@@ -18,6 +19,16 @@ namespace MnemoApp.Data.Runtime
         /// List all content items of a specific type.
         /// </summary>
         IEnumerable<ContentItem<T>> ListContent<T>(string contentType);
+        
+        /// <summary>
+        /// Async version of SetProperty for non-blocking writes.
+        /// </summary>
+        Task SetPropertyAsync<T>(string key, T value);
+        
+        /// <summary>
+        /// Async version of RemoveProperty for non-blocking deletes.
+        /// </summary>
+        Task RemovePropertyAsync(string key);
     }
     
     /// <summary>

@@ -27,7 +27,17 @@ public class NoteEditorViewModel : ViewModelBase
     public string NoteId
     {
         get => _noteId;
-        set => SetProperty(ref _noteId, value);
+        set
+        {
+            if (SetProperty(ref _noteId, value) && !string.IsNullOrEmpty(value))
+            {
+                // If BlockEditorInstance is already available, load immediately
+                if (BlockEditorInstance != null)
+                {
+                    _ = LoadNoteAsync(value);
+                }
+            }
+        }
     }
 
     public string Title
@@ -61,7 +71,27 @@ public class NoteEditorViewModel : ViewModelBase
         set => SetProperty(ref _hasUnsavedChanges, value);
     }
 
-    public BlockEditor? BlockEditorInstance { get; set; }
+    private BlockEditor? _blockEditorInstance;
+    public BlockEditor? BlockEditorInstance
+    {
+        get => _blockEditorInstance;
+        set
+        {
+            if (_blockEditorInstance == value)
+                return;
+                
+            _blockEditorInstance = value;
+            // If NoteId is already set when BlockEditorInstance is assigned, load the note
+            if (value != null && !string.IsNullOrEmpty(_noteId) && !_isLoading)
+            {
+                // Use InvokeAsync to properly handle async operation
+                _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    await LoadNoteAsync(_noteId);
+                }, Avalonia.Threading.DispatcherPriority.Loaded);
+            }
+        }
+    }
 
     public NoteEditorViewModel(IRuntimeStorage storage)
     {
@@ -80,7 +110,9 @@ public class NoteEditorViewModel : ViewModelBase
             return;
 
         _isLoading = true;
-        NoteId = noteId;
+        // Set field directly to avoid triggering property setter (which would cause double-load)
+        _noteId = noteId;
+        OnPropertyChanged(nameof(NoteId));
 
         try
         {
@@ -113,9 +145,35 @@ public class NoteEditorViewModel : ViewModelBase
                 CreatedAt = note.CreatedAt.ToString("MMMM dd, yyyy hh:mm tt");
                 Tags = note.Tags;
 
-                // Load blocks into editor on UI thread
-                BlockEditorInstance?.LoadBlocks(note.Blocks);
+                // Load blocks into editor (we're already on UI thread after await)
+                if (BlockEditorInstance != null)
+                {
+                    var blocks = note.Blocks ?? Array.Empty<Block>();
+                    BlockEditorInstance.LoadBlocks(blocks);
+                    
+                    // Ensure at least one block exists (fallback if blocks array was empty)
+                    if (BlockEditorInstance.Blocks.Count == 0)
+                    {
+                        BlockEditorInstance.AddBlock(BlockType.Text);
+                    }
+                }
+                else
+                {
+                    // If BlockEditorInstance isn't set yet, wait for it
+                    // The BlockEditorInstance setter will trigger loading
+                }
                 HasUnsavedChanges = false;
+            }
+            else
+            {
+                // If note not found, ensure we still have at least one block
+                if (BlockEditorInstance != null)
+                {
+                    if (BlockEditorInstance.Blocks.Count == 0)
+                    {
+                        BlockEditorInstance.AddBlock(BlockType.Text);
+                    }
+                }
             }
         }
         catch (Exception ex)
@@ -131,18 +189,21 @@ public class NoteEditorViewModel : ViewModelBase
 
     public void OnBlocksChanged()
     {
+        System.Diagnostics.Debug.WriteLine($"[NoteEditorViewModel] OnBlocksChanged called - setting HasUnsavedChanges and resetting timer");
         HasUnsavedChanges = true;
         ResetAutoSaveTimer();
     }
 
     private void ResetAutoSaveTimer()
     {
+        System.Diagnostics.Debug.WriteLine("[NoteEditorViewModel] ResetAutoSaveTimer - stopping and starting timer");
         _autoSaveTimer.Stop();
         _autoSaveTimer.Start();
     }
 
     private async Task SaveNoteAsync()
     {
+        System.Diagnostics.Debug.WriteLine($"[NoteEditorViewModel] SaveNoteAsync called - HasUnsavedChanges: {HasUnsavedChanges}, BlockEditorInstance: {BlockEditorInstance != null}");
         if (!HasUnsavedChanges || BlockEditorInstance == null)
             return;
 
@@ -194,7 +255,6 @@ public class NoteEditorViewModel : ViewModelBase
 
                 if (existing != null)
                 {
-                    note.FolderId = existing.FolderId;
                     note.CreatedAt = existing.CreatedAt;
                 }
 
@@ -209,11 +269,15 @@ public class NoteEditorViewModel : ViewModelBase
         }
     }
 
-    public void DeleteNote()
+    public async Task DeleteNoteAsync()
     {
         try
         {
-            _storage.RemoveProperty($"Content/Notes/{NoteId}");
+            // Stop auto-save timer and prevent further saves
+            _autoSaveTimer.Stop();
+            HasUnsavedChanges = false;
+            
+            await _storage.RemovePropertyAsync($"Content/Notes/{NoteId}");
 
             // Close editor
             OnClose?.Invoke();
@@ -226,6 +290,8 @@ public class NoteEditorViewModel : ViewModelBase
 
     public void CloseEditor()
     {
+        _autoSaveTimer.Stop();
+        HasUnsavedChanges = false;
         OnClose?.Invoke();
     }
 }
