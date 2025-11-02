@@ -1,3 +1,5 @@
+using System;
+
 namespace MnemoApp.Core.Extensions.Models
 {
     /// <summary>
@@ -12,7 +14,9 @@ namespace MnemoApp.Core.Extensions.Models
         
         /// <summary>
         /// Extension is loaded from source code (development mode)
+        /// Note: Only supported for bundled extensions. External extensions must use CompiledAssembly.
         /// </summary>
+        [Obsolete("Source-based extensions are only supported for bundled extensions. External extensions must use CompiledAssembly.")]
         SourceBased
     }
 }

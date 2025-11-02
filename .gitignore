@@ -5,6 +5,7 @@ obj/
 .cursor/
 .vscode/
 .docs/
+.SDK/
 
 # Other common .NET ignored files
 *.suo
@@ -16,7 +17,7 @@ obj/
 
 Core/AI/README.md
 
-# Icon libraries - Ignoring for now
+# Icon libraries - Ignoring use zip file
 UI/Icons/Tabler/filled/
 UI/Icons/Tabler/outline/
 

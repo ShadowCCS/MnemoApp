@@ -31,7 +31,6 @@ namespace MnemoApp.Core.Extensions.Services
         private readonly PermissionPromptService _permissionPrompt;
         private readonly DependencyResolver _dependencyResolver;
         private readonly ExtensionApiRouter _apiRouter;
-        private readonly SourceBasedExtensionCompiler _sourceCompiler;
         
         private readonly Dictionary<string, ExtensionMetadata> _extensions = new();
         private readonly Dictionary<string, LoadedExtension> _loadedExtensions = new();
@@ -55,7 +54,6 @@ namespace MnemoApp.Core.Extensions.Services
             _trustStore = new TrustStore(storage);
             _dependencyResolver = new DependencyResolver();
             _apiRouter = new ExtensionApiRouter(this);
-            _sourceCompiler = new SourceBasedExtensionCompiler();
             
             _userExtensionsPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -207,93 +205,26 @@ namespace MnemoApp.Core.Extensions.Services
                     metadata.TrustLevel = _trustStore.GetTrustLevel(name);
                 }
 
-                // Handle source-based extensions
-                if (metadata.LoadMode == ExtensionLoadMode.SourceBased)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[EXT_SERVICE] Compiling source extension: {name}");
-                    
-                    var needsRecompilation = _sourceCompiler.NeedsRecompilation(metadata.InstallPath, name);
-                    if (needsRecompilation)
-                    {
-                        var compilationResult = await _sourceCompiler.CompileAsync(metadata.InstallPath, name);
-                        
-                        if (!compilationResult.Success)
+                // Reject source-based extensions for external (non-bundled) extensions
+                if (metadata.LoadMode == ExtensionLoadMode.SourceBased && 
+                    !metadata.InstallPath.StartsWith(_bundledExtensionsPath, StringComparison.OrdinalIgnoreCase))
                         {
                             metadata.State = ExtensionState.Failed;
-                            metadata.LoadErrors.Add($"Compilation failed: {compilationResult.Error}");
-                            metadata.LoadErrors.AddRange(compilationResult.Errors);
+                    metadata.LoadErrors.Add("Source-based extensions are not supported for external extensions. Extensions must be compiled to DLL files.");
+                    System.Diagnostics.Debug.WriteLine($"[EXT_SERVICE] Rejected source-based external extension: {name}");
                             return false;
                         }
 
-                        // Update manifest to use compiled assembly
-                        if (compilationResult.AssemblyPath != null)
-                        {
-                            metadata.Manifest.EntryPoint = compilationResult.AssemblyPath;
-                            metadata.LoadMode = ExtensionLoadMode.CompiledAssembly;
-                        }
-                    }
-                    else
-                    {
-                        // Use cached compiled assembly
-                        var cachedAssemblyPath = Path.Combine(
-                            Path.Combine(
-                                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                                "MnemoApp",
-                                "ExtensionCache"
-                            ),
-                            $"{name}.dll"
-                        );
-                        
-                        if (File.Exists(cachedAssemblyPath))
-                        {
-                            // Verify cached assembly is valid before using it
-                            try
-                            {
-                                using var fs = File.OpenRead(cachedAssemblyPath);
-                                var assemblyBytes = new byte[fs.Length];
-                                fs.Read(assemblyBytes, 0, assemblyBytes.Length);
-                                _ = Assembly.Load(assemblyBytes);
-                                
-                                metadata.Manifest.EntryPoint = cachedAssemblyPath;
-                                metadata.LoadMode = ExtensionLoadMode.CompiledAssembly;
-                                System.Diagnostics.Debug.WriteLine($"[EXT_SERVICE] Using cached compiled assembly: {cachedAssemblyPath}");
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[EXT_SERVICE] Cached assembly is corrupted, recompiling: {ex.Message}");
-                                
-                                // Delete corrupted cache and recompile
-                                try
-                                {
-                                    File.Delete(cachedAssemblyPath);
-                                    var pdbPath = Path.Combine(Path.GetDirectoryName(cachedAssemblyPath)!, $"{name}.pdb");
-                                    if (File.Exists(pdbPath)) File.Delete(pdbPath);
-                                }
-                                catch { }
-                                
-                                var compilationResult = await _sourceCompiler.CompileAsync(metadata.InstallPath, name);
-                                
-                                if (!compilationResult.Success)
+                // Ensure compiled extensions have DLL files
+                if (metadata.LoadMode == ExtensionLoadMode.CompiledAssembly)
+                {
+                    var hasDll = Directory.GetFiles(metadata.InstallPath, "*.dll", SearchOption.TopDirectoryOnly).Any();
+                    if (!hasDll && !metadata.InstallPath.StartsWith(_bundledExtensionsPath, StringComparison.OrdinalIgnoreCase))
                                 {
                                     metadata.State = ExtensionState.Failed;
-                                    metadata.LoadErrors.Add($"Compilation failed: {compilationResult.Error}");
-                                    metadata.LoadErrors.AddRange(compilationResult.Errors);
+                        metadata.LoadErrors.Add("No DLL files found. External extensions must be compiled assemblies.");
+                        System.Diagnostics.Debug.WriteLine($"[EXT_SERVICE] No DLL files found for extension: {name}");
                                     return false;
-                                }
-
-                                if (compilationResult.AssemblyPath != null)
-                                {
-                                    metadata.Manifest.EntryPoint = compilationResult.AssemblyPath;
-                                    metadata.LoadMode = ExtensionLoadMode.CompiledAssembly;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            metadata.State = ExtensionState.Failed;
-                            metadata.LoadErrors.Add("Cached assembly not found, but recompilation was skipped");
-                            return false;
-                        }
                     }
                 }
 

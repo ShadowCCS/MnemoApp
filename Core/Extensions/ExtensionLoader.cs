@@ -122,8 +122,7 @@ namespace MnemoApp.Core.Extensions
                 }
                 else if (metadata.LoadMode == ExtensionLoadMode.SourceBased)
                 {
-                    // For bundled extensions with source files, treat as compiled assembly
-                    // since they're part of the main application
+                    // Only bundled extensions can use source-based mode (they're compiled with the app)
                     var bundledExtensionsPath = Path.Combine(
                         Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location ?? System.Reflection.Assembly.GetExecutingAssembly().Location) ?? AppDomain.CurrentDomain.BaseDirectory,
                         "Modules",
@@ -132,16 +131,20 @@ namespace MnemoApp.Core.Extensions
                     
                     if (metadata.InstallPath.StartsWith(bundledExtensionsPath, StringComparison.OrdinalIgnoreCase))
                     {
-                        // Treat as compiled assembly for bundled extensions
+                        // Bundled extensions with source are already compiled with the app
                         instance = await LoadCompiledExtensionAsync(metadata, errors);
                     }
                     else
                     {
-                        // Note: Source-based extensions should be compiled by ExtensionService
-                        // before reaching this point. If we get here, it's an error.
-                        errors.Add("Source-based extensions must be compiled before loading");
+                        // External source-based extensions should have been rejected by ExtensionService
+                        errors.Add("Source-based extensions are not supported for external extensions");
                         return (null, errors);
                     }
+                }
+                else
+                {
+                    errors.Add($"Unknown load mode: {metadata.LoadMode}");
+                    return (null, errors);
                 }
 
                 return (instance, errors);
@@ -316,7 +319,26 @@ namespace MnemoApp.Core.Extensions
             // Use manifest override if specified
             if (manifest.LoadMode.HasValue)
             {
-                return manifest.LoadMode.Value;
+                var specifiedMode = manifest.LoadMode.Value;
+                
+                // Reject SourceBased for external extensions if specified in manifest
+                if (specifiedMode == ExtensionLoadMode.SourceBased)
+                {
+                    var bundledExtensionsPath = Path.Combine(
+                        Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location ?? System.Reflection.Assembly.GetExecutingAssembly().Location) ?? AppDomain.CurrentDomain.BaseDirectory,
+                        "Modules",
+                        "Extensions"
+                    );
+                    
+                    if (!extensionPath.StartsWith(bundledExtensionsPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // External extensions cannot use SourceBased - default to CompiledAssembly
+                        System.Diagnostics.Debug.WriteLine($"[EXT_LOADER] Warning: Extension at {extensionPath} specified SourceBased mode but is external. Defaulting to CompiledAssembly.");
+                        return ExtensionLoadMode.CompiledAssembly;
+                    }
+                }
+                
+                return specifiedMode;
             }
 
             // Check for DLL files
@@ -326,12 +348,10 @@ namespace MnemoApp.Core.Extensions
                 return ExtensionLoadMode.CompiledAssembly;
             }
 
-            // Check for source files
+            // Check for source files - only allowed for bundled extensions
             var hasSourceFiles = Directory.GetFiles(extensionPath, "*.cs", SearchOption.AllDirectories).Any();
             if (hasSourceFiles)
             {
-                // If this is in the bundled extensions directory, treat as compiled assembly
-                // since it's part of the main application
                 var bundledExtensionsPath = Path.Combine(
                     Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location ?? System.Reflection.Assembly.GetExecutingAssembly().Location) ?? AppDomain.CurrentDomain.BaseDirectory,
                     "Modules",
@@ -340,10 +360,13 @@ namespace MnemoApp.Core.Extensions
 
                 if (extensionPath.StartsWith(bundledExtensionsPath, StringComparison.OrdinalIgnoreCase))
                 {
+                    // Bundled extensions with source are compiled with the app
                     return ExtensionLoadMode.CompiledAssembly;
                 }
 
-                return ExtensionLoadMode.SourceBased;
+                // External extensions with only source files are invalid
+                // Return CompiledAssembly but ExtensionService will reject it due to no DLLs
+                return ExtensionLoadMode.CompiledAssembly;
             }
 
             // Default to compiled
