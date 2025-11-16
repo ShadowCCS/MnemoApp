@@ -77,6 +77,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         // Replace entire collection to trigger UI update
         Blocks = newBlocks;
         
+        // Update list numbers after loading
+        UpdateListNumbers();
+        
         // Focus the first block after UI updates to make it immediately editable
         if (newBlocks.Count > 0)
         {
@@ -116,7 +119,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void SubscribeToBlock(BlockViewModel block)
     {
-        System.Diagnostics.Debug.WriteLine($"[BlockEditor] SubscribeToBlock called for block {block.Id}");
         block.ContentChanged += OnBlockContentChanged;
         block.DeleteRequested += OnBlockDeleteRequested;
         block.NewBlockRequested += OnNewBlockRequested;
@@ -139,12 +141,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnBlockContentChanged(BlockViewModel block)
     {
-        System.Diagnostics.Debug.WriteLine($"[BlockEditor] OnBlockContentChanged called for block {block.Id}");
+        // Update list numbers in case block type changed
+        UpdateListNumbers();
         // Trigger save in parent
-        if (BlocksChanged == null)
-        {
-            System.Diagnostics.Debug.WriteLine("[BlockEditor] WARNING: BlocksChanged event has no subscribers");
-        }
         BlocksChanged?.Invoke();
     }
 
@@ -166,6 +165,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             block.Content = string.Empty;
             block.Type = BlockType.Text;
             block.IsFocused = true; // Keep focus on the cleared block
+            UpdateListNumbers(); // Update list numbers in case type changed
             return;
         }
 
@@ -255,6 +255,32 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         for (int i = 0; i < Blocks.Count; i++)
         {
             Blocks[i].Order = i;
+        }
+        
+        // Update list numbers for numbered list blocks
+        UpdateListNumbers();
+    }
+
+    private void UpdateListNumbers()
+    {
+        int listNumber = 1;
+        for (int i = 0; i < Blocks.Count; i++)
+        {
+            if (Blocks[i].Type == BlockType.NumberedList)
+            {
+                // Check if this is the start of a new list (previous block is not a numbered list)
+                if (i == 0 || Blocks[i - 1].Type != BlockType.NumberedList)
+                {
+                    listNumber = 1;
+                }
+                
+                Blocks[i].ListNumberIndex = listNumber++;
+            }
+            else
+            {
+                // Reset counter when we encounter a non-numbered list block
+                listNumber = 1;
+            }
         }
     }
 

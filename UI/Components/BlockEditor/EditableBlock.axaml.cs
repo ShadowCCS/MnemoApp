@@ -6,6 +6,7 @@ using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MnemoApp.Modules.Notes.Models;
+using MnemoApp.UI.Components.BlockEditor.BlockComponents;
 using System;
 using System.Linq;
 
@@ -18,7 +19,7 @@ namespace MnemoApp.UI.Components.BlockEditor;
 public partial class EditableBlock : UserControl
 {
     // Manager instances
-    private SlashMenuManager? _slashMenuManager;
+    private SlashCommandMenu? _slashCommandMenu;
     private KeyboardHandler? _keyboardHandler;
     private FocusManager? _focusManager;
     private MarkdownShortcutDetector? _markdownDetector;
@@ -26,6 +27,7 @@ public partial class EditableBlock : UserControl
     
     private BlockViewModel? _viewModel;
     private BlockEditor? _cachedParentEditor;
+    private BlockComponentBase? _currentBlockComponent;
 
     public EditableBlock()
     {
@@ -75,6 +77,16 @@ public partial class EditableBlock : UserControl
         UnsubscribeFromViewModel();
         UnsubscribeFromManagers();
         
+        // Unwire block component
+        if (_currentBlockComponent != null)
+        {
+            _currentBlockComponent.TextBoxGotFocus -= HandleBlockComponentGotFocus;
+            _currentBlockComponent.TextBoxLostFocus -= HandleBlockComponentLostFocus;
+            _currentBlockComponent.TextBoxTextChanged -= HandleBlockComponentTextChanged;
+            _currentBlockComponent.TextBoxKeyDown -= HandleBlockComponentKeyDown;
+            _currentBlockComponent = null;
+        }
+        
         DataContextChanged -= OnDataContextChanged;
         Loaded -= OnControlLoaded;
         Unloaded -= OnControlUnloaded;
@@ -101,19 +113,84 @@ public partial class EditableBlock : UserControl
             _markdownDetector.ShortcutDetected -= OnMarkdownShortcutDetected;
         }
         
-        if (_slashMenuManager != null)
+        if (_slashCommandMenu != null)
         {
-            _slashMenuManager.CommandSelected -= OnCommandSelected;
+            _slashCommandMenu.CommandSelected -= OnCommandSelected;
         }
     }
 
     private void OnControlLoaded(object? sender, RoutedEventArgs e)
     {
-        // Initialize managers that depend on XAML elements after control is loaded
-        if (SlashCommandMenu != null && CommandItems != null && _slashMenuManager == null)
+        // Initialize slash command menu after control is loaded
+        if (SlashCommandMenu != null && _slashCommandMenu == null)
         {
-            _slashMenuManager = new SlashMenuManager(SlashCommandMenu, CommandItems, this);
-            _slashMenuManager.CommandSelected += OnCommandSelected;
+            _slashCommandMenu = SlashCommandMenu as SlashCommandMenu;
+            if (_slashCommandMenu != null)
+            {
+                _slashCommandMenu.CommandSelected += OnCommandSelected;
+            }
+        }
+        
+        // Wire up block component events
+        WireUpBlockComponent();
+    }
+    
+    private void WireUpBlockComponent()
+    {
+        // Unwire previous component
+        if (_currentBlockComponent != null)
+        {
+            _currentBlockComponent.TextBoxGotFocus -= HandleBlockComponentGotFocus;
+            _currentBlockComponent.TextBoxLostFocus -= HandleBlockComponentLostFocus;
+            _currentBlockComponent.TextBoxTextChanged -= HandleBlockComponentTextChanged;
+            _currentBlockComponent.TextBoxKeyDown -= HandleBlockComponentKeyDown;
+        }
+        
+        // Find and wire up new component
+        if (BlockContentControl?.Content is BlockComponentBase component)
+        {
+            _currentBlockComponent = component;
+            
+            // Ensure DataContext is set on the component
+            if (component.DataContext == null && _viewModel != null)
+            {
+                component.DataContext = _viewModel;
+            }
+            
+            component.TextBoxGotFocus += HandleBlockComponentGotFocus;
+            component.TextBoxLostFocus += HandleBlockComponentLostFocus;
+            component.TextBoxTextChanged += HandleBlockComponentTextChanged;
+            component.TextBoxKeyDown += HandleBlockComponentKeyDown;
+        }
+        else
+        {
+            _currentBlockComponent = null;
+        }
+    }
+    
+    private void HandleBlockComponentGotFocus(object? sender, TextBox textBox)
+    {
+        TextBox_GotFocus(textBox, new RoutedEventArgs());
+    }
+    
+    private void HandleBlockComponentLostFocus(object? sender, RoutedEventArgs e)
+    {
+        TextBox_LostFocus(sender, e);
+    }
+    
+    private void HandleBlockComponentTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (sender is BlockComponentBase component && component.GetInputControl() is TextBox textBox)
+        {
+            TextBox_TextChanged(textBox, e);
+        }
+    }
+    
+    private void HandleBlockComponentKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is BlockComponentBase component && component.GetInputControl() is TextBox textBox)
+        {
+            TextBox_KeyDown(textBox, e);
         }
     }
 
@@ -144,6 +221,9 @@ public partial class EditableBlock : UserControl
         
         SubscribeToViewModel();
         
+        // Wire up block component after data context changes
+        Dispatcher.UIThread.Post(() => WireUpBlockComponent(), DispatcherPriority.Loaded);
+        
         if (_viewModel != null && _stateManager != null)
         {
             _stateManager.SetUpdatingFromViewModel();
@@ -171,9 +251,26 @@ public partial class EditableBlock : UserControl
 
         switch (e.PropertyName)
         {
-            case nameof(BlockViewModel.IsFocused) when _viewModel.IsFocused:
-                _focusManager?.ClearCache(); // Clear cache when focus changes
-                _focusManager?.FocusTextBox();
+            case nameof(BlockViewModel.Type):
+                // Block type changed, need to rewire component
+                Dispatcher.UIThread.Post(() => WireUpBlockComponent(), DispatcherPriority.Loaded);
+                break;
+                
+            case nameof(BlockViewModel.IsFocused):
+                if (_viewModel.IsFocused)
+                {
+                    _focusManager?.ClearCache(); // Clear cache when focus changes
+                    _focusManager?.FocusTextBox();
+                }
+                else
+                {
+                    // Hide slash menu when block loses focus
+                    if (_slashCommandMenu?.IsVisibleMenu == true && _stateManager != null)
+                    {
+                        _slashCommandMenu.Hide();
+                        _stateManager.SetNormal();
+                    }
+                }
                 break;
                 
             case nameof(BlockViewModel.Content):
@@ -213,8 +310,6 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_GotFocus(object? sender, RoutedEventArgs e)
     {
-        BlockEditorLogger.Log("TextBox focused");
-        
         if (_viewModel == null || _stateManager == null) return;
 
         _viewModel.IsFocused = true;
@@ -238,17 +333,13 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
-        BlockEditorLogger.Log($"TextBox_TextChanged called");
-        
         if (sender is not TextBox textBox || _viewModel == null || _stateManager == null)
         {
-            BlockEditorLogger.Log("TextBox_TextChanged: early return - null check");
             return;
         }
         
         if (_stateManager.IsUpdatingFromViewModel)
         {
-            BlockEditorLogger.Log("Ignored - updating from ViewModel");
             return;
         }
         
@@ -262,13 +353,8 @@ public partial class EditableBlock : UserControl
         // Skip other handlers if text hasn't actually changed (e.g., programmatic updates)
         if (text == previousText)
         {
-            BlockEditorLogger.Log($"TextBox_TextChanged: text unchanged '{text}' == '{previousText}'");
             return;
         }
-        
-        BlockEditorLogger.LogTextChanged(text, previousText, _slashMenuManager?.IsVisible ?? false);
-        
-        HandleEmptyBlockBackspace(text);
         
         // Update ViewModel content - always update to ensure binding is in sync
         // The Content setter will only fire PropertyChanged if value actually changed
@@ -284,8 +370,6 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        BlockEditorLogger.LogKeyEvent(e.Key.ToString(), e.Handled);
-        
         if (_viewModel == null || sender is not TextBox textBox || _keyboardHandler == null)
         {
             return;
@@ -300,17 +384,16 @@ public partial class EditableBlock : UserControl
         // Optimistic slash menu handling: show immediately on slash key when textbox is empty
         // TextChanged will validate and correct state if needed (handles all edge cases)
         var isSlashKey = e.Key == Key.Divide || e.Key == Key.OemQuestion || e.Key == Key.Oem2;
-        if (isSlashKey && string.IsNullOrWhiteSpace(textBox.Text) && _slashMenuManager != null && _stateManager != null && !_slashMenuManager.IsVisible)
+        if (isSlashKey && string.IsNullOrWhiteSpace(textBox.Text) && _slashCommandMenu != null && _stateManager != null && !_slashCommandMenu.IsVisibleMenu)
         {
             // Text will become "/" after this keypress - show menu optimistically for immediate feedback
             // TextChanged will validate this and correct if needed
             Dispatcher.UIThread.Post(() =>
             {
                 var currentText = textBox.Text ?? string.Empty;
-                if (currentText == "/" && _slashMenuManager != null && !_slashMenuManager.IsVisible)
+                if (currentText == "/" && _slashCommandMenu != null && !_slashCommandMenu.IsVisibleMenu)
                 {
-                    BlockEditorLogger.Log("Optimistically showing slash menu from KeyDown");
-                    _slashMenuManager.Show(textBox);
+                    _slashCommandMenu.Show(textBox, this);
                     _stateManager?.SetShowingSlashMenu();
                 }
             }, DispatcherPriority.Input);
@@ -318,15 +401,14 @@ public partial class EditableBlock : UserControl
 
         // Fallback: Hide menu if visible and any non-slash key is pressed (covers cases where TextChanged doesn't fire)
         // This ensures menu state is always correct regardless of event timing
-        if (_slashMenuManager?.IsVisible == true && !isSlashKey && e.Key != Key.Escape && e.Key != Key.Enter && e.Key != Key.Up && e.Key != Key.Down)
+        if (_slashCommandMenu?.IsVisibleMenu == true && !isSlashKey && e.Key != Key.Escape && e.Key != Key.Enter && e.Key != Key.Up && e.Key != Key.Down)
         {
             Dispatcher.UIThread.Post(() =>
             {
                 var currentText = textBox.Text ?? string.Empty;
-                if (currentText != "/" && _slashMenuManager != null && _stateManager != null)
+                if (currentText != "/" && _slashCommandMenu != null && _stateManager != null)
                 {
-                    BlockEditorLogger.Log($"Hiding slash menu (KeyDown fallback) - text is '{currentText}'");
-                    _slashMenuManager.Hide();
+                    _slashCommandMenu.Hide();
                     _stateManager.SetNormal();
                 }
             }, DispatcherPriority.Input);
@@ -348,57 +430,39 @@ public partial class EditableBlock : UserControl
 
     private void HandleSlashMenuToggle(string text, TextBox textBox)
     {
-        if (_slashMenuManager == null || _stateManager == null)
+        if (_slashCommandMenu == null || _stateManager == null)
         {
-            BlockEditorLogger.Log("HandleSlashMenuToggle: managers null");
             return;
         }
 
-        // Source of truth: menu should be visible if and only if text is exactly "/"
-        var isSlashOnly = text == "/";
-        var menuIsVisible = _slashMenuManager.IsVisible;
-
-        BlockEditorLogger.Log($"HandleSlashMenuToggle: text='{text}', isSlashOnly={isSlashOnly}, menuIsVisible={menuIsVisible}");
+        // Check if text starts with "/" and is a valid slash command pattern
+        var isSlashCommand = text.StartsWith("/");
+        var menuIsVisible = _slashCommandMenu.IsVisibleMenu;
 
         // Always ensure state matches reality - correct any mismatches
-        if (isSlashOnly && !menuIsVisible)
+        if (isSlashCommand && !menuIsVisible)
         {
-            BlockEditorLogger.Log("Showing slash menu (TextChanged)");
-            _slashMenuManager.Show(textBox);
+            _slashCommandMenu.Show(textBox, this, text);
             _stateManager.SetShowingSlashMenu();
         }
-        else if (!isSlashOnly && menuIsVisible)
+        else if (isSlashCommand && menuIsVisible)
         {
-            BlockEditorLogger.Log($"Hiding slash menu (TextChanged) - text changed to '{text}'");
-            _slashMenuManager.Hide();
+            // Update filter if menu is already visible
+            _slashCommandMenu.UpdateFilter(text);
+        }
+        else if (!isSlashCommand && menuIsVisible)
+        {
+            _slashCommandMenu.Hide();
             _stateManager.SetNormal();
         }
-        else
-        {
-            BlockEditorLogger.Log($"HandleSlashMenuToggle: no state change needed");
-        }
     }
 
-    private void HandleEmptyBlockBackspace(string text)
-    {
-        if (_stateManager == null || _keyboardHandler == null) return;
-
-        var hadContentBefore = !string.IsNullOrWhiteSpace(_stateManager.PreviousText);
-        var isEmptyNow = string.IsNullOrWhiteSpace(text);
-        var isBackspacePress = _keyboardHandler.WasBackspace;
-        
-        if (hadContentBefore && isEmptyNow && isBackspacePress)
-        {
-            _keyboardHandler.LastKey = null;
-            Dispatcher.UIThread.Post(() => HandleBackspaceOnEmptyBlock(), DispatcherPriority.Input);
-        }
-    }
 
     private void OnEscapePressed()
     {
-        if (_slashMenuManager?.IsVisible == true && _stateManager != null)
+        if (_slashCommandMenu?.IsVisibleMenu == true && _stateManager != null)
         {
-            _slashMenuManager.Hide();
+            _slashCommandMenu.Hide();
             _stateManager.SetNormal();
         }
     }
@@ -448,17 +512,6 @@ public partial class EditableBlock : UserControl
         _focusManager?.ClearCache();
         
         Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
-    }
-
-    private void CommandItem_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Border border || border.DataContext is not CommandItem command)
-        {
-            return;
-        }
-
-        _slashMenuManager?.HandleItemClick(command);
-        e.Handled = true;
     }
 
     #endregion
@@ -562,12 +615,4 @@ public partial class EditableBlock : UserControl
     }
 
     #endregion
-}
-
-public class CommandItem
-{
-    public string Icon { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public BlockType BlockType { get; set; }
 }

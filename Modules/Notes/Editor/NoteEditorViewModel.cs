@@ -189,21 +189,18 @@ public class NoteEditorViewModel : ViewModelBase
 
     public void OnBlocksChanged()
     {
-        System.Diagnostics.Debug.WriteLine($"[NoteEditorViewModel] OnBlocksChanged called - setting HasUnsavedChanges and resetting timer");
         HasUnsavedChanges = true;
         ResetAutoSaveTimer();
     }
 
     private void ResetAutoSaveTimer()
     {
-        System.Diagnostics.Debug.WriteLine("[NoteEditorViewModel] ResetAutoSaveTimer - stopping and starting timer");
         _autoSaveTimer.Stop();
         _autoSaveTimer.Start();
     }
 
     private async Task SaveNoteAsync()
     {
-        System.Diagnostics.Debug.WriteLine($"[NoteEditorViewModel] SaveNoteAsync called - HasUnsavedChanges: {HasUnsavedChanges}, BlockEditorInstance: {BlockEditorInstance != null}");
         if (!HasUnsavedChanges || BlockEditorInstance == null)
             return;
 

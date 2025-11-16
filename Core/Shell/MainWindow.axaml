@@ -28,7 +28,7 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Border Background="{DynamicResource WorkspaceBackgroundBrush}" BorderThickness="0" CornerRadius="15">
+    <Border Background="{DynamicResource WorkspaceBackgroundBrush}" BorderThickness="0" CornerRadius="8">
         <Grid>
             <!-- Main content grid -->
             <Grid.ColumnDefinitions>

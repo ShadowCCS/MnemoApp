@@ -104,7 +104,8 @@ public class KeyboardHandler
         var isTextBoxEmpty = string.IsNullOrWhiteSpace(text);
         var isContentEmpty = string.IsNullOrWhiteSpace(viewModel.Content);
 
-        if ((isTextBoxEmpty || isContentEmpty) && (caretIndex <= BACKSPACE_THRESHOLD || text.Length == 0))
+        // If block is empty and caret is at start (or text is completely empty), handle empty block backspace
+        if ((isTextBoxEmpty || isContentEmpty) && (caretIndex == 0 || text.Length == 0))
         {
             e.Handled = true;
             BackspaceOnEmpty?.Invoke();
@@ -115,14 +116,14 @@ public class KeyboardHandler
     {
         if (viewModel == null) return;
 
-        if (IsTextOrHeadingBlock(viewModel.Type))
+        if (viewModel.Type == BlockType.Text)
         {
-            // Delete block and focus above
+            // If it's already a text block and empty, delete it and focus above
             viewModel.RequestDeleteAndFocusAbove();
         }
         else
         {
-            // Convert to text block
+            // For any special block (non-text), convert to text block first
             ConvertToBlockType?.Invoke(BlockType.Text);
         }
     }

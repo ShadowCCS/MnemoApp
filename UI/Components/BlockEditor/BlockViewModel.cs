@@ -13,6 +13,7 @@ public class BlockViewModel : INotifyPropertyChanged
     private string _content;
     private Dictionary<string, object> _meta;
     private int _order;
+    private int _listNumberIndex = 1;
     private bool _isFocused;
     private bool _isSelected;
     private string? _cachedWatermark;
@@ -76,7 +77,21 @@ public class BlockViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ListNumber => $"{Order + 1}.";
+    public int ListNumberIndex
+    {
+        get => _listNumberIndex;
+        set
+        {
+            if (_listNumberIndex != value)
+            {
+                _listNumberIndex = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ListNumber));
+            }
+        }
+    }
+
+    public string ListNumber => $"{_listNumberIndex}.";
 
     public bool IsFocused
     {
@@ -216,12 +231,7 @@ public class BlockViewModel : INotifyPropertyChanged
 
     public void NotifyContentChanged()
     {
-        System.Diagnostics.Debug.WriteLine($"[BlockViewModel] NotifyContentChanged called for block {Id}");
         ContentChanged?.Invoke(this);
-        if (ContentChanged == null)
-        {
-            System.Diagnostics.Debug.WriteLine($"[BlockViewModel] WARNING: ContentChanged event has no subscribers for block {Id}");
-        }
     }
 
     public void RequestDelete()

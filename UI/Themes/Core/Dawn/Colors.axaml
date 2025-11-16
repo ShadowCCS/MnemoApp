@@ -185,8 +185,8 @@
     
     <!-- TextBox -->
     <Color x:Key="TextControlBackground">#FFFFFF</Color>
-    <Color x:Key="TextControlBackgroundPointerOver">#FFFFFF</Color>
-    <Color x:Key="TextControlBackgroundFocused">#FFFFFF</Color>
+    <Color x:Key="TextControlBackgroundPointerOver">Transparent</Color>
+    <Color x:Key="TextControlBackgroundFocused">Transparent</Color>
     <Color x:Key="TextControlBackgroundDisabled">#F5F5F5</Color>
     <Color x:Key="TextControlForeground">#222222</Color>
     <Color x:Key="TextControlForegroundPointerOver">#222222</Color>
