@@ -12,7 +12,7 @@
 ![UI](https://img.shields.io/badge/UI-Avalonia%2011-orange.svg)
 </div>
 
-![Mnemo Dashboard](GithubAssets/dashboard.svg)
+![Mnemo Dashboard](GithubAssets/updated.png)
 > Free. Open-source. Cross-platform. A next-generation study application built for learners, by learners.
 ---
 
