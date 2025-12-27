@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="using:Mnemo.Core.Services" xmlns:models="using:Mnemo.Core.Models" xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:local="using:Mnemo.UI.Components.Toasts"
+             x:Class="Mnemo.UI.Components.Toasts.ToastControl"
+             x:DataType="services:ToastNotification">
+  <Border Width="300"
+          Background="{DynamicResource ToastBackgroundPrimaryBrush}"
+          CornerRadius="16"
+          Padding="12,10"
+          BorderBrush="{DynamicResource ToastBackgroundSecondaryBrush}"
+          BorderThickness="1"
+          Name="ToastRoot">
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+
+      <controls:SvgIcon Grid.Column="0"
+                         SvgPath="{Binding IconPath}"
+                         Width="28"
+                         Height="28"
+                         Color="{DynamicResource ToastIconForegroundBrush}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,12,0"/>
+
+      <StackPanel Grid.Column="1"
+                  Orientation="Vertical"
+                  VerticalAlignment="Center"
+                  Spacing="1">
+        <TextBlock Text="{Binding Title}"
+                   FontSize="{DynamicResource FontSize.Body.Small}"
+                   Foreground="{DynamicResource ToastTitleColorBrush}"
+                   FontFamily="{DynamicResource Font.SemiBold}"/>
+        <TextBlock Text="{Binding Message}"
+                   FontSize="{DynamicResource FontSize.Caption}"
+                   Foreground="{DynamicResource ToastDescriptionColorBrush}"
+                   FontFamily="{DynamicResource Font.Regular}"
+                   TextWrapping="Wrap"/>
+      </StackPanel>
+
+      <Button Grid.Column="2"
+              Background="Transparent"
+              BorderThickness="0"
+              VerticalAlignment="Center"
+              HorizontalAlignment="Right"
+              Width="32"
+              Height="32"
+              Padding="7"
+              Name="DismissButton"
+              IsVisible="{Binding Dismissable}"
+              ToolTip.Tip="Close notification">
+        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/square-rounded-x.svg"
+                          Width="22" Height="22"
+                          Color="{DynamicResource ToastIconColorBrush}"
+                          VerticalAlignment="Center"
+                          HorizontalAlignment="Center"/>
+      </Button>
+    </Grid>
+  </Border>
+</UserControl>
+
+
+
+
+
+
+

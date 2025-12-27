@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="using:Mnemo.Core.Services"
+             xmlns:conv="using:Mnemo.UI.Converters"
+             x:Class="Mnemo.UI.Components.OverlayPopupHost"
+             x:DataType="services:IOverlayService"
+             KeyDown="OnKeyDown">
+  <UserControl.Styles>
+    <Style Selector="UserControl#OverlayPopupHostRoot">
+      <Setter Property="ZIndex" Value="9999"/>
+    </Style>
+  </UserControl.Styles>
+  <UserControl.Resources>
+    <conv:OverlayBackdropConverter x:Key="OverlayBackdropConverter" />
+  </UserControl.Resources>
+
+  <!-- Host overlays on top of the window content -->
+  <Grid Name="OverlayPopupHostRoot" IsHitTestVisible="True" Focusable="True">
+    <ItemsControl ItemsSource="{Binding Overlays}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <Grid />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="services:OverlayInstance">
+          <Grid IsHitTestVisible="True"
+                ZIndex="{Binding ZIndex}">
+            <!-- Backdrop -->
+            <Border IsVisible="{Binding Options.ShowBackdrop}"
+                    IsHitTestVisible="{Binding Options.CloseOnOutsideClick}"
+                    PointerPressed="BackdropPressed">
+              <Border.Background>
+                <MultiBinding Converter="{StaticResource OverlayBackdropConverter}">
+                  <Binding Path="Options.BackdropBrush"/>
+                  <Binding Path="Options.BackdropColor"/>
+                  <Binding Path="Options.BackdropOpacity"/>
+                </MultiBinding>
+              </Border.Background>
+            </Border>
+
+            <!-- Content container with alignment options -->
+            <Border x:Name="ContentBorder"
+                    HorizontalAlignment="{Binding Options.HorizontalAlignment}"
+                    VerticalAlignment="{Binding Options.VerticalAlignment}"
+                    Margin="{Binding Options.Margin}"
+                    Background="Transparent"
+                    LayoutUpdated="OnOverlayLayoutUpdated"
+                    Loaded="OnOverlayLoaded">
+              <ContentPresenter Content="{Binding Content}"/>
+            </Border>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </Grid>
+</UserControl>
+
+
+
+
+

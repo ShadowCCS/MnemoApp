@@ -1,0 +1,16 @@
+<UserControl
+    x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Divider.DividerBlockComponent"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False">
+    <Border
+        Height="1"
+        Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+        Margin="0,8" />
+</UserControl>
+
+
+
+
+
+

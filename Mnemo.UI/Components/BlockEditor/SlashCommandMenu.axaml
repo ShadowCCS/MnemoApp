@@ -1,0 +1,83 @@
+<UserControl
+    x:Class="Mnemo.UI.Components.BlockEditor.SlashCommandMenu"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Mnemo.UI.Components.BlockEditor"
+    x:CompileBindings="True"
+    MinWidth="280"
+    MaxHeight="400">
+    <Border
+        Background="{DynamicResource CardBackgroundPrimaryBrush}"
+        BorderBrush="{DynamicResource ButtonBorderBrush}"
+        BorderThickness="1"
+        BoxShadow="0 8 24 0 #20000000, 0 2 8 0 #10000000"
+        CornerRadius="12"
+        Padding="6">
+        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="CommandItems">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="2" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:CommandItem">
+                        <Border
+                            x:Name="ItemBorder"
+                            Background="Transparent"
+                            CornerRadius="8"
+                            Cursor="Hand"
+                            Padding="10,10"
+                            PointerPressed="CommandItem_PointerPressed">
+                            <Border.Transitions>
+                                <Transitions>
+                                    <BrushTransition Property="Background" Duration="0:0:0.15" />
+                                </Transitions>
+                            </Border.Transitions>
+                            <Border.Styles>
+                                <Style Selector="Border:pointerover">
+                                    <Setter Property="Background" Value="{DynamicResource ListBoxItemBackgroundPointerOverBrush}" />
+                                </Style>
+                            </Border.Styles>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <!-- Icon Container -->
+                                <Border
+                                    Width="36"
+                                    Height="36"
+                                    Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                    CornerRadius="8"
+                                    VerticalAlignment="Center">
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        FontSize="16"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource TextPrimaryBrush}"
+                                        Text="{Binding Icon}" />
+                                </Border>
+                                <!-- Text Content -->
+                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource TextPrimaryBrush}"
+                                        Text="{Binding Name}" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        Text="{Binding Description}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Border>
+</UserControl>
+
+
+
+
+
+

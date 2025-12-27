@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Mnemo.UI.Components.Overlays"
+             x:Class="Mnemo.UI.Components.Overlays.DialogOverlay"
+             x:DataType="local:DialogOverlay">
+  <Border Background="{DynamicResource OverlayBackgroundBrush}"
+          BorderBrush="{DynamicResource IconsSeparationBarBrush}"
+          BorderThickness="1"
+          CornerRadius="12"
+          Padding="16"
+          MinWidth="360">
+    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
+      <TextBlock Text="{Binding Title}"
+                 FontSize="{DynamicResource FontSize.Heading4}" 
+                 FontFamily="{DynamicResource Font.Bold}"
+                 Foreground="{DynamicResource TextPrimaryBrush}"/>
+      <TextBlock Grid.Row="1"
+                  Text="{Binding Description}"
+                  FontFamily="{DynamicResource Font.Medium}"
+                  FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                  Foreground="{DynamicResource TextSecondaryBrush}"
+                 TextWrapping="Wrap"/>
+      <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Content="{Binding SecondaryText}"
+                Classes="Subtle"
+                Command="{Binding SecondaryCommand}"/>
+        <Button Content="{Binding PrimaryText}"
+                Command="{Binding PrimaryCommand}"/>
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>
+
+
+
+
+
+
+

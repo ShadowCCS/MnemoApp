@@ -1,0 +1,432 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Mnemo.UI.Components"
+             xmlns:services="using:Mnemo.Core.Services" xmlns:models="using:Mnemo.Core.Models" xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:converters="using:Mnemo.UI.Converters"
+             x:Class="Mnemo.UI.Components.InputBuilder"
+             x:DataType="local:InputBuilderViewModel">
+
+    <UserControl.Resources>
+        <!-- Use static brushes to avoid initial DynamicResource timing glitches -->
+        <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" 
+                                         TrueBrush="{StaticResource TextPrimaryBrush}"
+                                         FalseBrush="{StaticResource TextSecondaryBrush}"/>
+        <converters:ProgressPhaseBrushConverter x:Key="ProgressPhaseBrushConverter"/>
+        
+        <!-- Horizontal InputTab ToggleButton Style (kept for reference, no longer used) -->
+        <ControlTheme x:Key="InputTabTheme" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Margin" Value="1"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOverBrush}"/>
+            </Style>
+            
+            <Style Selector="^:checked">
+                <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundBrush}"/>
+            </Style>
+            
+            <Style Selector="^:checked:pointerover">
+                <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundPointerOverBrush}"/>
+            </Style>
+        </ControlTheme>
+
+        <!-- Vertical Nav ToggleButton Style -->
+        <ControlTheme x:Key="InputTabVerticalTheme" TargetType="ToggleButton">
+            <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundUnselectedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TabItemHeaderForegroundUnselectedBrush}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundUnselectedPointerOverBrush}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundUnselectedPointerOverBrush}"/>
+            </Style>
+            <Style Selector="^:checked">
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundSelectedBrush}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundSelectedBrush}"/>
+            </Style>
+            <Style Selector="^:checked:pointerover">
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundSelectedPointerOverBrush}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundSelectedPointerOverBrush}"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Background" Value="{DynamicResource TabItemHeaderBackgroundDisabledBrush}"/>
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource TabItemHeaderForegroundDisabledBrush}"/>
+            </Style>
+        </ControlTheme>
+    </UserControl.Resources>
+
+    <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" 
+            BorderBrush="{DynamicResource TextControlBorderBrush}" 
+            BorderThickness="1" 
+            CornerRadius="8"
+            Padding="12">
+        
+        <Grid RowDefinitions="Auto,*,Auto">
+            
+            <!-- Header with Title/Description (left) and Counters (right) -->
+            <Grid Grid.Row="0" Margin="0,0,0,8" ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="{Binding Title}"
+                               FontFamily="{DynamicResource Font.SemiBold}" 
+                               FontSize="{DynamicResource FontSize.Body.Large}"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding Description}"
+                               FontFamily="{DynamicResource Font.Regular}" 
+                               FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+
+                <!-- Top-right counters -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Top" ToolTip.Tip="Context usage percentage">
+                    <StackPanel Spacing="0" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding CurrentTokenCount}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Tokens" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiaryBrush}"/>
+                    </StackPanel>
+                    <StackPanel Spacing="0" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding MaxTokens}" FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Max Tokens" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiaryBrush}"/>
+                    </StackPanel>
+                    <StackPanel Spacing="0" HorizontalAlignment="Right">
+                        <TextBlock FontFamily="{DynamicResource Font.SemiBold}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}">
+                            <Run Text="{Binding PercentComplete}"/><Run Text="%"/>
+                        </TextBlock>
+                        <TextBlock Text="Context Used" FontFamily="{DynamicResource Font.Regular}" FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextTertiaryBrush}"/>
+                        <ProgressBar Value="{Binding PercentComplete}" Height="2" Width="65" Foreground="{Binding PercentComplete, Converter={StaticResource ProgressPhaseBrushConverter}, ConverterParameter=33|66}" MinWidth="2" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+            
+            <!-- Left Navigation + Right Content Area -->
+            <Grid Grid.Row="1" ColumnDefinitions="200,*" ColumnSpacing="8">
+                <!-- Left vertical tabs and summary -->
+                <StackPanel Grid.Column="0" Spacing="8">
+                    <!-- Tabs -->
+                    <StackPanel Spacing="2">
+                    <ToggleButton Name="TextTabButton"
+                                  IsVisible="{Binding ShowTextTab}"
+                                  IsChecked="{Binding IsTextTabActive}"
+                                  Command="{Binding SelectTextTabCommand}"
+                                  Theme="{StaticResource InputTabVerticalTheme}">
+                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                            <controls:SvgIcon Grid.Column="0"
+                                               SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/text.svg" 
+                                               Width="16" Height="16" 
+                                               Color="{Binding IsTextTabActive, Converter={StaticResource BoolToBrushConverter}}" 
+                                               Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="Text" 
+                                       FontFamily="{DynamicResource Font.Medium}" 
+                                       FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                       Foreground="{Binding IsTextTabActive, Converter={StaticResource BoolToBrushConverter}}"/>
+                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackgroundBrush}" CornerRadius="10" Padding="6,2">
+                                <TextBlock Text="{Binding TextEntryCount}" 
+                                           FontFamily="{DynamicResource Font.SemiBold}"
+                                           FontSize="{DynamicResource FontSize.Caption}"
+                                           Foreground="{DynamicResource AccentButtonForegroundBrush}"/>
+                            </Border>
+                        </Grid>
+                    </ToggleButton>
+                    
+                    <ToggleButton Name="FilesTabButton"
+                                  IsVisible="{Binding ShowFilesTab}"
+                                  IsChecked="{Binding IsFilesTabActive}"
+                                  Command="{Binding SelectFilesTabCommand}"
+                                  Theme="{StaticResource InputTabVerticalTheme}">
+                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                            <controls:SvgIcon Grid.Column="0"
+                                               SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file.svg" 
+                                               Width="16" Height="16" 
+                                               Color="{Binding IsFilesTabActive, Converter={StaticResource BoolToBrushConverter}}" 
+                                               Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="Files" 
+                                       FontFamily="{DynamicResource Font.Medium}" 
+                                       FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                       Foreground="{Binding IsFilesTabActive, Converter={StaticResource BoolToBrushConverter}}"/>
+                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackgroundBrush}" CornerRadius="10" Padding="6,2">
+                                <TextBlock Text="{Binding Files.Count}" 
+                                           FontFamily="{DynamicResource Font.SemiBold}"
+                                           FontSize="{DynamicResource FontSize.Caption}"
+                                           Foreground="{DynamicResource AccentButtonForegroundBrush}"/>
+                            </Border>
+                        </Grid>
+                    </ToggleButton>
+                    
+                    <ToggleButton Name="LinksTabButton"
+                                  IsVisible="{Binding ShowLinksTab}"
+                                  IsChecked="{Binding IsLinksTabActive}"
+                                  Command="{Binding SelectLinksTabCommand}"
+                                  Theme="{StaticResource InputTabVerticalTheme}">
+                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                            <controls:SvgIcon Grid.Column="0"
+                                               SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" 
+                                               Width="16" Height="16" 
+                                               Color="{Binding IsLinksTabActive, Converter={StaticResource BoolToBrushConverter}}" 
+                                               Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="Links" 
+                                       FontFamily="{DynamicResource Font.Medium}" 
+                                       FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                       Foreground="{Binding IsLinksTabActive, Converter={StaticResource BoolToBrushConverter}}"/>
+                            <Border Grid.Column="2" Background="{DynamicResource BadgeBackgroundBrush}" CornerRadius="10" Padding="6,2">
+                                <TextBlock Text="{Binding Links.Count}" 
+                                           FontFamily="{DynamicResource Font.SemiBold}"
+                                           FontSize="{DynamicResource FontSize.Caption}"
+                                           Foreground="{DynamicResource AccentButtonForegroundBrush}"/>
+                            </Border>
+                        </Grid>
+                    </ToggleButton>
+                    </StackPanel>
+
+                    <!-- Content Summary -->
+                    <StackPanel Orientation="Vertical" Spacing="4">
+                        <TextBlock Text="Content Summary"
+                                   FontFamily="{DynamicResource Font.SemiBold}"
+                                   FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <StackPanel Orientation="Vertical" Spacing="2">
+                            <TextBlock FontFamily="{DynamicResource Font.Regular}"
+                                       FontSize="{DynamicResource FontSize.Caption}"
+                                       Foreground="{DynamicResource TextTertiaryBrush}">
+                                <Run Text="Files processed: "/>
+                                <Run Text="{Binding FilesProcessedCount}" FontFamily="{DynamicResource Font.Medium}"/>
+                                <Run Text=" chars"/>
+                            </TextBlock>
+                            <TextBlock FontFamily="{DynamicResource Font.Regular}"
+                                       FontSize="{DynamicResource FontSize.Caption}"
+                                       Foreground="{DynamicResource TextTertiaryBrush}">
+                                <Run Text="Links scraped: "/>
+                                <Run Text="{Binding LinksScrapedCount}" FontFamily="{DynamicResource Font.Medium}"/>
+                                <Run Text=" chars"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Right content area -->
+                <Border Grid.Column="1"
+                        Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                        BorderBrush="{DynamicResource TextControlBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="8"
+                        MinHeight="120">
+                    <Grid>
+                        <!-- Text Tab Content -->
+                        <StackPanel IsVisible="{Binding IsTextTabActive}" Spacing="8">
+                            <!-- make textbox expand with max height and internal scroll -->
+                            <TextBox Name="ContentTextBox"
+                                     Text="{Binding TextContent}"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     MinHeight="100"
+                                     MaxHeight="280"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     Watermark="Enter text content..."
+                                     Background="{DynamicResource TextControlBackgroundBrush}"
+                                     BorderBrush="{DynamicResource TextControlBorderBrush}"
+                                     BorderThickness="1"
+                                     CornerRadius="4"
+                                     Padding="8"/>
+                        </StackPanel>
+
+                        <!-- Files Tab Content -->
+                        <StackPanel IsVisible="{Binding IsFilesTabActive}" Spacing="8">
+                            <!-- File Drop Zone -->
+                            <Button Background="{DynamicResource OverlayBackgroundBrush}" 
+                                    BorderBrush="{DynamicResource TextControlBorderBrush}" 
+                                    BorderThickness="2" 
+                                    CornerRadius="6" 
+                                    Padding="12" 
+                                    MinHeight="70"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Command="{Binding AddFileCommand}"
+                                    Cursor="Hand">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg" 
+                                                       Width="20" Height="20" 
+                                                       Color="{DynamicResource TextTertiaryBrush}"/>
+                                    <TextBlock Text="Click to add files" 
+                                               FontFamily="{DynamicResource Font.Medium}" 
+                                               FontSize="{DynamicResource FontSize.Caption}"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="PDF, DOCX, TXT, MD supported" 
+                                               FontFamily="{DynamicResource Font.Regular}" 
+                                               FontSize="{DynamicResource FontSize.Caption}"
+                                               Foreground="{DynamicResource TextFadedBrush}"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- File List -->
+                            <ItemsControl ItemsSource="{Binding Files}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource WidgetBackgroundPrimaryBrush}" 
+                                                BorderBrush="{DynamicResource TextControlBorderBrush}" 
+                                                BorderThickness="1" 
+                                                CornerRadius="4" 
+                                                Padding="8" 
+                                                Margin="0,1">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <controls:SvgIcon Grid.Column="0"
+                                                                   SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg" 
+                                                                   Width="16" Height="16" 
+                                                                   Color="{DynamicResource TextSecondaryBrush}" 
+                                                                   Margin="0,0,8,0"/>
+                                                <TextBlock Grid.Column="1" 
+                                                           Text="{Binding FileName}" 
+                                                           FontFamily="{DynamicResource Font.Medium}" 
+                                                           FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button Grid.Column="2" 
+                                                        Command="{Binding RemoveCommand}"
+                                                        Classes="GhostButton"
+                                                        Padding="4">
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" 
+                                                                       Width="14" Height="14" 
+                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Links Tab Content -->
+                        <StackPanel IsVisible="{Binding IsLinksTabActive}" Spacing="8">
+                            <!-- Add Link Input -->
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Grid.Styles>
+                                    <Style Selector="Grid > :is(Control)">
+                                        <Setter Property="Margin" Value="0,0,4,0"/>
+                                    </Style>
+                                    <Style Selector="Grid > :is(Control):nth-last-child(1)">
+                                        <Setter Property="Margin" Value="4,0,0,0"/>
+                                    </Style>
+                                </Grid.Styles>
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding NewLinkUrl}"
+                                         Watermark="Enter URL..."
+                                         Background="{DynamicResource TextControlBackgroundBrush}"
+                                         BorderBrush="{DynamicResource TextControlBorderBrush}"
+                                         BorderThickness="1"
+                                         CornerRadius="4"
+                                         Padding="10"/>
+                                <Button Grid.Column="1" 
+                                        Command="{Binding AddLinkCommand}"
+                                        Classes="AccentButton"
+                                        Padding="10,6">
+                                    <TextBlock Text="Add" 
+                                               FontFamily="{DynamicResource Font.Medium}" 
+                                               FontSize="{DynamicResource FontSize.Body.ExtraSmall}"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Links List -->
+                            <ItemsControl ItemsSource="{Binding Links}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource WidgetBackgroundPrimaryBrush}" 
+                                                BorderBrush="{DynamicResource TextControlBorderBrush}" 
+                                                BorderThickness="1" 
+                                                CornerRadius="4" 
+                                                Padding="8" 
+                                                Margin="0,1">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <controls:SvgIcon Grid.Column="0"
+                                                                   SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" 
+                                                                   Width="16" Height="16" 
+                                                                   Color="{DynamicResource TextSecondaryBrush}" 
+                                                                   Margin="0,0,8,0"/>
+                                                <TextBlock Grid.Column="1" 
+                                                           Text="{Binding Url}" 
+                                                           FontFamily="{DynamicResource Font.Medium}" 
+                                                           FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                                           Foreground="{DynamicResource LinksBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button Grid.Column="2" 
+                                                        Command="{Binding RemoveCommand}"
+                                                        Classes="GhostButton"
+                                                        Padding="4">
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" 
+                                                                       Width="14" Height="14" 
+                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+            
+            <!-- Footer with Generate Button only -->
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                <!-- spacer -->
+                <Border Grid.Column="0"/>
+                <!-- Generate Button -->
+                <Button Grid.Column="1" 
+                        Command="{Binding GenerateCommand}"
+                        Classes="AccentButton"
+                        Padding="12,6">
+                    <TextBlock Text="Generate" 
+                               FontFamily="{DynamicResource Font.SemiBold}" 
+                               FontSize="{DynamicResource FontSize.Body.ExtraSmall}"/>
+                </Button>
+                
+            </Grid>
+            
+        </Grid>
+        
+    </Border>
+
+</UserControl>
+
+
+
+
+

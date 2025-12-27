@@ -1,0 +1,23 @@
+<UserControl
+    x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Text.TextBlockComponent"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Mnemo.UI.Controls"
+    x:CompileBindings="False">
+    <TextBox
+        x:Name="InputTextBox"
+        AcceptsReturn="False"
+        Background="Transparent"
+        BorderThickness="0"
+        FontSize="14"
+        Padding="0"
+        Text="{Binding Content, Mode=TwoWay}"
+        TextWrapping="Wrap"
+        Watermark="{Binding Watermark}" />
+</UserControl>
+
+
+
+
+
+

@@ -1,0 +1,28 @@
+<UserControl
+    x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Code.CodeBlockComponent"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False">
+    <Border
+        Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+        CornerRadius="4"
+        Padding="12">
+        <TextBox
+            x:Name="InputTextBox"
+            AcceptsReturn="True"
+            Background="Transparent"
+            BorderThickness="0"
+            FontFamily="Cascadia Code,Consolas,Courier New"
+            FontSize="13"
+            Padding="0"
+            Text="{Binding Content, Mode=TwoWay}"
+            TextWrapping="NoWrap"
+            Watermark="{Binding Watermark}" />
+    </Border>
+</UserControl>
+
+
+
+
+
+

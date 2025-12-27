@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Mnemo.UI.Modules.Notes.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Mnemo.UI.Modules.Notes.Views.NotesView"
+             x:DataType="vm:NotesViewModel">
+    <Grid RowDefinitions="Auto,*">
+        <TextBlock Text="Notes" FontSize="{DynamicResource FontSize.Heading2}" Margin="10" Foreground="{DynamicResource TextPrimaryBrush}"/>
+        <ListBox Grid.Row="1" Margin="10" Foreground="{DynamicResource TextPrimaryBrush}">
+            <ListBoxItem Content="Note 1 - Placeholder" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="{DynamicResource FontSize.Body}"/>
+            <ListBoxItem Content="Note 2 - Placeholder" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="{DynamicResource FontSize.Body}"/>
+        </ListBox>
+    </Grid>
+</UserControl>
+
+
+
+
+

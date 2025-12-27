@@ -1,0 +1,30 @@
+<UserControl
+    x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Checklist.ChecklistBlockComponent"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False">
+    <Grid ColumnDefinitions="Auto,*">
+        <CheckBox
+            Grid.Column="0"
+            Margin="0,0,8,0"
+            IsChecked="{Binding IsChecked}"
+            VerticalAlignment="Top" />
+        <TextBox
+            x:Name="InputTextBox"
+            Grid.Column="1"
+            AcceptsReturn="False"
+            Background="Transparent"
+            BorderThickness="0"
+            FontSize="14"
+            Padding="0"
+            Text="{Binding Content, Mode=TwoWay}"
+            TextWrapping="Wrap"
+            Watermark="{Binding Watermark}" />
+    </Grid>
+</UserControl>
+
+
+
+
+
+

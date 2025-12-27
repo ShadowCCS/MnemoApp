@@ -1,0 +1,52 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:converters="using:Mnemo.UI.Converters"
+                    xmlns:local="using:Mnemo.UI.Components"
+                    x:ClassModifier="internal"
+                    x:CompileBindings="True">
+  
+  <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
+  
+  <ControlTheme x:Key="{x:Type local:SettingsCard}" TargetType="local:SettingsCard">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+                CornerRadius="12"
+                Padding="12"
+                Width="600">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+              <TextBlock Text="{TemplateBinding Title}"
+                         FontSize="{DynamicResource FontSize.Heading4}" 
+                         FontFamily="{DynamicResource Font.Medium}" 
+                         Foreground="{DynamicResource TextPrimaryBrush}" 
+                         Margin="2" 
+                         Padding="0"/>
+              <TextBlock Text="{TemplateBinding Description}"
+                         FontSize="{DynamicResource FontSize.Body.Small}" 
+                         FontFamily="{DynamicResource Font.Medium}" 
+                         Foreground="{DynamicResource TextSecondaryBrush}" 
+                         Margin="2,0,2,2"
+                         IsVisible="{TemplateBinding Description, Converter={StaticResource NullToBoolConverter}}"/>
+            </StackPanel>
+            
+            <ContentPresenter Grid.Column="1" 
+                              Content="{TemplateBinding RightContent}"
+                              VerticalAlignment="Center"
+                              Margin="2"/>
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+</ResourceDictionary>
+
+
+
+
+

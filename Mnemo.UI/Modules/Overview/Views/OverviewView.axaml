@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Mnemo.UI.Modules.Overview.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Mnemo.UI.Modules.Overview.Views.OverviewView"
+             x:DataType="vm:OverviewViewModel">
+    <ScrollViewer>
+        <StackPanel Margin="40" MaxWidth="900">
+            <!-- Header -->
+            <TextBlock Text="Welcome to Mnemo" 
+                       FontSize="{DynamicResource FontSize.Heading1}" 
+                       FontFamily="{DynamicResource Font.SemiBold}"
+                       Margin="0,0,0,12" 
+                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+            
+            <TextBlock Text="A fresh start for a better application" 
+                       FontSize="{DynamicResource FontSize.Body.Large}" 
+                       Margin="0,0,0,40" 
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            
+            <!-- Main Content -->
+            <StackPanel Spacing="32">
+                <!-- What's Happening Section -->
+                <StackPanel Spacing="12">
+                    <TextBlock Text="What's Happening" 
+                               FontSize="{DynamicResource FontSize.Heading3}" 
+                               FontFamily="{DynamicResource Font.SemiBold}"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Text="We're currently creating a fresh project to migrate, refactor, and rewrite large portions of the Mnemo application. The previous version had architectural flaws that we're addressing with this rewrite." 
+                               FontSize="{DynamicResource FontSize.Body.Medium}" 
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               LineHeight="24"/>
+                </StackPanel>
+                
+                <!-- Improvements Section -->
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Key Improvements" 
+                               FontSize="{DynamicResource FontSize.Heading3}" 
+                               FontFamily="{DynamicResource Font.SemiBold}"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    
+                    <StackPanel Spacing="16" Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="Faster loading times and improved performance" 
+                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="More lightweight architecture with reduced overhead" 
+                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="Better code structure and organization" 
+                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="More robust systems, less prone to problems" 
+                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="Faster, more efficient systems throughout" 
+                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="UI improvements with better design and usability" 
+                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+
