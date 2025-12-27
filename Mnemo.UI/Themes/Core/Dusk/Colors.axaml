@@ -4,7 +4,7 @@
     <Color x:Key="SidebarBackground">#171715</Color>
     <Color x:Key="SidebarBorder">#2d2c30</Color>
     <Color x:Key="WorkspaceBackground">#171715</Color>
-    <Color x:Key="OverlayBackground">#2d2c30</Color>
+    <Color x:Key="OverlayBackground">#2e2e2c</Color>
     <Color x:Key="TopbarBackground">Transparent</Color>
     
     <!-- Text Colors -->

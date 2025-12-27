@@ -27,10 +27,12 @@ public partial class SidebarItem : ObservableObject
 public class SidebarCategory
 {
     public string Name { get; }
+    public int Order { get; }
     public ObservableCollection<SidebarItem> Items { get; } = new();
 
-    public SidebarCategory(string name)
+    public SidebarCategory(string name, int order = int.MaxValue)
     {
         Name = name;
+        Order = order;
     }
 }

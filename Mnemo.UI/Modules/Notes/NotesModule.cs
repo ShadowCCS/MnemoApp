@@ -17,7 +17,7 @@ public class NotesModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("Notes", "notes", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg", "Library");
+        sidebarService.RegisterItem("Notes", "notes", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg", "Library", 1);
     }
 
     public void RegisterTools(IFunctionRegistry registry)
