@@ -42,12 +42,12 @@ public sealed class ProgressPhaseBrushConverter : IValueConverter
         }
 
         string brushKey = progress < lowThreshold
-            ? "ProgressBarPhaseLowBrush"
-            : (progress < highThreshold ? "ProgressBarPhaseMediumBrush" : "ProgressBarPhaseHighBrush");
+            ? "ProgressBarPhaseHighBrush"
+            : (progress < highThreshold ? "ProgressBarPhaseMediumBrush" : "ProgressBarPhaseLowBrush");
 
         string colorKey = progress < lowThreshold
-            ? "ProgressBarPhaseLow"
-            : (progress < highThreshold ? "ProgressBarPhaseMedium" : "ProgressBarPhaseHigh");
+            ? "ProgressBarPhaseHigh"
+            : (progress < highThreshold ? "ProgressBarPhaseMedium" : "ProgressBarPhaseLow");
 
         if (Application.Current?.Resources.TryGetResource(brushKey, ThemeVariant.Default, out var brushRes) == true)
         {
@@ -63,8 +63,8 @@ public sealed class ProgressPhaseBrushConverter : IValueConverter
 
         // Final fallback to visible defaults
         return progress < lowThreshold
-            ? new SolidColorBrush(Colors.ForestGreen)
-            : (progress < highThreshold ? new SolidColorBrush(Colors.Goldenrod) : new SolidColorBrush(Colors.IndianRed));
+            ? new SolidColorBrush(Colors.IndianRed)
+            : (progress < highThreshold ? new SolidColorBrush(Colors.Goldenrod) : new SolidColorBrush(Colors.ForestGreen));
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

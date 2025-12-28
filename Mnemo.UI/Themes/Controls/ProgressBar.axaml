@@ -42,9 +42,11 @@
             BorderBrush="{TemplateBinding BorderBrush}"
             BorderThickness="{TemplateBinding BorderThickness}"
             ClipToBounds="True"
-            CornerRadius="{TemplateBinding CornerRadius}">
-          <Panel>
-            <Panel x:Name="DeterminateRoot" Opacity="1">
+            CornerRadius="{TemplateBinding CornerRadius}"
+            HorizontalAlignment="Stretch"
+            MaxWidth="{TemplateBinding MaxWidth}">
+          <Panel HorizontalAlignment="Stretch">
+            <Panel x:Name="DeterminateRoot" Opacity="1" ClipToBounds="True">
               <Panel.Transitions>
                 <Transitions>
                   <DoubleTransition Property="Opacity" Duration="0:0:0.197" />
@@ -56,7 +58,7 @@
                   Background="{TemplateBinding Foreground}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
             </Panel>
-            <Panel x:Name="IndeterminateRoot" Opacity="0">
+            <Panel x:Name="IndeterminateRoot" Opacity="0" ClipToBounds="True">
               <Panel.Transitions>
                 <Transitions>
                   <DoubleTransition Property="Opacity" Duration="0:0:0.197" />
@@ -103,7 +105,6 @@
       <Setter Property="VerticalAlignment" Value="Bottom" />
     </Style>
     <Style Selector="^:horizontal">
-      <Setter Property="MinWidth" Value="200" />
       <Setter Property="MinHeight" Value="4" />
     </Style>
     <Style Selector="^:vertical">
