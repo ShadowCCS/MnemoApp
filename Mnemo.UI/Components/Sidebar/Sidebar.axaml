@@ -120,7 +120,7 @@
                     </StackPanel>
                 </Button>
                 
-                <TextBlock Text="v1.0.0-beta" 
+                <TextBlock Text="Development Build - Beta" 
                            FontSize="{DynamicResource FontSize.Body.Caption}" 
                            Foreground="{DynamicResource VersionTextBrush}"
                            HorizontalAlignment="Center"

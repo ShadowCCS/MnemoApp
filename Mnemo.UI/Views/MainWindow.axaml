@@ -21,7 +21,7 @@
         <sidebar:Sidebar Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" DataContext="{Binding SidebarViewModel}"/>
 
         <!-- Topbar -->
-        <components:Topbar Grid.Row="0" Grid.Column="1" PointerPressed="Window_PointerPressed"/>
+        <components:Topbar Grid.Row="0" Grid.Column="1" PointerPressed="Window_PointerPressed" DataContext="{Binding TopbarViewModel}"/>
 
         <!-- Main Content -->
         <ContentControl Grid.Row="1" Grid.Column="1" 

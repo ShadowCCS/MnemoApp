@@ -80,6 +80,7 @@
     
     <!-- NavigationButton (includes ControlTheme and child element styles) -->
     <StyleInclude Source="NavigationButton.axaml" />
+    <StyleInclude Source="ModernComboBox.axaml" />
 </Styles>
 
 

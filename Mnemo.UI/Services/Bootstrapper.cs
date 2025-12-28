@@ -18,6 +18,7 @@ public static class Bootstrapper
         services.AddSingleton<ILoggerService, LoggerService>();
         services.AddSingleton<ITaskScheduler, TaskSchedulerService>();
         services.AddSingleton<IStorageProvider, SqliteStorageProvider>();
+        services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<ILateXEngine, LaTeXEngine>();
         
         // 2. Register UI-specific Services

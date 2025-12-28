@@ -22,7 +22,7 @@ public class SettingsModule : IModule
 
     public void RegisterTools(IFunctionRegistry registry)
     {
-        // No tools for overview yet
+        // No tools for settings yet
     }
 }
 

@@ -14,6 +14,7 @@
     <AvaloniaResource Include="Themes\**" />
     <AvaloniaResource Include="Icons\Tabler\Used\**\*.svg"/>
     <AvaloniaResource Include="Icons\Assets\*.svg"/>
+    <AvaloniaResource Include="Assets\ProfilePictures\*.png"/>
     <AvaloniaResource Include="Languages\**" />
 
   </ItemGroup>

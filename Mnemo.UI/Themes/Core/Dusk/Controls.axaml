@@ -107,6 +107,18 @@
     <SolidColorBrush x:Key="ToggleButtonHoverBackgroundBrush" Color="{DynamicResource ToggleButtonHoverBackground}"/>
     <SolidColorBrush x:Key="ToggleButtonActiveBackgroundBrush" Color="{DynamicResource ToggleButtonActiveBackground}"/>
     <SolidColorBrush x:Key="ToggleButtonEyeBrush" Color="{DynamicResource ToggleButtonEye}"/>
+    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedBrush" Color="{DynamicResource ToggleButtonBackgroundChecked}"/>
+    <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedBrush" Color="{DynamicResource ToggleButtonBorderBrushChecked}"/>
+    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedBrush" Color="{DynamicResource ToggleButtonForegroundChecked}"/>
+    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOverBrush" Color="{DynamicResource ToggleButtonBackgroundCheckedPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOverBrush" Color="{DynamicResource ToggleButtonBorderBrushCheckedPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOverBrush" Color="{DynamicResource ToggleButtonForegroundCheckedPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressedBrush" Color="{DynamicResource ToggleButtonBackgroundCheckedPressed}"/>
+    <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPressedBrush" Color="{DynamicResource ToggleButtonBorderBrushCheckedPressed}"/>
+    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressedBrush" Color="{DynamicResource ToggleButtonForegroundCheckedPressed}"/>
+    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedDisabledBrush" Color="{DynamicResource ToggleButtonBackgroundCheckedDisabled}"/>
+    <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedDisabledBrush" Color="{DynamicResource ToggleButtonBorderBrushCheckedDisabled}"/>
+    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedDisabledBrush" Color="{DynamicResource ToggleButtonForegroundCheckedDisabled}"/>
     <SolidColorBrush x:Key="TextHighlightColorBrush" Color="{DynamicResource TextHighlightColor}"/>
     <SolidColorBrush x:Key="LineColorBrush" Color="{DynamicResource LineColor}"/>
     <SolidColorBrush x:Key="ListItemBackgroundBrush" Color="{DynamicResource ListItemBackground}"/>
@@ -116,6 +128,37 @@
     <SolidColorBrush x:Key="AnswerCorrectBrush" Color="{DynamicResource AnswerCorrect}"/>
     <SolidColorBrush x:Key="AnswerWrongBrush" Color="{DynamicResource AnswerWrong}"/>
     <SolidColorBrush x:Key="SidebarLogoBrush" Color="{DynamicResource SidebarLogo}"/>
+
+    <!-- ToggleSwitch Brushes -->
+    <SolidColorBrush x:Key="ToggleSwitchFillOffBrush" Color="{DynamicResource ToggleSwitchFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnBrush" Color="{DynamicResource ToggleSwitchFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOffBrush" Color="{DynamicResource ToggleSwitchKnobFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnBrush" Color="{DynamicResource ToggleSwitchKnobFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffBrush" Color="{DynamicResource ToggleSwitchStrokeOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnBrush" Color="{DynamicResource ToggleSwitchStrokeOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOverBrush" Color="{DynamicResource ToggleSwitchFillOffPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOverBrush" Color="{DynamicResource ToggleSwitchFillOnPointerOver}"/>
+    <SolidColorBrush x:Key="ToggleSwitchContainerBackgroundBrush" Color="{DynamicResource ToggleSwitchContainerBackground}"/>
+    <SolidColorBrush x:Key="ToggleSwitchContainerBackgroundPointerOverBrush" Color="{DynamicResource ToggleSwitchContainerBackground}"/>
+    <SolidColorBrush x:Key="ToggleSwitchContainerBackgroundPressedBrush" Color="{DynamicResource ToggleSwitchContainerBackground}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPressedBrush" Color="{DynamicResource ToggleSwitchFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPressedBrush" Color="{DynamicResource ToggleSwitchFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOverBrush" Color="{DynamicResource ToggleSwitchKnobFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOverBrush" Color="{DynamicResource ToggleSwitchKnobFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPressedBrush" Color="{DynamicResource ToggleSwitchKnobFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressedBrush" Color="{DynamicResource ToggleSwitchKnobFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOffDisabledBrush" Color="{DynamicResource ToggleSwitchFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchFillOnDisabledBrush" Color="{DynamicResource ToggleSwitchFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOffDisabledBrush" Color="{DynamicResource ToggleSwitchKnobFillOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnDisabledBrush" Color="{DynamicResource ToggleSwitchKnobFillOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOverBrush" Color="{DynamicResource ToggleSwitchStrokeOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOverBrush" Color="{DynamicResource ToggleSwitchStrokeOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressedBrush" Color="{DynamicResource ToggleSwitchStrokeOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressedBrush" Color="{DynamicResource ToggleSwitchStrokeOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffDisabledBrush" Color="{DynamicResource ToggleSwitchStrokeOff}"/>
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnDisabledBrush" Color="{DynamicResource ToggleSwitchStrokeOn}"/>
+    <SolidColorBrush x:Key="ToggleSwitchHeaderForegroundDisabledBrush" Color="{DynamicResource TextDisabled}"/>
+    <SolidColorBrush x:Key="ToggleSwitchContentForegroundBrush" Color="{DynamicResource TextPrimary}"/>
     
     <!-- Standard Avalonia Control Brushes -->
     <!-- Button Brushes -->
@@ -196,6 +239,9 @@
     <SolidColorBrush x:Key="ComboBoxBorderPressedBrush" Color="{DynamicResource ComboBoxBorderPressed}"/>
     <SolidColorBrush x:Key="ComboBoxBorderDisabledBrush" Color="{DynamicResource ComboBoxBorderDisabled}"/>
     <SolidColorBrush x:Key="ComboBoxChevronBrush" Color="{DynamicResource ComboBoxChevron}"/>
+    <SolidColorBrush x:Key="ComboBoxBackgroundUnfocusedBrush" Color="{DynamicResource ComboBoxBackgroundUnfocused}"/>
+    <SolidColorBrush x:Key="ComboBoxBackgroundBorderBrushUnfocusedBrush" Color="{DynamicResource ComboBoxBackgroundBorderBrushUnfocused}"/>
+    <SolidColorBrush x:Key="ComboBoxBackgroundBorderBrushFocusedBrush" Color="{DynamicResource ComboBoxBackgroundBorderBrushFocused}"/>
     
     <!-- ComboBox Item Brushes -->
     <SolidColorBrush x:Key="ComboBoxItemBackgroundBrush" Color="{DynamicResource ComboBoxItemBackground}"/>

@@ -10,6 +10,7 @@
   <x:Double x:Key="ToggleSwitchThemeMinWidth">0</x:Double>
 
   <ControlTheme x:Key="{x:Type ToggleSwitch}" TargetType="ToggleSwitch">
+    <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Foreground" Value="{DynamicResource ToggleSwitchContentForegroundBrush}" />
     <Setter Property="HorizontalAlignment" Value="Left" />
     <Setter Property="VerticalAlignment" Value="Center" />
