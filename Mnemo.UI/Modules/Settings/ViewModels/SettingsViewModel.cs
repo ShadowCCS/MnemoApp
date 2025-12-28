@@ -50,7 +50,7 @@ public partial class SettingsViewModel : ViewModelBase
     private void InitializeCategories()
     {
         // Account Category
-        var account = new SettingsCategoryViewModel("Account", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg");
+        var account = new SettingsCategoryViewModel("Account", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/user.svg");
         var profileGroup = new SettingsGroupViewModel("Profile");
         profileGroup.Items.Add(new ProfilePictureSettingViewModel(_settingsService, "Profile Picture", "Your personal avatar shown in the app."));
         profileGroup.Items.Add(new NameSettingViewModel(_settingsService, "Display Name", "Your name will be visible to other users when you share notes."));
@@ -71,7 +71,7 @@ public partial class SettingsViewModel : ViewModelBase
         general.Groups.Add(expGroup);
 
         // Editor Category
-        var editor = new SettingsCategoryViewModel("Editor", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file.svg");
+        var editor = new SettingsCategoryViewModel("Editor", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg");
         var editorGroup = new SettingsGroupViewModel("Writing Experience");
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.AutoSave", "Auto-save", "Automatically save changes every few seconds.", true));
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.SpellCheck", "Spell Check", "Highlight misspelled words in the editor.", true));
@@ -79,14 +79,14 @@ public partial class SettingsViewModel : ViewModelBase
         editor.Groups.Add(editorGroup);
 
         // AI & Tools Category
-        var aiTools = new SettingsCategoryViewModel("AI & Tools", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg");
+        var aiTools = new SettingsCategoryViewModel("AI & Tools", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg");
         var aiGroup = new SettingsGroupViewModel("Intelligence");
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", "Enable AI Assistant", "Use AI to help you write, summarize, and organize.", true));
         aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.Model", "AI Model", "Select the model to use for AI features.", new[] { "Llama 3 (Local)", "GPT-4o (Cloud)", "Mistral (Local)" }));
         aiTools.Groups.Add(aiGroup);
 
         // Appearance Category
-        var appearance = new SettingsCategoryViewModel("Appearance", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg");
+        var appearance = new SettingsCategoryViewModel("Appearance", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg");
         
         var themeGroup = new SettingsGroupViewModel("Theme & Visuals");
         themeGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Appearance.Theme", "App Theme", "Select the visual style of the application.", new[] { "System", "Light", "Dark", "Dusk" }));
