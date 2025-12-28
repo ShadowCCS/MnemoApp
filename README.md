@@ -61,12 +61,10 @@ We’ve built Mnemo to be:
 
 We release **new features every 1–4 weeks**. Highlights:
 
-### **2025 Q3**
-- **Alpha 0.1** – Modular architecture, theme/language switching, learning paths...
-- **Alpha 0.2** – Flashcards with multiple algorithms  
-- Notes, Games, Explore, Mindmaps
+### **2026 Q1**
+- **Beta Release**
 
-### **2025 Q4**
+### **2026 Q2**
 - **Version 1.0** – Polished cross-platform release
 
 ### **Beyond**
