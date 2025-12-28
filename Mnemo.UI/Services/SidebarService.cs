@@ -34,7 +34,7 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
         }
     }
 
-    public void RegisterItem(string label, string route, string icon, string categoryName = "General", int? categoryOrder = null)
+    public void RegisterItem(string label, string route, string icon, string categoryName = "General", int? categoryOrder = null, int itemOrder = int.MaxValue)
     {
         var category = Categories.FirstOrDefault(c => string.Equals(c.Name, categoryName, StringComparison.OrdinalIgnoreCase));
         if (category == null)
@@ -56,7 +56,19 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
             Categories.Insert(insertIndex, category);
         }
         
-        category.Items.Add(new SidebarItem(label, route, icon));
+        var item = new SidebarItem(label, route, icon, itemOrder);
+        
+        // Insert at the correct position to maintain order
+        var itemInsertIndex = category.Items.Count;
+        for (int i = 0; i < category.Items.Count; i++)
+        {
+            if (category.Items[i].Order > itemOrder)
+            {
+                itemInsertIndex = i;
+                break;
+            }
+        }
+        category.Items.Insert(itemInsertIndex, item);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

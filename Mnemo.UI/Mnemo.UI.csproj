@@ -35,7 +35,6 @@
     <PackageReference Include="Svg.Skia" Version="3.0.4" />
     <PackageReference Include="Markdig" Version="0.37.0" />
     <PackageReference Include="Markdown.Avalonia" Version="11.0.3-a1" />
-    <PackageReference Include="PdfPig" Version="0.1.9" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.1.0" />
   </ItemGroup>
 

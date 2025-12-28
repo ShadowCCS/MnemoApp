@@ -12,15 +12,17 @@ public partial class SidebarItem : ObservableObject
     public string Icon { get; }
     public string Title { get => Label; }
     public string IconPath { get => Icon; }
+    public int Order { get; }
     
     [ObservableProperty]
     private bool _isSelected;
 
-    public SidebarItem(string label, string route, string icon)
+    public SidebarItem(string label, string route, string icon, int order = int.MaxValue)
     {
         Label = label;
         Route = route;
         Icon = icon;
+        Order = order;
     }
 }
 

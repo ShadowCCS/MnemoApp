@@ -14,7 +14,6 @@ namespace Mnemo.UI.Components
     public partial class InputBuilderViewModel : ViewModelBase, IDisposable
     {
         private readonly IAIService _aiService;
-        private readonly IFileService _fileService;
         private Action<string?>? _modelChangedHandler;
         private CancellationTokenSource? _textMetricsCts;
         public event Action<string>? Generated;
@@ -97,10 +96,9 @@ namespace Mnemo.UI.Components
         public ICommand AddFileCommand { get; }
         public ICommand GenerateCommand { get; }
         
-        public InputBuilderViewModel(IAIService aiService, IFileService fileService)
+        public InputBuilderViewModel(IAIService aiService)
         {
             _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
-            _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
             
             SelectTextTabCommand = new RelayCommand(SelectTextTab);
             SelectFilesTabCommand = new RelayCommand(SelectFilesTab);
@@ -262,22 +260,13 @@ namespace Mnemo.UI.Components
         {
             try
             {
-                // Get supported extensions for file picker filter
-                var supportedExtensions = _fileService.GetSupportedExtensions();
-                var filterString = string.Join(";", supportedExtensions.Select(ext => $"*{ext}"));
-                
-                // Open file picker (this will be implemented in the view)
-                // For now, we'll create a placeholder that extensions can hook into
+                // Open file picker
                 var filePicker = new Avalonia.Platform.Storage.FilePickerOpenOptions
                 {
                     Title = "Select Files to Upload",
                     AllowMultiple = true,
                     FileTypeFilter = new[]
                     {
-                        new Avalonia.Platform.Storage.FilePickerFileType("Supported Files")
-                        {
-                            Patterns = supportedExtensions.Select(ext => $"*{ext}").ToArray()
-                        },
                         new Avalonia.Platform.Storage.FilePickerFileType("All Files")
                         {
                             Patterns = new[] { "*.*" }
@@ -304,14 +293,11 @@ namespace Mnemo.UI.Components
                         if (string.IsNullOrEmpty(filePath))
                             continue;
 
-                        // Process the file
-                        var processResult = await _fileService.ProcessFileAsync(filePath);
-                        
                         var fileItem = new FileItemViewModel(
                             System.IO.Path.GetFileName(filePath),
                             filePath,
-                            processResult.Success ? processResult.Content ?? string.Empty : string.Empty,
-                            processResult.Success ? null : processResult.ErrorMessage
+                            string.Empty,
+                            null
                         );
                         
                         fileItem.RemoveCommand = new RelayCommand(() => Files.Remove(fileItem));

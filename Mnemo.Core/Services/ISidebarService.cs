@@ -6,6 +6,6 @@ namespace Mnemo.Core.Services;
 public interface ISidebarService
 {
     ObservableCollection<SidebarCategory> Categories { get; }
-    void RegisterItem(string label, string route, string icon, string category = "General", int? categoryOrder = null);
+    void RegisterItem(string label, string route, string icon, string category = "General", int? categoryOrder = null, int itemOrder = int.MaxValue);
     bool IsCollapsed { get; set; }
 }

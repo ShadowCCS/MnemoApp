@@ -17,7 +17,7 @@ public class OverviewModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("Overview", "overview", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/home.svg", "Main hub", 0);
+        sidebarService.RegisterItem("Overview", "overview", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/home.svg", "Main hub", 0, 0);
     }
 
     public void RegisterTools(IFunctionRegistry registry)

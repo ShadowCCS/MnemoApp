@@ -289,7 +289,7 @@
                                                FontSize="{DynamicResource FontSize.Caption}"
                                                Foreground="{DynamicResource TextTertiaryBrush}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="PDF, DOCX, TXT, MD supported" 
+                                    <TextBlock Text="DOCX, TXT, MD supported" 
                                                FontFamily="{DynamicResource Font.Regular}" 
                                                FontSize="{DynamicResource FontSize.Caption}"
                                                Foreground="{DynamicResource TextFadedBrush}"
