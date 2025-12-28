@@ -12,13 +12,19 @@ public class OverlayService : IOverlayService
 {
     public ObservableCollection<OverlayInstance> Overlays { get; } = new();
     private readonly Dictionary<string, TaskCompletionSource<object?>> _completionSources = new();
+    private readonly Dictionary<string, Type> _typeCache = new();
 
     public void Show(string overlayName, object? parameter = null)
     {
-        // Simple registry-less resolution: search for the type by name in the Overlays namespace
-        var type = AppDomain.CurrentDomain.GetAssemblies()
-            .SelectMany(a => a.GetTypes())
-            .FirstOrDefault(t => t.Name == overlayName || t.FullName == overlayName);
+        if (!_typeCache.TryGetValue(overlayName, out var type))
+        {
+            // Simple registry-less resolution: search for the type by name
+            type = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => a.GetTypes())
+                .FirstOrDefault(t => t.Name == overlayName || t.FullName == overlayName);
+            
+            if (type != null) _typeCache[overlayName] = type;
+        }
 
         if (type == null) return;
 
