@@ -1,25 +1,33 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Threading.Tasks;
 
 namespace Mnemo.Core.Services;
 
 public enum AnchorPosition
 {
-    TopLeft, TopRight, BottomLeft, BottomRight, TopCenter, BottomCenter, LeftCenter, RightCenter
+    TopLeft, 
+    TopRight, 
+    BottomLeft, 
+    BottomRight, 
+    TopCenter, 
+    BottomCenter, 
+    LeftCenter, 
+    RightCenter
 }
 
 public class OverlayOptions
 {
-    public dynamic? AnchorControl { get; set; } 
+    public object? AnchorControl { get; set; } 
     public AnchorPosition AnchorPosition { get; set; }
-    public dynamic? AnchorOffset { get; set; } 
-    public dynamic? Margin { get; set; }
+    public object? AnchorOffset { get; set; } 
+    public object? Margin { get; set; }
     public bool CloseOnOutsideClick { get; set; } = true;
     public bool ShowBackdrop { get; set; } = true;
-    public dynamic? HorizontalAlignment { get; set; }
-    public dynamic? VerticalAlignment { get; set; }
-    public dynamic? BackdropBrush { get; set; }
+    public object? HorizontalAlignment { get; set; }
+    public object? VerticalAlignment { get; set; }
+    public object? BackdropBrush { get; set; }
     public string? BackdropColor { get; set; }
     public double BackdropOpacity { get; set; } = 0.5;
 }
@@ -43,6 +51,6 @@ public interface IOverlayService
     void Hide();
     void CloseOverlay(string id);
     void CloseOverlay(string id, object? result);
-    string CreateOverlay(object content, OverlayOptions options, string name);
-    System.Threading.Tasks.Task CreateDialog(string title, string message, string confirmText = "OK", string cancelText = "", object? icon = null, object? parameter = null);
+    string CreateOverlay(object content, OverlayOptions options, string? name = null);
+    Task<string?> CreateDialogAsync(string title, string message, string confirmText = "OK", string cancelText = "", object? icon = null, object? parameter = null);
 }

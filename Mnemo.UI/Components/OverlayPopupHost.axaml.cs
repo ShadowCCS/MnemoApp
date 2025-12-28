@@ -83,13 +83,13 @@ namespace Mnemo.UI.Components
 
         private Thickness? CalculateAnchorMargin(OverlayInstance overlay, TopLevel topLevel)
         {
-            var anchor = overlay.Options.AnchorControl;
+            var anchor = overlay.Options.AnchorControl as Control;
             if (anchor == null) return null;
             if (!anchor.IsVisible) return null;
 
             try
             {
-                var anchorBounds = anchor!.TranslatePoint(new Point(0, 0), topLevel);
+                var anchorBounds = anchor.TranslatePoint(new Point(0, 0), topLevel);
                 if (!anchorBounds.HasValue) return null;
 
                 var anchorWidth = anchor.Bounds.Width;

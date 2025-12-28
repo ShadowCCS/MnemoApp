@@ -10,8 +10,8 @@ namespace Mnemo.UI.Converters
 
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            var isNull = value is null;
-            var result = !isNull;
+            var isNullOrEmpty = value is null || (value is string s && string.IsNullOrEmpty(s));
+            var result = !isNullOrEmpty;
             return Invert ? !result : result;
         }
 

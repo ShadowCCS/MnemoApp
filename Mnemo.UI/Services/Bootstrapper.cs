@@ -22,6 +22,9 @@ public static class Bootstrapper
         services.AddSingleton<ILateXEngine, LaTeXEngine>();
         
         // 2. Register UI-specific Services
+        services.AddSingleton<IOverlayService, OverlayService>();
+        services.AddSingleton<IUIService, UIService>();
+        
         services.AddSingleton<NavigationService>();
         services.AddSingleton<INavigationService>(sp => sp.GetRequiredService<NavigationService>());
         services.AddSingleton<INavigationRegistry>(sp => sp.GetRequiredService<NavigationService>());

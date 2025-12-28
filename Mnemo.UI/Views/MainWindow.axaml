@@ -16,16 +16,22 @@
         Background="transparent">
 
 <Border CornerRadius="8" Background="{DynamicResource WorkspaceBackgroundBrush}" ClipToBounds="True">
-    <Grid RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
-        <!-- Sidebar -->
-        <sidebar:Sidebar Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" DataContext="{Binding SidebarViewModel}"/>
+    <Grid>
+        <!-- Actual Application Content -->
+        <Grid RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
+            <!-- Sidebar -->
+            <sidebar:Sidebar Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" DataContext="{Binding SidebarViewModel}"/>
 
-        <!-- Topbar -->
-        <components:Topbar Grid.Row="0" Grid.Column="1" PointerPressed="Window_PointerPressed" DataContext="{Binding TopbarViewModel}"/>
+            <!-- Topbar -->
+            <components:Topbar Grid.Row="0" Grid.Column="1" PointerPressed="Window_PointerPressed" DataContext="{Binding TopbarViewModel}"/>
 
-        <!-- Main Content -->
-        <ContentControl Grid.Row="1" Grid.Column="1" 
-                        Content="{Binding Navigation.CurrentViewModel}"/>
+            <!-- Main Content -->
+            <ContentControl Grid.Row="1" Grid.Column="1" 
+                            Content="{Binding Navigation.CurrentViewModel}"/>
+        </Grid>
+
+        <!-- Global Overlay Layer -->
+        <components:OverlayPopupHost HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
     </Grid>
 </Border>
 </Window>

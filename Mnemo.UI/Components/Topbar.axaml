@@ -48,17 +48,17 @@
 
                 <Border Background="{DynamicResource TopbarButtonBackgroundBrush}" Padding="7" CornerRadius="19" BorderThickness="0">
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Button Background="Transparent" BorderThickness="0" Padding="0" Click="MinimizeWindow">
+                        <Button Background="Transparent" BorderThickness="0" Padding="0" Command="{Binding MinimizeCommand}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/square-rounded-minus.svg"
                                              Color="{DynamicResource TopbarIconsBrush}"
                                              Width="22" Height="22" />
                         </Button>
-                        <Button Background="Transparent" BorderThickness="0" Padding="0" Click="MaximizeWindow">
+                        <Button Background="Transparent" BorderThickness="0" Padding="0" Command="{Binding MaximizeCommand}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/maximize.svg"
                                              Color="{DynamicResource TopbarIconsBrush}"
                                              Width="22" Height="22" />
                         </Button>
-                        <Button Background="Transparent" BorderThickness="0" Padding="0" Click="CloseWindow">
+                        <Button Background="Transparent" BorderThickness="0" Padding="0" Command="{Binding CloseCommand}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/square-rounded-x.svg"
                                              Color="{DynamicResource TopbarIconsBrush}"
                                              Width="22" Height="22"/>

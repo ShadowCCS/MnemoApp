@@ -15,7 +15,12 @@ namespace Mnemo.UI.Converters
             {
                 return brush;
             }
-            var color = values.Count >= 2 && values[1] is Color c ? c : Colors.Black;
+            var color = Colors.Black;
+            if (values.Count >= 2)
+            {
+                if (values[1] is Color c) color = c;
+                else if (values[1] is string s && Color.TryParse(s, out var parsed)) color = parsed;
+            }
             var opacity = values.Count >= 3 && values[2] is double d ? d : 0.45;
             return new SolidColorBrush(color, opacity);
         }

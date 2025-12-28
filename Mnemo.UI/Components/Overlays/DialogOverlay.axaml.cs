@@ -11,8 +11,6 @@ namespace Mnemo.UI.Components.Overlays
 {
     public partial class DialogOverlay : UserControl
     {
-        private readonly ILocalizationService _loc;
-
         public static readonly StyledProperty<string?> TitleProperty = AvaloniaProperty.Register<DialogOverlay, string?>(nameof(Title));
         public static readonly StyledProperty<string?> DescriptionProperty = AvaloniaProperty.Register<DialogOverlay, string?>(nameof(Description));
         public static readonly StyledProperty<string?> PrimaryTextProperty = AvaloniaProperty.Register<DialogOverlay, string?>(nameof(PrimaryText));
@@ -30,7 +28,6 @@ namespace Mnemo.UI.Components.Overlays
 
         public DialogOverlay()
         {
-            _loc = ((App)Application.Current!).Services!.GetRequiredService<ILocalizationService>();
             PrimaryCommand = new RelayCommand(OnPrimary);
             SecondaryCommand = new RelayCommand(OnSecondary);
             InitializeComponent();
@@ -44,12 +41,12 @@ namespace Mnemo.UI.Components.Overlays
 
         private void OnPrimary()
         {
-            OnChoose?.Invoke(PrimaryText ?? _loc.T("Primary", "Common"));
+            OnChoose?.Invoke(PrimaryText);
         }
 
         private void OnSecondary()
         {
-            OnChoose?.Invoke(SecondaryText ?? _loc.T("Secondary", "Common"));
+            OnChoose?.Invoke(SecondaryText);
         }
     }
 }

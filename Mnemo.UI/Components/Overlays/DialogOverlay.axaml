@@ -1,8 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Mnemo.UI.Components.Overlays"
+             xmlns:conv="using:Mnemo.UI.Converters"
              x:Class="Mnemo.UI.Components.Overlays.DialogOverlay"
              x:DataType="local:DialogOverlay">
+  <UserControl.Resources>
+    <conv:NullToBoolConverter x:Key="NullToBoolConverter" />
+  </UserControl.Resources>
   <Border Background="{DynamicResource OverlayBackgroundBrush}"
           BorderBrush="{DynamicResource IconsSeparationBarBrush}"
           BorderThickness="1"
@@ -13,19 +17,25 @@
       <TextBlock Text="{Binding Title}"
                  FontSize="{DynamicResource FontSize.Heading4}" 
                  FontFamily="{DynamicResource Font.Bold}"
-                 Foreground="{DynamicResource TextPrimaryBrush}"/>
+                 Foreground="{DynamicResource TextPrimaryBrush}"
+                 IsVisible="{Binding Title, Converter={StaticResource NullToBoolConverter}}"/>
+      
       <TextBlock Grid.Row="1"
                   Text="{Binding Description}"
                   FontFamily="{DynamicResource Font.Medium}"
                   FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                   Foreground="{DynamicResource TextSecondaryBrush}"
-                 TextWrapping="Wrap"/>
+                 TextWrapping="Wrap"
+                 IsVisible="{Binding Description, Converter={StaticResource NullToBoolConverter}}"/>
+
       <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <Button Content="{Binding SecondaryText}"
                 Classes="Subtle"
-                Command="{Binding SecondaryCommand}"/>
+                Command="{Binding SecondaryCommand}"
+                IsVisible="{Binding SecondaryText, Converter={StaticResource NullToBoolConverter}}"/>
         <Button Content="{Binding PrimaryText}"
-                Command="{Binding PrimaryCommand}"/>
+                Command="{Binding PrimaryCommand}"
+                IsVisible="{Binding PrimaryText, Converter={StaticResource NullToBoolConverter}}"/>
       </StackPanel>
     </Grid>
   </Border>
