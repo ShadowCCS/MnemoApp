@@ -42,3 +42,4 @@ public abstract class PathBaseViewModel : ViewModelBase
     public abstract bool IsFolder { get; }
 }
 
+

@@ -6,6 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services;
 
+using Mnemo.Infrastructure.Services.AI;
+using Mnemo.Infrastructure.Services.Knowledge;
+
 namespace Mnemo.UI.Services;
 
 public static class Bootstrapper
@@ -19,6 +22,19 @@ public static class Bootstrapper
         services.AddSingleton<IStorageProvider, SqliteStorageProvider>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<ILateXEngine, LaTeXEngine>();
+
+        // AI Services
+        services.AddSingleton<HardwareDetector>();
+        services.AddSingleton<IAIModelRegistry, ModelRegistry>();
+        services.AddSingleton<IResourceGovernor, ResourceGovernor>();
+        services.AddSingleton<ITextGenerationService, LLamaTextService>();
+        services.AddSingleton<IAIOrchestrator, AIOrchestrator>();
+        services.AddSingleton<IAITaskManager, AITaskManager>();
+
+        // Knowledge/RAG Services
+        services.AddSingleton<IVectorStore, SqliteVectorStore>();
+        services.AddSingleton<IEmbeddingService, OnnxEmbeddingService>();
+        services.AddSingleton<IKnowledgeService, KnowledgeService>();
         
         // 2. Register UI-specific Services
         services.AddSingleton<IOverlayService, OverlayService>();
@@ -43,6 +59,9 @@ public static class Bootstrapper
         }
 
         var serviceProvider = services.BuildServiceProvider();
+
+        // 4. Initialize AI Model Registry
+        _ = serviceProvider.GetRequiredService<IAIModelRegistry>().RefreshAsync();
 
         // 5. Register Routes, Sidebar Items and Tools
         var navRegistry = serviceProvider.GetRequiredService<INavigationRegistry>();

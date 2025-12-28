@@ -1,13 +1,22 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Models;
+using Mnemo.Core.Services;
 using Mnemo.UI.ViewModels;
+using Mnemo.UI.Modules.Path.ViewModels;
+using Mnemo.UI.Modules.Path.Tasks;
 
 namespace Mnemo.UI.Modules.Path.ViewModels;
 
 public class PathViewModel : ViewModelBase
 {
+    private readonly IAITaskManager _taskManager;
+    private readonly IAIOrchestrator _orchestrator;
+    private readonly ILoggerService _logger;
+
     private string _searchText = string.Empty;
     public string SearchText
     {
@@ -28,17 +37,27 @@ public class PathViewModel : ViewModelBase
     public ICommand ToggleViewCommand { get; }
     public ICommand CreateCommand { get; }
 
-    public PathViewModel()
+    public PathViewModel(IAITaskManager taskManager, IAIOrchestrator orchestrator, ILoggerService logger)
     {
+        _taskManager = taskManager;
+        _orchestrator = orchestrator;
+        _logger = logger;
+
         ToggleViewCommand = new RelayCommand(() => IsGridView = !IsGridView);
         CreateCommand = new RelayCommand(CreateNewItem);
 
         LoadSampleData();
     }
 
-    private void CreateNewItem()
+    private async void CreateNewItem()
     {
-        // Placeholder for creation logic
+        if (string.IsNullOrWhiteSpace(SearchText)) return;
+
+        var task = new GeneratePathTask(SearchText, _orchestrator, _logger);
+        await _taskManager.QueueTaskAsync(task);
+        
+        // In a real app, we'd navigate to the task view or show a toast
+        _logger.Info("Path", $"Started generation for: {SearchText}");
     }
 
     private void LoadSampleData()
@@ -63,4 +82,3 @@ public class PathViewModel : ViewModelBase
         AllItems.Add(new PathItemViewModel { Name = "Organic Chemistry", LastModified = "09/01/2025", Size = 2.9, Progress = 35, Category = "CHEMISTRY" });
     }
 }
-

@@ -12,9 +12,9 @@
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
     <AvaloniaResource Include="Themes\**" />
-    <AvaloniaResource Include="Icons\Tabler\Used\**\*.svg"/>
-    <AvaloniaResource Include="Icons\Assets\*.svg"/>
-    <AvaloniaResource Include="Assets\ProfilePictures\*.png"/>
+    <AvaloniaResource Include="Icons\Tabler\Used\**\*.svg" />
+    <AvaloniaResource Include="Icons\Assets\*.svg" />
+    <AvaloniaResource Include="Assets\ProfilePictures\*.png" />
     <AvaloniaResource Include="Languages\**" />
 
   </ItemGroup>
@@ -29,7 +29,9 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="LLamaSharp.Backend.Cuda12" Version="0.16.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
     <PackageReference Include="Svg.Controls.Skia.Avalonia" Version="11.3.0.2" />
     <PackageReference Include="Svg.Skia" Version="3.0.4" />

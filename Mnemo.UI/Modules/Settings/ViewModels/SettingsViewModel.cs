@@ -80,10 +80,19 @@ public partial class SettingsViewModel : ViewModelBase
 
         // AI & Tools Category
         var aiTools = new SettingsCategoryViewModel("AI & Tools", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg");
+        
         var aiGroup = new SettingsGroupViewModel("Intelligence");
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", "Enable AI Assistant", "Use AI to help you write, summarize, and organize.", true));
-        aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.Model", "AI Model", "Select the model to use for AI features.", new[] { "Llama 3 (Local)", "GPT-4o (Cloud)", "Mistral (Local)" }));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartSwitch", "Smart Switch", "Automatically use the smarter (but slower) model for complex tasks."));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", "GPU Acceleration", "Use your graphics card to speed up AI inference. Requires NVIDIA GPU with CUDA."));
+        aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.UnloadTimeout", "Unload Timeout", "Free up memory when AI models are not in use.", new[] { "Never", "5 Minutes", "15 Minutes", "1 Hour" }));
+        
+        var ragGroup = new SettingsGroupViewModel("Local Knowledge");
+        ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartRAG", "Smart RAG", "Only search your notes when the query is substantial. Skips RAG for greetings and short questions.", true));
+        ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", "Embedding Model", "The model used to index your personal library.", new[] { "bge-small (Fast)", "nomic-embed (Accurate)" }));
+        
         aiTools.Groups.Add(aiGroup);
+        aiTools.Groups.Add(ragGroup);
 
         // Appearance Category
         var appearance = new SettingsCategoryViewModel("Appearance", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg");

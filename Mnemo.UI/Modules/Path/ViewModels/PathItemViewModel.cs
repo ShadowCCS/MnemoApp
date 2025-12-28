@@ -5,3 +5,4 @@ public class PathItemViewModel : PathBaseViewModel
     public override bool IsFolder => false;
 }
 
+

@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
@@ -33,6 +34,15 @@ public partial class App : Application
             desktop.MainWindow = new MainWindow
             {
                 DataContext = Services.GetRequiredService<MainWindowViewModel>(),
+            };
+            
+            // Cleanup on application exit
+            desktop.Exit += (_, _) =>
+            {
+                if (Services is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
             };
         }
 

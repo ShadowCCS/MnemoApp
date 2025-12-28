@@ -208,6 +208,7 @@
                 </components:SettingsCard.RightContent>
             </components:SettingsCard>
         </DataTemplate>
+
     </UserControl.Resources>
 
     <Grid ColumnDefinitions="300,*">
