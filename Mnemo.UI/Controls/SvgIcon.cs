@@ -47,7 +47,11 @@ namespace Mnemo.UI.Controls
             _svgPicture = svg.Load(stream);
             _loadedPath = path;
         }
-        catch { }
+        catch (Exception ex)
+        {
+            // Log error for debugging - SVG loading failed
+            System.Diagnostics.Debug.WriteLine($"Failed to load SVG from {path}: {ex.Message}");
+        }
     }
 
     public override void Render(DrawingContext context)
@@ -109,13 +113,16 @@ namespace Mnemo.UI.Controls
             canvas.Translate(offsetX, offsetY);
             canvas.Scale(scale);
 
-            using var paint = new SKPaint();
             if (_color.HasValue)
             {
+                using var paint = new SKPaint();
                 paint.ColorFilter = SKColorFilter.CreateBlendMode(_color.Value, SKBlendMode.SrcIn);
+                canvas.DrawPicture(_picture, paint);
             }
-
-            canvas.DrawPicture(_picture, paint);
+            else
+            {
+                canvas.DrawPicture(_picture);
+            }
             canvas.Restore();
         }
 

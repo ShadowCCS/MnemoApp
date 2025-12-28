@@ -20,7 +20,7 @@
 
     <!-- Icon Brushes -->
     <SolidColorBrush x:Key="ChevronSidebarBrush" Color="{DynamicResource ChevronSidebar}"/>
-    <SolidColorBrush x:Key="IconsTopbarBrush" Color="{DynamicResource IconsTopbar}"/>
+    <SolidColorBrush x:Key="TopbarIconsBrush" Color="{DynamicResource TopbarIcons}"/>
     <SolidColorBrush x:Key="IconsWorkspaceBrush" Color="{DynamicResource IconsWorkspace}"/>
     <SolidColorBrush x:Key="IconsOverlayBrush" Color="{DynamicResource IconsOverlay}"/>
     <SolidColorBrush x:Key="IconsSeparationBarBrush" Color="{DynamicResource IconsSeparationBar}"/>

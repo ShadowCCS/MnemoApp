@@ -4,23 +4,28 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:sidebar="using:Mnemo.UI.Components.Sidebar"
+        xmlns:components="using:Mnemo.UI.Components"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="Mnemo.UI.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="avares://Mnemo.UI/Assets/menmo_dark.ico"
         Title="Mnemo"
         SystemDecorations="None"
+        CanMinimize="True"
+        CanResize="True"
         Background="transparent">
 
-<Border CornerRadius="12" Background="{DynamicResource WorkspaceBackgroundBrush}" PointerPressed="Border_PointerPressed">
-    <Grid ColumnDefinitions="Auto,*">
+<Border CornerRadius="8" Background="{DynamicResource WorkspaceBackgroundBrush}" ClipToBounds="True">
+    <Grid RowDefinitions="Auto,*" ColumnDefinitions="Auto,*">
         <!-- Sidebar -->
-        <sidebar:Sidebar Grid.Column="0" DataContext="{Binding SidebarViewModel}"/>
+        <sidebar:Sidebar Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" DataContext="{Binding SidebarViewModel}"/>
+
+        <!-- Topbar -->
+        <components:Topbar Grid.Row="0" Grid.Column="1" PointerPressed="Window_PointerPressed"/>
 
         <!-- Main Content -->
-        <ContentControl Grid.Column="1" 
-                        Content="{Binding Navigation.CurrentViewModel}"
-                        Margin="0,10,10,10"/>
+        <ContentControl Grid.Row="1" Grid.Column="1" 
+                        Content="{Binding Navigation.CurrentViewModel}"/>
     </Grid>
 </Border>
 </Window>

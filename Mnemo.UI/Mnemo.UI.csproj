@@ -13,6 +13,7 @@
     <AvaloniaResource Include="Assets\**" />
     <AvaloniaResource Include="Themes\**" />
     <AvaloniaResource Include="Icons\Tabler\Used\**\*.svg"/>
+    <AvaloniaResource Include="Icons\Assets\*.svg"/>
     <AvaloniaResource Include="Languages\**" />
 
   </ItemGroup>

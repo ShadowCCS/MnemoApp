@@ -10,7 +10,7 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    private void Border_PointerPressed(object? sender, PointerPressedEventArgs e)
+    private void Window_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {

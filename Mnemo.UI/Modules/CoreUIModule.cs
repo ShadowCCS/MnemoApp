@@ -1,6 +1,7 @@
 using Mnemo.Core.Services;
 using Mnemo.UI.ViewModels;
 using Mnemo.UI.Components.Sidebar;
+using Mnemo.UI.Components;
 
 namespace Mnemo.UI.Modules;
 
@@ -10,6 +11,7 @@ public class CoreUIModule : IModule
     {
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<SidebarViewModel>();
+        services.AddTransient<TopbarViewModel>();
     }
 
     public void RegisterRoutes(INavigationRegistry registry)
