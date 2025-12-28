@@ -16,7 +16,6 @@ public static class Bootstrapper
 
         // 1. Register Core/Infrastructure Services
         services.AddSingleton<ILoggerService, LoggerService>();
-        services.AddSingleton<ITaskScheduler, TaskSchedulerService>();
         services.AddSingleton<IStorageProvider, SqliteStorageProvider>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<ILateXEngine, LaTeXEngine>();

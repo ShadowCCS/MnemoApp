@@ -12,32 +12,20 @@ The coding-standard.md is important to understand what to do and not do
 
 -   **`MnemoApp.Core`**:
     -   **Role:** The "Contract". Interfaces, Models, Enums only. No dependencies.
-    -   **Key Interfaces:** `IModule`, `ITaskScheduler`, `IFunctionRegistry`, `IStorageProvider`, `ILoggerService`.
+    -   **Key Interfaces:** `IModule`, `IFunctionRegistry`, `IStorageProvider`, `ILoggerService`.
 -   **`MnemoApp.Infrastructure`**:
     -   **Role:** The "Implementation".
     -   **Contents:**
         -   `SqliteStorageProvider` (Data persistence).
         -   `MnemoPackageHandler` (ZIP/.mnemo export/import).
-        -   `TaskSchedulerService` (Background job management).
         -   `AIService` (LLM integration).
         -   `FileProcessingService`.
         -   `LoggerService` (Centralized logging with file/console sinks).
 -   **`MnemoApp.UI`**:
     -   **Role:** The "Shell". Avalonia Project.
-    -   **Components:** `TaskDashboard` (Overlay), `ShellWindow`, `NavigationHost`.
+    -   **Components:** `ShellWindow`, `NavigationHost`.
 
-## 2. The Task System
-
-**Refactored for Performance & Visibility:**
-
--   **Execution Modes:**
-    -   `Parallel`: For light I/O tasks.
-    -   `Exclusive`: For Local AI generation (pauses others).
--   **UI Representation:**
-    -   **Status Bar:** Shows summary (e.g., "Processing files... (2/5)").
-    -   **Task Overlay:** A collapsible panel showing active tasks, progress bars, and cancel buttons.
-
-## 3. Data & Storage (`.mnemo`)
+## 2. Data & Storage (`.mnemo`)
 
 **Standardized Portable Format:**
 
@@ -93,8 +81,8 @@ The coding-standard.md is important to understand what to do and not do
 ## 8. Migration Roadmap
 
 1.  **Setup Solution:** Create the 3-project structure (`Core`, `Infrastructure`, `UI`).
-2.  **Core Contracts:** Define `IModule`, `ITaskScheduler`, `IStorageProvider`, `ILoggerService`.
-3.  **Infrastructure Port:** Move `TaskScheduler`, `FileProcessing`, and implement `LoggerService`.
+2.  **Core Contracts:** Define `IModule`, `IStorageProvider`, `ILoggerService`.
+3.  **Infrastructure Port:** Move `FileProcessing`, and implement `LoggerService`.
 4.  **Storage Engine:** Implement `SqliteStorageProvider` and `MnemoPackageHandler`.
 5.  **The Shell:** Build `MnemoApp.UI` with the new Auto-Discovery Bootstrapper.
 6.  **Module Migration:** Port `Dashboard` and `Notes` as standard `IModule`s.

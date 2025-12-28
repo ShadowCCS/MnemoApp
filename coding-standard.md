@@ -87,19 +87,6 @@
 - Hard-code strings in UI (use localization)
 - Block the UI thread with long-running operations
 
-## Task System
-
-### DO
-- Use `TaskExecutionMode.Exclusive` for resource-intensive operations (e.g., local AI)
-- Use `TaskExecutionMode.Parallel` for lightweight I/O operations
-- Provide progress updates via `IProgress<T>`
-- Allow task cancellation
-
-### DON'T
-- Run multiple exclusive tasks simultaneously
-- Block task execution without cancellation support
-- Create tasks without proper error handling
-
 ## Storage & Data
 
 ### DO
