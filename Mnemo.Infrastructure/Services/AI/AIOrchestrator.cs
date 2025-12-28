@@ -150,17 +150,43 @@ public class AIOrchestrator : IAIOrchestrator
         }
     }
 
-    private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct)
+    public async IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        // Smart Switch Logic
+        // For simplicity in the first version, we skip RAG for streaming if it requires complex rewriting,
+        // but we can still use the basic user prompt.
+        var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
+        if (targetModel == null) yield break;
+
+        var effectiveSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
+            ? "You are Mnemo, a helpful and concise AI assistant."
+            : systemPrompt;
+
+        var formattedPrompt = FormatPrompt(targetModel.PromptTemplate, effectiveSystemPrompt, userPrompt);
+
+        await _governor.AcquireModelAsync(targetModel, ct).ConfigureAwait(false);
+        try
+        {
+            await foreach (var token in _textService.GenerateStreamingAsync(targetModel, formattedPrompt, ct).ConfigureAwait(false))
+            {
+                yield return token;
+            }
+        }
+        finally
+        {
+            _governor.ReleaseModel(targetModel);
+        }
+    }
+
+    private async Task<AIModelManifest?> SelectModelAsync(string userPrompt, CancellationToken ct)
+    {
         bool smartSwitchEnabled = await _settings.GetAsync("AI.SmartSwitch", false).ConfigureAwait(false);
         var models = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
-        
+
         var fastModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && !m.IsOptional);
         var smartModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.IsOptional);
 
         AIModelManifest? targetModel = null;
-        
+
         if (smartSwitchEnabled && smartModel != null && fastModel != null)
         {
             if (IsObviouslySimple(userPrompt))
@@ -179,7 +205,12 @@ public class AIOrchestrator : IAIOrchestrator
             targetModel = fastModel;
         }
 
-        targetModel ??= models.FirstOrDefault(m => m.Type == AIModelType.Text);
+        return targetModel ?? models.FirstOrDefault(m => m.Type == AIModelType.Text);
+    }
+
+    private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct)
+    {
+        var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
 
         if (targetModel == null) return Result<string>.Failure("No suitable text model found.");
 

@@ -1,247 +1,58 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
-using Markdig;
-using Markdown.Avalonia;
 using Avalonia.Controls.Documents;
+using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media;
-using System.Linq;
-using System.Collections.Generic;
+using Markdig;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
-using Markdig.Extensions.Tables;
+using Mnemo.Core.Models.Markdown;
 using Mnemo.Core.Services;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using Avalonia.Threading;
-using Avalonia.Input;
-using Microsoft.Extensions.DependencyInjection;
 
-namespace Mnemo.UI.Components;
+namespace Mnemo.UI.Services;
 
-public partial class RichContentView : UserControl
+public class MarkdownRenderer : IMarkdownRenderer
 {
-    private readonly ILocalizationService _loc;
     private readonly ILateXEngine _latexEngine;
-    public static readonly StyledProperty<string?> SourceProperty =
-        AvaloniaProperty.Register<RichContentView, string?>(nameof(Source));
-
-    public string? Source
-    {
-        get => GetValue(SourceProperty);
-        set => SetValue(SourceProperty, value);
-    }
-
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
-    // Compiled regex patterns for performance
-    private static readonly Regex DisplayMathRegex = new(@"\$\$(.+?)\$\$", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex InlineMathRegex = new(@"\$(.+?)\$", RegexOptions.Compiled);
-    private static readonly Regex HighlightRegex = new(@"==(.+?)==", RegexOptions.Compiled);
-    private static readonly Regex StrikethroughRegex = new(@"~~(.+?)~~", RegexOptions.Compiled);
-    // LaTeX-style subscript and superscript: H_{2}O or H_2O, x^{2} or x^2
-    private static readonly Regex SubscriptRegex = new(@"_(\{[^}]+?\}|\w)", RegexOptions.Compiled);
-    private static readonly Regex SuperscriptRegex = new(@"\^(\{[^}]+?\}|\w)", RegexOptions.Compiled);
-    // Markdown-style subscript and superscript: H~2~O and E=mc^2^
-    private static readonly Regex TildeSubscriptRegex = new(@"~([^~]+)~", RegexOptions.Compiled);
-    private static readonly Regex CaretSuperscriptRegex = new(@"\^([^^\s]+)\^", RegexOptions.Compiled);
-
-    private ContentControl? _contentHost;
-    private bool _isRendering = false;
-
-    public RichContentView()
+    public MarkdownRenderer(ILateXEngine latexEngine)
     {
-        var sp = ((App)Application.Current!).Services!;
-        _loc = sp.GetRequiredService<ILocalizationService>();
-        _latexEngine = sp.GetRequiredService<ILateXEngine>();
-        InitializeComponent();
-        _contentHost = this.FindControl<ContentControl>("ContentHost");
+        _latexEngine = latexEngine;
     }
 
-    private void InitializeComponent()
+    public async Task<Control> RenderAsync(string markdown, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground = null)
     {
-        AvaloniaXamlLoader.Load(this);
-    }
+        var document = Markdig.Markdown.Parse(markdown, Pipeline);
+        var container = new StackPanel { Spacing = 12 };
 
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        base.OnPropertyChanged(change);
-
-        if (change.Property == SourceProperty)
+        foreach (var block in document)
         {
-            _ = RenderAsync();
-        }
-    }
-
-    private async Task RenderAsync()
-    {
-        if (_contentHost == null || string.IsNullOrWhiteSpace(Source))
-        {
-            if (_contentHost != null)
-                _contentHost.Content = null;
-            return;
+            var rendered = await RenderBlockAsync(block, specialInlines, foreground);
+            if (rendered != null)
+                container.Children.Add(rendered);
         }
 
-        // Prevent concurrent renders
-        if (_isRendering)
-            return;
-
-        _isRendering = true;
-
-        try
-        {
-            // Show loading placeholder
-            _contentHost.Content = new TextBlock
-            {
-                Text = _loc.T("Loading", "Common"),
-                Foreground = (IBrush)Application.Current!.FindResource("TextTertiaryBrush")!,
-                FontStyle = FontStyle.Italic
-            };
-
-            var source = Source;
-
-            // Background: Parse markdown + extract special inline elements
-            var (document, specialInlines) = await Task.Run(() =>
-            {
-                var (processedSource, inlines) = ExtractSpecialInlines(source);
-                var doc = Markdig.Markdown.Parse(processedSource, Pipeline);
-                return (doc, inlines);
-            });
-
-            // UI thread: Render blocks
-            var container = new StackPanel { Spacing = 12 };
-
-            foreach (var block in document)
-            {
-                var rendered = await RenderBlockAsync(block, specialInlines);
-                if (rendered != null)
-                    container.Children.Add(rendered);
-            }
-
-            _contentHost.Content = container;
-        }
-        catch (Exception ex)
-        {
-            _contentHost.Content = new TextBlock
-            {
-                Text = $"{_loc.T("ErrorRendering", "RichText")}: {ex.Message}",
-                Foreground = (IBrush)Application.Current!.FindResource("SystemErrorBackgroundBrush")!,
-                TextWrapping = TextWrapping.Wrap
-            };
-        }
-        finally
-        {
-            _isRendering = false;
-        }
+        return container;
     }
 
-    private (string processedSource, Dictionary<string, (string content, InlineType type)> inlines) ExtractSpecialInlines(string source)
-    {
-        var inlines = new Dictionary<string, (string, InlineType)>();
-        var counter = 0;
-        
-
-        // Extract display math $$...$$ first (must be before inline math)
-        var processed = DisplayMathRegex.Replace(source, match =>
-        {
-            var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            inlines[key] = (match.Groups[1].Value, InlineType.DisplayMath);
-            return key;
-        });
-
-        // Extract inline math $...$
-        processed = InlineMathRegex.Replace(processed, match =>
-        {
-            var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            inlines[key] = (match.Groups[1].Value, InlineType.InlineMath);
-            return key;
-        });
-
-        // Extract highlighted text ==...==
-        processed = HighlightRegex.Replace(processed, match =>
-        {
-            var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            inlines[key] = (match.Groups[1].Value, InlineType.Highlight);
-            return key;
-        });
-
-        // Extract strikethrough ~~...~~ (MUST be before tilde subscript!)
-        processed = StrikethroughRegex.Replace(processed, match =>
-        {
-            var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            inlines[key] = (match.Groups[1].Value, InlineType.Strikethrough);
-            return key;
-        });
-
-        // Extract caret superscript ^...^ (MUST be before LaTeX superscript!)
-        processed = CaretSuperscriptRegex.Replace(processed, match =>
-        {
-            var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            var content = match.Groups[1].Value;
-            inlines[key] = (content, InlineType.Superscript);
-            return key;
-        });
-
-        // Extract LaTeX superscript ^{...} or ^x
-        processed = SuperscriptRegex.Replace(processed, match =>
-        {
-            var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            var content = match.Groups[1].Value;
-            // Strip braces if present
-            if (content.StartsWith("{") && content.EndsWith("}"))
-                content = content.Substring(1, content.Length - 2);
-            inlines[key] = (content, InlineType.Superscript);
-            return key;
-        });
-
-        // Extract tilde subscript ~...~ (after strikethrough to avoid conflicts)
-        processed = TildeSubscriptRegex.Replace(processed, match =>
-        {
-            var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            var content = match.Groups[1].Value;
-            inlines[key] = (content, InlineType.Subscript);
-            return key;
-        });
-
-        // Extract LaTeX subscript _{...} or _x
-        processed = SubscriptRegex.Replace(processed, match =>
-        {
-            var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            var content = match.Groups[1].Value;
-            // Strip braces if present
-            if (content.StartsWith("{") && content.EndsWith("}"))
-                content = content.Substring(1, content.Length - 2);
-            inlines[key] = (content, InlineType.Subscript);
-            return key;
-        });
-
-        
-        return (processed, inlines);
-    }
-
-    private enum InlineType
-    {
-        DisplayMath,
-        InlineMath,
-        Highlight,
-        Strikethrough,
-        Superscript,
-        Subscript
-    }
-
-    private async Task<Control?> RenderBlockAsync(Markdig.Syntax.Block block, Dictionary<string, (string content, InlineType type)> specialInlines)
+    private async Task<Control?> RenderBlockAsync(Markdig.Syntax.Block block, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)
     {
         return block switch
         {
-            ParagraphBlock paragraph => await RenderParagraphAsync(paragraph, specialInlines),
-            HeadingBlock heading => await RenderHeadingAsync(heading, specialInlines),
+            ParagraphBlock paragraph => await RenderParagraphAsync(paragraph, specialInlines, foreground),
+            HeadingBlock heading => await RenderHeadingAsync(heading, specialInlines, foreground),
             CodeBlock code => RenderCodeBlock(code),
-            QuoteBlock quote => await RenderQuoteAsync(quote, specialInlines),
-            ListBlock list => await RenderListAsync(list, specialInlines),
-            var table when table.GetType().Name == "Table" => await RenderTableAsync(table, specialInlines),
+            QuoteBlock quote => await RenderQuoteAsync(quote, specialInlines, foreground),
+            ListBlock list => await RenderListAsync(list, specialInlines, foreground),
+            var table when table.GetType().Name == "Table" => await RenderTableAsync(table, specialInlines, foreground),
             ThematicBreakBlock => new Border
             {
                 Height = 1,
@@ -252,32 +63,32 @@ public partial class RichContentView : UserControl
         };
     }
 
-    private async Task<Control> RenderParagraphAsync(ParagraphBlock paragraph, Dictionary<string, (string content, InlineType type)> specialInlines)
+    private async Task<Control> RenderParagraphAsync(ParagraphBlock paragraph, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)
     {
         var textBlock = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
+            Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
         };
 
         if (paragraph.Inline != null && textBlock.Inlines != null)
         {
             foreach (var inline in paragraph.Inline)
             {
-                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, specialInlines);
+                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, specialInlines, foreground);
             }
         }
 
         return textBlock;
     }
 
-    private async Task RenderInlineToInlinesAsync(Markdig.Syntax.Inlines.Inline inline, InlineCollection inlines, Dictionary<string, (string content, InlineType type)> specialInlines, bool isHeading = false)
+    private async Task RenderInlineToInlinesAsync(Markdig.Syntax.Inlines.Inline inline, InlineCollection inlines, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, bool isHeading = false)
     {
         switch (inline)
         {
             case LiteralInline literal:
                 var text = literal.Content.ToString();
-                await ReplaceSpecialPlaceholdersAsync(text, inlines, specialInlines, isHeading);
+                await ReplaceSpecialPlaceholdersAsync(text, inlines, specialInlines, foreground, isHeading);
                 break;
 
             case EmphasisInline emphasis:
@@ -289,7 +100,7 @@ public partial class RichContentView : UserControl
 
                 foreach (var child in emphasis)
                 {
-                    await RenderInlineToInlinesAsync(child, span.Inlines, specialInlines, isHeading);
+                    await RenderInlineToInlinesAsync(child, span.Inlines, specialInlines, foreground, isHeading);
                 }
                 inlines.Add(span);
                 break;
@@ -304,54 +115,52 @@ public partial class RichContentView : UserControl
                 break;
 
             case LinkInline link:
-                // Create a clickable link using a Button with transparent styling
-                var linkButton = new Button
+                var linkButton = new HyperlinkButton
                 {
-                    Background = Avalonia.Media.Brushes.Transparent,
+                    Background = Brushes.Transparent,
                     BorderThickness = new Thickness(0),
                     Padding = new Thickness(0),
                     Margin = new Thickness(0),
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
-                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+                    MinHeight = 0,
+                    MinWidth = 0,
                     Cursor = new Cursor(StandardCursorType.Hand)
                 };
                 
-                // Create the link content
                 var linkContent = new TextBlock
                 {
                     Foreground = (IBrush)Application.Current!.FindResource("LinksBrush")!,
                     TextDecorations = TextDecorations.Underline,
-                    Background = Avalonia.Media.Brushes.Transparent
+                    Background = Brushes.Transparent,
+                    VerticalAlignment = VerticalAlignment.Center
                 };
                 
-                // Add the link text
                 if (link.FirstChild is LiteralInline linkLiteral)
                 {
                     linkContent.Text = linkLiteral.Content.ToString();
                 }
                 else
                 {
-                    // Handle complex link content
                     foreach (var child in link)
                     {
                         if (linkContent.Inlines != null)
                         {
-                            await RenderInlineToInlinesAsync(child, linkContent.Inlines, specialInlines, isHeading);
+                            await RenderInlineToInlinesAsync(child, linkContent.Inlines, specialInlines, foreground, isHeading);
                         }
                     }
                 }
                 
                 linkButton.Content = linkContent;
-                
-                // Add click handler
                 linkButton.Click += (sender, e) =>
                 {
                     HandleLinkClick(link.Url);
                     e.Handled = true;
                 };
                 
-                // Wrap the button in an InlineUIContainer
-                inlines.Add(new InlineUIContainer { Child = linkButton });
+                inlines.Add(new InlineUIContainer 
+                { 
+                    Child = linkButton,
+                    BaselineAlignment = BaselineAlignment.Baseline
+                });
                 break;
 
             case LineBreakInline:
@@ -361,19 +170,18 @@ public partial class RichContentView : UserControl
             case ContainerInline container:
                 foreach (var child in container)
                 {
-                    await RenderInlineToInlinesAsync(child, inlines, specialInlines, isHeading);
+                    await RenderInlineToInlinesAsync(child, inlines, specialInlines, foreground, isHeading);
                 }
                 break;
         }
     }
 
-    // OPTIMIZED: O(n) single-pass placeholder search instead of O(n×m)
-    private async Task ReplaceSpecialPlaceholdersAsync(string text, InlineCollection inlines, Dictionary<string, (string content, InlineType type)> specialInlines, bool isHeading = false)
+    private async Task ReplaceSpecialPlaceholdersAsync(string text, InlineCollection inlines, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, bool isHeading = false)
     {
         if (string.IsNullOrEmpty(text) || specialInlines.Count == 0)
         {
             if (!string.IsNullOrWhiteSpace(text))
-                inlines.Add(new Run { Text = text, Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")! });
+                inlines.Add(new Run { Text = text, Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)) });
             return;
         }
 
@@ -382,93 +190,82 @@ public partial class RichContentView : UserControl
         
         while (position < textLength)
         {
-            // Single-pass: find next placeholder by scanning for marker prefix
             var markerIndex = text.IndexOf("Ⓢ", position, StringComparison.Ordinal);
             if (markerIndex < 0)
             {
-                // No more placeholders, add remaining text
                 var remainingText = text.Substring(position);
                 if (!string.IsNullOrWhiteSpace(remainingText))
-                    inlines.Add(new Run { Text = remainingText, Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")! });
+                    inlines.Add(new Run { Text = remainingText, Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)) });
                 break;
             }
 
-            // Extract potential placeholder key
             var endMarkerIndex = text.IndexOf("Ⓢ", markerIndex + 1, StringComparison.Ordinal);
             if (endMarkerIndex < 0)
             {
-                // Incomplete marker, treat as text
                 var remainingText = text.Substring(position);
                 if (!string.IsNullOrWhiteSpace(remainingText))
-                    inlines.Add(new Run { Text = remainingText, Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")! });
+                    inlines.Add(new Run { Text = remainingText, Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)) });
                 break;
             }
 
             var potentialKey = text.Substring(markerIndex, endMarkerIndex - markerIndex + 1);
             
-            // Check if this is a valid placeholder
             if (specialInlines.TryGetValue(potentialKey, out var inlineData))
             {
-                // Add text before placeholder
                 if (markerIndex > position)
                 {
                     var beforeText = text.Substring(position, markerIndex - position);
                     if (!string.IsNullOrWhiteSpace(beforeText))
-                        inlines.Add(new Run { Text = beforeText, Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")! });
+                        inlines.Add(new Run { Text = beforeText, Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)) });
                 }
 
-                // Render the special inline based on type
-                switch (inlineData.type)
+                switch (inlineData.Type)
                 {
-                    case InlineType.DisplayMath:
-                        var displayMathControl = await _latexEngine.RenderAsync(inlineData.content, 18.0);
-                        inlines.Add(new InlineUIContainer { Child = displayMathControl });
+                    case MarkdownInlineType.DisplayMath:
+                        var displayMathControl = await _latexEngine.RenderAsync(inlineData.Content, 18.0);
+                        inlines.Add(new InlineUIContainer { Child = displayMathControl, BaselineAlignment = BaselineAlignment.Center });
                         break;
 
-                    case InlineType.InlineMath:
-                        var inlineMathControl = await _latexEngine.RenderAsync(inlineData.content, 16.0);
-                        inlines.Add(new InlineUIContainer { Child = inlineMathControl });
+                    case MarkdownInlineType.InlineMath:
+                        var inlineMathControl = await _latexEngine.RenderAsync(inlineData.Content, 16.0);
+                        inlines.Add(new InlineUIContainer { Child = inlineMathControl, BaselineAlignment = BaselineAlignment.Center });
                         break;
 
-                    case InlineType.Highlight:
+                    case MarkdownInlineType.Highlight:
                         inlines.Add(new Run
                         {
-                            Text = inlineData.content,
+                            Text = inlineData.Content,
                             Background = (IBrush)Application.Current!.FindResource("HighlightedTextBrush")!,
-                            Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")!
+                            Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!))
                         });
                         break;
 
-                    case InlineType.Superscript:
+                    case MarkdownInlineType.Superscript:
                         var superscriptTextBlock = new TextBlock
                         {
-                            Text = inlineData.content,
+                            Text = inlineData.Content,
                             FontSize = 10,
-                            Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")!,
-                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
-                            Margin = new Thickness(0, -2, 0, 0)
+                            Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)),
                         };
-                        inlines.Add(new InlineUIContainer { Child = superscriptTextBlock });
+                        inlines.Add(new InlineUIContainer { Child = superscriptTextBlock, BaselineAlignment = BaselineAlignment.Superscript });
                         break;
 
-                    case InlineType.Subscript:
+                    case MarkdownInlineType.Subscript:
                         var subscriptTextBlock = new TextBlock
                         {
-                            Text = inlineData.content,
+                            Text = inlineData.Content,
                             FontSize = 10,
-                            Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")!,
-                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
-                            Margin = new Thickness(0, 0, 0, -2)
+                            Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)),
                         };
-                        inlines.Add(new InlineUIContainer { Child = subscriptTextBlock });
+                        inlines.Add(new InlineUIContainer { Child = subscriptTextBlock, BaselineAlignment = BaselineAlignment.Subscript });
                         break;
 
-                    case InlineType.Strikethrough:
+                    case MarkdownInlineType.Strikethrough:
                         inlines.Add(new Run
                         {
-                            Text = inlineData.content,
+                            Text = inlineData.Content,
                             TextDecorations = TextDecorations.Strikethrough,
-                            Foreground = (IBrush)Application.Current!.FindResource(isHeading ? "TextPrimaryBrush" : "TextSecondaryBrush")!
+                            Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!))
                         });
                         break;
                 }
@@ -477,13 +274,12 @@ public partial class RichContentView : UserControl
             }
             else
             {
-                // Not a valid placeholder, continue searching
                 position = markerIndex + 1;
             }
         }
     }
 
-    private async Task<Control> RenderHeadingAsync(HeadingBlock heading, Dictionary<string, (string content, InlineType type)> specialInlines)
+    private async Task<Control> RenderHeadingAsync(HeadingBlock heading, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)
     {
         var textBlock = new TextBlock
         {
@@ -503,12 +299,11 @@ public partial class RichContentView : UserControl
             _ => 14
         };
 
-        // UNIFIED: Use same placeholder-based rendering as paragraphs
         if (heading.Inline != null && textBlock.Inlines != null)
         {
             foreach (var inline in heading.Inline)
             {
-                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, specialInlines, isHeading: true);
+                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, specialInlines, foreground, isHeading: true);
             }
         }
 
@@ -532,7 +327,6 @@ public partial class RichContentView : UserControl
 
         var stackPanel = new StackPanel();
 
-        // Language indicator header
         if (!string.IsNullOrEmpty(language))
         {
             var headerPanel = new Grid
@@ -548,17 +342,17 @@ public partial class RichContentView : UserControl
                 FontWeight = FontWeight.SemiBold,
                 FontSize = 12,
                 Foreground = (IBrush)Application.Current!.FindResource("TextTertiaryBrush")!,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 0, 0)
             };
 
             var copyButton = new Button
             {
-                Content = _loc.T("Copy", "Common"),
+                Content = "Copy",
                 FontSize = 11,
                 Padding = new Thickness(8, 4),
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0),
                 Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
                 Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!,
@@ -571,7 +365,7 @@ public partial class RichContentView : UserControl
             {
                 try
                 {
-                    var topLevel = TopLevel.GetTopLevel(this);
+                    var topLevel = TopLevel.GetTopLevel(copyButton);
                     if (topLevel?.Clipboard != null)
                     {
                         await topLevel.Clipboard.SetTextAsync(code);
@@ -579,7 +373,7 @@ public partial class RichContentView : UserControl
                 }
                 catch
                 {
-                    // Clipboard access might fail in some contexts
+                    // Clipboard access might fail
                 }
             };
 
@@ -589,13 +383,12 @@ public partial class RichContentView : UserControl
         }
         else
         {
-            // Copy button for non-fenced code blocks
             var copyButton = new Button
             {
-                Content = _loc.T("Copy", "Common"),
+                Content = "Copy",
                 FontSize = 11,
                 Padding = new Thickness(8, 4),
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(0, 8, 8, 0),
                 Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
                 Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!,
@@ -608,7 +401,7 @@ public partial class RichContentView : UserControl
             {
                 try
                 {
-                    var topLevel = TopLevel.GetTopLevel(this);
+                    var topLevel = TopLevel.GetTopLevel(copyButton);
                     if (topLevel?.Clipboard != null)
                     {
                         await topLevel.Clipboard.SetTextAsync(code);
@@ -616,14 +409,13 @@ public partial class RichContentView : UserControl
                 }
                 catch
                 {
-                    // Clipboard access might fail in some contexts
+                    // Clipboard access might fail
                 }
             };
 
             stackPanel.Children.Add(copyButton);
         }
 
-        // Code content with syntax highlighting
         var codeTextBlock = new TextBlock
         {
             Text = code,
@@ -635,7 +427,6 @@ public partial class RichContentView : UserControl
             Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!
         };
 
-        // Apply basic syntax highlighting based on language
         if (!string.IsNullOrEmpty(language))
         {
             ApplyBasicSyntaxHighlighting(codeTextBlock, code, language);
@@ -648,7 +439,6 @@ public partial class RichContentView : UserControl
 
     private void ApplyBasicSyntaxHighlighting(TextBlock textBlock, string code, string language)
     {
-        // Basic syntax highlighting using Run elements
         var inlines = new InlineCollection();
         var lines = code.Split('\n');
         
@@ -659,7 +449,6 @@ public partial class RichContentView : UserControl
             inlines.Add(new LineBreak());
         }
 
-        // Remove the last line break
         if (inlines.Count > 0 && inlines[inlines.Count - 1] is LineBreak)
         {
             inlines.RemoveAt(inlines.Count - 1);
@@ -673,7 +462,6 @@ public partial class RichContentView : UserControl
         var inlines = new List<Avalonia.Controls.Documents.Inline>();
         var currentText = line;
         
-        // Language-specific highlighting patterns
         var patterns = GetHighlightingPatterns(language);
         
         foreach (var (pattern, brushKey) in patterns)
@@ -684,18 +472,16 @@ public partial class RichContentView : UserControl
                 var lastIndex = 0;
                 foreach (System.Text.RegularExpressions.Match match in matches)
                 {
-                    // Add text before match
                     if (match.Index > lastIndex)
                     {
-                        inlines.Add(new Avalonia.Controls.Documents.Run 
+                        inlines.Add(new Run 
                         { 
                             Text = currentText.Substring(lastIndex, match.Index - lastIndex),
                             Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!
                         });
                     }
                     
-                    // Add highlighted match
-                    inlines.Add(new Avalonia.Controls.Documents.Run 
+                    inlines.Add(new Run 
                     { 
                         Text = match.Value,
                         Foreground = (IBrush)Application.Current!.FindResource(brushKey)!
@@ -704,10 +490,9 @@ public partial class RichContentView : UserControl
                     lastIndex = match.Index + match.Length;
                 }
                 
-                // Add remaining text
                 if (lastIndex < currentText.Length)
                 {
-                    inlines.Add(new Avalonia.Controls.Documents.Run 
+                    inlines.Add(new Run 
                     { 
                         Text = currentText.Substring(lastIndex),
                         Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!
@@ -717,8 +502,7 @@ public partial class RichContentView : UserControl
             }
         }
         
-        // No highlighting applied, return plain text
-        inlines.Add(new Avalonia.Controls.Documents.Run 
+        inlines.Add(new Run 
         { 
             Text = line,
             Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!
@@ -763,11 +547,32 @@ public partial class RichContentView : UserControl
                 (@"[a-zA-Z-]+\s*:", "PropertyBrush"),
                 (@"//.*$", "CommentBrush")
             },
+            "json" => new List<(string, string)>
+            {
+                (@"""[^""]*""(?=\s*:)", "KeywordBrush"), // Keys
+                (@"""[^""]*""", "StringBrush"), // Values
+                (@"\b(true|false|null)\b", "KeywordBrush"),
+                (@"\b[0-9]+\b", "NumberBrush")
+            },
+            "sql" => new List<(string, string)>
+            {
+                (@"\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|JOIN|GROUP|ORDER|BY|HAVING|CREATE|TABLE|ALTER|DROP|INTO|VALUES|SET|AND|OR|NOT|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|ON)\b", "KeywordBrush"),
+                (@"--.*$", "CommentBrush"),
+                (@"""[^""]*""", "StringBrush"),
+                (@"'[^']*'", "StringBrush")
+            },
+            "yaml" or "yml" => new List<(string, string)>
+            {
+                (@"^\s*[a-zA-Z0-9_-]+\s*:", "KeywordBrush"), // Keys
+                (@"#.*$", "CommentBrush"),
+                (@"""[^""]*""", "StringBrush"),
+                (@"'[^']*'", "StringBrush")
+            },
             _ => new List<(string, string)>()
         };
     }
 
-    private async Task<Control> RenderQuoteAsync(QuoteBlock quote, Dictionary<string, (string content, InlineType type)> specialInlines)
+    private async Task<Control> RenderQuoteAsync(QuoteBlock quote, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)
     {
         var border = new Border
         {
@@ -781,7 +586,7 @@ public partial class RichContentView : UserControl
 
         foreach (var block in quote)
         {
-            var rendered = await RenderBlockAsync(block, specialInlines);
+            var rendered = await RenderBlockAsync(block, specialInlines, foreground);
             if (rendered != null)
                 container.Children.Add(rendered);
         }
@@ -790,27 +595,27 @@ public partial class RichContentView : UserControl
         return border;
     }
 
-    private async Task<Control> RenderListAsync(ListBlock list, Dictionary<string, (string content, InlineType type)> specialInlines)
+    private async Task<Control> RenderListAsync(ListBlock list, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)
     {
         var container = new StackPanel { Spacing = 4, Margin = new Thickness(0, 4) };
         int index = 1;
 
         foreach (var item in list.Cast<ListItemBlock>())
         {
-            var itemContainer = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8 };
+            var itemContainer = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
 
             var bullet = new TextBlock
             {
                 Text = list.IsOrdered ? $"{index++}." : "•",
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+                VerticalAlignment = VerticalAlignment.Top,
                 MinWidth = 20,
-                Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
+                Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
             };
 
             var content = new StackPanel { Spacing = 4 };
             foreach (var block in item)
             {
-                var rendered = await RenderBlockAsync(block, specialInlines);
+                var rendered = await RenderBlockAsync(block, specialInlines, foreground);
                 if (rendered != null)
                     content.Children.Add(rendered);
             }
@@ -823,28 +628,24 @@ public partial class RichContentView : UserControl
         return container;
     }
 
-    private async Task<Control> RenderTableAsync(Markdig.Syntax.Block table, Dictionary<string, (string content, InlineType type)> specialInlines)
+    private async Task<Control> RenderTableAsync(Markdig.Syntax.Block table, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)
     {
         if (table is not Markdig.Extensions.Tables.Table markdigTable)
         {
-            System.Diagnostics.Debug.WriteLine($"Table is not a Markdig Table type: {table.GetType().Name}");
-            return new TextBlock { Text = _loc.T("InvalidTableFormat", "RichText") };
+            return new TextBlock { Text = "Invalid table format" };
         }
-
-        System.Diagnostics.Debug.WriteLine($"Rendering table with {markdigTable.Count} rows and {markdigTable.ColumnDefinitions.Count} columns");
         
         var grid = new Grid
         {
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left
+            HorizontalAlignment = HorizontalAlignment.Left
         };
         
-        // Create a scrollable container for the table
         var scrollViewer = new ScrollViewer
         {
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             Margin = new Thickness(0, 8),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left
+            HorizontalAlignment = HorizontalAlignment.Left
         };
         
         var tableBorder = new Border
@@ -854,70 +655,44 @@ public partial class RichContentView : UserControl
             CornerRadius = new CornerRadius(6),
             Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
             Child = grid,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left
+            HorizontalAlignment = HorizontalAlignment.Left
         };
 
-        // Set up columns with content-based sizing
         for (int i = 0; i < markdigTable.ColumnDefinitions.Count; i++)
         {
             var columnDef = new ColumnDefinition();
-            // Use Auto sizing to fit content, preventing unnecessary width expansion
             columnDef.Width = GridLength.Auto;
             grid.ColumnDefinitions.Add(columnDef);
         }
 
-        // Process each row
         for (int rowIndex = 0; rowIndex < markdigTable.Count; rowIndex++)
         {
             var row = markdigTable[rowIndex];
-            if (row is not Markdig.Extensions.Tables.TableRow tableRow)
-            {
-                System.Diagnostics.Debug.WriteLine($"Row {rowIndex} is not a TableRow: {row.GetType().Name}");
-                continue;
-            }
+            if (row is not Markdig.Extensions.Tables.TableRow tableRow) continue;
 
-            // Add row definition
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-            System.Diagnostics.Debug.WriteLine($"Processing row {rowIndex} with {tableRow.Count} cells");
-
-            // Determine if this is a header row (first row)
             bool isHeaderRow = rowIndex == 0;
 
-            // Process each cell in the row
             for (int cellIndex = 0; cellIndex < tableRow.Count; cellIndex++)
             {
                 var cell = tableRow[cellIndex];
-                if (cell is not Markdig.Extensions.Tables.TableCell tableCell)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Cell {cellIndex} is not a TableCell: {cell.GetType().Name}");
-                    continue;
-                }
+                if (cell is not Markdig.Extensions.Tables.TableCell tableCell) continue;
 
-                // Create cell border with improved styling
                 var cellBorder = new Border
                 {
                     BorderBrush = (IBrush)Application.Current!.FindResource("RichTextSeparationLineBrush")!,
-                    BorderThickness = new Thickness(0, 0, 1, 1), // Right and bottom borders only
+                    BorderThickness = new Thickness(cellIndex == 0 ? 1 : 0, 0, 1, 1),
                     Padding = new Thickness(12, 8),
                     Background = GetCellBackground(rowIndex, isHeaderRow)
                 };
 
-                // Add left border for first column
-                if (cellIndex == 0)
-                {
-                    cellBorder.BorderThickness = new Thickness(1, 0, 1, 1);
-                }
-
                 var cellContent = new StackPanel { Spacing = 4 };
 
-                // Render cell content with appropriate styling for headers
                 foreach (var block in tableCell)
                 {
-                    var rendered = await RenderBlockAsync(block, specialInlines);
+                    var rendered = await RenderBlockAsync(block, specialInlines, foreground);
                     if (rendered != null)
                     {
-                        // Apply header styling to text blocks in header row
                         if (isHeaderRow && rendered is TextBlock headerTextBlock)
                         {
                             headerTextBlock.FontWeight = FontWeight.SemiBold;
@@ -942,12 +717,10 @@ public partial class RichContentView : UserControl
     {
         if (isHeaderRow)
         {
-            // Header row gets a distinct background
             return (IBrush)Application.Current!.FindResource("CardBackgroundSecondaryBrush")!;
         }
         else
         {
-            // Alternating row colors for data rows
             return (rowIndex % 2 == 0) 
                 ? (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!
                 : (IBrush)Application.Current!.FindResource("CardBackgroundPrimaryBrush")!;
@@ -961,19 +734,13 @@ public partial class RichContentView : UserControl
 
         try
         {
-            // Check if it's an internal link (starts with #)
             if (url.StartsWith("#"))
             {
-                // Handle internal navigation if needed
-                // For now, just log it
-                System.Diagnostics.Debug.WriteLine($"Internal link clicked: {url}");
                 return;
             }
 
-            // Handle external links
             if (url.StartsWith("http://") || url.StartsWith("https://") || url.StartsWith("mailto:"))
             {
-                // Use the system to open the URL
                 var process = new System.Diagnostics.Process
                 {
                     StartInfo = new System.Diagnostics.ProcessStartInfo
@@ -990,7 +757,5 @@ public partial class RichContentView : UserControl
             System.Diagnostics.Debug.WriteLine($"Failed to open link {url}: {ex.Message}");
         }
     }
-
 }
-
 

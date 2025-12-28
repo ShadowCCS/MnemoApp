@@ -4,10 +4,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Mnemo.UI.Components"
         mc:Ignorable="d"
-        x:Class="Mnemo.UI.Components.RichContentView">
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
-        <ContentControl Name="ContentHost" />
-    </ScrollViewer>
+        x:Class="Mnemo.UI.Components.MarkdownView">
+    <ContentControl Name="ContentHost" />
 </UserControl>
 
 

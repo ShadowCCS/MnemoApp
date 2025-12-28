@@ -1,0 +1,198 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Mnemo.UI.Modules.Chat.ViewModels"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:components="using:Mnemo.UI.Components"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
+             x:Class="Mnemo.UI.Modules.Chat.Views.ChatView"
+             x:DataType="vm:ChatViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="ListBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Margin" Value="0,0,0,20"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Style Selector="^:pointerover /template/ ContentPresenter">
+                <Setter Property="Background" Value="Transparent"/>
+            </Style>
+            <Style Selector="^:selected /template/ ContentPresenter">
+                <Setter Property="Background" Value="Transparent"/>
+            </Style>
+        </Style>
+
+        <Style Selector="TextBox.ChatInput">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="MinHeight" Value="45"/>
+            <Style Selector="^:pointerover /template/ Border#PART_BorderElement">
+                <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+            </Style>
+            <Style Selector="^:focus /template/ Border#PART_BorderElement">
+                <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+            </Style>
+        </Style>
+
+        <!-- Message Bubbles -->
+        <Style Selector="Border.MessageBubble">
+            <Setter Property="MaxWidth" Value="800"/>
+            <Setter Property="Padding" Value="20,16"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="BoxShadow" Value="0 2 10 0 #10000000"/>
+        </Style>
+
+        <Style Selector="Border.UserMessage">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Background" Value="{DynamicResource CardAccentBrush}"/>
+            <Setter Property="Margin" Value="100,0,0,0"/>
+            <Setter Property="CornerRadius" Value="16,16,2,16"/>
+        </Style>
+
+        <Style Selector="Border.AIMessage">
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
+            <Setter Property="Margin" Value="0,0,100,0"/>
+            <Setter Property="CornerRadius" Value="16,16,16,2"/>
+        </Style>
+
+        <Style Selector="TextBlock.SenderTag">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="LetterSpacing" Value="0.05"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
+        <Style Selector="Border.UserMessage TextBlock.SenderTag">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Opacity" Value="0.9"/>
+            <Setter Property="Text" Value="YOU"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+
+        <Style Selector="Border.UserMessage components|MarkdownView">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <Style Selector="Border.AIMessage TextBlock.SenderTag">
+            <Setter Property="Foreground" Value="{DynamicResource CardAccentBrush}"/>
+            <Setter Property="Text" Value="MNEMO AI"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+
+        <Style Selector="Border.AIMessage components|MarkdownView">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="40,20,40,40">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,24">
+            <StackPanel Spacing="4">
+                <TextBlock Text="AI Chat" 
+                           FontSize="28" 
+                           FontFamily="{DynamicResource Font.Bold}"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <TextBlock Text="Chat with your personal knowledge assistant" 
+                           FontSize="14"
+                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <Button Grid.Column="1"
+                    Command="{Binding NewChatCommand}"
+                    Background="Transparent"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource CardAccentBrush}"
+                    CornerRadius="8"
+                    Padding="12,6"
+                    VerticalAlignment="Center">
+                <TextBlock Text="New Chat" FontWeight="Medium"/>
+            </Button>
+        </Grid>
+
+        <!-- Chat History -->
+        <ListBox Grid.Row="1" x:Name="ChatListBox" 
+                 ItemsSource="{Binding Messages}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0,0,16,0">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="vm:ChatMessageViewModel">
+                    <Border Classes="MessageBubble"
+                            Classes.UserMessage="{Binding IsUser}"
+                            Classes.AIMessage="{Binding !IsUser}">
+                        <StackPanel Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Classes="SenderTag" Grid.Column="0"/>
+                                <TextBlock Text="{Binding Timestamp, StringFormat=\{0:HH:mm\}}" 
+                                           FontSize="10" 
+                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                           Opacity="0.6"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                            <components:MarkdownView Source="{Binding Content}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+
+        <!-- Input Area -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,24,0,0">
+            <TextBox Grid.Column="0" 
+                     x:Name="InputBox"
+                     Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}" 
+                     Watermark="Ask anything... (Enter to send, Shift+Enter for new line)"
+                     Classes="ChatInput"
+                     AcceptsReturn="True"
+                     MaxHeight="200"
+                     VerticalContentAlignment="Top"
+                     TextWrapping="Wrap"
+                     Padding="16,12"
+                     KeyDown="InputBox_KeyDown">
+            </TextBox>
+
+            <Panel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Bottom">
+                <Button Command="{Binding SendMessageCommand}"
+                        IsVisible="{Binding !IsBusy}"
+                        Background="{DynamicResource CardAccentBrush}"
+                        Foreground="White"
+                        Width="100"
+                        Height="45"
+                        CornerRadius="12">
+                    <TextBlock Text="Send" FontWeight="SemiBold" 
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+
+                <Button Command="{Binding StopCommand}"
+                        IsVisible="{Binding IsBusy}"
+                        Background="#D32F2F"
+                        Foreground="White"
+                        Width="100"
+                        Height="45"
+                        CornerRadius="12">
+                    <TextBlock Text="Stop" FontWeight="SemiBold" 
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+            </Panel>
+        </Grid>
+    </Grid>
+</UserControl>
+

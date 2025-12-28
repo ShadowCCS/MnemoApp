@@ -34,75 +34,76 @@ public class LLamaTextService : ITextGenerationService
     {
         try
         {
-            // Auto-detect GPU acceleration if not explicitly set
-            var hardwareInfo = _hardware.Detect();
-            var useGpuSetting = await _settings.GetAsync<bool?>("AI.GpuAcceleration").ConfigureAwait(false);
-            bool useGpu = useGpuSetting ?? hardwareInfo.HasNvidiaGpu;
-            
-            if (useGpuSetting == null)
-            {
-                _logger.Info("LLamaTextService", $"Auto-detected GPU acceleration: {useGpu}");
-            }
-
-            var weights = await GetWeightsAsync(manifest).ConfigureAwait(false);
-            var modelPath = ResolveModelPath(manifest);
-
-            // Dynamically determine context size, defaulting to 32768 for better RAG performance
-            // if the model supports 128k, we can go higher, but 32k is a safe large default for memory
-            var contextSize = manifest.Metadata.TryGetValue("ContextSize", out var csStr) && uint.TryParse(csStr, out var cs) 
-                ? cs 
-                : 32768;
-
-            var parameters = new ModelParams(modelPath)
-            {
-                ContextSize = contextSize,
-                GpuLayerCount = useGpu ? 99 : 0,
-                Seed = 42, // Deterministic for testing, can be randomized
-            };
-
-            var executor = new StatelessExecutor(weights, parameters);
-            
-            var pipeline = new LLama.Sampling.DefaultSamplingPipeline();
-            pipeline.Temperature = 0.6f; // Slightly lower for more coherence
-            pipeline.TopP = 0.9f;
-            pipeline.TopK = 40;
-            pipeline.RepeatPenalty = 1.1f; // Help prevent gibberish repetition
-            
-            var inferenceParams = new InferenceParams
-            {
-                MaxTokens = 8192, // Increased for long-form generation support
-                AntiPrompts = new[] 
-                { 
-                    "\nUser:", "\nHuman:", "###", "<|", "\n\n\n", 
-                    "### Instruction:", "### Response:", "### Input:",
-                    "Instruction:", "Input:", "Response:", "User:", "Question:",
-                    "<|im_start|>", "<|im_end|>", "<|endoftext|>",
-                    "<|eot_id|>", "<|start_header_id|>", "<|end_header_id|>"
-                },
-                SamplingPipeline = pipeline
-            };
-
             var sb = new StringBuilder();
-            await foreach (var token in executor.InferAsync(prompt, inferenceParams, ct).ConfigureAwait(false))
+            await foreach (var token in GenerateStreamingAsync(manifest, prompt, ct).ConfigureAwait(false))
             {
                 sb.Append(token);
-                
-                var currentText = sb.ToString();
-                if (inferenceParams.AntiPrompts.Any(ap => currentText.EndsWith(ap, StringComparison.OrdinalIgnoreCase)))
-                {
-                    break;
-                }
-
-                if (sb.Length > 32000) break; // Safety cutoff adjusted for 8k generation
             }
-
-            var cleaned = CleanResponse(sb.ToString());
-            return Result<string>.Success(cleaned);
+            return Result<string>.Success(sb.ToString());
         }
         catch (Exception ex)
         {
             _logger.Error("LLamaTextService", $"Failed to generate text with {manifest.DisplayName}", ex);
             return Result<string>.Failure($"Generation failed: {ex.Message}", ex);
+        }
+    }
+
+    public async IAsyncEnumerable<string> GenerateStreamingAsync(AIModelManifest manifest, string prompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        var hardwareInfo = _hardware.Detect();
+        var useGpuSetting = await _settings.GetAsync<bool?>("AI.GpuAcceleration").ConfigureAwait(false);
+        bool useGpu = useGpuSetting ?? hardwareInfo.HasNvidiaGpu;
+
+        var weights = await GetWeightsAsync(manifest).ConfigureAwait(false);
+        var modelPath = ResolveModelPath(manifest);
+
+        var contextSize = manifest.Metadata.TryGetValue("ContextSize", out var csStr) && uint.TryParse(csStr, out var cs)
+            ? cs
+            : 32768;
+
+        var parameters = new ModelParams(modelPath)
+        {
+            ContextSize = contextSize,
+            GpuLayerCount = useGpu ? 99 : 0,
+            Seed = 42,
+        };
+
+        var executor = new StatelessExecutor(weights, parameters);
+
+        var pipeline = new LLama.Sampling.DefaultSamplingPipeline();
+        pipeline.Temperature = 0.6f;
+        pipeline.TopP = 0.9f;
+        pipeline.TopK = 40;
+        pipeline.RepeatPenalty = 1.1f;
+
+        var inferenceParams = new InferenceParams
+        {
+            MaxTokens = 8192,
+            AntiPrompts = new[]
+            {
+                "\nUser:", "\nHuman:", "###", "<|", "\n\n\n",
+                "### Instruction:", "### Response:", "### Input:",
+                "Instruction:", "Input:", "Response:", "User:", "Question:",
+                "<|im_start|>", "<|im_end|>", "<|endoftext|>",
+                "<|eot_id|>", "<|start_header_id|>", "<|end_header_id|>"
+            },
+            SamplingPipeline = pipeline
+        };
+
+        var totalOutput = new StringBuilder();
+        await foreach (var token in executor.InferAsync(prompt, inferenceParams, ct).ConfigureAwait(false))
+        {
+            totalOutput.Append(token);
+            var currentText = totalOutput.ToString();
+
+            if (inferenceParams.AntiPrompts.Any(ap => currentText.EndsWith(ap, StringComparison.OrdinalIgnoreCase)))
+            {
+                break;
+            }
+
+            yield return token;
+
+            if (totalOutput.Length > 32000) break;
         }
     }
 
