@@ -38,8 +38,27 @@ public partial class MarkdownView : UserControl
         _markdownProcessor = sp.GetRequiredService<IMarkdownProcessor>();
         _markdownRenderer = sp.GetRequiredService<IMarkdownRenderer>();
         
+        var settings = sp.GetRequiredService<ISettingsService>();
+        settings.SettingChanged += OnSettingChanged;
+
         InitializeComponent();
         _contentHost = this.FindControl<ContentControl>("ContentHost");
+    }
+
+    private void OnSettingChanged(object? sender, string key)
+    {
+        if (key.StartsWith("Markdown."))
+        {
+            _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(RenderAsync);
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        var sp = ((App)Application.Current!).Services!;
+        var settings = sp.GetRequiredService<ISettingsService>();
+        settings.SettingChanged -= OnSettingChanged;
     }
 
     private void InitializeComponent()

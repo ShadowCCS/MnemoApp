@@ -1,17 +1,63 @@
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Mnemo.Core.Services;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules.Settings.ViewModels;
 
 public partial class AppIconSettingViewModel : ViewModelBase
 {
+    private readonly ISettingsService _settingsService;
+    private const string SettingKey = "App.Icon";
+    private const string DefaultIcon = "avares://Mnemo.UI/Assets/AppIcons/AppIconDarkClassic.ico";
+
     [ObservableProperty] private string _title;
     [ObservableProperty] private string _description;
+    
+    [ObservableProperty] private string _currentIconPath = DefaultIcon;
 
-    public AppIconSettingViewModel(string title, string description)
+    public ObservableCollection<AppIconOptionViewModel> Options { get; } = new();
+
+    public AppIconSettingViewModel(ISettingsService settingsService, string title, string description)
     {
+        _settingsService = settingsService;
         _title = title;
         _description = description;
+
+        _ = InitializeAsync();
+    }
+
+    private async Task InitializeAsync()
+    {
+        // Load current without blocking the constructor
+        CurrentIconPath = await _settingsService.GetAsync(SettingKey, DefaultIcon);
+
+        // Initialize options
+        string[] iconFiles = new[]
+        {
+            "AppIconDarkClassic.ico",
+            "AppIconDarkFaceted.ico",
+            "AppIconDarkNebula.ico",
+            "AppIconLightClassic.ico",
+            "AppIconLightFaceted.ico",
+            "AppIconLightNebula.ico"
+        };
+
+        foreach (var file in iconFiles)
+        {
+            var path = $"avares://Mnemo.UI/Assets/AppIcons/{file}";
+            Options.Add(new AppIconOptionViewModel(path, path == _currentIconPath, this));
+        }
+    }
+
+    public async Task SelectIconAsync(string path)
+    {
+        CurrentIconPath = path;
+        foreach (var option in Options)
+        {
+            option.IsSelected = option.IconPath == path;
+        }
+        await _settingsService.SetAsync(SettingKey, path);
     }
 }
-

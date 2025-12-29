@@ -50,7 +50,15 @@ public class AITaskManager : IAITaskManager
                 if (task.Status == AITaskStatus.Pending || task.Status == AITaskStatus.Paused)
                 {
                     _logger.Info("AITaskManager", $"Starting task: {task.DisplayName}");
-                    await task.RunAsync(default).ConfigureAwait(false);
+                    var result = await task.RunAsync(default).ConfigureAwait(false);
+                    if (result.IsSuccess)
+                    {
+                        _logger.Info("AITaskManager", $"Task completed: {task.DisplayName}");
+                    }
+                    else
+                    {
+                        _logger.Error("AITaskManager", $"Task failed: {task.DisplayName} - {result.ErrorMessage}");
+                    }
                     TaskUpdated?.Invoke(task);
                 }
 

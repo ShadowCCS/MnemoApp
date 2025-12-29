@@ -15,7 +15,7 @@ public partial class DropdownSettingViewModel : ViewModelBase
     [ObservableProperty] private string _selectedOption;
     public ObservableCollection<string> Options { get; }
 
-    public DropdownSettingViewModel(ISettingsService settingsService, string settingsKey, string title, string description, string[] options)
+    public DropdownSettingViewModel(ISettingsService settingsService, string settingsKey, string title, string description, string[] options, string? defaultValue = null)
     {
         _settingsService = settingsService;
         _settingsKey = settingsKey;
@@ -24,8 +24,9 @@ public partial class DropdownSettingViewModel : ViewModelBase
         Options = new ObservableCollection<string>(options);
         
         // Initialize value from settings
-        var savedValue = _settingsService.GetAsync(_settingsKey, options[0]).GetAwaiter().GetResult();
-        _selectedOption = savedValue ?? options[0];
+        var defaultVal = defaultValue ?? options[0];
+        var savedValue = _settingsService.GetAsync(_settingsKey, defaultVal).GetAwaiter().GetResult();
+        _selectedOption = savedValue ?? defaultVal;
     }
 
     partial void OnSelectedOptionChanged(string value)

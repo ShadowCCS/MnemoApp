@@ -8,11 +8,13 @@ public class PathModule : IModule
     public void ConfigureServices(IServiceRegistrar services)
     {
         services.AddTransient<PathViewModel>();
+        services.AddTransient<PathDetailViewModel>();
     }
 
     public void RegisterRoutes(INavigationRegistry registry)
     {
         registry.RegisterRoute("path", typeof(PathViewModel));
+        registry.RegisterRoute("path-detail", typeof(PathDetailViewModel));
     }
 
     public void RegisterSidebarItems(ISidebarService sidebarService)

@@ -41,9 +41,6 @@
 
             <!-- Content container with alignment options -->
             <Border x:Name="ContentBorder"
-                    HorizontalAlignment="{Binding Options.HorizontalAlignment}"
-                    VerticalAlignment="{Binding Options.VerticalAlignment}"
-                    Margin="{Binding Options.Margin}"
                     Background="Transparent"
                     LayoutUpdated="OnOverlayLayoutUpdated"
                     Loaded="OnOverlayLoaded">

@@ -57,9 +57,20 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
 
     public void NavigateTo(string route)
     {
+        NavigateTo(route, null);
+    }
+
+    public void NavigateTo(string route, object? parameter)
+    {
         if (_routes.TryGetValue(route, out var vmType))
         {
             var vm = _serviceProvider.GetRequiredService(vmType);
+            
+            if (vm is INavigationAware aware)
+            {
+                aware.OnNavigatedTo(parameter);
+            }
+
             _history.Push(route);
             CurrentViewModel = vm;
             CanGoBackChanged?.Invoke();

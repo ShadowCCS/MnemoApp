@@ -9,6 +9,7 @@ public interface INavigationService : INavigationRegistry
     object? CurrentViewModel { get; }
     string? CurrentRoute { get; }
     void NavigateTo(string route);
+    void NavigateTo(string route, object? parameter);
     bool CanGoBack { get; }
     event Action? CanGoBackChanged;
     ObservableCollection<BreadcrumbItem> Breadcrumbs { get; }

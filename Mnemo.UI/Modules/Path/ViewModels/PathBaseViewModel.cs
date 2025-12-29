@@ -4,6 +4,13 @@ namespace Mnemo.UI.Modules.Path.ViewModels;
 
 public abstract class PathBaseViewModel : ViewModelBase
 {
+    private string _id = string.Empty;
+    public string Id
+    {
+        get => _id;
+        set => SetProperty(ref _id, value);
+    }
+
     private string _name = string.Empty;
     public string Name
     {

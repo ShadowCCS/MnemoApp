@@ -33,18 +33,25 @@ public partial class SettingsViewModel : ViewModelBase
     {
         _settingsService = settingsService;
         
-        // Load profile info
-        _userName = _settingsService.GetAsync("User.DisplayName", "John Doe").GetAwaiter().GetResult();
-        _profilePicturePath = _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/demo-profile-pic.png").GetAwaiter().GetResult();
+        // Load settings asynchronously
+        _ = LoadInitialSettingsAsync();
 
         // Listen for changes to update sidebar profile info
         _settingsService.SettingChanged += (s, e) =>
         {
-            if (e == "User.DisplayName") UserName = _settingsService.GetAsync("User.DisplayName", "John Doe").GetAwaiter().GetResult();
-            if (e == "User.ProfilePicture") ProfilePicturePath = _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/demo-profile-pic.png").GetAwaiter().GetResult();
+            if (e == "User.DisplayName" || e == "User.ProfilePicture")
+            {
+                _ = LoadInitialSettingsAsync();
+            }
         };
 
         InitializeCategories();
+    }
+
+    private async Task LoadInitialSettingsAsync()
+    {
+        UserName = await _settingsService.GetAsync("User.DisplayName", "John Doe");
+        ProfilePicturePath = await _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/demo-profile-pic.png");
     }
 
     private void InitializeCategories()
@@ -72,11 +79,23 @@ public partial class SettingsViewModel : ViewModelBase
 
         // Editor Category
         var editor = new SettingsCategoryViewModel("Editor", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg");
+        
         var editorGroup = new SettingsGroupViewModel("Writing Experience");
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.AutoSave", "Auto-save", "Automatically save changes every few seconds.", true));
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.SpellCheck", "Spell Check", "Highlight misspelled words in the editor.", true));
         editorGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Editor.DefaultView", "Default View", "Choose the default view for new notes.", new[] { "Editor Only", "Preview Only", "Split View" }));
+        
+        var markdownGroup = new SettingsGroupViewModel("Markdown Rendering");
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.BlockSpacing", "Block Spacing", "Adjust the vertical space between paragraphs and sections.", new[] { "Normal", "Compact", "Relaxed" }));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LineHeight", "Line Spacing", "Adjust the height between lines of text within a paragraph.", new[] { "1.0", "1.2", "1.4", "1.45", "1.5", "1.6", "1.8", "2.0" }, "1.5"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LetterSpacing", "Letter Spacing", "Adjust the space between characters.", new[] { "0", "0.2", "0.3", "0.4", "0.5", "0.8", "1.0", "1.5" }, "0.3"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.FontSize", "Base Font Size", "Change the base font size for the rendered markdown.", new[] { "12px", "13px", "14px", "15px", "16px", "17px", "18px" }, "14px"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.CodeFontSize", "Code Font Size", "Adjust the font size for code blocks.", new[] { "12px", "13px", "14px", "15px", "16px" }, "15px"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.MathFontSize", "Math Font Size", "Adjust the font size for LaTeX formulas.", new[] { "14px", "16px", "18px", "20px" }, "14px"));
+        markdownGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Markdown.RenderMath", "Render LaTeX Math", "Enable or disable mathematical formula rendering.", true));
+        
         editor.Groups.Add(editorGroup);
+        editor.Groups.Add(markdownGroup);
 
         // AI & Tools Category
         var aiTools = new SettingsCategoryViewModel("AI & Tools", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg");
@@ -84,6 +103,9 @@ public partial class SettingsViewModel : ViewModelBase
         var aiGroup = new SettingsGroupViewModel("Intelligence");
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", "Enable AI Assistant", "Use AI to help you write, summarize, and organize.", true));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartSwitch", "Smart Switch", "Automatically use the smarter (but slower) model for complex tasks."));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartUnitGeneration", "Smart Unit Generation", "Generate only the first unit on creation, then others on-demand."));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.UseGemini", "Use Gemini (Experimental)", "Enable Google Gemini API for all AI tasks. Bypasses local models and router."));
+        aiGroup.Items.Add(new TextSettingViewModel(_settingsService, "AI.GeminiApiKey", "Gemini API Key", "Your Google AI Studio API key.", "", true));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", "GPU Acceleration", "Use your graphics card to speed up AI inference. Requires NVIDIA GPU with CUDA."));
         aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.UnloadTimeout", "Unload Timeout", "Free up memory when AI models are not in use.", new[] { "Never", "5 Minutes", "15 Minutes", "1 Hour" }));
         
@@ -99,8 +121,7 @@ public partial class SettingsViewModel : ViewModelBase
         
         var themeGroup = new SettingsGroupViewModel("Theme & Visuals");
         themeGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Appearance.Theme", "App Theme", "Select the visual style of the application.", new[] { "System", "Light", "Dark", "Dusk" }));
-        themeGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Appearance.Transparency", "Transparency Effects", "Enable glass-like transparency in the sidebar and overlays.", true));
-        themeGroup.Items.Add(new AppIconSettingViewModel("App Icon", "Customize the application icon in your taskbar."));
+        themeGroup.Items.Add(new AppIconSettingViewModel(_settingsService, "App Icon", "Customize the application icon in your taskbar."));
         
         appearance.Groups.Add(themeGroup);
 

@@ -29,6 +29,7 @@ public static class Bootstrapper
         services.AddSingleton<HardwareDetector>();
         services.AddSingleton<IAIModelRegistry, ModelRegistry>();
         services.AddSingleton<IResourceGovernor, ResourceGovernor>();
+        services.AddSingleton<GeminiTextService>();
         services.AddSingleton<ITextGenerationService, LLamaTextService>();
         services.AddSingleton<IAIOrchestrator, AIOrchestrator>();
         services.AddSingleton<IAITaskManager, AITaskManager>();
@@ -37,6 +38,7 @@ public static class Bootstrapper
         services.AddSingleton<IVectorStore, SqliteVectorStore>();
         services.AddSingleton<IEmbeddingService, OnnxEmbeddingService>();
         services.AddSingleton<IKnowledgeService, KnowledgeService>();
+        services.AddSingleton<ILearningPathService, LearningPathService>();
         
         // 2. Register UI-specific Services
         services.AddSingleton<IOverlayService, OverlayService>();

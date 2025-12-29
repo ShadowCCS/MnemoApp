@@ -190,23 +190,39 @@ namespace Mnemo.UI.Components
 
         private void UpdateOverlayPosition(Border border, OverlayInstance overlay)
         {
+            var topLevel = this.FindAncestorOfType<TopLevel>();
+            if (topLevel == null) return;
+
             if (overlay.Options.AnchorControl != null)
             {
-                var topLevel = this.FindAncestorOfType<TopLevel>();
-                if (topLevel != null)
+                var calculatedMargin = CalculateAnchorMargin(overlay, topLevel);
+                if (calculatedMargin.HasValue)
                 {
-                    var calculatedMargin = CalculateAnchorMargin(overlay, topLevel);
-                    if (calculatedMargin.HasValue && border.Margin != calculatedMargin.Value)
-                    {
-                        // Set margin directly on border to bypass binding issues
-                        border.Margin = calculatedMargin.Value;
-                        // Also update options for consistency
-                        overlay.Options.Margin = calculatedMargin.Value;
-                        // Use Left/Top alignment when anchored
-                        border.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
-                        border.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
-                    }
+                    border.Margin = calculatedMargin.Value;
+                    border.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
+                    border.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
                 }
+            }
+            else
+            {
+                // Handle non-anchored overlay positioning
+                if (overlay.Options.HorizontalAlignment is string hStr && Enum.TryParse<HorizontalAlignment>(hStr, true, out var hAlign))
+                    border.HorizontalAlignment = hAlign;
+                else if (overlay.Options.HorizontalAlignment is HorizontalAlignment hEnum)
+                    border.HorizontalAlignment = hEnum;
+
+                if (overlay.Options.VerticalAlignment is string vStr && Enum.TryParse<VerticalAlignment>(vStr, true, out var vAlign))
+                    border.VerticalAlignment = vAlign;
+                else if (overlay.Options.VerticalAlignment is VerticalAlignment vEnum)
+                    border.VerticalAlignment = vEnum;
+
+                if (overlay.Options.Margin is string mStr)
+                {
+                    try { border.Margin = Thickness.Parse(mStr); }
+                    catch { /* Ignore invalid thickness strings */ }
+                }
+                else if (overlay.Options.Margin is Thickness mThickness)
+                    border.Margin = mThickness;
             }
         }
     }

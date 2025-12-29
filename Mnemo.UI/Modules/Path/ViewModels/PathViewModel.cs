@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
@@ -8,6 +9,7 @@ using Mnemo.Core.Services;
 using Mnemo.UI.ViewModels;
 using Mnemo.UI.Modules.Path.ViewModels;
 using Mnemo.UI.Modules.Path.Tasks;
+using Mnemo.UI.Components;
 
 namespace Mnemo.UI.Modules.Path.ViewModels;
 
@@ -15,6 +17,11 @@ public class PathViewModel : ViewModelBase
 {
     private readonly IAITaskManager _taskManager;
     private readonly IAIOrchestrator _orchestrator;
+    private readonly ILearningPathService _pathService;
+    private readonly IKnowledgeService _knowledge;
+    private readonly ISettingsService _settings;
+    private readonly INavigationService _navigation;
+    private readonly IOverlayService _overlay;
     private readonly ILoggerService _logger;
 
     private string _searchText = string.Empty;
@@ -36,28 +43,145 @@ public class PathViewModel : ViewModelBase
 
     public ICommand ToggleViewCommand { get; }
     public ICommand CreateCommand { get; }
+    public ICommand OpenPathCommand { get; }
 
-    public PathViewModel(IAITaskManager taskManager, IAIOrchestrator orchestrator, ILoggerService logger)
+    public PathViewModel(
+        IAITaskManager taskManager, 
+        IAIOrchestrator orchestrator, 
+        ILearningPathService pathService,
+        IKnowledgeService knowledge,
+        ISettingsService settings,
+        INavigationService navigation,
+        IOverlayService overlay,
+        ILoggerService logger)
     {
         _taskManager = taskManager;
         _orchestrator = orchestrator;
+        _pathService = pathService;
+        _knowledge = knowledge;
+        _settings = settings;
+        _navigation = navigation;
+        _overlay = overlay;
         _logger = logger;
 
         ToggleViewCommand = new RelayCommand(() => IsGridView = !IsGridView);
         CreateCommand = new RelayCommand(CreateNewItem);
+        OpenPathCommand = new RelayCommand<PathBaseViewModel>(OpenPath);
 
-        LoadSampleData();
+        _ = LoadPathsAsync();
     }
 
-    private async void CreateNewItem()
+    private async Task LoadPathsAsync()
     {
-        if (string.IsNullOrWhiteSpace(SearchText)) return;
+        FrequentlyUsedItems.Clear();
+        AllItems.Clear();
 
-        var task = new GeneratePathTask(SearchText, _orchestrator, _logger);
+        var paths = await _pathService.GetAllPathsAsync();
+        var pathList = paths.ToList();
+        
+        foreach (var path in pathList)
+        {
+            var vm = new PathItemViewModel 
+            { 
+                Id = path.PathId,
+                Name = path.Title, 
+                LastModified = path.Metadata.CreatedAt.ToString("MM/dd/yyyy"), 
+                Size = 0,
+                Progress = path.Progress, 
+                Category = path.Difficulty.ToUpper() 
+            };
+            AllItems.Add(vm);
+        }
+
+        foreach (var path in pathList.Take(4))
+        {
+             var vm = new PathItemViewModel 
+            { 
+                Id = path.PathId,
+                Name = path.Title, 
+                LastModified = path.Metadata.CreatedAt.ToString("MM/dd/yyyy"), 
+                Size = 0,
+                Progress = path.Progress, 
+                Category = path.Difficulty.ToUpper() 
+            };
+            FrequentlyUsedItems.Add(vm);
+        }
+
+        if (!AllItems.Any())
+        {
+            LoadSampleData();
+        }
+    }
+
+    private void OpenPath(PathBaseViewModel? item)
+    {
+        if (item is PathItemViewModel pathItem && !string.IsNullOrEmpty(pathItem.Id))
+        {
+            _navigation.NavigateTo("path-detail", pathItem.Id);
+        }
+    }
+
+    private void CreateNewItem()
+    {
+        var inputBuilder = new InputBuilder();
+        var options = new OverlayOptions
+        {
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true
+        };
+        
+        var id = _overlay.CreateOverlay(inputBuilder, options, "Create Learning Path");
+        
+        inputBuilder.GenerateRequested += async (s, e) =>
+        {
+            try 
+            {
+                _overlay.CloseOverlay(id);
+                await StartGeneration(e.text, e.files);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("Path", "Failed to start generation", ex);
+                await _overlay.CreateDialogAsync("Error", $"Could not start generation: {ex.Message}");
+            }
+        };
+    }
+
+    private async Task StartGeneration(string topic, string[] files)
+    {
+        var task = new GeneratePathTask(
+            topic, 
+            "", 
+            files, 
+            _orchestrator, 
+            _knowledge, 
+            _pathService, 
+            _settings, 
+            _logger);
+
         await _taskManager.QueueTaskAsync(task);
         
-        // In a real app, we'd navigate to the task view or show a toast
-        _logger.Info("Path", $"Started generation for: {SearchText}");
+        _logger.Info("Path", $"Started generation for: {topic}");
+        
+        // Wait for the path to be created in the first step
+        while (task.GeneratedPath == null && 
+               (task.Status == AITaskStatus.Running || task.Status == AITaskStatus.Pending))
+        {
+            await Task.Delay(500);
+        }
+
+        if (task.Status == AITaskStatus.Failed)
+        {
+            _logger.Error("Path", $"Generation failed: {task.Steps.FirstOrDefault(s => s.Status == AITaskStatus.Failed)?.ErrorMessage}");
+            await _overlay.CreateDialogAsync("Generation Failed", "Could not create the learning path. Please check your connection or try again.");
+            return;
+        }
+
+        if (task.GeneratedPath != null)
+        {
+            _navigation.NavigateTo("path-detail", task.GeneratedPath.PathId);
+            _ = LoadPathsAsync();
+        }
     }
 
     private void LoadSampleData()

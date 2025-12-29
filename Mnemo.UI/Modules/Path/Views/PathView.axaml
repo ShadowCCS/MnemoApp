@@ -8,7 +8,9 @@
              xmlns:components="using:Mnemo.UI.Components"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="Mnemo.UI.Modules.Path.Views.PathView"
-             x:DataType="vm:PathViewModel">
+             x:DataType="vm:PathViewModel"
+             Foreground="{DynamicResource TextPrimaryBrush}"
+             x:Name="root">
 
     <UserControl.Resources>
         <converters:FolderIconConverter x:Key="FolderIconConverter"/>
@@ -108,7 +110,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Learning Path" 
-                               FontSize="32" 
+                               FontSize="{DynamicResource FontSize.Heading1}" 
                                FontFamily="{DynamicResource Font.Bold}"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                     <TextBlock Text="Organize your knowledge and track your progress" 
@@ -124,7 +126,9 @@
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg" 
                                           Width="18" Height="18" Color="{DynamicResource CardAccentBrush}"/>
-                        <TextBlock Text="Generate New" FontWeight="SemiBold" Foreground="{DynamicResource CardAccentBrush}"/>
+                        <TextBlock Text="Generate New" 
+                                   FontFamily="{DynamicResource Font.SemiBold}" 
+                                   Foreground="{DynamicResource CardAccentBrush}"/>
                     </StackPanel>
                 </Button>
             </Grid>
@@ -146,50 +150,58 @@
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Border Width="280" Height="170" 
-                                    Margin="0,0,20,0"
-                                    Background="{DynamicResource CardBackgroundSecondaryBrush}" 
-                                    Cursor="Hand"
-                                    CornerRadius="24" ClipToBounds="True"
-                                    Classes="FeaturedCardHover">
-                                    <Panel>
-                                        <!-- Background Decoration -->
-                                        <Ellipse Width="180" Height="180" Fill="{DynamicResource WidgetIconBackground1Brush}" 
-                                                 Opacity="0.05" Margin="-60,-60,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                                        <Ellipse Width="120" Height="120" Fill="{DynamicResource CardAccentBrush}" 
-                                                 Opacity="0.03" Margin="0,0,-40,-40" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
-                                        
-                                        <Grid RowDefinitions="Auto,*,Auto" Margin="24">
-                                            <Border Grid.Row="0" HorizontalAlignment="Left" Padding="10,5" 
-                                                    Background="{DynamicResource SearchBarBackgroundBrush}" CornerRadius="8">
-                                                <TextBlock Text="{Binding Category}" FontSize="11" FontWeight="Bold" 
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            </Border>
+                        <DataTemplate DataType="vm:PathItemViewModel">
+                            <Button Command="{Binding #root.((vm:PathViewModel)DataContext).OpenPathCommand}"
+                                    CommandParameter="{Binding}"
+                                    Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,20,0">
+                                <Border Width="280" Height="170" 
+                                        Background="{DynamicResource CardBackgroundSecondaryBrush}" 
+                                        Cursor="Hand"
+                                        CornerRadius="24" ClipToBounds="True"
+                                        Classes="FeaturedCardHover">
+                                        <Panel>
+                                            <!-- Background Decoration -->
+                                            <Ellipse Width="180" Height="180" Fill="{DynamicResource WidgetIconBackground1Brush}" 
+                                                     Opacity="0.05" Margin="-60,-60,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                            <Ellipse Width="120" Height="120" Fill="{DynamicResource CardAccentBrush}" 
+                                                     Opacity="0.03" Margin="0,0,-40,-40" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
                                             
-                                            <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="18" 
-                                                       FontFamily="{DynamicResource Font.SemiBold}" 
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       VerticalAlignment="Center"
-                                                       TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
-                                            
-                                            <StackPanel Grid.Row="2" Spacing="8">
-                                                <DockPanel>
-                                                    <TextBlock Text="{Binding Progress, StringFormat={}{0}% complete}" 
-                                                               FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding LastModified}" 
-                                                               FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}" 
-                                                               HorizontalAlignment="Right"/>
-                                                </DockPanel>
-                                                <ProgressBar Value="{Binding Progress}" Height="8" CornerRadius="4"
-                                                             Background="{DynamicResource ProgressBarBackgroundBrush}"
-                                                             Foreground="{Binding Progress, Converter={StaticResource ProgressPhaseBrushConverter}}"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Panel>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
+                                            <Grid RowDefinitions="Auto,*,Auto" Margin="24">
+                                                <Border Grid.Row="0" HorizontalAlignment="Left" Padding="10,5" 
+                                                        Background="{DynamicResource SearchBarBackgroundBrush}" CornerRadius="8">
+                                                    <TextBlock Text="{Binding Category}" 
+                                                               FontSize="{DynamicResource FontSize.Caption}" 
+                                                               FontFamily="{DynamicResource Font.Bold}" 
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                </Border>
+                                                
+                                                <TextBlock Grid.Row="1" Text="{Binding Name}" 
+                                                           FontSize="{DynamicResource FontSize.Heading5}" 
+                                                           FontFamily="{DynamicResource Font.SemiBold}" 
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           VerticalAlignment="Center"
+                                                           TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+                                                
+                                                <StackPanel Grid.Row="2" Spacing="8">
+                                                    <DockPanel>
+                                                        <TextBlock Text="{Binding Progress, StringFormat={}{0}% complete}" 
+                                                                   FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding LastModified}" 
+                                                                   FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
+                                                                   Foreground="{DynamicResource TextTertiaryBrush}" 
+                                                                   HorizontalAlignment="Right"/>
+                                                    </DockPanel>
+                                                    <ProgressBar Value="{Binding Progress}" Height="8" CornerRadius="4"
+                                                                 Background="{DynamicResource ProgressBarBackgroundBrush}"
+                                                                 Foreground="{Binding Progress, Converter={StaticResource ProgressPhaseBrushConverter}}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Panel>
+                                    </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
                     </ListBox>
             </StackPanel>
 
@@ -243,33 +255,45 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="vm:PathBaseViewModel">
-                                <Border Margin="0,0,20,20" Padding="20" Background="{DynamicResource CardBackgroundPrimaryBrush}" Cursor="Hand" 
-                                        CornerRadius="20" MinWidth="180" MaxWidth="220" Height="180" Classes="CardHover">
-                                    <Grid RowDefinitions="Auto,*,Auto">
-                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
-                                            <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource SearchBarBackgroundBrush}">
-                                                <controls:SvgIcon SvgPath="{Binding IsFolder, Converter={StaticResource FolderIconConverter}}" 
-                                                                  Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
-                                            </Border>
-                                            <StackPanel VerticalAlignment="Center">
-                                                 <TextBlock Text="{Binding Category}" FontSize="10" Foreground="{DynamicResource TextTertiaryBrush}" FontWeight="SemiBold"/>
-                                                 <TextBlock Text="{Binding Size, StringFormat={}{0} MB}" FontSize="10" Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                <Button Command="{Binding #root.((vm:PathViewModel)DataContext).OpenPathCommand}"
+                                        CommandParameter="{Binding}"
+                                        Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,20,20">
+                                    <Border Padding="20" Background="{DynamicResource CardBackgroundPrimaryBrush}" Cursor="Hand" 
+                                            CornerRadius="20" MinWidth="180" MaxWidth="220" Height="180" Classes="CardHover">
+                                        <Grid RowDefinitions="Auto,*,Auto">
+                                            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
+                                                <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource SearchBarBackgroundBrush}">
+                                                    <controls:SvgIcon SvgPath="{Binding IsFolder, Converter={StaticResource FolderIconConverter}}" 
+                                                                      Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
+                                                </Border>
+                                                <StackPanel VerticalAlignment="Center">
+                                                     <TextBlock Text="{Binding Category}" 
+                                                                FontSize="{DynamicResource FontSize.CaptionButton}" 
+                                                                Foreground="{DynamicResource TextTertiaryBrush}" 
+                                                                FontFamily="{DynamicResource Font.SemiBold}"/>
+                                                     <TextBlock Text="{Binding Size, StringFormat={}{0} MB}" 
+                                                                FontSize="{DynamicResource FontSize.CaptionButton}" 
+                                                                Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                                </StackPanel>
                                             </StackPanel>
-                                        </StackPanel>
-                                        
-                                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="{DynamicResource FontSize.Body.Small}" 
-                                                   FontFamily="{DynamicResource Font.Medium}" TextWrapping="Wrap" Margin="0,12,0,0"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                   VerticalAlignment="Top" MaxLines="2" TextTrimming="CharacterEllipsis"/>
-                                        
-                                        <StackPanel Grid.Row="2" Spacing="8">
-                                            <ProgressBar Value="{Binding Progress}" Height="6" CornerRadius="3"
-                                                         Background="{DynamicResource ProgressBarBackgroundBrush}"
-                                                         Foreground="{Binding Progress, Converter={StaticResource ProgressPhaseBrushConverter}}"/>
-                                            <TextBlock Text="{Binding LastModified}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Right"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
+                                            
+                                            <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="{DynamicResource FontSize.Body.Small}" 
+                                                       FontFamily="{DynamicResource Font.Medium}" TextWrapping="Wrap" Margin="0,12,0,0"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       VerticalAlignment="Top" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+                                            
+                                            <StackPanel Grid.Row="2" Spacing="8">
+                                                <ProgressBar Value="{Binding Progress}" Height="6" CornerRadius="3"
+                                                             Background="{DynamicResource ProgressBarBackgroundBrush}"
+                                                             Foreground="{Binding Progress, Converter={StaticResource ProgressPhaseBrushConverter}}"/>
+                                                <TextBlock Text="{Binding LastModified}" 
+                                                           FontSize="{DynamicResource FontSize.Caption}" 
+                                                           Foreground="{DynamicResource TextTertiaryBrush}" 
+                                                           HorizontalAlignment="Right"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </Button>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -279,56 +303,90 @@
                         <!-- Custom List Header -->
                         <Border Padding="12,8" Margin="0,0,0,5">
                             <Grid ColumnDefinitions="48,*,150,100,180">
-                                <TextBlock Grid.Column="1" Text="NAME" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextTertiaryBrush}" Margin="12,0,0,0"/>
-                                <TextBlock Grid.Column="2" Text="LAST MODIFIED" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="3" Text="SIZE" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="4" Text="PROGRESS" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Right" Margin="0,0,10,0"/>
+                                <TextBlock Grid.Column="1" Text="NAME" 
+                                           FontSize="{DynamicResource FontSize.Caption}" 
+                                           FontFamily="{DynamicResource Font.Bold}" 
+                                           Foreground="{DynamicResource TextTertiaryBrush}" 
+                                           Margin="12,0,0,0"/>
+                                <TextBlock Grid.Column="2" Text="LAST MODIFIED" 
+                                           FontSize="{DynamicResource FontSize.Caption}" 
+                                           FontFamily="{DynamicResource Font.Bold}" 
+                                           Foreground="{DynamicResource TextTertiaryBrush}" 
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="SIZE" 
+                                           FontSize="{DynamicResource FontSize.Caption}" 
+                                           FontFamily="{DynamicResource Font.Bold}" 
+                                           Foreground="{DynamicResource TextTertiaryBrush}" 
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="4" Text="PROGRESS" 
+                                           FontSize="{DynamicResource FontSize.Caption}" 
+                                           FontFamily="{DynamicResource Font.Bold}" 
+                                           Foreground="{DynamicResource TextTertiaryBrush}" 
+                                           HorizontalAlignment="Right" 
+                                           Margin="0,0,10,0"/>
                             </Grid>
                         </Border>
 
                         <ListBox ItemsSource="{Binding AllItems}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="vm:PathBaseViewModel">
-                                    <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" CornerRadius="16" Margin="0,0,0,8" Padding="12" Classes="CardHover" ClipToBounds="True" Cursor="Hand">
-                                        <Grid ColumnDefinitions="48,*,150,100,170">
-                                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{DynamicResource SearchBarBackgroundBrush}">
-                                                <controls:SvgIcon SvgPath="{Binding IsFolder, Converter={StaticResource FolderIconConverter}}"
-                                                                  Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
-                                            </Border>
-
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
-                                                <TextBlock Text="{Binding Name}" FontSize="{DynamicResource FontSize.Body.Small}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                <TextBlock Text="{Binding Category}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"/>
-                                            </StackPanel>
-
-                                            <TextBlock Grid.Column="2" Text="{Binding LastModified}" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-
-                                            <TextBlock Grid.Column="3" Text="{Binding Size, StringFormat={}{0} MB}" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-
-                                            <Grid Grid.Column="4" VerticalAlignment="Center" Width="170">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <ProgressBar Grid.Column="0"
-                                                             Value="{Binding Progress}"
-                                                             Height="6"
-                                                             CornerRadius="3"
-                                                             Margin="0,0,8,0"
-                                                             VerticalAlignment="Center"
-                                                             Background="{DynamicResource ProgressBarBackgroundBrush}"
-                                                             Foreground="{Binding Progress, Converter={StaticResource ProgressPhaseBrushConverter}}"/>
-                                                
-                                                <TextBlock Grid.Column="1"
-                                                           Text="{Binding Progress, StringFormat={}{0:0}%}"
-                                                           FontSize="11"
-                                                           Foreground="{DynamicResource TextTertiaryBrush}"
-                                                           VerticalAlignment="Center"/>
+                                    <Button Command="{Binding #root.((vm:PathViewModel)DataContext).OpenPathCommand}"
+                                            CommandParameter="{Binding}"
+                                            Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Stretch">
+                                        <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" CornerRadius="16" Margin="0,0,0,8" Padding="12" Classes="CardHover" ClipToBounds="True" Cursor="Hand">
+                                            <Grid ColumnDefinitions="48,*,150,100,170">
+                                                <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{DynamicResource SearchBarBackgroundBrush}">
+                                                    <controls:SvgIcon SvgPath="{Binding IsFolder, Converter={StaticResource FolderIconConverter}}"
+                                                                      Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
+                                                </Border>
+    
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                    <TextBlock Text="{Binding Name}" 
+                                                               FontSize="{DynamicResource FontSize.Body.Small}" 
+                                                               FontFamily="{DynamicResource Font.SemiBold}" 
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBlock Text="{Binding Category}" 
+                                                               FontSize="{DynamicResource FontSize.Caption}" 
+                                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                                </StackPanel>
+    
+                                                <TextBlock Grid.Column="2" Text="{Binding LastModified}" 
+                                                           VerticalAlignment="Center" 
+                                                           FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                                           HorizontalAlignment="Center"/>
+    
+                                                <TextBlock Grid.Column="3" Text="{Binding Size, StringFormat={}{0} MB}" 
+                                                           VerticalAlignment="Center" 
+                                                           FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" 
+                                                           HorizontalAlignment="Center"/>
+    
+                                                <Grid Grid.Column="4" VerticalAlignment="Center" Width="170">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+    
+                                                    <ProgressBar Grid.Column="0"
+                                                                 Value="{Binding Progress}"
+                                                                 Height="6"
+                                                                 CornerRadius="3"
+                                                                 Margin="0,0,8,0"
+                                                                 VerticalAlignment="Center"
+                                                                 Background="{DynamicResource ProgressBarBackgroundBrush}"
+                                                                 Foreground="{Binding Progress, Converter={StaticResource ProgressPhaseBrushConverter}}"/>
+                                                    
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Progress, StringFormat={}{0:0}%}"
+                                                               FontSize="{DynamicResource FontSize.Caption}"
+                                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                </Grid>
+    
                                             </Grid>
-
-                                        </Grid>
-                                    </Border>
+                                        </Border>
+                                    </Button>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>

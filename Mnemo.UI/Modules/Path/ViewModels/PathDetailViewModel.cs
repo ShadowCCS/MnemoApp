@@ -1,0 +1,113 @@
+using System;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Models;
+using Mnemo.Core.Services;
+using Mnemo.UI.ViewModels;
+using Mnemo.UI.Modules.Path.Tasks;
+
+namespace Mnemo.UI.Modules.Path.ViewModels;
+
+public partial class PathDetailViewModel : ViewModelBase, INavigationAware
+{
+    private readonly ILearningPathService _pathService;
+    private readonly IAITaskManager _taskManager;
+    private readonly IAIOrchestrator _orchestrator;
+    private readonly IKnowledgeService _knowledge;
+    private readonly ISettingsService _settings;
+    private readonly ILoggerService _logger;
+
+    [ObservableProperty]
+    private LearningPath? _path;
+
+    [ObservableProperty]
+    private LearningUnit? _selectedUnit;
+
+    [ObservableProperty]
+    private bool _isSidebarOpen = true;
+
+    public ObservableCollection<LearningUnit> Units { get; } = new();
+
+    public PathDetailViewModel(
+        ILearningPathService pathService,
+        IAITaskManager taskManager,
+        IAIOrchestrator orchestrator,
+        IKnowledgeService knowledge,
+        ISettingsService settings,
+        ILoggerService logger)
+    {
+        _pathService = pathService;
+        _taskManager = taskManager;
+        _orchestrator = orchestrator;
+        _knowledge = knowledge;
+        _settings = settings;
+        _logger = logger;
+    }
+
+    public void OnNavigatedTo(object? parameter)
+    {
+        if (parameter is string pathId)
+        {
+            _ = LoadPathAsync(pathId);
+        }
+    }
+
+    public async Task LoadPathAsync(string pathId)
+    {
+        Path = await _pathService.GetPathAsync(pathId);
+        if (Path != null)
+        {
+            Units.Clear();
+            foreach (var unit in Path.Units.OrderBy(u => u.Order))
+            {
+                Units.Add(unit);
+            }
+            SelectedUnit = Units.FirstOrDefault();
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
+
+    [RelayCommand]
+    private async Task SelectUnit(LearningUnit unit)
+    {
+        SelectedUnit = unit;
+        
+        // If smart generation is on and unit is not generated, trigger it
+        if (!unit.IsCompleted && unit.Status != AITaskStatus.Running)
+        {
+            bool smartGen = await _settings.GetAsync("AI.SmartUnitGeneration", false);
+            if (smartGen)
+            {
+                await GenerateUnitAsync(unit);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private async Task GenerateUnit(LearningUnit unit)
+    {
+        await GenerateUnitAsync(unit);
+    }
+
+    private async Task GenerateUnitAsync(LearningUnit unit)
+    {
+        if (Path == null) return;
+
+        var task = new GenerateUnitTask(
+            Path.PathId,
+            unit.UnitId,
+            _orchestrator,
+            _knowledge,
+            _pathService,
+            _logger);
+
+        _logger.Info("Path", $"Triggering generation for unit: {unit.Title}");
+        await _taskManager.QueueTaskAsync(task);
+    }
+}
+

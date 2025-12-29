@@ -29,6 +29,7 @@
 
     <UserControl.Resources>
         <converters:PathToImageConverter x:Key="PathToImageConverter"/>
+        <converters:BoolToPasswordCharConverter x:Key="BoolToPasswordCharConverter"/>
         <!-- Toggle Setting Template -->
         <DataTemplate x:Key="ToggleSettingTemplate" x:DataType="vm:ToggleSettingViewModel">
             <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
@@ -81,41 +82,67 @@
 
         <!-- App Icon Setting Template -->
         <DataTemplate x:Key="AppIconSettingTemplate" x:DataType="vm:AppIconSettingViewModel">
-             <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
+            <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
                 <components:SettingsCard.RightContent>
-                    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                        <Border Width="40" Height="40" 
-                                Background="Transparent" 
-                                CornerRadius="8" 
-                                BorderThickness="0">
-                             <Image Source="avares://Mnemo.UI/Assets/menmo_dark.ico" 
-                                    Width="40" Height="40"
-                                    Stretch="Uniform"/>
-                        </Border>
-                        <Button Padding="16,8"
-                                CornerRadius="6"
-                                Background="{DynamicResource SecondaryButtonBackgroundBrush}"
-                                Foreground="{DynamicResource SecondaryButtonTextColorBrush}"
-                                BorderThickness="0"
-                                HorizontalAlignment="Center"
-                                FontSize="13"
-                                FontFamily="{DynamicResource Font.Medium}">
-                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/settings.svg" 
-                                                  Width="14" Height="14"
-                                                  Color="{DynamicResource SecondaryButtonTextColorBrush}"/>
-                                <TextBlock Text="Change Icon" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <Button.Styles>
-                                <Style Selector="Button:pointerover">
-                                    <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
-                                </Style>
-                                <Style Selector="Button:pressed">
-                                    <Setter Property="Background" Value="{DynamicResource ListItemActiveBackgroundBrush}"/>
-                                </Style>
-                            </Button.Styles>
-                        </Button>
-                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding Options}" ClipToBounds="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="8" ClipToBounds="False" Margin="4"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AppIconOptionViewModel">
+                                <Button Command="{Binding SelectCommand}" 
+                                        Padding="0" 
+                                        Background="Transparent" 
+                                        BorderThickness="0"
+                                        Cursor="Hand">
+                                    <Button.Styles>
+                                        <Style Selector="Button">
+                                            <Setter Property="Transitions">
+                                                <Transitions>
+                                                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1"/>
+                                                </Transitions>
+                                            </Setter>
+                                        </Style>
+                                        <Style Selector="Button:pointerover">
+                                            <Setter Property="RenderTransform" Value="scale(1.1)"/>
+                                        </Style>
+                                        <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                        </Style>
+                                    </Button.Styles>
+                                    <Border Width="42" Height="42" 
+                                            CornerRadius="8" 
+                                            ClipToBounds="True"
+                                            BorderThickness="2"
+                                            Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                            Classes.selected="{Binding IsSelected}">
+                                        <Border.Styles>
+                                            <Style Selector="Border">
+                                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                                <Setter Property="Transitions">
+                                                    <Transitions>
+                                                        <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+                                                    </Transitions>
+                                                </Setter>
+                                            </Style>
+                                            <Style Selector="Border:pointerover">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+                                            </Style>
+                                            <Style Selector="Border.selected">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+                                            </Style>
+                                        </Border.Styles>
+                                        <Image Source="{Binding IconPath, Converter={StaticResource PathToImageConverter}}" 
+                                               Width="32" Height="32"
+                                               Margin="4"
+                                               Stretch="Uniform"/>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </components:SettingsCard.RightContent>
             </components:SettingsCard>
         </DataTemplate>
@@ -209,6 +236,32 @@
             </components:SettingsCard>
         </DataTemplate>
 
+        <!-- Text Setting Template -->
+        <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:TextSettingViewModel">
+            <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
+                <components:SettingsCard.RightContent>
+                    <TextBox Text="{Binding Value}" 
+                             FontSize="14" 
+                             FontFamily="{DynamicResource Font.Medium}"
+                             Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                             BorderThickness="0"
+                             CornerRadius="8"
+                             Padding="12,8"
+                             Width="250"
+                             VerticalContentAlignment="Center"
+                             PasswordChar="{Binding IsPassword, Converter={StaticResource BoolToPasswordCharConverter}}">
+                        <TextBox.Styles>
+                            <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+                                <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+                            </Style>
+                        </TextBox.Styles>
+                    </TextBox>
+                </components:SettingsCard.RightContent>
+            </components:SettingsCard>
+        </DataTemplate>
+
     </UserControl.Resources>
 
     <Grid ColumnDefinitions="300,*">
@@ -264,83 +317,88 @@
 
                 <Separator Grid.Row="2" Height="1" Background="{DynamicResource SidebarBorderBrush}" Margin="24,0,24,16" Opacity="0.5"/>
                 
-                <ScrollViewer Grid.Row="3" Padding="12,0,12,24">
-                    <ItemsControl ItemsSource="{Binding Categories}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:SettingsCategoryViewModel">
-                                <controls:NavigationButton IsSelected="{Binding IsSelected}"
-                                                           Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SelectCategoryCommand}"
-                                                           CommandParameter="{Binding}"
-                                                           HorizontalAlignment="Stretch"
-                                                           Margin="12,0,12,4"
-                                                           Padding="12,10"
-                                                           CornerRadius="8">
-                                    <StackPanel Orientation="Horizontal" Spacing="12">
-                                        <controls:SvgIcon SvgPath="{Binding Icon}" 
-                                                          Width="18" Height="18"/>
-                                        <TextBlock Text="{Binding Name}" 
-                                                   VerticalAlignment="Center"
-                                                   FontSize="14"
-                                                   FontFamily="{DynamicResource Font.Medium}"/>
-                                    </StackPanel>
-                                </controls:NavigationButton>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                <ScrollViewer Grid.Row="3">
+                    <Border Padding="12,0,12,24">
+                        <ItemsControl ItemsSource="{Binding Categories}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsCategoryViewModel">
+                                    <controls:NavigationButton IsSelected="{Binding IsSelected}"
+                                                               Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SelectCategoryCommand}"
+                                                               CommandParameter="{Binding}"
+                                                               HorizontalAlignment="Stretch"
+                                                               Margin="12,0,12,4"
+                                                               Padding="12,10"
+                                                               CornerRadius="8">
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <controls:SvgIcon SvgPath="{Binding Icon}" 
+                                                              Width="18" Height="18"/>
+                                            <TextBlock Text="{Binding Name}" 
+                                                       VerticalAlignment="Center"
+                                                       FontSize="14"
+                                                       FontFamily="{DynamicResource Font.Medium}"/>
+                                        </StackPanel>
+                                    </controls:NavigationButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
                 </ScrollViewer>
             </Grid>
         </Border>
 
         <!-- Settings Content Area -->
         <Border Grid.Column="1" Background="{DynamicResource WorkspaceBackgroundBrush}">
-            <ScrollViewer Padding="48,32">
-                <StackPanel Spacing="40" MaxWidth="800" HorizontalAlignment="Left">
-                    <!-- Category Header -->
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="{Binding SelectedCategory.Name}" 
-                                   FontSize="32" 
-                                   FontFamily="{DynamicResource Font.Bold}" 
-                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                        <TextBlock Text="Manage your preferences and application settings."
-                                   FontSize="14"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <ScrollViewer>
+                <Border Padding="48,32,48,64">
+                    <StackPanel Spacing="40" MaxWidth="800" HorizontalAlignment="Left">
+                        <!-- Category Header -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding SelectedCategory.Name}" 
+                                       FontSize="32" 
+                                       FontFamily="{DynamicResource Font.Bold}" 
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="Manage your preferences and application settings."
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+
+                        <Separator Height="1" Background="{DynamicResource SidebarBorderBrush}" Opacity="0.3"/>
+
+                        <!-- Settings Groups -->
+                        <ItemsControl ItemsSource="{Binding SelectedCategory.Groups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingsGroupViewModel">
+                                    <StackPanel Spacing="12" Margin="0,0,0,40">
+                                        <TextBlock Text="{Binding Name}" 
+                                                   FontSize="12" 
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontFamily="{DynamicResource Font.SemiBold}"
+                                                   LetterSpacing="0.5"
+                                                   Margin="0,0,0,8"/>
+                                        
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <ContentControl Content="{Binding}">
+                                                        <ContentControl.DataTemplates>
+                                                            <StaticResource ResourceKey="ToggleSettingTemplate"/>
+                                                            <StaticResource ResourceKey="DropdownSettingTemplate"/>
+                                                            <StaticResource ResourceKey="ActionSettingTemplate"/>
+                                                            <StaticResource ResourceKey="AppIconSettingTemplate"/>
+                                                            <StaticResource ResourceKey="ProfilePictureSettingTemplate"/>
+                                                            <StaticResource ResourceKey="NameSettingTemplate"/>
+                                                            <StaticResource ResourceKey="TextSettingTemplate"/>
+                                                        </ContentControl.DataTemplates>
+                                                    </ContentControl>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
-
-                    <Separator Height="1" Background="{DynamicResource SidebarBorderBrush}" Opacity="0.3"/>
-
-                    <!-- Settings Groups -->
-                    <ItemsControl ItemsSource="{Binding SelectedCategory.Groups}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:SettingsGroupViewModel">
-                                <StackPanel Spacing="12" Margin="0,0,0,40">
-                                    <TextBlock Text="{Binding Name}" 
-                                               FontSize="12" 
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontFamily="{DynamicResource Font.SemiBold}"
-                                               LetterSpacing="0.5"
-                                               Margin="0,0,0,8"/>
-                                    
-                                    <ItemsControl ItemsSource="{Binding Items}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <ContentControl Content="{Binding}">
-                                                    <ContentControl.DataTemplates>
-                                                        <StaticResource ResourceKey="ToggleSettingTemplate"/>
-                                                        <StaticResource ResourceKey="DropdownSettingTemplate"/>
-                                                        <StaticResource ResourceKey="ActionSettingTemplate"/>
-                                                        <StaticResource ResourceKey="AppIconSettingTemplate"/>
-                                                        <StaticResource ResourceKey="ProfilePictureSettingTemplate"/>
-                                                        <StaticResource ResourceKey="NameSettingTemplate"/>
-                                                    </ContentControl.DataTemplates>
-                                                </ContentControl>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                </Border>
             </ScrollViewer>
         </Border>
     </Grid>

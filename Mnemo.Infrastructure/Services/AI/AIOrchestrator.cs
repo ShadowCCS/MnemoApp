@@ -17,6 +17,7 @@ public class AIOrchestrator : IAIOrchestrator
     private readonly ILoggerService _logger;
     private readonly IResourceGovernor _governor;
     private readonly ITextGenerationService _textService;
+    private readonly GeminiTextService _geminiService;
 
     public AIOrchestrator(
         IAIModelRegistry modelRegistry,
@@ -24,7 +25,8 @@ public class AIOrchestrator : IAIOrchestrator
         ISettingsService settings,
         ILoggerService logger,
         IResourceGovernor governor,
-        ITextGenerationService textService)
+        ITextGenerationService textService,
+        GeminiTextService geminiService)
     {
         _modelRegistry = modelRegistry;
         _knowledgeService = knowledgeService;
@@ -32,6 +34,7 @@ public class AIOrchestrator : IAIOrchestrator
         _logger = logger;
         _governor = governor;
         _textService = textService;
+        _geminiService = geminiService;
     }
 
     public async Task<Result<string>> PromptAsync(string systemPrompt, string userPrompt, CancellationToken ct = default)
@@ -100,6 +103,13 @@ public class AIOrchestrator : IAIOrchestrator
         <|im_start|>assistant
         """;
 
+        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
+        if (useGemini)
+        {
+            var geminiResult = await _geminiService.GenerateAsync(null!, rewritePrompt, ct).ConfigureAwait(false);
+            return geminiResult.IsSuccess ? geminiResult.Value?.Trim() ?? query : query;
+        }
+
         var models = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
         var fastModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && !m.IsOptional);
         
@@ -135,6 +145,12 @@ public class AIOrchestrator : IAIOrchestrator
 
     public async Task<Result<string>> PromptWithModelAsync(string modelId, string prompt, CancellationToken ct = default)
     {
+        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
+        if (useGemini)
+        {
+            return await _geminiService.GenerateAsync(null!, prompt, ct).ConfigureAwait(false);
+        }
+
         var manifest = await _modelRegistry.GetModelAsync(modelId).ConfigureAwait(false);
         if (manifest == null) return Result<string>.Failure("Model not found.");
 
@@ -152,6 +168,17 @@ public class AIOrchestrator : IAIOrchestrator
 
     public async IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
+        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
+        if (useGemini)
+        {
+            var fullPrompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
+            await foreach (var token in _geminiService.GenerateStreamingAsync(null!, fullPrompt, ct).ConfigureAwait(false))
+            {
+                yield return token;
+            }
+            yield break;
+        }
+
         // For simplicity in the first version, we skip RAG for streaming if it requires complex rewriting,
         // but we can still use the basic user prompt.
         var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
@@ -179,6 +206,9 @@ public class AIOrchestrator : IAIOrchestrator
 
     private async Task<AIModelManifest?> SelectModelAsync(string userPrompt, CancellationToken ct)
     {
+        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
+        if (useGemini) return null; // We handle Gemini separately in PromptStreaming/ExecutePrompt
+
         bool smartSwitchEnabled = await _settings.GetAsync("AI.SmartSwitch", false).ConfigureAwait(false);
         var models = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
 
@@ -210,6 +240,13 @@ public class AIOrchestrator : IAIOrchestrator
 
     private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct)
     {
+        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
+        if (useGemini)
+        {
+            var fullPrompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
+            return await _geminiService.GenerateAsync(null!, fullPrompt, ct).ConfigureAwait(false);
+        }
+
         var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
 
         if (targetModel == null) return Result<string>.Failure("No suitable text model found.");
