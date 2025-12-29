@@ -8,3 +8,4 @@ public interface IMarkdownProcessor
     (string ProcessedSource, Dictionary<string, MarkdownSpecialInline> SpecialInlines) ExtractSpecialInlines(string source);
 }
 
+
