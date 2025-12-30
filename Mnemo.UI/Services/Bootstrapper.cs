@@ -41,6 +41,7 @@ public static class Bootstrapper
         services.AddSingleton<ILearningPathService, LearningPathService>();
         
         // 2. Register UI-specific Services
+        services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IOverlayService, OverlayService>();
         services.AddSingleton<IUIService, UIService>();
         

@@ -9,6 +9,7 @@ namespace Mnemo.UI.Modules.Settings.ViewModels;
 public partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settingsService;
+    private readonly IThemeService _themeService;
 
     [ObservableProperty]
     private string _userName = "John Doe";
@@ -29,9 +30,10 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedCategory.IsSelected = true;
     }
 
-    public SettingsViewModel(ISettingsService settingsService)
+    public SettingsViewModel(ISettingsService settingsService, IThemeService themeService)
     {
         _settingsService = settingsService;
+        _themeService = themeService;
         
         // Load settings asynchronously
         _ = LoadInitialSettingsAsync();
@@ -120,7 +122,7 @@ public partial class SettingsViewModel : ViewModelBase
         var appearance = new SettingsCategoryViewModel("Appearance", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg");
         
         var themeGroup = new SettingsGroupViewModel("Theme & Visuals");
-        themeGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Appearance.Theme", "App Theme", "Select the visual style of the application.", new[] { "System", "Light", "Dark", "Dusk" }));
+        themeGroup.Items.Add(new ThemeSettingViewModel(_themeService, "App Theme", "Select the visual style of the application."));
         themeGroup.Items.Add(new AppIconSettingViewModel(_settingsService, "App Icon", "Customize the application icon in your taskbar."));
         
         appearance.Groups.Add(themeGroup);

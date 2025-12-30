@@ -8,7 +8,7 @@
     <ResourceDictionary>
       <ControlTheme x:Key="{x:Type controls:NavigationButton}" TargetType="controls:NavigationButton">
         <Setter Property="Background" Value="{DynamicResource NavigationButtonBackgroundBrush}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource NavigationButtonForegroundBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="{DynamicResource SidebarButtonCornerRadius}"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
@@ -76,7 +76,7 @@
 
   <!-- Child element styles for NavigationButton -->
   <Style Selector="controls|NavigationButton TextBlock">
-    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource NavigationButtonForegroundBrush}"/>
   </Style>
 
   <Style Selector="controls|NavigationButton controls|SvgIcon">

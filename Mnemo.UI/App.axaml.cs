@@ -25,6 +25,16 @@ public partial class App : Application
     {
         Services = Bootstrapper.Build();
         var navService = Services.GetRequiredService<INavigationService>();
+        var themeService = Services.GetRequiredService<IThemeService>();
+
+        // Apply saved theme on startup
+        _ = themeService.GetCurrentThemeAsync().ContinueWith(t =>
+        {
+            if (t.IsCompletedSuccessfully)
+            {
+                _ = themeService.ApplyThemeAsync(t.Result);
+            }
+        }, TaskScheduler.FromCurrentSynchronizationContext());
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

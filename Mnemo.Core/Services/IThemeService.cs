@@ -9,7 +9,7 @@ public interface IThemeService
 {
     Task ApplyThemeAsync(string themeName);
     Task<IEnumerable<ThemeManifest>> GetAllThemesAsync();
-    string GetCurrentTheme();
+    Task<string> GetCurrentThemeAsync();
     void StartWatching();
     void StopWatching();
     Task<bool> ImportAsync(string path);

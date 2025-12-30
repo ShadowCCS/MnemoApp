@@ -1,51 +1,52 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!-- Background Colors -->
-    <Color x:Key="SidebarBackground">#D2D2D2</Color>
-    <Color x:Key="WorkspaceBackground">#DFDFDF</Color>
-    <Color x:Key="OverlayBackground">#D2D2D2</Color>
+    <Color x:Key="SidebarBackground">#F5F5F5</Color>
+    <Color x:Key="SidebarBorder">#E5E5E5</Color>
+    <Color x:Key="WorkspaceBackground">#FFFFFF</Color>
+    <Color x:Key="OverlayBackground">#FFFFFF</Color>
     <Color x:Key="TopbarBackground">Transparent</Color>
     
     <!-- Text Colors -->
-    <Color x:Key="TextPrimary">#222222</Color>
-    <Color x:Key="TextSecondary">#555555</Color>
-    <Color x:Key="TextTertiary">#848484</Color>
-    <Color x:Key="TextFaded">#999999</Color>
-    <Color x:Key="TextDisabled">#999999</Color>
-    <Color x:Key="ToastTitleColor">#5D5D5D</Color>
-    <Color x:Key="ToastDescriptionColor">#898989</Color>
-    <Color x:Key="BreadcrumbText">#999999</Color>
-    <Color x:Key="VersionText">#848484</Color>
-    <Color x:Key="QuickActionsTextPrimary">#555555</Color>
-    <Color x:Key="QuickActionsTextSecondary">#999999</Color>
+    <Color x:Key="TextPrimary">#1A1A1A</Color>
+    <Color x:Key="TextSecondary">#777777</Color>
+    <Color x:Key="TextTertiary">#888888</Color>
+    <Color x:Key="TextFaded">#AAAAAA</Color>
+    <Color x:Key="TextDisabled">#CCCCCC</Color>
+    <Color x:Key="ToastTitleColor">#1A1A1A</Color>
+    <Color x:Key="ToastDescriptionColor">#777777</Color>
+    <Color x:Key="BreadcrumbText">#888888</Color>
+    <Color x:Key="VersionText">#AAAAAA</Color>
+    <Color x:Key="QuickActionsTextPrimary">#888888</Color>
+    <Color x:Key="QuickActionsTextSecondary">#AAAAAA</Color>
     
     <!-- Icon Colors -->
-    <Color x:Key="IconsSidebar">#555555</Color>
-    <Color x:Key="ChevronSidebar">#8A8A8A</Color>
-    <Color x:Key="IconsTopbar">#7b7b7b</Color>
-    <Color x:Key="IconsWorkspace">#7B7B7B</Color>
-    <Color x:Key="IconsOverlay">#7B7B7B</Color>
-    <Color x:Key="IconsSeparationBar">#919191</Color>
-    <Color x:Key="CardIconColor">#555555</Color>
-    <Color x:Key="ToastIconColor">#7B7B7B</Color>
-    <Color x:Key="ToastIconForeground">#D9D9D9</Color>
-    <Color x:Key="OverlayIconColor">#797979</Color>
-    <Color x:Key="LearnCardIconColor">#999999</Color>
-    <Color x:Key="ListItemIconColor">#777777</Color>
+    <Color x:Key="ChevronSidebar">#B0B0B0</Color>
+    <Color x:Key="TopbarIcons">#888888</Color>
+    <Color x:Key="IconsWorkspace">#AAAAAA</Color>
+    <Color x:Key="IconsOverlay">#AAAAAA</Color>
+    <Color x:Key="IconsSeparationBar">#E5E5E5</Color>
+    <Color x:Key="CardIconColor">#999999</Color>
+    <Color x:Key="CardIconBackground">#F0F0F0</Color>
+    <Color x:Key="ToastIconColor">#888888</Color>
+    <Color x:Key="ToastIconForeground">#F5F5F5</Color>
+    <Color x:Key="OverlayIconColor">#888888</Color>
+    <Color x:Key="LearnCardIconColor">#BBBBBB</Color>
+    <Color x:Key="ListItemIconColor">#999999</Color>
     <Color x:Key="AccentButtonIcon">#FFFFFF</Color>
-    <Color x:Key="GhostButtonIcon">#777777</Color>
+    <Color x:Key="GhostButtonIcon">#999999</Color>
     
     <!-- All other color definitions from theme.axaml -->
     <Color x:Key="Links">#2686C2</Color>
-    <Color x:Key="LinksHover">#2686C2</Color>
+    <Color x:Key="LinksHover">#3396D2</Color>
     <Color x:Key="NavButtonBackground">Transparent</Color>
-    <Color x:Key="NavButtonHover">#C5C5C5</Color>
-    <Color x:Key="NavButtonActive">#C5C5C5</Color>
-    <Color x:Key="NavElementBackground">#D2D2D2</Color>
-    <Color x:Key="NavElementActiveBackground">#2079FF</Color>
-    <Color x:Key="NavElementHoverBackground">#C7C7C7</Color>
-    <Color x:Key="WidgetBackgroundPrimary">#C5C5C5</Color>
-    <Color x:Key="WidgetBackgroundSecondary">#D7D7D7</Color>
+    <Color x:Key="NavButtonHover">#E5E5E5</Color>
+    <Color x:Key="NavButtonActive">#E5E5E5</Color>
+    <Color x:Key="NavElementBackground">#F5F5F5</Color>
+    <Color x:Key="NavElementActiveBackground">#e95b45</Color>
+    <Color x:Key="NavElementHoverBackground">#E5E5E5</Color>
+    <Color x:Key="WidgetBackgroundPrimary">#F0F0F0</Color>
+    <Color x:Key="WidgetBackgroundSecondary">#E5E5E5</Color>
     <Color x:Key="WidgetIconBackground1">#A4C5F0</Color>
     <Color x:Key="WidgetIconBackground2">#B5FFA7</Color>
     <Color x:Key="WidgetIconBackground3">#FFE48F</Color>
@@ -55,302 +56,279 @@
     <Color x:Key="WidgetIconColor2">#6DA861</Color>
     <Color x:Key="WidgetIconColor3">#EAB308</Color>
     <Color x:Key="WidgetIconColor4">#EF4444</Color>
-    <Color x:Key="WidgetIconColor5">#777777</Color>
-    <Color x:Key="CardBackgroundPrimary">#EBEBEB</Color>
-    <Color x:Key="CardBackgroundSecondary">#D7D7D7</Color>
-    <Color x:Key="CardAccent">#2079FF</Color>
-    <Color x:Key="LearnCardBackground">#D2D2D2</Color>
-    <Color x:Key="LearnCardTitleColor">#616161</Color>
-    <Color x:Key="LearnCardSubTextColor">#575757</Color>
-    <Color x:Key="ToastBackgroundPrimary">#ffffff</Color>
+    <Color x:Key="WidgetIconColor5">#888888</Color>
+    <Color x:Key="CardBackgroundPrimary">Transparent</Color>
+    <Color x:Key="CardBackgroundSecondary">#F5F5F5</Color>
+    <Color x:Key="CardAccent">#e95b45</Color>
+    <Color x:Key="QuickActionCardBackground">#F0F0F0</Color>
+    <Color x:Key="LearnCardBackground">#F5F5F5</Color>
+    <Color x:Key="LearnCardTitleColor">#1A1A1A</Color>
+    <Color x:Key="LearnCardSubTextColor">#666666</Color>
+    <Color x:Key="ToastBackgroundPrimary">#FFFFFF</Color>
     <Color x:Key="ToastBackgroundSecondary">Transparent</Color>
     <Color x:Key="SystemInfoBackground">#3954b0</Color>
     <Color x:Key="SystemProcessBackground">#886ce4</Color>
     <Color x:Key="SystemWarningBackground">#f0ad4e</Color>
     <Color x:Key="SystemErrorBackground">#d9534f</Color>
     <Color x:Key="SystemSuccessBackground">#5cb85c</Color>
-    <Color x:Key="ProgressBarBackground">#c8c8c8</Color>
-    <Color x:Key="ProgressBarFill">#2079ff</Color>
-    <Color x:Key="ProgressBarSecondaryBackground">#C0C0C0</Color>
-    <Color x:Key="ProgressBarSecondaryFill">#8B8B8B</Color>
-    <Color x:Key="ProgressBarPhaseLow">#4CAF50</Color>
-    <Color x:Key="ProgressBarPhaseMedium">#FF9800</Color>
-    <Color x:Key="ProgressBarPhaseHigh">#F44336</Color>
-    <Color x:Key="MainButtonBackground">#D7D7D7</Color>
-    <Color x:Key="MainButtonTextColor">#676767</Color>
-    <Color x:Key="InstallButtonBackground">#2079FF</Color>
+    <Color x:Key="ProgressBarBackground">#E5E5E5</Color>
+    <Color x:Key="ProgressBarFill">#e95b45</Color>
+    <Color x:Key="ProgressBarSecondaryBackground">#E5E5E5</Color>
+    <Color x:Key="ProgressBarSecondaryFill">#AAAAAA</Color>
+    <Color x:Key="MainButtonBackground">#F5F5F5</Color>
+    <Color x:Key="MainButtonTextColor">#1A1A1A</Color>
+    <Color x:Key="InstallButtonBackground">#e95b45</Color>
     <Color x:Key="InstallButtonTextColor">#FFFFFF</Color>
-    <Color x:Key="SecondaryButtonBackground">#DBDBDB</Color>
-    <Color x:Key="SecondaryButtonTextColor">#858585</Color>
-    <Color x:Key="CreateButtonBackground">#D7D7D7</Color>
-    <Color x:Key="CreateButtonTextColor">#777777</Color>
+    <Color x:Key="SecondaryButtonBackground">#EBEBEB</Color>
+    <Color x:Key="SecondaryButtonTextColor">#666666</Color>
+    <Color x:Key="CreateButtonBackground">#EBEBEB</Color>
+    <Color x:Key="CreateButtonTextColor">#666666</Color>
     <Color x:Key="BasicButtonBackground">#FFFFFF</Color>
-    <Color x:Key="BasicButtonTextColor">#565656</Color>
+    <Color x:Key="BasicButtonTextColor">#1A1A1A</Color>
     <Color x:Key="DestructiveButtonColor">#ff5050</Color>
     <Color x:Key="DestructiveButtonHoverColor">#FF6868</Color>
-    <Color x:Key="NewButtonBackground">#2079FF</Color>
+    <Color x:Key="NewButtonBackground">#e95b45</Color>
     <Color x:Key="AccentButtonText">#FFFFFF</Color>
     <Color x:Key="GhostButtonBackground">Transparent</Color>
-    <Color x:Key="GhostButtonText">#777777</Color>
-    <Color x:Key="ViewSwitchButton">#BBBBBB</Color>
-    <Color x:Key="ViewSwitchButtonActive">#2079FF</Color>
-    <Color x:Key="PaginatorBackground">#ebebeb</Color>
-    <Color x:Key="PaginatorActive">#2079FF</Color>
-    <Color x:Key="PaginatorText">#6A6A6A</Color>
-    <Color x:Key="OverlayIconBackground">#CBCBCB</Color>
-    <Color x:Key="OverlayItemBackgroundColor">#d2d2d2</Color>
-    <Color x:Key="OverlayItemActiveBackgroundColor">#2079FF</Color>
-    <Color x:Key="OverlayItemHoverBackgroundColor">#c5c5c5</Color>
-    <Color x:Key="OverlayHighlightColor">#b3b3b3</Color>
-    <Color x:Key="BadgeBackground">#D2D2D2</Color>
-    <Color x:Key="BadgeIconBackground">#929292</Color>
-    <Color x:Key="ToggleButtonBackground">#B1B1B1</Color>
-    <Color x:Key="ToggleButtonHoverBackground">#B1B1B1</Color>
-    <Color x:Key="ToggleButtonActiveBackground">#2079FF</Color>
-    <Color x:Key="ToggleButtonEye">#D9D9D9</Color>
-    
-    <!-- Toggle Switch Colors -->
-    <Color x:Key="ToggleSwitchTrackBackground">#C8C8C8</Color>
-    <Color x:Key="ToggleSwitchTrackBackgroundChecked">#2079FF</Color>
-    <Color x:Key="ToggleSwitchTrackBackgroundDisabled">#E0E0E0</Color>
-    <Color x:Key="ToggleSwitchThumbBackground">#FFFFFF</Color>
-    <Color x:Key="ToggleSwitchThumbBackgroundDisabled">#F5F5F5</Color>
-    <Color x:Key="ToggleSwitchThumbShadow">#00000020</Color>
-    
-    <!-- Additional ToggleSwitch Colors -->
-    <Color x:Key="ToggleSwitchContentForeground">#222222</Color>
-    <Color x:Key="ToggleSwitchContainerBackground">Transparent</Color>
-    <Color x:Key="ToggleSwitchContainerBackgroundPointerOver">Transparent</Color>
-    <Color x:Key="ToggleSwitchContainerBackgroundPressed">Transparent</Color>
-    <Color x:Key="ToggleSwitchFillOff">#C8C8C8</Color>
-    <Color x:Key="ToggleSwitchFillOffPointerOver">#B8B8B8</Color>
-    <Color x:Key="ToggleSwitchFillOffPressed">#A8A8A8</Color>
-    <Color x:Key="ToggleSwitchFillOffDisabled">#E0E0E0</Color>
-    <Color x:Key="ToggleSwitchFillOn">#2079FF</Color>
-    <Color x:Key="ToggleSwitchFillOnPointerOver">#1C6DD6</Color>
-    <Color x:Key="ToggleSwitchFillOnPressed">#1861C2</Color>
-    <Color x:Key="ToggleSwitchFillOnDisabled">#E0E0E0</Color>
-    <Color x:Key="ToggleSwitchStrokeOff">Transparent</Color>
-    <Color x:Key="ToggleSwitchStrokeOffPointerOver">Transparent</Color>
-    <Color x:Key="ToggleSwitchStrokeOffPressed">Transparent</Color>
-    <Color x:Key="ToggleSwitchStrokeOffDisabled">Transparent</Color>
-    <Color x:Key="ToggleSwitchStrokeOn">Transparent</Color>
-    <Color x:Key="ToggleSwitchStrokeOnPointerOver">Transparent</Color>
-    <Color x:Key="ToggleSwitchStrokeOnPressed">Transparent</Color>
-    <Color x:Key="ToggleSwitchStrokeOnDisabled">Transparent</Color>
-    <Color x:Key="ToggleSwitchKnobFillOff">#FFFFFF</Color>
-    <Color x:Key="ToggleSwitchKnobFillOffPointerOver">#FFFFFF</Color>
-    <Color x:Key="ToggleSwitchKnobFillOffPressed">#FFFFFF</Color>
-    <Color x:Key="ToggleSwitchKnobFillOffDisabled">#F5F5F5</Color>
-    <Color x:Key="ToggleSwitchKnobFillOn">#FFFFFF</Color>
-    <Color x:Key="ToggleSwitchKnobFillOnPointerOver">#FFFFFF</Color>
-    <Color x:Key="ToggleSwitchKnobFillOnPressed">#FFFFFF</Color>
-    <Color x:Key="ToggleSwitchKnobFillOnDisabled">#F5F5F5</Color>
-    <Color x:Key="ToggleSwitchHeaderForegroundDisabled">#999999</Color>
-    
-    <Color x:Key="TextHighlightColor">#A4C8E8</Color>
-    <Color x:Key="LineColor">#828282</Color>
+    <Color x:Key="GhostButtonText">#888888</Color>
+    <Color x:Key="ViewSwitchButton">#E5E5E5</Color>
+    <Color x:Key="ViewSwitchButtonActive">#e95b45</Color>
+    <Color x:Key="PaginatorBackground">#E5E5E5</Color>
+    <Color x:Key="PaginatorActive">#e95b45</Color>
+    <Color x:Key="PaginatorText">#666666</Color>
+    <Color x:Key="OverlayIconBackground">#F0F0F0</Color>
+    <Color x:Key="OverlayItemBackgroundColor">#F5F5F5</Color>
+    <Color x:Key="OverlayItemActiveBackgroundColor">#e95b45</Color>
+    <Color x:Key="OverlayItemHoverBackgroundColor">#E5E5E5</Color>
+    <Color x:Key="OverlayHighlightColor">#E5E5E5</Color>
+    <Color x:Key="BadgeBackground">#F5F5F5</Color>
+    <Color x:Key="BadgeIconBackground">#AAAAAA</Color>
+    <Color x:Key="ToggleButtonBackground">#E5E5E5</Color>
+    <Color x:Key="ToggleButtonHoverBackground">#e95b45</Color>
+    <Color x:Key="ToggleButtonActiveBackground">#D5D5D5</Color>
+    <Color x:Key="ToggleButtonEye">#F5F5F5</Color>
+    <Color x:Key="ToggleButtonBackgroundChecked">#D5D5D5</Color>
+    <Color x:Key="ToggleButtonBorderBrushChecked">#D5D5D5</Color>
+    <Color x:Key="ToggleButtonForegroundChecked">#1A1A1A</Color>
+    <Color x:Key="ToggleButtonBackgroundCheckedPointerOver">#CCCCCC</Color>
+    <Color x:Key="ToggleButtonBorderBrushCheckedPointerOver">#CCCCCC</Color>
+    <Color x:Key="ToggleButtonForegroundCheckedPointerOver">#1A1A1A</Color>
+    <Color x:Key="ToggleButtonBackgroundCheckedPressed">#BBBBBB</Color>
+    <Color x:Key="ToggleButtonBorderBrushCheckedPressed">#BBBBBB</Color>
+    <Color x:Key="ToggleButtonForegroundCheckedPressed">#1A1A1A</Color>
+    <Color x:Key="ToggleButtonBackgroundCheckedDisabled">#F5F5F5</Color>
+    <Color x:Key="ToggleButtonBorderBrushCheckedDisabled">#F5F5F5</Color>
+    <Color x:Key="ToggleButtonForegroundCheckedDisabled">#CCCCCC</Color>
+    <Color x:Key="TextHighlightColor">#FFD700</Color>
+    <Color x:Key="LineColor">#E5E5E5</Color>
     <Color x:Key="ListItemBackground">Transparent</Color>
-    <Color x:Key="ListItemText">#777777</Color>
-    <Color x:Key="ListItemHoverBackground">#D2D2D2</Color>
-    <Color x:Key="ListItemActiveBackground">#D2D2D2</Color>
-    <Color x:Key="AnswerCorrect">#95d6a2</Color>
-    <Color x:Key="AnswerWrong">#dbd29f</Color>
-    <Color x:Key="SidebarLogo">#555555</Color>
+    <Color x:Key="ListItemText">#666666</Color>
+    <Color x:Key="ListItemHoverBackground">#E5E5E5</Color>
+    <Color x:Key="ListItemActiveBackground">#E5E5E5</Color>
+    <Color x:Key="AnswerCorrect">#D4EDDA</Color>
+    <Color x:Key="AnswerWrong">#F8D7DA</Color>
+    <Color x:Key="SidebarLogo">#E95B45</Color>
+
+    <!-- ToggleSwitch -->
+    <Color x:Key="ToggleSwitchFillOff">#E5E5E5</Color>
+    <Color x:Key="ToggleSwitchFillOn">#e95b45</Color>
+    <Color x:Key="ToggleSwitchKnobFillOff">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchKnobFillOn">#FFFFFF</Color>
+    <Color x:Key="ToggleSwitchStrokeOff">#E5E5E5</Color>
+    <Color x:Key="ToggleSwitchStrokeOn">#e95b45</Color>
+    <Color x:Key="ToggleSwitchFillOffPointerOver">#D5D5D5</Color>
+    <Color x:Key="ToggleSwitchFillOnPointerOver">#e95b45</Color>
+    <Color x:Key="ToggleSwitchContainerBackground">Transparent</Color>
     
     <!-- Standard Avalonia Control Resources -->
     <!-- Button -->
-    <Color x:Key="ButtonBackground">#EBEBEB</Color>
-    <Color x:Key="ButtonBackgroundPointerOver">#D7D7D7</Color>
-    <Color x:Key="ButtonBackgroundPressed">#C5C5C5</Color>
-    <Color x:Key="ButtonBackgroundDisabled">#F0F0F0</Color>
-    <Color x:Key="ButtonForeground">#555555</Color>
-    <Color x:Key="ButtonForegroundPointerOver">#444444</Color>
-    <Color x:Key="ButtonForegroundPressed">#333333</Color>
-    <Color x:Key="ButtonForegroundDisabled">#999999</Color>
-    <Color x:Key="ButtonBorder">#CCCCCC</Color>
-    <Color x:Key="ButtonBorderPointerOver">#BBBBBB</Color>
-    <Color x:Key="ButtonBorderPressed">#AAAAAA</Color>
-    <Color x:Key="ButtonBorderDisabled">#DDDDDD</Color>
+    <Color x:Key="ButtonBackground">#F5F5F5</Color>
+    <Color x:Key="ButtonBackgroundPointerOver">#EBEBEB</Color>
+    <Color x:Key="ButtonBackgroundPressed">#E5E5E5</Color>
+    <Color x:Key="ButtonBackgroundDisabled">#F9F9F9</Color>
+    <Color x:Key="ButtonForeground">#1A1A1A</Color>
+    <Color x:Key="ButtonForegroundPointerOver">#1A1A1A</Color>
+    <Color x:Key="ButtonForegroundPressed">#1A1A1A</Color>
+    <Color x:Key="ButtonForegroundDisabled">#CCCCCC</Color>
+    <Color x:Key="ButtonBorder">#E5E5E5</Color>
+    <Color x:Key="ButtonBorderPointerOver">#D5D5D5</Color>
+    <Color x:Key="ButtonBorderPressed">#E5E5E5</Color>
+    <Color x:Key="ButtonBorderDisabled">#F9F9F9</Color>
     
     <!-- Accent Button -->
-    <Color x:Key="AccentButtonBackground">#2079FF</Color>
-    <Color x:Key="AccentButtonBackgroundPointerOver">#1C6DD6</Color>
-    <Color x:Key="AccentButtonBackgroundPressed">#1861C2</Color>
-    <Color x:Key="AccentButtonBackgroundDisabled">#E0E0E0</Color>
+    <Color x:Key="AccentButtonBackground">#e95b45</Color>
+    <Color x:Key="AccentButtonBackgroundPointerOver">#FF6B55</Color>
+    <Color x:Key="AccentButtonBackgroundPressed">#D14F3B</Color>
+    <Color x:Key="AccentButtonBackgroundDisabled">#F5F5F5</Color>
     <Color x:Key="AccentButtonForeground">#FFFFFF</Color>
     <Color x:Key="AccentButtonForegroundPointerOver">#FFFFFF</Color>
     <Color x:Key="AccentButtonForegroundPressed">#FFFFFF</Color>
-    <Color x:Key="AccentButtonForegroundDisabled">#999999</Color>
+    <Color x:Key="AccentButtonForegroundDisabled">#CCCCCC</Color>
     
     <!-- TextBox -->
     <Color x:Key="TextControlBackground">#FFFFFF</Color>
-    <Color x:Key="TextControlBackgroundPointerOver">Transparent</Color>
-    <Color x:Key="TextControlBackgroundFocused">Transparent</Color>
+    <Color x:Key="TextControlBackgroundPointerOver">#FAFAFA</Color>
+    <Color x:Key="TextControlBackgroundFocused">#FFFFFF</Color>
     <Color x:Key="TextControlBackgroundDisabled">#F5F5F5</Color>
-    <Color x:Key="TextControlForeground">#222222</Color>
-    <Color x:Key="TextControlForegroundPointerOver">#222222</Color>
-    <Color x:Key="TextControlForegroundFocused">#222222</Color>
-    <Color x:Key="TextControlForegroundDisabled">#999999</Color>
-    <Color x:Key="TextControlBorder">#CCCCCC</Color>
-    <Color x:Key="TextControlBorderPointerOver">#BBBBBB</Color>
-    <Color x:Key="TextControlBorderFocused">#2079FF</Color>
-    <Color x:Key="TextControlBorderDisabled">#DDDDDD</Color>
-    <Color x:Key="TextControlPlaceholderForeground">#999999</Color>
-    <Color x:Key="TextControlSelectionHighlightColor">#A4C8E8</Color>
+    <Color x:Key="TextControlForeground">#1A1A1A</Color>
+    <Color x:Key="TextControlForegroundPointerOver">#1A1A1A</Color>
+    <Color x:Key="TextControlForegroundFocused">#1A1A1A</Color>
+    <Color x:Key="TextControlForegroundDisabled">#CCCCCC</Color>
+    <Color x:Key="TextControlBorder">#E5E5E5</Color>
+    <Color x:Key="TextControlBorderPointerOver">#D5D5D5</Color>
+    <Color x:Key="TextControlBorderFocused">#e95b45</Color>
+    <Color x:Key="TextControlBorderDisabled">#F5F5F5</Color>
+    <Color x:Key="TextControlPlaceholderForeground">#888888</Color>
+    <Color x:Key="TextControlSelectionHighlightColor">#FFD700</Color>
     
     <!-- ListBox -->
     <Color x:Key="ListBoxBackground">#FFFFFF</Color>
-    <Color x:Key="ListBoxBorder">#CCCCCC</Color>
+    <Color x:Key="ListBoxBorder">#E5E5E5</Color>
     <Color x:Key="ListBoxItemBackground">Transparent</Color>
-    <Color x:Key="ListBoxItemBackgroundSelected">#2079FF</Color>
-    <Color x:Key="ListBoxItemBackgroundPointerOver">#E0E0E0</Color>
-    <Color x:Key="ListBoxItemBackgroundPressed">#D0D0D0</Color>
-    <Color x:Key="ListBoxItemBackgroundSelectedPointerOver">#1C6DD6</Color>
-    <Color x:Key="ListBoxItemBackgroundSelectedPressed">#1861C2</Color>
-    <Color x:Key="ListBoxItemForeground">#222222</Color>
+    <Color x:Key="ListBoxItemBackgroundSelected">#e95b45</Color>
+    <Color x:Key="ListBoxItemBackgroundPointerOver">#F5F5F5</Color>
+    <Color x:Key="ListBoxItemBackgroundPressed">#E5E5E5</Color>
+    <Color x:Key="ListBoxItemBackgroundSelectedPointerOver">#FF6B55</Color>
+    <Color x:Key="ListBoxItemBackgroundSelectedPressed">#D14F3B</Color>
+    <Color x:Key="ListBoxItemForeground">#1A1A1A</Color>
     <Color x:Key="ListBoxItemForegroundSelected">#FFFFFF</Color>
-    <Color x:Key="ListBoxItemForegroundPointerOver">#222222</Color>
-    <Color x:Key="ListBoxItemForegroundPressed">#222222</Color>
+    <Color x:Key="ListBoxItemForegroundPointerOver">#1A1A1A</Color>
+    <Color x:Key="ListBoxItemForegroundPressed">#1A1A1A</Color>
     <Color x:Key="ListBoxItemForegroundSelectedPointerOver">#FFFFFF</Color>
     <Color x:Key="ListBoxItemForegroundSelectedPressed">#FFFFFF</Color>
-    <Color x:Key="ListBoxItemForegroundDisabled">#999999</Color>
+    <Color x:Key="ListBoxItemForegroundDisabled">#CCCCCC</Color>
     
     <!-- ComboBox -->
-    <Color x:Key="ComboBoxBackground">#EBEBEB</Color>
-    <Color x:Key="ComboBoxBackgroundPointerOver">#D7D7D7</Color> 
-    <Color x:Key="ComboBoxBackgroundPressed">#C5C5C5</Color>     
-    <Color x:Key="ComboBoxBackgroundDisabled">#F0F0F0</Color>    
-    <Color x:Key="ComboBoxForeground">#555555</Color>              
-    <Color x:Key="ComboBoxForegroundPointerOver">#444444</Color>   
-    <Color x:Key="ComboBoxForegroundPressed">#333333</Color>       
-    <Color x:Key="ComboBoxForegroundDisabled">#999999</Color>      
-        <Color x:Key="ComboBoxBorder">#CCCCCC</Color>
-    <Color x:Key="ComboBoxBorderPointerOver">#BBBBBB</Color>
-    <Color x:Key="ComboBoxBorderPressed">#AAAAAA</Color>
-    <Color x:Key="ComboBoxBorderDisabled">#DDDDDD</Color>     
+    <Color x:Key="ComboBoxBackground">#FFFFFF</Color>
+    <Color x:Key="ComboBoxBackgroundPointerOver">#F5F5F5</Color> 
+    <Color x:Key="ComboBoxBackgroundPressed">#F0F0F0</Color>     
+    <Color x:Key="ComboBoxBackgroundDisabled">#F9F9F9</Color>    
+    <Color x:Key="ComboBoxForeground">#1A1A1A</Color>              
+    <Color x:Key="ComboBoxForegroundPointerOver">#1A1A1A</Color>   
+    <Color x:Key="ComboBoxForegroundPressed">#1A1A1A</Color>       
+    <Color x:Key="ComboBoxForegroundDisabled">#CCCCCC</Color>      
+    <Color x:Key="ComboBoxBorder">#E5E5E5</Color>             
+    <Color x:Key="ComboBoxBorderPointerOver">#D5D5D5</Color>   
+    <Color x:Key="ComboBoxBorderPressed">#E5E5E5</Color>       
+    <Color x:Key="ComboBoxBorderDisabled">#F5F5F5</Color>     
+    <Color x:Key="ComboBoxChevron">#888888</Color>
+    <Color x:Key="ComboBoxBackgroundUnfocused">#F5F5F5</Color>
+    <Color x:Key="ComboBoxBackgroundBorderBrushUnfocused">Transparent</Color>
+    <Color x:Key="ComboBoxBackgroundBorderBrushFocused">Transparent</Color>
 
     <!-- ComboBox Item -->
-    <Color x:Key="ComboBoxItemBackground">#EBEBEB</Color>
-    <Color x:Key="ComboBoxItemBackgroundPointerOver">#D7D7D7</Color>
-    <Color x:Key="ComboBoxItemBackgroundPressed">#C5C5C5</Color>
-    <Color x:Key="ComboBoxItemBackgroundSelected">#B0B0B0</Color>
-    <Color x:Key="ComboBoxItemBackgroundSelectedPointerOver">#A0A0A0</Color>
-    <Color x:Key="ComboBoxItemBackgroundSelectedPressed">#909090</Color>
-    <Color x:Key="ComboBoxItemForeground">#555555</Color>
-    <Color x:Key="ComboBoxItemForegroundPointerOver">#444444</Color>
-    <Color x:Key="ComboBoxItemForegroundPressed">#333333</Color>
-    <Color x:Key="ComboBoxItemForegroundSelected">#222222</Color>
-    <Color x:Key="ComboBoxItemForegroundSelectedPointerOver">#222222</Color>
-    <Color x:Key="ComboBoxItemForegroundSelectedPressed">#333333</Color>
-    <Color x:Key="ComboBoxItemForegroundDisabled">#999999</Color>
+    <Color x:Key="ComboBoxItemBackground">#FFFFFF</Color>
+    <Color x:Key="ComboBoxItemBackgroundPointerOver">#F5F5F5</Color>          
+    <Color x:Key="ComboBoxItemBackgroundPressed">#E5E5E5</Color>              
+    <Color x:Key="ComboBoxItemBackgroundSelected">#F0F0F0</Color>             
+    <Color x:Key="ComboBoxItemBackgroundSelectedPointerOver">#EBEBEB</Color>  
+    <Color x:Key="ComboBoxItemBackgroundSelectedPressed">#E5E5E5</Color>      
+    <Color x:Key="ComboBoxItemForeground">#1A1A1A</Color>                     
+    <Color x:Key="ComboBoxItemForegroundPointerOver">#1A1A1A</Color>          
+    <Color x:Key="ComboBoxItemForegroundPressed">#1A1A1A</Color>              
+    <Color x:Key="ComboBoxItemForegroundSelected">#1A1A1A</Color>             
+    <Color x:Key="ComboBoxItemForegroundSelectedPointerOver">#1A1A1A</Color>  
+    <Color x:Key="ComboBoxItemForegroundSelectedPressed">#1A1A1A</Color>      
+    <Color x:Key="ComboBoxItemForegroundDisabled">#CCCCCC</Color>             
 
     <!-- CheckBox -->
-    <Color x:Key="CheckBoxCheckBackgroundStroke">#CCCCCC</Color>
-    <Color x:Key="CheckBoxCheckBackgroundStrokePointerOver">#BBBBBB</Color>
-    <Color x:Key="CheckBoxCheckBackgroundStrokePressed">#AAAAAA</Color>
-    <Color x:Key="CheckBoxCheckBackgroundStrokeDisabled">#DDDDDD</Color>
+    <Color x:Key="CheckBoxCheckBackgroundStroke">#E5E5E5</Color>
+    <Color x:Key="CheckBoxCheckBackgroundStrokePointerOver">#D5D5D5</Color>
+    <Color x:Key="CheckBoxCheckBackgroundStrokePressed">#E5E5E5</Color>
+    <Color x:Key="CheckBoxCheckBackgroundStrokeDisabled">#F5F5F5</Color>
     <Color x:Key="CheckBoxCheckBackgroundFill">#FFFFFF</Color>
     <Color x:Key="CheckBoxCheckBackgroundFillPointerOver">#F5F5F5</Color>
     <Color x:Key="CheckBoxCheckBackgroundFillPressed">#E5E5E5</Color>
-    <Color x:Key="CheckBoxCheckBackgroundFillDisabled">#F0F0F0</Color>
-    <Color x:Key="CheckBoxCheckGlyphForeground">#FFFFFF</Color>
-    <Color x:Key="CheckBoxCheckGlyphForegroundIndeterminate">#FFFFFF</Color>
-    <Color x:Key="CheckBoxCheckGlyphForegroundDisabled">#999999</Color>
-    <Color x:Key="CheckBoxForeground">#222222</Color>
-    <Color x:Key="CheckBoxForegroundPointerOver">#222222</Color>
-    <Color x:Key="CheckBoxForegroundPressed">#222222</Color>
-    <Color x:Key="CheckBoxForegroundDisabled">#999999</Color>
+    <Color x:Key="CheckBoxCheckBackgroundFillDisabled">#F5F5F5</Color>
+    <Color x:Key="CheckBoxCheckGlyphForeground">#e95b45</Color>
+    <Color x:Key="CheckBoxCheckGlyphForegroundIndeterminate">#e95b45</Color>
+    <Color x:Key="CheckBoxCheckGlyphForegroundDisabled">#CCCCCC</Color>
+    <Color x:Key="CheckBoxForeground">#1A1A1A</Color>
+    <Color x:Key="CheckBoxForegroundPointerOver">#1A1A1A</Color>
+    <Color x:Key="CheckBoxForegroundPressed">#1A1A1A</Color>
+    <Color x:Key="CheckBoxForegroundDisabled">#CCCCCC</Color>
     
     <!-- ScrollBar -->
-    <Color x:Key="ScrollBarBackground">#F0F0F0</Color>
-    <Color x:Key="ScrollBarThumbBackground">#C0C0C0</Color>
-    <Color x:Key="ScrollBarThumbBackgroundPointerOver">#B0B0B0</Color>
-    <Color x:Key="ScrollBarThumbBackgroundPressed">#A0A0A0</Color>
-    <Color x:Key="ScrollBarButtonBackground">#E0E0E0</Color>
-    <Color x:Key="ScrollBarButtonBackgroundPointerOver">#D0D0D0</Color>
-    <Color x:Key="ScrollBarButtonBackgroundPressed">#C0C0C0</Color>
-    <Color x:Key="ScrollBarButtonBackgroundDisabled">#F0F0F0</Color>
+    <Color x:Key="ScrollBarBackground">#F5F5F5</Color>
+    <Color x:Key="ScrollBarThumbBackground">#CCCCCC</Color>
+    <Color x:Key="ScrollBarThumbBackgroundPointerOver">#BBBBBB</Color>
+    <Color x:Key="ScrollBarThumbBackgroundPressed">#AAAAAA</Color>
+    <Color x:Key="ScrollBarButtonBackground">#F5F5F5</Color>
+    <Color x:Key="ScrollBarButtonBackgroundPointerOver">#EBEBEB</Color>
+    <Color x:Key="ScrollBarButtonBackgroundPressed">#E5E5E5</Color>
+    <Color x:Key="ScrollBarButtonBackgroundDisabled">#F9F9F9</Color>
     <Color x:Key="ScrollBarButtonArrowForeground">#666666</Color>
-    <Color x:Key="ScrollBarButtonArrowForegroundPointerOver">#555555</Color>
-    <Color x:Key="ScrollBarButtonArrowForegroundPressed">#444444</Color>
-    <Color x:Key="ScrollBarButtonArrowForegroundDisabled">#999999</Color>
+    <Color x:Key="ScrollBarButtonArrowForegroundPointerOver">#1A1A1A</Color>
+    <Color x:Key="ScrollBarButtonArrowForegroundPressed">#666666</Color>
+    <Color x:Key="ScrollBarButtonArrowForegroundDisabled">#CCCCCC</Color>
 
     <!-- Tooltip -->
-    <Color x:Key="TooltipBackground">#DFDFDF</Color>
-    <Color x:Key="TooltipForeground">#565656</Color>
-    <Color x:Key="TooltipBorder">#D2D2D2</Color>
+    <Color x:Key="TooltipBackground">#F5F5F5</Color>
+    <Color x:Key="TooltipForeground">#1A1A1A</Color>
+    <Color x:Key="TooltipBorder">#E5E5E5</Color>
 
     <!-- Navigation Button -->
-    <Color x:Key="NavigationButtonBackground">#D2D2D2</Color>
-    <Color x:Key="NavigationButtonBackgroundHover">#DBDBDB</Color>
-    <Color x:Key="NavigationButtonBackgroundSelected">#c5c5c5</Color>
-    <Color x:Key="NavigationButtonBackgroundPressed">#C5C5C5</Color>
-    <Color x:Key="NavigationButtonForeground">#555555</Color>
-    <Color x:Key="NavigationButtonForegroundSelected">#555555</Color>
+    <Color x:Key="NavigationButtonBackground">Transparent</Color>
+    <Color x:Key="NavigationButtonBackgroundHover">#F0F0F0</Color>
+    <Color x:Key="NavigationButtonBackgroundSelected">#E5E5E5</Color>
+    <Color x:Key="NavigationButtonBackgroundPressed">#EBEBEB</Color>
+    <Color x:Key="NavigationButtonForeground">#808080</Color>
+    <Color x:Key="NavigationButtonForegroundSelected">#1A1A1A</Color>
+    <Color x:Key="NavigationButtonForegroundHover">#666666</Color>
+    <Color x:Key="NavigationButtonForegroundPressed">#666666</Color>
+
+    <!-- Navigation Button Icons -->
+    <Color x:Key="NavigationButtonIcon">#A0A0A0</Color>
+    <Color x:Key="NavigationButtonIconSelected">#1A1A1A</Color>
+    <Color x:Key="NavigationButtonIconHover">#888888</Color>
+    <Color x:Key="NavigationButtonIconPressed">#888888</Color>
+    <Color x:Key="NavigationButtonIconDisabled">#CCCCCC</Color>
 
     <!-- Topbar Button -->
-    <Color x:Key="TopbarButtonBackground">Transparent</Color>
-    <Color x:Key="TopbarButtonBackgroundHover">Transparent</Color>
-    <Color x:Key="TopbarButtonBackgroundSelected">Transparent</Color>
-    <Color x:Key="TopbarButtonBackgroundPressed">Transparent</Color>
-    <Color x:Key="TopbarButtonForeground">#555555</Color>
+    <Color x:Key="TopbarButtonBackground">#F5F5F5</Color>
+    <Color x:Key="TopbarButtonBackgroundHover">#F0F0F0</Color>
+    <Color x:Key="TopbarButtonBackgroundSelected">#F5F5F5</Color>
+    <Color x:Key="TopbarButtonBackgroundPressed">#EBEBEB</Color>
+    <Color x:Key="TopbarButtonForeground">#888888</Color>
 
     <!-- Search Bar -->
-    <Color x:Key="SearchBarBackground">#D2D2D2</Color>
-    <Color x:Key="SearchBarTextColor">#777777</Color>
-    <Color x:Key="SearchBarBorder">Transparent</Color>
-    <Color x:Key="SearchBarHover">#BBBBBB</Color>
-    <Color x:Key="SearchBarDisabled">#DDDDDD</Color>
-    <Color x:Key="SearchBarTextHover">#555555</Color>
-    <Color x:Key="SearchBarText">#777777</Color>
-    <Color x:Key="SearchBarTextDisabled">#999999</Color>
+    <Color x:Key="SearchBarBackground">#F5F5F5</Color>
+    <Color x:Key="SearchBarTextColor">#888888</Color>
+    <Color x:Key="SearchBarBorder">#E5E5E5</Color>
+    <Color x:Key="SearchBarHover">#F0F0F0</Color>
+    <Color x:Key="SearchBarDisabled">#F9F9F9</Color>
+    <Color x:Key="SearchBarTextHover">#1A1A1A</Color>
+    <Color x:Key="SearchBarText">#888888</Color>
+    <Color x:Key="SearchBarTextDisabled">#CCCCCC</Color>
 
-    <!-- Dropdown -->
-    <Color x:Key="DropdownBackground">#D2D2D2</Color>
-    <Color x:Key="DropdownBorder">#D2D2D2</Color>
-
-    <!-- Dropdown Item -->
-    <Color x:Key="DropdownItemBackground">#D2D2D2</Color>
-    <Color x:Key="DropdownItemBackgroundPointerOver">#BBBBBB</Color>
-    <Color x:Key="DropdownItemBackgroundPressed">#AAAAAA</Color>
-    <Color x:Key="DropdownItemBackgroundDisabled">#DDDDDD</Color>
-    <Color x:Key="DropdownItemForeground">#898989</Color>
-    <Color x:Key="DropdownItemForegroundHeader">#898989</Color>
-    <Color x:Key="DropdownItemForegroundSecondary">#898989</Color>
-    <Color x:Key="DropdownItemSeparatorBrush">#969696</Color>
-
-    <!-- Generate Path -->
-    <Color x:Key="GeneratePathText">#616161</Color>
-    
     <!-- Tab Control / Tab Item Colors -->
     <Color x:Key="TabControlBackground">Transparent</Color>
     
     <!-- Unselected States -->
-    <Color x:Key="TabItemHeaderBackgroundUnselected">Transparent</Color>
-    <Color x:Key="TabItemHeaderForegroundUnselected">#555555</Color>
-    <Color x:Key="TabItemHeaderBackgroundUnselectedPointerOver">#DBDBDB</Color>
-    <Color x:Key="TabItemHeaderForegroundUnselectedPointerOver">#555555</Color>
-    <Color x:Key="TabItemHeaderBackgroundUnselectedPressed">#C5C5C5</Color>
-    <Color x:Key="TabItemHeaderForegroundUnselectedPressed">#555555</Color>
+    <Color x:Key="TabItemHeaderBackgroundUnselected">#F5F5F5</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselected">#888888</Color>
+    <Color x:Key="TabItemHeaderBackgroundUnselectedPointerOver">#F0F0F0</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselectedPointerOver">#1A1A1A</Color>
+    <Color x:Key="TabItemHeaderBackgroundUnselectedPressed">#F5F5F5</Color>
+    <Color x:Key="TabItemHeaderForegroundUnselectedPressed">#888888</Color>
     
     <!-- Selected States -->
-    <Color x:Key="TabItemHeaderBackgroundSelected">#C5C5C5</Color>
-    <Color x:Key="TabItemHeaderForegroundSelected">#555555</Color>
-    <Color x:Key="TabItemHeaderBackgroundSelectedPointerOver">#DBDBDB</Color>
-    <Color x:Key="TabItemHeaderForegroundSelectedPointerOver">#555555</Color>
-    <Color x:Key="TabItemHeaderBackgroundSelectedPressed">#C5C5C5</Color>
-    <Color x:Key="TabItemHeaderForegroundSelectedPressed">#555555</Color>
+    <Color x:Key="TabItemHeaderBackgroundSelected">#F5F5F5</Color>
+    <Color x:Key="TabItemHeaderForegroundSelected">#1A1A1A</Color>
+    <Color x:Key="TabItemHeaderBackgroundSelectedPointerOver">#F0F0F0</Color>
+    <Color x:Key="TabItemHeaderForegroundSelectedPointerOver">#1A1A1A</Color>
+    <Color x:Key="TabItemHeaderBackgroundSelectedPressed">#F5F5F5</Color>
+    <Color x:Key="TabItemHeaderForegroundSelectedPressed">#1A1A1A</Color>
     
     <!-- Disabled State -->
-    <Color x:Key="TabItemHeaderBackgroundDisabled">#F0F0F0</Color>
-    <Color x:Key="TabItemHeaderForegroundDisabled">#999999</Color>
+    <Color x:Key="TabItemHeaderBackgroundDisabled">#F5F5F5</Color>
+    <Color x:Key="TabItemHeaderForegroundDisabled">#CCCCCC</Color>
     
     <!-- Selected Pipe Indicator -->
-    <Color x:Key="TabItemHeaderSelectedPipeFill">#555555</Color>
+    <Color x:Key="TabItemHeaderSelectedPipeFill">#1A1A1A</Color>
     
     <!-- Rich Text Separation Line -->
-    <Color x:Key="RichTextSeparationLineColor">#CECECE</Color>
+    <Color x:Key="RichTextSeparationLineColor">#E5E5E5</Color>
     
     <!-- Syntax Highlighting Colors -->
     <Color x:Key="SyntaxKeyword">#0000FF</Color>
@@ -362,9 +340,5 @@
     <Color x:Key="SyntaxProperty">#FF8C00</Color>
     
     <!-- Rich Text Highlighting -->
-    <Color x:Key="HighlightedText">#FFF4A3</Color>
+    <Color x:Key="HighlightedText">#E5E5E5</Color>
 </ResourceDictionary>
-
-
-
-
