@@ -88,6 +88,8 @@ Generate educational content for the specific unit following these rules:
 5. Interpretation & Understanding (What it means, address confusion)
 6. What to Remember (Short recap, intuition focus)
 
+IMPORTANT: Do NOT include a title or heading (# Title) at the top of your response. The unit title is already provided and displayed separately. Start directly with the content.
+
 Tone: Assume learner is capable but new. Never shame. 
 Formatting: Use Markdown headings and short paragraphs; use LaTeX only for complex math, strictly wrapped in $ (inline) or $$ (block) delimiters (e.g., $ \frac{a}{b} $), and never as raw text. White space is key.
 Avoid: Tool instructions, academic-only language, dense formula blocks without explanation.";
