@@ -137,11 +137,24 @@ When answering:
 - Use LaTeX for equations when appropriate
 - Prefer clarity and structure over prose";
 
+            var buffer = new StringBuilder();
+            var lastUpdate = DateTime.Now;
+
             await foreach (var token in _orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, _cts?.Token ?? default))
             {
-                aiMessage.Content += token;
+                buffer.Append(token);
                 foundResponse = true;
+
+                // Update UI every 50ms or if token is a newline (completes a block)
+                if ((DateTime.Now - lastUpdate).TotalMilliseconds > 50 || token.Contains('\n'))
+                {
+                    aiMessage.Content = buffer.ToString();
+                    lastUpdate = DateTime.Now;
+                }
             }
+            
+            // Final update
+            aiMessage.Content = buffer.ToString();
             
             if (!foundResponse)
             {

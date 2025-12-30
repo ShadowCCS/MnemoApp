@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
@@ -10,6 +11,8 @@ public interface ILearningPathService
     Task<LearningPath?> GetPathAsync(string id);
     Task<Result> SavePathAsync(LearningPath path);
     Task<Result> DeletePathAsync(string id);
+
+    event Action<LearningPath>? PathUpdated;
 }
 
 

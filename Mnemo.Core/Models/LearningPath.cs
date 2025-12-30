@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace Mnemo.Core.Models;
 
-public class LearningPath
+public partial class LearningPath : ObservableObject
 {
     [JsonPropertyName("path_id")]
     public string PathId { get; set; } = Guid.NewGuid().ToString();
@@ -34,6 +36,8 @@ public class LearningPath
     // UI properties
     [JsonIgnore]
     public double Progress => Units.Count == 0 ? 0 : (double)Units.Count(u => u.IsCompleted) / Units.Count * 100;
+
+    public void RefreshProgress() => OnPropertyChanged(nameof(Progress));
 }
 
 public class SourceMaterial
@@ -45,7 +49,7 @@ public class SourceMaterial
     public List<string> DocumentIds { get; set; } = new();
 }
 
-public class LearningUnit
+public partial class LearningUnit : ObservableObject
 {
     [JsonPropertyName("unit_id")]
     public string UnitId { get; set; } = Guid.NewGuid().ToString();
@@ -65,14 +69,17 @@ public class LearningUnit
     [JsonPropertyName("generation_hints")]
     public GenerationHints GenerationHints { get; set; } = new();
 
-    [JsonPropertyName("content")]
-    public string? Content { get; set; }
+    [ObservableProperty]
+    [property: JsonPropertyName("content")]
+    private string? _content;
 
-    [JsonPropertyName("is_completed")]
-    public bool IsCompleted { get; set; }
+    [ObservableProperty]
+    [property: JsonPropertyName("is_completed")]
+    private bool _isCompleted;
 
-    [JsonPropertyName("status")]
-    public AITaskStatus Status { get; set; } = AITaskStatus.Pending;
+    [ObservableProperty]
+    [property: JsonPropertyName("status")]
+    private AITaskStatus _status = AITaskStatus.Pending;
 }
 
 public class AllocatedMaterial

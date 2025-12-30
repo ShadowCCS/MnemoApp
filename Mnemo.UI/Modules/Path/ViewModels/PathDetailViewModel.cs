@@ -11,7 +11,7 @@ using Mnemo.UI.Modules.Path.Tasks;
 
 namespace Mnemo.UI.Modules.Path.ViewModels;
 
-public partial class PathDetailViewModel : ViewModelBase, INavigationAware
+public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDisposable
 {
     private readonly ILearningPathService _pathService;
     private readonly IAITaskManager _taskManager;
@@ -45,6 +45,71 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware
         _knowledge = knowledge;
         _settings = settings;
         _logger = logger;
+
+        _pathService.PathUpdated += OnPathUpdated;
+    }
+
+    private void OnPathUpdated(LearningPath updatedPath)
+    {
+        if (Path == null || updatedPath.PathId != Path.PathId) return;
+
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            // Sync properties of the path itself if needed
+            Path.Title = updatedPath.Title;
+            
+            // Sync units
+            bool changed = false;
+            foreach (var updatedUnit in updatedPath.Units)
+            {
+                var existingUnit = Units.FirstOrDefault(u => u.UnitId == updatedUnit.UnitId);
+                if (existingUnit != null)
+                {
+                    // Update properties - this will trigger INotifyPropertyChanged
+                    if (existingUnit.Content != updatedUnit.Content)
+                    {
+                        existingUnit.Content = updatedUnit.Content;
+                        changed = true;
+                    }
+                    if (existingUnit.Status != updatedUnit.Status)
+                    {
+                        existingUnit.Status = updatedUnit.Status;
+                        changed = true;
+                    }
+                    if (existingUnit.IsCompleted != updatedUnit.IsCompleted)
+                    {
+                        existingUnit.IsCompleted = updatedUnit.IsCompleted;
+                        changed = true;
+                    }
+                }
+                else
+                {
+                    // New unit added (e.g. during initial generation)
+                    Units.Add(updatedUnit);
+                    Path?.Units.Add(updatedUnit);
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                Path?.RefreshProgress();
+            }
+
+            // Remove units that no longer exist
+            var toRemove = Units.Where(u => !updatedPath.Units.Any(uu => uu.UnitId == u.UnitId)).ToList();
+            foreach (var u in toRemove)
+            {
+                Units.Remove(u);
+                Path?.Units.Remove(u);
+                changed = true;
+            }
+
+            if (changed)
+            {
+                Path?.RefreshProgress();
+            }
+        });
     }
 
     public void OnNavigatedTo(object? parameter)
@@ -55,18 +120,28 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware
         }
     }
 
+    public void Dispose()
+    {
+        _pathService.PathUpdated -= OnPathUpdated;
+    }
+
     public async Task LoadPathAsync(string pathId)
     {
-        Path = await _pathService.GetPathAsync(pathId);
-        if (Path != null)
+        var path = await _pathService.GetPathAsync(pathId);
+        
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
-            Units.Clear();
-            foreach (var unit in Path.Units.OrderBy(u => u.Order))
+            Path = path;
+            if (Path != null)
             {
-                Units.Add(unit);
+                Units.Clear();
+                foreach (var unit in Path.Units.OrderBy(u => u.Order))
+                {
+                    Units.Add(unit);
+                }
+                SelectedUnit = Units.FirstOrDefault();
             }
-            SelectedUnit = Units.FirstOrDefault();
-        }
+        });
     }
 
     [RelayCommand]
@@ -98,6 +173,7 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware
     {
         if (Path == null) return;
 
+        unit.IsCompleted = false;
         unit.Status = AITaskStatus.Running;
 
         var task = new GenerateUnitTask(

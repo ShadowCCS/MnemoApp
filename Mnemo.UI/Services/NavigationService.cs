@@ -29,6 +29,11 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
         get => _currentViewModel;
         private set
         {
+            if (_currentViewModel is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
             _currentViewModel = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CurrentRoute));

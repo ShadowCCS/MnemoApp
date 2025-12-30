@@ -102,6 +102,15 @@
                 <Setter Property="Background" Value="Transparent"/>
             </Style>
         </Style>
+
+        <Style Selector="Button[Background=Transparent]:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button[Background=Transparent]:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
     </UserControl.Styles>
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
@@ -167,13 +176,26 @@
                                                      Opacity="0.03" Margin="0,0,-40,-40" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
                                             
                                             <Grid RowDefinitions="Auto,*,Auto" Margin="24">
-                                                <Border Grid.Row="0" HorizontalAlignment="Left" Padding="10,5" 
-                                                        Background="{DynamicResource SearchBarBackgroundBrush}" CornerRadius="8">
-                                                    <TextBlock Text="{Binding Category}" 
-                                                               FontSize="{DynamicResource FontSize.Caption}" 
-                                                               FontFamily="{DynamicResource Font.Bold}" 
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                </Border>
+                                                <Grid Grid.Row="0">
+                                                    <Border HorizontalAlignment="Left" Padding="10,5" 
+                                                            Background="{DynamicResource SearchBarBackgroundBrush}" CornerRadius="8">
+                                                        <TextBlock Text="{Binding Category}" 
+                                                                   FontSize="{DynamicResource FontSize.Caption}" 
+                                                                   FontFamily="{DynamicResource Font.Bold}" 
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    </Border>
+                                                    <Button HorizontalAlignment="Right" 
+                                                            Command="{Binding #root.((vm:PathViewModel)DataContext).DeletePathCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="Transparent" 
+                                                            BorderThickness="0" 
+                                                            Padding="6"
+                                                            Cursor="Hand">
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                                          Width="16" Height="16"
+                                                                          Color="{DynamicResource TextTertiaryBrush}"/>
+                                                    </Button>
+                                                </Grid>
                                                 
                                                 <TextBlock Grid.Row="1" Text="{Binding Name}" 
                                                            FontSize="{DynamicResource FontSize.Heading5}" 
@@ -261,21 +283,34 @@
                                     <Border Padding="20" Background="{DynamicResource CardBackgroundPrimaryBrush}" Cursor="Hand" 
                                             CornerRadius="20" MinWidth="180" MaxWidth="220" Height="180" Classes="CardHover">
                                         <Grid RowDefinitions="Auto,*,Auto">
-                                            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
-                                                <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource SearchBarBackgroundBrush}">
-                                                    <controls:SvgIcon SvgPath="{Binding IsFolder, Converter={StaticResource FolderIconConverter}}" 
-                                                                      Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
-                                                </Border>
-                                                <StackPanel VerticalAlignment="Center">
-                                                     <TextBlock Text="{Binding Category}" 
-                                                                FontSize="{DynamicResource FontSize.CaptionButton}" 
-                                                                Foreground="{DynamicResource TextTertiaryBrush}" 
-                                                                FontFamily="{DynamicResource Font.SemiBold}"/>
-                                                     <TextBlock Text="{Binding Size, StringFormat={}{0} MB}" 
-                                                                FontSize="{DynamicResource FontSize.CaptionButton}" 
-                                                                Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                            <Grid Grid.Row="0">
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource SearchBarBackgroundBrush}">
+                                                        <controls:SvgIcon SvgPath="{Binding IsFolder, Converter={StaticResource FolderIconConverter}}" 
+                                                                          Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
+                                                    </Border>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                         <TextBlock Text="{Binding Category}" 
+                                                                    FontSize="{DynamicResource FontSize.CaptionButton}" 
+                                                                    Foreground="{DynamicResource TextTertiaryBrush}" 
+                                                                    FontFamily="{DynamicResource Font.SemiBold}"/>
+                                                         <TextBlock Text="{Binding Size, StringFormat={}{0} MB}" 
+                                                                    FontSize="{DynamicResource FontSize.CaptionButton}" 
+                                                                    Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                                    </StackPanel>
                                                 </StackPanel>
-                                            </StackPanel>
+                                                <Button HorizontalAlignment="Right" 
+                                                        Command="{Binding #root.((vm:PathViewModel)DataContext).DeletePathCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent" 
+                                                        BorderThickness="0" 
+                                                        Padding="6"
+                                                        Cursor="Hand">
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                                      Width="14" Height="14"
+                                                                      Color="{DynamicResource TextTertiaryBrush}"/>
+                                                </Button>
+                                            </Grid>
                                             
                                             <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="{DynamicResource FontSize.Body.Small}" 
                                                        FontFamily="{DynamicResource Font.Medium}" TextWrapping="Wrap" Margin="0,12,0,0"
@@ -302,7 +337,7 @@
                     <StackPanel Spacing="10" IsVisible="{Binding !IsGridView}">
                         <!-- Custom List Header -->
                         <Border Padding="12,8" Margin="0,0,0,5">
-                            <Grid ColumnDefinitions="48,*,150,100,180">
+                            <Grid ColumnDefinitions="48,*,150,100,170,40">
                                 <TextBlock Grid.Column="1" Text="NAME" 
                                            FontSize="{DynamicResource FontSize.Caption}" 
                                            FontFamily="{DynamicResource Font.Bold}" 
@@ -334,7 +369,7 @@
                                             CommandParameter="{Binding}"
                                             Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Stretch">
                                         <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" CornerRadius="16" Margin="0,0,0,8" Padding="12" Classes="CardHover" ClipToBounds="True" Cursor="Hand">
-                                            <Grid ColumnDefinitions="48,*,150,100,170">
+                                            <Grid ColumnDefinitions="48,*,150,100,170,40">
                                                 <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{DynamicResource SearchBarBackgroundBrush}">
                                                     <controls:SvgIcon SvgPath="{Binding IsFolder, Converter={StaticResource FolderIconConverter}}"
                                                                       Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
@@ -383,6 +418,20 @@
                                                                Foreground="{DynamicResource TextTertiaryBrush}"
                                                                VerticalAlignment="Center"/>
                                                 </Grid>
+
+                                                <Button Grid.Column="5"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding #root.((vm:PathViewModel)DataContext).DeletePathCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent" 
+                                                        BorderThickness="0" 
+                                                        Padding="6"
+                                                        Cursor="Hand">
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                                      Width="16" Height="16"
+                                                                      Color="{DynamicResource TextTertiaryBrush}"/>
+                                                </Button>
     
                                             </Grid>
                                         </Border>

@@ -150,10 +150,34 @@
                             <DataTemplate DataType="models:LearningUnit">
                                 <StackPanel Spacing="30">
                                     <StackPanel Spacing="10">
-                                        <TextBlock Text="{Binding Title}" 
-                                                   FontSize="{DynamicResource FontSize.Heading1}" 
-                                                   FontFamily="{DynamicResource Font.Bold}"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" 
+                                                    Command="{Binding #rootDetail.((vm:PathDetailViewModel)DataContext).GenerateUnitCommand}" 
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource SearchBarBackgroundBrush}"
+                                                    Padding="12,6"
+                                                    CornerRadius="8"
+                                                    VerticalAlignment="Center"
+                                                    IsVisible="{Binding IsCompleted}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg" 
+                                                                      Width="14" Height="14" 
+                                                                      Color="{DynamicResource TextSecondaryBrush}"/>
+                                                    <TextBlock Text="Regenerate" 
+                                                               FontSize="{DynamicResource FontSize.Body.Small}" 
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <TextBlock Text="{Binding Title}" 
+                                                       FontSize="{DynamicResource FontSize.Heading1}" 
+                                                       FontFamily="{DynamicResource Font.Bold}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       VerticalAlignment="Center"
+                                                       TextWrapping="Wrap"/>
+                                        </DockPanel>
                                         <TextBlock Text="{Binding Goal}" 
                                                    FontSize="{DynamicResource FontSize.Body.Medium}" 
                                                    Foreground="{DynamicResource TextSecondaryBrush}" FontStyle="Italic"/>

@@ -11,6 +11,8 @@ public class LearningPathService : ILearningPathService
     private readonly IStorageProvider _storage;
     private const string IndexKey = "learning_paths_index";
 
+    public event Action<LearningPath>? PathUpdated;
+
     public LearningPathService(IStorageProvider storage)
     {
         _storage = storage;
@@ -51,9 +53,10 @@ public class LearningPathService : ILearningPathService
         if (!index.Contains(path.PathId))
         {
             index.Add(path.PathId);
-            return await _storage.SaveAsync(IndexKey, index);
+            await _storage.SaveAsync(IndexKey, index);
         }
 
+        PathUpdated?.Invoke(path);
         return Result.Success();
     }
 

@@ -44,10 +44,10 @@ public class AIOrchestrator : IAIOrchestrator
         
         if (smartRagEnabled && ShouldUseRag(userPrompt))
         {
-            var contextResult = await _knowledgeService.SearchAsync(userPrompt, 3, ct).ConfigureAwait(false);
+            var contextResult = await _knowledgeService.SearchAsync(userPrompt, 5, ct).ConfigureAwait(false);
             if (contextResult.IsSuccess && contextResult.Value != null)
             {
-                var relevantChunks = contextResult.Value.Where(c => c.RelevanceScore > 0.6).ToList();
+                var relevantChunks = contextResult.Value.Where(c => c.RelevanceScore > 0.4).ToList();
                 if (relevantChunks.Any())
                 {
                     _logger.Info("AIOrchestrator", $"Using RAG with {relevantChunks.Count} chunks (best score: {relevantChunks.Max(c => c.RelevanceScore):F2})");

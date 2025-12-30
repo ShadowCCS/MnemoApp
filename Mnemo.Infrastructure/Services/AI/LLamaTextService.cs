@@ -81,11 +81,11 @@ public class LLamaTextService : ITextGenerationService
             MaxTokens = 8192,
             AntiPrompts = new[]
             {
-                "\nUser:", "\nHuman:", "###", "<|", "\n\n\n",
-                "### Instruction:", "### Response:", "### Input:",
-                "Instruction:", "Input:", "Response:", "User:", "Question:",
-                "<|im_start|>", "<|im_end|>", "<|endoftext|>",
-                "<|eot_id|>", "<|start_header_id|>", "<|end_header_id|>"
+                "\nUser:", "\nHuman:", "\n\nUser:", "\n\nHuman:",
+                "\n### Instruction:", "\n### Response:", "\n### Input:",
+                "\nInstruction:", "\nInput:", "\nResponse:", "\nQuestion:",
+                "<|im_start|>user", "<|im_start|>User", "<|im_end|>",
+                "<|eot_id|><|start_header_id|>user", "<|eot_id|><|start_header_id|>User"
             },
             SamplingPipeline = pipeline
         };
@@ -96,6 +96,7 @@ public class LLamaTextService : ITextGenerationService
             totalOutput.Append(token);
             var currentText = totalOutput.ToString();
 
+            // Check for clear turn markers - only stop on unambiguous patterns
             if (inferenceParams.AntiPrompts.Any(ap => currentText.EndsWith(ap, StringComparison.OrdinalIgnoreCase)))
             {
                 break;

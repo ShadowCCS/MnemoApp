@@ -13,7 +13,7 @@ using Mnemo.UI.Components;
 
 namespace Mnemo.UI.Modules.Path.ViewModels;
 
-public class PathViewModel : ViewModelBase
+public class PathViewModel : ViewModelBase, IDisposable
 {
     private readonly IAITaskManager _taskManager;
     private readonly IAIOrchestrator _orchestrator;
@@ -44,6 +44,7 @@ public class PathViewModel : ViewModelBase
     public ICommand ToggleViewCommand { get; }
     public ICommand CreateCommand { get; }
     public ICommand OpenPathCommand { get; }
+    public ICommand DeletePathCommand { get; }
 
     public PathViewModel(
         IAITaskManager taskManager, 
@@ -64,53 +65,69 @@ public class PathViewModel : ViewModelBase
         _overlay = overlay;
         _logger = logger;
 
+        _pathService.PathUpdated += OnPathUpdated;
+
         ToggleViewCommand = new RelayCommand(() => IsGridView = !IsGridView);
         CreateCommand = new RelayCommand(CreateNewItem);
         OpenPathCommand = new RelayCommand<PathBaseViewModel>(OpenPath);
+        DeletePathCommand = new RelayCommand<PathBaseViewModel>(DeletePath);
 
         _ = LoadPathsAsync();
     }
 
     private async Task LoadPathsAsync()
     {
-        FrequentlyUsedItems.Clear();
-        AllItems.Clear();
-
         var paths = await _pathService.GetAllPathsAsync();
         var pathList = paths.ToList();
         
-        foreach (var path in pathList)
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
-            var vm = new PathItemViewModel 
-            { 
-                Id = path.PathId,
-                Name = path.Title, 
-                LastModified = path.Metadata.CreatedAt.ToString("MM/dd/yyyy"), 
-                Size = 0,
-                Progress = path.Progress, 
-                Category = path.Difficulty.ToUpper() 
-            };
-            AllItems.Add(vm);
-        }
+            FrequentlyUsedItems.Clear();
+            AllItems.Clear();
 
-        foreach (var path in pathList.Take(4))
-        {
-             var vm = new PathItemViewModel 
-            { 
-                Id = path.PathId,
-                Name = path.Title, 
-                LastModified = path.Metadata.CreatedAt.ToString("MM/dd/yyyy"), 
-                Size = 0,
-                Progress = path.Progress, 
-                Category = path.Difficulty.ToUpper() 
-            };
-            FrequentlyUsedItems.Add(vm);
-        }
+            foreach (var path in pathList)
+            {
+                var vm = new PathItemViewModel 
+                { 
+                    Id = path.PathId,
+                    Name = path.Title, 
+                    LastModified = path.Metadata.CreatedAt.ToString("MM/dd/yyyy"), 
+                    Size = 0,
+                    Progress = path.Progress, 
+                    Category = path.Difficulty.ToUpper() 
+                };
+                AllItems.Add(vm);
+            }
 
-        if (!AllItems.Any())
-        {
-            LoadSampleData();
-        }
+            foreach (var path in pathList.Take(4))
+            {
+                var vm = new PathItemViewModel 
+                { 
+                    Id = path.PathId,
+                    Name = path.Title, 
+                    LastModified = path.Metadata.CreatedAt.ToString("MM/dd/yyyy"), 
+                    Size = 0,
+                    Progress = path.Progress, 
+                    Category = path.Difficulty.ToUpper() 
+                };
+                FrequentlyUsedItems.Add(vm);
+            }
+
+            if (!AllItems.Any())
+            {
+                LoadSampleData();
+            }
+        });
+    }
+
+    private void OnPathUpdated(LearningPath path)
+    {
+        _ = LoadPathsAsync();
+    }
+
+    public void Dispose()
+    {
+        _pathService.PathUpdated -= OnPathUpdated;
     }
 
     private void OpenPath(PathBaseViewModel? item)
@@ -118,6 +135,33 @@ public class PathViewModel : ViewModelBase
         if (item is PathItemViewModel pathItem && !string.IsNullOrEmpty(pathItem.Id))
         {
             _navigation.NavigateTo("path-detail", pathItem.Id);
+        }
+    }
+
+    private async void DeletePath(PathBaseViewModel? item)
+    {
+        if (item is PathItemViewModel pathItem && !string.IsNullOrEmpty(pathItem.Id))
+        {
+            var result = await _overlay.CreateDialogAsync(
+                "Delete Path", 
+                $"Are you sure you want to delete '{pathItem.Name}'? This action cannot be undone.",
+                "Delete",
+                "Cancel");
+            
+            if (result == "Delete")
+            {
+                var deleteResult = await _pathService.DeletePathAsync(pathItem.Id);
+                if (deleteResult.IsSuccess)
+                {
+                    _ = LoadPathsAsync();
+                    _logger.Info("Path", $"Deleted path: {pathItem.Name}");
+                }
+                else
+                {
+                    await _overlay.CreateDialogAsync("Error", $"Failed to delete path: {deleteResult.ErrorMessage}");
+                    _logger.Error("Path", $"Failed to delete path: {deleteResult.ErrorMessage}");
+                }
+            }
         }
     }
 
