@@ -4,6 +4,6 @@ namespace Mnemo.Core.Services;
 
 public interface ILateXEngine
 {
-    Task<dynamic> RenderAsync(string tex, double scale);
+    Task<object> RenderAsync(string tex, double fontSize = 16.0);
 }
 

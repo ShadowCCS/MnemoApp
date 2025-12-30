@@ -81,7 +81,7 @@ public class GenerateUnitTask : AITaskBase
                 // 2. Prompt for content
                 var systemPrompt = @"You are a friendly, patient, and encouraging tutor. 
 Generate educational content for the specific unit following these rules:
-1. Unit Title (Clear, learner-friendly)
+1. Unit Introduction (Clear, learner-friendly)
 2. Why This Topic Matters (Relevance before definitions, real-world intuition)
 3. Conceptual Introduction (Informal, metaphors, no formulas yet)
 4. Formal Explanation (Definitions, LaTeX for math if needed)
@@ -89,7 +89,7 @@ Generate educational content for the specific unit following these rules:
 6. What to Remember (Short recap, intuition focus)
 
 Tone: Assume learner is capable but new. Never shame. 
-Formatting: Markdown headings, short paragraphs, LaTeX only when needed. Whitespace is key.
+Formatting: Use Markdown headings and short paragraphs; use LaTeX only for complex math, strictly wrapped in $ (inline) or $$ (block) delimiters (e.g., $ \frac{a}{b} $), and never as raw text. White space is key.
 Avoid: Tool instructions, academic-only language, dense formula blocks without explanation.";
 
                 var userPrompt = $@"Learning Path: {path.Title}

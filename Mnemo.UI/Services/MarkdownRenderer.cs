@@ -281,7 +281,7 @@ public class MarkdownRenderer : IMarkdownRenderer
                         if (await _settingsService.GetAsync("Markdown.RenderMath", true))
                         {
                             var displayFontSize = await GetMathFontSizeAsync(true);
-                            var displayMathControl = await _latexEngine.RenderAsync(inlineData.Content, displayFontSize);
+                            var displayMathControl = (Control)await _latexEngine.RenderAsync(inlineData.Content, displayFontSize);
                             inlines.Add(new InlineUIContainer { Child = displayMathControl, BaselineAlignment = BaselineAlignment.Center });
                         }
                         else
@@ -294,7 +294,7 @@ public class MarkdownRenderer : IMarkdownRenderer
                         if (await _settingsService.GetAsync("Markdown.RenderMath", true))
                         {
                             var inlineFontSize = await GetMathFontSizeAsync(false);
-                            var inlineMathControl = await _latexEngine.RenderAsync(inlineData.Content, inlineFontSize);
+                            var inlineMathControl = (Control)await _latexEngine.RenderAsync(inlineData.Content, inlineFontSize);
                             inlines.Add(new InlineUIContainer { Child = inlineMathControl, BaselineAlignment = BaselineAlignment.Center });
                         }
                         else

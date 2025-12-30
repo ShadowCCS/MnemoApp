@@ -10,6 +10,9 @@ public class MarkdownProcessor : IMarkdownProcessor
 {
     private static readonly Regex DisplayMathRegex = new(@"\$\$(.+?)\$\$", RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex InlineMathRegex = new(@"\$(.+?)\$", RegexOptions.Compiled);
+    // Matches [content] where content contains backslashes (LaTeX commands)
+    // Avoids markdown links by ensuring ] is not followed by (
+    private static readonly Regex BracketMathRegex = new(@"\[((?:[^\]]|\\\])+)\](?!\()", RegexOptions.Compiled);
     private static readonly Regex HighlightRegex = new(@"==(.+?)==", RegexOptions.Compiled);
     private static readonly Regex StrikethroughRegex = new(@"~~(.+?)~~", RegexOptions.Compiled);
     private static readonly Regex SubscriptRegex = new(@"_(\{[^}]+?\}|\w)", RegexOptions.Compiled);
@@ -36,6 +39,21 @@ public class MarkdownProcessor : IMarkdownProcessor
             var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
             inlines[key] = new MarkdownSpecialInline(match.Groups[1].Value, MarkdownInlineType.InlineMath);
             return key;
+        });
+
+        // Extract bracket math [...], but only when it contains LaTeX commands (backslashes)
+        // This avoids conflicts with markdown links [text](url)
+        processed = BracketMathRegex.Replace(processed, match =>
+        {
+            var content = match.Groups[1].Value;
+            // Only treat as LaTeX if it contains backslashes (LaTeX commands)
+            if (content.Contains('\\'))
+            {
+                var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
+                inlines[key] = new MarkdownSpecialInline(content, MarkdownInlineType.InlineMath);
+                return key;
+            }
+            return match.Value; // Return original if not LaTeX
         });
 
         // Extract highlighted text ==...==
