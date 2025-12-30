@@ -119,6 +119,20 @@ Source Material Context:
             {
                 ErrorMessage = ex.Message;
                 Status = AITaskStatus.Failed;
+                
+                // Try to update unit status to failed if possible
+                try 
+                {
+                    var path = await _parent._pathService.GetPathAsync(_parent._pathId);
+                    var unit = path?.Units.FirstOrDefault(u => u.UnitId == _parent._unitId);
+                    if (unit != null)
+                    {
+                        unit.Status = AITaskStatus.Failed;
+                        await _parent._pathService.SavePathAsync(path!);
+                    }
+                }
+                catch { /* Ignore secondary errors */ }
+
                 return Result.Failure(ex.Message, ex);
             }
         }

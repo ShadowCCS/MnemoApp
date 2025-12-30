@@ -115,7 +115,7 @@ public class AIOrchestrator : IAIOrchestrator
         
         if (fastModel == null) return query;
 
-        var result = await _textService.GenerateAsync(fastModel, rewritePrompt, ct).ConfigureAwait(false);
+        var result = await PromptWithModelAsync(fastModel.Id, rewritePrompt, ct).ConfigureAwait(false);
         return result.IsSuccess ? result.Value?.Trim() ?? query : query;
     }
 

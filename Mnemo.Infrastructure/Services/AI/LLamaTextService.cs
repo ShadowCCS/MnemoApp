@@ -39,7 +39,7 @@ public class LLamaTextService : ITextGenerationService
             {
                 sb.Append(token);
             }
-            return Result<string>.Success(sb.ToString());
+            return Result<string>.Success(CleanResponse(sb.ToString()));
         }
         catch (Exception ex)
         {

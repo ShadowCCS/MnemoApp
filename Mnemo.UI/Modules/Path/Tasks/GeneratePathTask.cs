@@ -61,9 +61,12 @@ public class GeneratePathTask : AITaskBase
         {
             if (unit.Status != AITaskStatus.Completed)
             {
+                unit.Status = AITaskStatus.Running;
                 _steps.Add(new GenerateUnitContentStep(this, _generatedPath.PathId, unit.UnitId));
             }
         }
+
+        await _pathService.SavePathAsync(_generatedPath);
     }
 
     private class GenerateStructureStep : IAITaskStep
@@ -77,6 +80,29 @@ public class GeneratePathTask : AITaskBase
         public string? ErrorMessage { get; private set; }
 
         public GenerateStructureStep(GeneratePathTask parent) => _parent = parent;
+
+        private static string ExtractJson(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+
+            // 1. Try to find markdown JSON block
+            var match = System.Text.RegularExpressions.Regex.Match(input, @"```(?:json)?\s*([\s\S]*?)\s*```");
+            if (match.Success)
+            {
+                return match.Groups[1].Value.Trim();
+            }
+
+            // 2. Fallback to finding first { and last }
+            int startIndex = input.IndexOf('{');
+            int endIndex = input.LastIndexOf('}');
+
+            if (startIndex != -1 && endIndex != -1 && endIndex > startIndex)
+            {
+                return input.Substring(startIndex, endIndex - startIndex + 1).Trim();
+            }
+
+            return input.Trim();
+        }
 
         public async Task<Result> ExecuteAsync(CancellationToken ct)
         {
@@ -105,7 +131,7 @@ public class GeneratePathTask : AITaskBase
                 // 2. RAG Search
                 var searchQuery = $"{_parent._topic} {_parent._instructions}";
                 var searchResult = await _parent._knowledge.SearchAsync(searchQuery, 10, ct);
-                var chunks = searchResult.IsSuccess ? searchResult.Value : Enumerable.Empty<KnowledgeChunk>();
+                var chunks = searchResult.IsSuccess && searchResult.Value != null ? searchResult.Value : Enumerable.Empty<KnowledgeChunk>();
 
                 var contextBuilder = new StringBuilder();
                 foreach (var chunk in chunks)
@@ -118,55 +144,54 @@ public class GeneratePathTask : AITaskBase
 
                 // 3. Prompt AI for structure
                 var systemPrompt = @"You are an expert curriculum designer. 
-Generate a comprehensive learning path in JSON format based on the provided topic, instructions, and source materials.
-Follow the exact JSON template provided. Ensure each unit has a clear goal and allocated material chunks.
-The output MUST be valid JSON only.";
+Generate a comprehensive learning path in JSON format.
+CRITICAL: You must respond ONLY with the JSON object. Do not include any conversational text before or after the JSON.
+Follow the exact schema provided.";
 
-                var userPrompt = $@"Topic: {_parent._topic}
-Instructions: {_parent._instructions}
+                var userPrompt = $@"Create a learning path for the topic: '{_parent._topic}'
+Additional Instructions: {_parent._instructions}
 
-Source Materials:
+Source Materials Context:
 {contextBuilder}
 
-JSON Template:
+RESPOND ONLY WITH THIS JSON STRUCTURE:
 {{
-  ""title"": ""string"",
-  ""description"": ""string"",
+  ""title"": ""Title of the path"",
+  ""description"": ""Brief overview"",
   ""difficulty"": ""beginner | intermediate | advanced"",
-  ""estimated_time_hours"": number,
+  ""estimated_time_hours"": 10,
   ""units"": [
     {{
-      ""order"": number,
-      ""title"": ""string"",
-      ""goal"": ""string"",
+      ""order"": 1,
+      ""title"": ""Unit Title"",
+      ""goal"": ""What the learner will achieve"",
       ""allocated_material"": {{
-        ""chunk_ids"": [""string""],
-        ""summary"": ""string""
+        ""chunk_ids"": [],
+        ""summary"": ""Summary of source material used for this unit""
       }},
       ""generation_hints"": {{
-        ""focus"": [""string""],
-        ""avoid"": [""string""],
-        ""prerequisites"": [""string""]
+        ""focus"": [""key concept 1"", ""key concept 2""],
+        ""avoid"": [""irrelevant topic""],
+        ""prerequisites"": [""previous unit concept""]
       }}
     }}
   ]
 }}";
 
                 var aiResult = await _parent._orchestrator.PromptAsync(systemPrompt, userPrompt, ct);
-                if (!aiResult.IsSuccess) return Result.Failure(aiResult.ErrorMessage!);
+                if (!aiResult.IsSuccess || aiResult.Value == null) return Result.Failure(aiResult.ErrorMessage ?? "AI failed to respond.");
 
-                var json = aiResult.Value;
+                var json = ExtractJson(aiResult.Value);
                 
-                // Robust JSON extraction from potential markdown
-                int startIndex = json.IndexOf('{');
-                int endIndex = json.LastIndexOf('}');
-                
-                if (startIndex != -1 && endIndex != -1 && endIndex > startIndex)
+                try 
                 {
-                    json = json.Substring(startIndex, endIndex - startIndex + 1);
+                    _parent._generatedPath = JsonSerializer.Deserialize<LearningPath>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 }
-
-                _parent._generatedPath = JsonSerializer.Deserialize<LearningPath>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                catch (JsonException ex)
+                {
+                    _parent._logger.Error("PathGen", $"JSON Parsing failed. Raw: {aiResult.Value}");
+                    return Result.Failure($"Failed to parse generated path structure: {ex.Message}. The AI response was not valid JSON.", ex);
+                }
                 
                 if (_parent._generatedPath == null) return Result.Failure("Failed to parse generated path structure.");
 
@@ -233,7 +258,7 @@ JSON Template:
                     // For now we might not have the chunks directly by ID if they weren't stored in the model with content.
                     // But we can search again specifically for this unit's goal.
                     var searchResult = await _parent._knowledge.SearchAsync($"{unit.Title} {unit.Goal}", 5, ct);
-                    if (searchResult.IsSuccess)
+                    if (searchResult.IsSuccess && searchResult.Value != null)
                     {
                         foreach (var chunk in searchResult.Value)
                         {
@@ -285,6 +310,19 @@ Source Material Context:
             {
                 ErrorMessage = ex.Message;
                 Status = AITaskStatus.Failed;
+
+                try
+                {
+                    var path = await _parent._pathService.GetPathAsync(_pathId);
+                    var unit = path?.Units.FirstOrDefault(u => u.UnitId == _unitId);
+                    if (unit != null)
+                    {
+                        unit.Status = AITaskStatus.Failed;
+                        await _parent._pathService.SavePathAsync(path!);
+                    }
+                }
+                catch { /* Ignore secondary errors */ }
+
                 return Result.Failure(ex.Message, ex);
             }
         }

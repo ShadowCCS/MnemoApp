@@ -98,6 +98,8 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware
     {
         if (Path == null) return;
 
+        unit.Status = AITaskStatus.Running;
+
         var task = new GenerateUnitTask(
             Path.PathId,
             unit.UnitId,

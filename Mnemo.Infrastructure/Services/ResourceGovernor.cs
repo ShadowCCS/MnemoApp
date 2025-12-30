@@ -30,13 +30,7 @@ public class ResourceGovernor : IResourceGovernor
     {
         _lastAccess[manifest.Id] = DateTime.UtcNow;
 
-        if (manifest.Type == AIModelType.Text && !manifest.IsOptional)
-        {
-            // Fast models are always considered accessible/loaded
-            return true;
-        }
-
-        // Heavy models (Smart, TTS, STT) require a lock to prevent VRAM explosion
+        // Models with significant VRAM usage require a lock to prevent VRAM explosion
         if (manifest.EstimatedVramUsageBytes > 500 * 1024 * 1024) // > 500MB
         {
             await _heavyModelLock.WaitAsync(ct).ConfigureAwait(false);
@@ -54,6 +48,7 @@ public class ResourceGovernor : IResourceGovernor
         {
             if (_loadedModels.TryRemove(manifest.Id, out _))
             {
+                _lastAccess[manifest.Id] = DateTime.UtcNow;
                 _heavyModelLock.Release();
                 _logger.Info("ResourceGovernor", $"Released heavy model: {manifest.DisplayName}");
             }
@@ -61,6 +56,10 @@ public class ResourceGovernor : IResourceGovernor
             {
                 _logger.Warning("ResourceGovernor", $"Attempted to release model {manifest.DisplayName} that was not acquired");
             }
+        }
+        else
+        {
+            _lastAccess[manifest.Id] = DateTime.UtcNow;
         }
     }
 
@@ -71,12 +70,15 @@ public class ResourceGovernor : IResourceGovernor
         {
             if (now - kvp.Value > _unloadTimeout)
             {
-                if (_loadedModels.TryRemove(kvp.Key, out _))
+                // Never unload a model that is currently acquired/in use
+                if (_loadedModels.ContainsKey(kvp.Key))
                 {
-                    _logger.Info("ResourceGovernor", $"Model {kvp.Key} idle for too long, marking for unload.");
-                    ModelShouldUnload?.Invoke(kvp.Key);
-                    _lastAccess.TryRemove(kvp.Key, out _);
+                    continue;
                 }
+
+                _logger.Info("ResourceGovernor", $"Model {kvp.Key} idle for too long, marking for unload.");
+                ModelShouldUnload?.Invoke(kvp.Key);
+                _lastAccess.TryRemove(kvp.Key, out _);
             }
         }
     }
