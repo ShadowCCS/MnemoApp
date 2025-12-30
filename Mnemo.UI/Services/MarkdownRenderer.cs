@@ -93,7 +93,7 @@ public class MarkdownRenderer : IMarkdownRenderer
         return 0.0;
     }
 
-    private async Task<Control?> RenderBlockAsync(Markdig.Syntax.Block block, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)
+    private async Task<Control?> RenderBlockAsync(Markdig.Syntax.Block block, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, int listDepth = 0)
     {
         return block switch
         {
@@ -101,7 +101,7 @@ public class MarkdownRenderer : IMarkdownRenderer
             HeadingBlock heading => await RenderHeadingAsync(heading, specialInlines, foreground),
             CodeBlock code => await RenderCodeBlockAsync(code),
             QuoteBlock quote => await RenderQuoteAsync(quote, specialInlines, foreground),
-            ListBlock list => await RenderListAsync(list, specialInlines, foreground),
+            ListBlock list => await RenderListAsync(list, specialInlines, foreground, listDepth),
             var table when table.GetType().Name == "Table" => await RenderTableAsync(table, specialInlines, foreground),
             ThematicBreakBlock => new Border
             {
@@ -673,7 +673,24 @@ public class MarkdownRenderer : IMarkdownRenderer
         return border;
     }
 
-    private async Task<Control> RenderListAsync(ListBlock list, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)
+    private string GetBulletSymbol(int depth, bool isOrdered, int index)
+    {
+        if (isOrdered)
+        {
+            return $"{index}.";
+        }
+
+        return depth switch
+        {
+            0 => "•",  // Filled circle
+            1 => "○",  // Circle
+            2 => "▪",  // Square
+            3 => "▫",  // White square
+            _ => "•"   // Cycle back to filled circle for deeper nesting
+        };
+    }
+
+    private async Task<Control> RenderListAsync(ListBlock list, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, int depth = 0)
     {
         var container = new StackPanel { Spacing = 4, Margin = new Thickness(0, 4) };
         var fontSize = await GetBaseFontSizeAsync();
@@ -683,30 +700,42 @@ public class MarkdownRenderer : IMarkdownRenderer
 
         foreach (var item in list.Cast<ListItemBlock>())
         {
-            var itemContainer = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var itemContainer = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+                Margin = new Thickness(0, 0, 0, 0)
+            };
 
+            var bulletSize = depth == 0 ? fontSize * 1.1 : fontSize * 0.75;
             var bullet = new TextBlock
             {
-                Text = list.IsOrdered ? $"{index++}." : "•",
+                Text = GetBulletSymbol(depth, list.IsOrdered, index),
                 VerticalAlignment = VerticalAlignment.Top,
-                MinWidth = 20,
-                FontSize = fontSize,
+                Margin = new Thickness(0, 0, 8, 0),
+                FontSize = bulletSize,
                 LineHeight = fontSize * lineHeight,
                 LetterSpacing = letterSpacing,
                 Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
             };
+            Grid.SetColumn(bullet, 0);
 
             var content = new StackPanel { Spacing = 4 };
             foreach (var block in item)
             {
-                var rendered = await RenderBlockAsync(block, specialInlines, foreground);
+                // Increment depth for nested lists
+                var blockDepth = block is ListBlock ? depth + 1 : depth;
+                var rendered = await RenderBlockAsync(block, specialInlines, foreground, blockDepth);
                 if (rendered != null)
                     content.Children.Add(rendered);
             }
+            Grid.SetColumn(content, 1);
 
             itemContainer.Children.Add(bullet);
             itemContainer.Children.Add(content);
             container.Children.Add(itemContainer);
+            
+            if (list.IsOrdered)
+                index++;
         }
 
         return container;
