@@ -68,4 +68,3 @@ public class MatrixBox : Box
         Depth = totalRowHeight / 2 + 4;
     }
 }
-

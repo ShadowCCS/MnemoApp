@@ -9,7 +9,3 @@ public enum MarkdownInlineType
     Superscript,
     Subscript
 }
-
-
-
-

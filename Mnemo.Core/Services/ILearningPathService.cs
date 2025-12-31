@@ -14,6 +14,3 @@ public interface ILearningPathService
 
     event Action<LearningPath>? PathUpdated;
 }
-
-
-

@@ -9,6 +9,3 @@ public partial class PathDetailView : UserControl
         InitializeComponent();
     }
 }
-
-
-

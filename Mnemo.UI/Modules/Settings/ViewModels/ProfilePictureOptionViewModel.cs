@@ -23,6 +23,3 @@ public partial class ProfilePictureOptionViewModel : ViewModelBase
         await _parent.SelectPictureAsync(ImagePath);
     }
 }
-
-
-

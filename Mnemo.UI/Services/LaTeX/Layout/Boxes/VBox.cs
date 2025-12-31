@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Mnemo.UI.Services.LaTeX.Layout.Boxes;
 
@@ -15,15 +17,15 @@ public class VBox : Box
     private void RecalculateMetrics()
     {
         Width = 0;
-        Height = 0;
-        Depth = 0;
+        double totalHeight = 0;
 
         foreach (var child in Children)
         {
-            if (child.Width > Width)
-                Width = child.Width;
-            Height += child.TotalHeight;
+            Width = Math.Max(Width, child.Width);
+            totalHeight += child.TotalHeight;
         }
+
+        Height = totalHeight; 
+        Depth = 0;
     }
 }
-

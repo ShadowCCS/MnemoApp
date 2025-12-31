@@ -23,4 +23,3 @@ public class FractionBox : Box
         Depth = denominator.TotalHeight + denominatorSpacing + RuleThickness / 2;
     }
 }
-

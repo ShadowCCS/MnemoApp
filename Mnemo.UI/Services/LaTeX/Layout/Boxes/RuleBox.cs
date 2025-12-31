@@ -9,4 +9,3 @@ public class RuleBox : Box
         Depth = thickness / 2;
     }
 }
-

@@ -871,4 +871,3 @@ public class MarkdownRenderer : IMarkdownRenderer
         }
     }
 }
-

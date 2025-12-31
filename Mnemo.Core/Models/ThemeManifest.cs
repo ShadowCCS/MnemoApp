@@ -12,8 +12,3 @@ public class ThemeManifest
     public DateTimeOffset? LastUsed { get; set; }
     public List<string> PreviewColors { get; set; } = new();
 }
-
-
-
-
-

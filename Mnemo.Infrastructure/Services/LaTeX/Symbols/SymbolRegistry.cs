@@ -273,4 +273,3 @@ public static class SymbolRegistry
         _symbols[command] = unicode;
     }
 }
-

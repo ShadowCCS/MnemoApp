@@ -11,4 +11,3 @@ public abstract class Box
     
     public double TotalHeight => Height + Depth;
 }
-

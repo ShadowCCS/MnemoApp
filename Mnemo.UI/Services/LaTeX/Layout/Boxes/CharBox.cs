@@ -11,4 +11,3 @@ public class CharBox : Box
         FontSize = fontSize;
     }
 }
-

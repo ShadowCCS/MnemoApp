@@ -21,6 +21,3 @@ public class StatusToBoolConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
-
-
-

@@ -8,8 +8,3 @@ public interface IEmbeddingService
 {
     Task<Result<float[]>> GetEmbeddingAsync(string text, CancellationToken ct = default);
 }
-
-
-
-
-

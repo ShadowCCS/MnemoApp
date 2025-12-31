@@ -77,6 +77,3 @@ public class LearningPathService : ILearningPathService
         return Result.Success();
     }
 }
-
-
-

@@ -7,8 +7,3 @@ public class LanguageManifest
     public string NativeName { get; set; } = string.Empty;
     public string? IconPath { get; set; }
 }
-
-
-
-
-

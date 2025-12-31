@@ -26,7 +26,3 @@ public class ChatMessageViewModel : ViewModelBase
         set => SetProperty(ref _timestamp, value);
     }
 }
-
-
-
-

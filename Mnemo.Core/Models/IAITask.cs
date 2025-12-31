@@ -19,8 +19,3 @@ public interface IAITask
     void Cancel();
     Task<Result> RedoStepAsync(int stepIndex, CancellationToken ct);
 }
-
-
-
-
-

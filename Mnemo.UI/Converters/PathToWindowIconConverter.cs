@@ -34,6 +34,3 @@ public class PathToWindowIconConverter : IValueConverter
         throw new NotSupportedException();
     }
 }
-
-
-

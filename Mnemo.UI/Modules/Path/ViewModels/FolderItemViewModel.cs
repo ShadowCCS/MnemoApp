@@ -14,8 +14,3 @@ public class FolderItemViewModel : PathBaseViewModel
         set => SetProperty(ref _isExpanded, value);
     }
 }
-
-
-
-
-

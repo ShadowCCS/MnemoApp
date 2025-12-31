@@ -135,7 +135,9 @@ public class AIOrchestrator : IAIOrchestrator
         var sb = new StringBuilder();
         foreach (var chunk in relevantChunks)
         {
-            sb.AppendLine($"--- Source: {chunk.Metadata.GetValueOrDefault("path", "Unknown")} ---");
+            // Normalize backslashes to forward slashes for cross-platform and JSON safety
+            var safePath = chunk.Metadata.GetValueOrDefault("path", "Unknown")?.ToString()?.Replace("\\", "/");
+            sb.AppendLine($"--- Source: {safePath} ---");
             sb.AppendLine(chunk.Content);
             sb.AppendLine();
         }

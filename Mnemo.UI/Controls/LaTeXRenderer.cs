@@ -314,7 +314,7 @@ public class LaTeXRenderer : Control
             }
         }
         var foreground = GetTextBrush();
-        var color = (foreground as ISolidColorBrush)?.Color.ToUint32() ?? 0xFF000000;
+        var color = (foreground as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF000000;
 
         var cacheKey = (charBox.Character, charBox.FontSize, color);
         if (!_formattedTextCache.TryGetValue(cacheKey, out var formattedText))
@@ -347,4 +347,3 @@ public class LaTeXRenderer : Control
         return Brushes.Black;
     }
 }
-

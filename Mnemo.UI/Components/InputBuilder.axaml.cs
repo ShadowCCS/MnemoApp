@@ -72,6 +72,3 @@ public partial class InputBuilder : UserControl
         GenerateRequested?.Invoke(this, (Text, Files.ToArray()));
     }
 }
-
-
-

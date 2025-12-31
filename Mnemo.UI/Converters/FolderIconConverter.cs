@@ -22,8 +22,3 @@ public class FolderIconConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
-
-
-
-
-

@@ -11,4 +11,3 @@ public interface IMarkdownRenderer
 {
     Task<Control> RenderAsync(string markdown, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground = null);
 }
-

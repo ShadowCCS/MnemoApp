@@ -21,8 +21,3 @@ namespace Mnemo.UI.Converters
         }
     }
 }
-
-
-
-
-

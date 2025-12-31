@@ -34,8 +34,3 @@ public class PathToImageConverter : IValueConverter
         throw new NotSupportedException();
     }
 }
-
-
-
-
-

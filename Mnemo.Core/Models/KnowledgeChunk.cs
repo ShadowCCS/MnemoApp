@@ -12,8 +12,3 @@ public class KnowledgeChunk
     public Dictionary<string, object> Metadata { get; set; } = new();
     public float[]? Embedding { get; set; }
 }
-
-
-
-
-

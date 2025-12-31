@@ -11,4 +11,3 @@ public class ParseError : Exception
         Position = position;
     }
 }
-

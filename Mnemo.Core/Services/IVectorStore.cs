@@ -10,8 +10,3 @@ public interface IVectorStore
     Task<IEnumerable<KnowledgeChunk>> SearchAsync(float[] queryVector, int limit = 5);
     Task DeleteBySourceAsync(string sourceId);
 }
-
-
-
-
-

@@ -19,4 +19,3 @@ public enum LaTeXTokenType
     Punctuation,    // ,, ;, :, etc.
     EOF
 }
-

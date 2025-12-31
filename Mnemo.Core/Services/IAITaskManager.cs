@@ -12,8 +12,3 @@ public interface IAITaskManager
     IEnumerable<IAITask> GetAllTasks();
     event Action<IAITask>? TaskUpdated;
 }
-
-
-
-
-

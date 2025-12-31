@@ -23,6 +23,3 @@ public partial class AppIconOptionViewModel : ViewModelBase
         await _parent.SelectIconAsync(IconPath);
     }
 }
-
-
-

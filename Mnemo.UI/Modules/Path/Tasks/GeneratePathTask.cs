@@ -136,7 +136,9 @@ public class GeneratePathTask : AITaskBase
                 var contextBuilder = new StringBuilder();
                 foreach (var chunk in chunks)
                 {
-                    contextBuilder.AppendLine($"--- Source: {chunk.SourceId} ---");
+                    // Normalize backslashes to forward slashes to prevent AI from generating invalid JSON on Windows
+                    var safeSourceId = chunk.SourceId.Replace("\\", "/");
+                    contextBuilder.AppendLine($"--- Source: {safeSourceId} ---");
                     contextBuilder.AppendLine(chunk.Content);
                 }
 
@@ -146,7 +148,7 @@ public class GeneratePathTask : AITaskBase
                 var systemPrompt = @"You are an expert curriculum designer. 
 Generate a comprehensive learning path in JSON format.
 CRITICAL: You must respond ONLY with the JSON object. Do not include any conversational text before or after the JSON.
-Follow the exact schema provided.";
+Follow the exact schema provided. Ensure all strings are correctly escaped for JSON (use forward slashes for any paths).";
 
                 var userPrompt = $@"Create a learning path for the topic: '{_parent._topic}'
 Additional Instructions: {_parent._instructions}

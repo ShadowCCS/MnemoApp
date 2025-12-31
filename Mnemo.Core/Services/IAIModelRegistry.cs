@@ -10,8 +10,3 @@ public interface IAIModelRegistry
     Task<AIModelManifest?> GetModelAsync(string modelId);
     Task RefreshAsync();
 }
-
-
-
-
-

@@ -88,4 +88,3 @@ public class LaTeXEngine : ILateXEngine
         FontMetrics.Instance.ClearCache();
     }
 }
-
