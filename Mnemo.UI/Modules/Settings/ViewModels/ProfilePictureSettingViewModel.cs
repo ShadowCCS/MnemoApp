@@ -38,7 +38,7 @@ public partial class ProfilePictureSettingViewModel : ViewModelBase
         for (int i = 0; i <= 5; i++)
         {
             var path = $"avares://Mnemo.UI/Assets/ProfilePictures/img{i}.png";
-            Options.Add(new ProfilePictureOptionViewModel(path, path == _currentPicturePath, this));
+            Options.Add(new ProfilePictureOptionViewModel(path, path == CurrentPicturePath, this));
         }
     }
 

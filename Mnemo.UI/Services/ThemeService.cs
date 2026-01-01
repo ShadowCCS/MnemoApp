@@ -49,10 +49,10 @@ public class ThemeService : IThemeService
         await _settingsService.SetAsync(ThemeSettingKey, themeName);
     }
 
-    public async Task<IEnumerable<ThemeManifest>> GetAllThemesAsync()
+    public Task<IEnumerable<ThemeManifest>> GetAllThemesAsync()
     {
         // For now, hardcode the two themes as they are baked into the app
-        return new List<ThemeManifest>
+        var themes = new List<ThemeManifest>
         {
             new ThemeManifest 
             { 
@@ -69,6 +69,8 @@ public class ThemeService : IThemeService
                 PreviewColors = new List<string> { "#1A1A1C", "#2A2A2C", "#3A3A3C" }
             }
         };
+
+        return Task.FromResult<IEnumerable<ThemeManifest>>(themes);
     }
 
     public async Task<string> GetCurrentThemeAsync()

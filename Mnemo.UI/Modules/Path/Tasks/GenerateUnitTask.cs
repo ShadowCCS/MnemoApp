@@ -68,7 +68,7 @@ public class GenerateUnitTask : AITaskBase
                 // 1. Gather material for this unit
                 var contextBuilder = new StringBuilder();
                 var searchResult = await _parent._knowledge.SearchAsync($"{unit.Title} {unit.Goal}", 5, ct);
-                if (searchResult.IsSuccess)
+                if (searchResult is { IsSuccess: true, Value: not null })
                 {
                     foreach (var chunk in searchResult.Value)
                     {

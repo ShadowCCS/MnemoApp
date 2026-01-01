@@ -30,7 +30,3 @@ public partial class TextSettingViewModel : ViewModelBase
         _settingsService.SetAsync(_settingsKey, value).ConfigureAwait(false);
     }
 }
-
-
-
-

@@ -24,3 +24,5 @@ public class BoolToPasswordCharConverter : IValueConverter
 
 
 
+
+

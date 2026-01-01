@@ -47,7 +47,7 @@ public partial class AppIconSettingViewModel : ViewModelBase
         foreach (var file in iconFiles)
         {
             var path = $"avares://Mnemo.UI/Assets/AppIcons/{file}";
-            Options.Add(new AppIconOptionViewModel(path, path == _currentIconPath, this));
+            Options.Add(new AppIconOptionViewModel(path, path == CurrentIconPath, this));
         }
     }
 
