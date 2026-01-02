@@ -53,6 +53,12 @@ public partial class MarkdownView : UserControl
         }
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _ = RenderAsync();
+    }
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -70,7 +76,9 @@ public partial class MarkdownView : UserControl
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == SourceProperty || change.Property == ForegroundProperty)
+        if (change.Property == SourceProperty || 
+            change.Property == ForegroundProperty || 
+            change.Property == IsVisibleProperty)
         {
             _ = RenderAsync();
         }
@@ -80,7 +88,11 @@ public partial class MarkdownView : UserControl
     {
         if (_contentHost == null) return;
 
+        // If we are not visible, we can delay rendering until we are, 
+        // unless we already have content and just need to clear it.
         var currentSource = Source;
+        if (!IsVisible && !string.IsNullOrWhiteSpace(currentSource)) return;
+
         if (string.IsNullOrWhiteSpace(currentSource))
         {
             _contentHost.Content = null;
@@ -104,25 +116,42 @@ public partial class MarkdownView : UserControl
                 
                 if (string.IsNullOrEmpty(currentSource)) break;
 
-                // Process special inlines (LaTeX, etc.)
+                // Process special inlines (LaTeX, etc.) on a background thread
                 var (processedSource, specialInlines) = await Task.Run(() => 
                     _markdownProcessor.ExtractSpecialInlines(currentSource));
 
-                // Render the processed markdown
-                var renderedControl = await _markdownRenderer.RenderAsync(processedSource, specialInlines, Foreground);
-
-                _contentHost.Content = renderedControl;
+                // Render the processed markdown - must be on UI thread
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    try 
+                    {
+                        var renderedControl = await _markdownRenderer.RenderAsync(processedSource, specialInlines, Foreground);
+                        _contentHost.Content = renderedControl;
+                    }
+                    catch (Exception ex)
+                    {
+                        _contentHost.Content = new TextBlock
+                        {
+                            Text = $"Error rendering markdown: {ex.Message}",
+                            Foreground = Brushes.Red,
+                            TextWrapping = TextWrapping.Wrap
+                        };
+                    }
+                });
 
             } while (_renderRequested);
         }
         catch (Exception ex)
         {
-            _contentHost.Content = new TextBlock
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                Text = $"Error rendering content: {ex.Message}",
-                Foreground = (IBrush)Application.Current!.FindResource("SystemErrorBackgroundBrush")!,
-                TextWrapping = TextWrapping.Wrap
-            };
+                _contentHost.Content = new TextBlock
+                {
+                    Text = $"Error processing content: {ex.Message}",
+                    Foreground = (IBrush?)Application.Current?.FindResource("SystemErrorBackgroundBrush") ?? Brushes.Red,
+                    TextWrapping = TextWrapping.Wrap
+                };
+            });
         }
         finally
         {

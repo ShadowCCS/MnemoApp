@@ -26,6 +26,21 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
     [ObservableProperty]
     private LearningUnit? _selectedUnit;
 
+    async partial void OnSelectedUnitChanged(LearningUnit? value)
+    {
+        if (value == null) return;
+
+        // If smart generation is on and unit is not generated, trigger it
+        if (!value.IsCompleted && value.Status != AITaskStatus.Running)
+        {
+            bool smartGen = await _settings.GetAsync("AI.SmartUnitGeneration", false);
+            if (smartGen)
+            {
+                await GenerateUnitAsync(value);
+            }
+        }
+    }
+
     [ObservableProperty]
     private bool _isSidebarOpen = true;
 
@@ -134,6 +149,7 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
             Path = path;
             if (Path != null)
             {
+                SelectedUnit = null;
                 Units.Clear();
                 foreach (var unit in Path.Units.OrderBy(u => u.Order))
                 {
@@ -146,22 +162,6 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
 
     [RelayCommand]
     private void ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
-
-    [RelayCommand]
-    private async Task SelectUnit(LearningUnit unit)
-    {
-        SelectedUnit = unit;
-        
-        // If smart generation is on and unit is not generated, trigger it
-        if (!unit.IsCompleted && unit.Status != AITaskStatus.Running)
-        {
-            bool smartGen = await _settings.GetAsync("AI.SmartUnitGeneration", false);
-            if (smartGen)
-            {
-                await GenerateUnitAsync(unit);
-            }
-        }
-    }
 
     [RelayCommand]
     private async Task GenerateUnit(LearningUnit unit)

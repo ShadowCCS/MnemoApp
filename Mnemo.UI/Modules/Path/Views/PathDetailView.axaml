@@ -180,7 +180,9 @@
                                         </DockPanel>
                                         <TextBlock Text="{Binding Goal}" 
                                                    FontSize="{DynamicResource FontSize.Body.Medium}" 
-                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontStyle="Italic"/>
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" 
+                                                   FontStyle="Italic"
+                                                   TextWrapping="Wrap"/>
                                     </StackPanel>
 
                                     <Border IsVisible="{Binding !IsCompleted}" 
