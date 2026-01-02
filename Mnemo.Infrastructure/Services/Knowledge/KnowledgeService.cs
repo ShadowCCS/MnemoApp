@@ -32,15 +32,19 @@ public class KnowledgeService : IKnowledgeService
             var content = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
             var sourceId = Guid.NewGuid().ToString();
             
-            // Simple semantic chunking (by paragraphs/sentences)
-            var chunks = ChunkText(content);
-            var knowledgeChunks = new List<KnowledgeChunk>();
+            var chunkTexts = ChunkText(content);
+            var knowledgeChunks = new System.Collections.Concurrent.ConcurrentBag<KnowledgeChunk>();
 
-            foreach (var chunkText in chunks)
+            // Parallelize embedding generation with bounded parallelism to avoid CPU/memory contention
+            var parallelOptions = new ParallelOptions 
+            { 
+                CancellationToken = ct,
+                MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) 
+            };
+
+            await Parallel.ForEachAsync(chunkTexts, parallelOptions, async (chunkText, token) =>
             {
-                if (ct.IsCancellationRequested) break;
-
-                var embeddingResult = await _embeddingService.GetEmbeddingAsync(chunkText, ct).ConfigureAwait(false);
+                var embeddingResult = await _embeddingService.GetEmbeddingAsync(chunkText, token).ConfigureAwait(false);
                 if (embeddingResult.IsSuccess)
                 {
                     knowledgeChunks.Add(new KnowledgeChunk
@@ -51,9 +55,9 @@ public class KnowledgeService : IKnowledgeService
                         Metadata = new Dictionary<string, object> { { "path", path } }
                     });
                 }
-            }
+            }).ConfigureAwait(false);
 
-            await _vectorStore.SaveChunksAsync(knowledgeChunks).ConfigureAwait(false);
+            await _vectorStore.SaveChunksAsync(knowledgeChunks, ct).ConfigureAwait(false);
             return Result.Success();
         }
         catch (Exception ex)
@@ -70,7 +74,7 @@ public class KnowledgeService : IKnowledgeService
             var embeddingResult = await _embeddingService.GetEmbeddingAsync(query, ct).ConfigureAwait(false);
             if (!embeddingResult.IsSuccess) return Result<IEnumerable<KnowledgeChunk>>.Failure(embeddingResult.ErrorMessage!);
 
-            var results = await _vectorStore.SearchAsync(embeddingResult.Value!, limit).ConfigureAwait(false);
+            var results = await _vectorStore.SearchAsync(embeddingResult.Value!, limit, ct).ConfigureAwait(false);
             return Result<IEnumerable<KnowledgeChunk>>.Success(results);
         }
         catch (Exception ex)
@@ -80,11 +84,11 @@ public class KnowledgeService : IKnowledgeService
         }
     }
 
-    public async Task<Result> RemoveSourceAsync(string sourceId)
+    public async Task<Result> RemoveSourceAsync(string sourceId, CancellationToken ct = default)
     {
         try
         {
-            await _vectorStore.DeleteBySourceAsync(sourceId).ConfigureAwait(false);
+            await _vectorStore.DeleteBySourceAsync(sourceId, ct).ConfigureAwait(false);
             return Result.Success();
         }
         catch (Exception ex)

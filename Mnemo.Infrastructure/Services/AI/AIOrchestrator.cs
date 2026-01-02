@@ -17,7 +17,6 @@ public class AIOrchestrator : IAIOrchestrator
     private readonly ILoggerService _logger;
     private readonly IResourceGovernor _governor;
     private readonly ITextGenerationService _textService;
-    private readonly GeminiTextService _geminiService;
 
     public AIOrchestrator(
         IAIModelRegistry modelRegistry,
@@ -25,8 +24,7 @@ public class AIOrchestrator : IAIOrchestrator
         ISettingsService settings,
         ILoggerService logger,
         IResourceGovernor governor,
-        ITextGenerationService textService,
-        GeminiTextService geminiService)
+        ITextGenerationService textService)
     {
         _modelRegistry = modelRegistry;
         _knowledgeService = knowledgeService;
@@ -34,35 +32,47 @@ public class AIOrchestrator : IAIOrchestrator
         _logger = logger;
         _governor = governor;
         _textService = textService;
-        _geminiService = geminiService;
     }
 
     public async Task<Result<string>> PromptAsync(string systemPrompt, string userPrompt, CancellationToken ct = default)
     {
-        // Smart RAG: Only search if enabled and query is substantial enough
-        var smartRagEnabled = await _settings.GetAsync("AI.SmartRAG", true).ConfigureAwait(false);
-        
-        if (smartRagEnabled && ShouldUseRag(userPrompt))
+        var context = await GetRagContextAsync(userPrompt, ct).ConfigureAwait(false);
+        if (context != null)
         {
-            var contextResult = await _knowledgeService.SearchAsync(userPrompt, 5, ct).ConfigureAwait(false);
-            if (contextResult.IsSuccess && contextResult.Value != null)
-            {
-                var relevantChunks = contextResult.Value.Where(c => c.RelevanceScore > 0.4).ToList();
-                if (relevantChunks.Any())
-                {
-                    _logger.Info("AIOrchestrator", $"Using RAG with {relevantChunks.Count} chunks (best score: {relevantChunks.Max(c => c.RelevanceScore):F2})");
-                    return await PromptWithContextAsync(userPrompt, relevantChunks, ct).ConfigureAwait(false);
-                }
-            }
+            return await PromptWithContextAsync(systemPrompt, userPrompt, context, ct).ConfigureAwait(false);
         }
 
         return await ExecutePromptAsync(systemPrompt, userPrompt, ct).ConfigureAwait(false);
+    }
+
+    private async Task<List<KnowledgeChunk>?> GetRagContextAsync(string userPrompt, CancellationToken ct)
+    {
+        var smartRagEnabled = await _settings.GetAsync("AI.SmartRAG", true).ConfigureAwait(false);
+        if (!smartRagEnabled || !ShouldUseRag(userPrompt)) return null;
+
+        // Use a simpler query for search if the prompt is very long
+        var searchQuery = userPrompt.Length > 200 ? userPrompt[..200] : userPrompt;
+        
+        var contextResult = await _knowledgeService.SearchAsync(searchQuery, 10, ct).ConfigureAwait(false);
+        if (contextResult.IsSuccess && contextResult.Value != null)
+        {
+            var relevantChunks = contextResult.Value.Where(c => c.RelevanceScore > 0.4).ToList();
+            if (relevantChunks.Any())
+            {
+                _logger.Info("AIOrchestrator", $"Using RAG with {relevantChunks.Count} chunks (best score: {relevantChunks.Max(c => c.RelevanceScore):F2})");
+                return relevantChunks;
+            }
+        }
+        return null;
     }
 
     private static bool ShouldUseRag(string query)
     {
         // Skip RAG for short queries (greetings, simple questions)
         if (query.Length < 20) return false;
+
+        // Skip RAG for obviously programmed prompts (like JSON schema instructions)
+        if (query.Contains("JSON") || query.Contains("STRUCTURE") || query.Contains("RESPOND ONLY WITH")) return false;
         
         // Skip RAG for obvious greetings/chitchat
         var greetings = new[] { "hi", "hello", "hey", "how are you", "what's up", "thanks", "thank you", "bye", "goodbye" };
@@ -77,57 +87,37 @@ public class AIOrchestrator : IAIOrchestrator
 
     public async Task<Result<string>> PromptWithContextAsync(string prompt, IEnumerable<KnowledgeChunk> context, CancellationToken ct = default)
     {
-        // Phase A: Smart Query Expansion/Rewriting
-        var searchPrompt = await RewriteQueryAsync(prompt, ct).ConfigureAwait(false);
-        
-        // Phase B: Smart condensing
-        var condensedContext = await CondenseContextAsync(context, searchPrompt, ct).ConfigureAwait(false);
-
-        // Phase C: Answer
-        var systemPrompt = "You are Mnemo, an expert assistant. Use the provided context to answer the user's question accurately. If the answer is not in the context, politely state that you don't have that information. Keep answers professional and grounded in the provided facts.";
-        var fullPrompt = $"Context:\n{condensedContext}\n\nQuestion: {prompt}";
-
-        return await ExecutePromptAsync(systemPrompt, fullPrompt, ct).ConfigureAwait(false);
+        return await PromptWithContextAsync(string.Empty, prompt, context, ct).ConfigureAwait(false);
     }
 
-    private async Task<string> RewriteQueryAsync(string query, CancellationToken ct)
+    public async Task<Result<string>> PromptWithContextAsync(string systemPrompt, string prompt, IEnumerable<KnowledgeChunk> context, CancellationToken ct = default)
     {
-        // Only rewrite if query is long/complex enough to benefit
-        if (query.Length < 30) return query;
+        // Phase A: Smart condensing
+        var condensedContext = await CondenseContextAsync(context, prompt, ct).ConfigureAwait(false);
 
-        var rewritePrompt = $"""
-        <|im_start|>system
-        Rewrite the user's query into a better search term for a vector database. Extract key concepts and entities. Respond ONLY with the rewritten query.<|im_end|>
-        <|im_start|>user
-        {query}<|im_end|>
-        <|im_start|>assistant
-        """;
+        // Phase B: Answer
+        var finalSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
+            ? "You are Mnemo, an expert assistant. Use the provided context to answer the user's question accurately. If the answer is not in the context, politely state that you don't have that information. Keep answers professional and grounded in the provided facts."
+            : systemPrompt;
 
-        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
-        if (useGemini)
-        {
-            var geminiResult = await _geminiService.GenerateAsync(null!, rewritePrompt, ct).ConfigureAwait(false);
-            return geminiResult.IsSuccess ? geminiResult.Value?.Trim() ?? query : query;
-        }
+        var fullPrompt = $"Context:\n{condensedContext}\n\nQuestion: {prompt}";
 
-        var models = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
-        var fastModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && !m.IsOptional);
-        
-        if (fastModel == null) return query;
+        return await ExecutePromptAsync(finalSystemPrompt, fullPrompt, ct).ConfigureAwait(false);
+    }
 
-        var result = await PromptWithModelAsync(fastModel.Id, rewritePrompt, ct).ConfigureAwait(false);
-        return result.IsSuccess ? result.Value?.Trim() ?? query : query;
+    private Task<string> RewriteQueryAsync(string query, CancellationToken ct)
+    {
+        // Skip rewriting for now as it's not currently used for condensation and can cause hallucinations
+        return Task.FromResult(query);
     }
 
     private async Task<string> CondenseContextAsync(IEnumerable<KnowledgeChunk> context, string query, CancellationToken ct)
     {
         await Task.Yield();
         
-        // Sort by relevance and take top chunks. 
-        // With 128k context support, we can afford to send many more chunks.
         var relevantChunks = context
             .OrderByDescending(c => c.RelevanceScore)
-            .Take(50) // Increased from 10 to 50 to leverage long context
+            .Take(15) 
             .ToList();
 
         if (!relevantChunks.Any()) return string.Empty;
@@ -135,7 +125,6 @@ public class AIOrchestrator : IAIOrchestrator
         var sb = new StringBuilder();
         foreach (var chunk in relevantChunks)
         {
-            // Normalize backslashes to forward slashes for cross-platform and JSON safety
             var safePath = chunk.Metadata.GetValueOrDefault("path", "Unknown")?.ToString()?.Replace("\\", "/");
             sb.AppendLine($"--- Source: {safePath} ---");
             sb.AppendLine(chunk.Content);
@@ -147,12 +136,6 @@ public class AIOrchestrator : IAIOrchestrator
 
     public async Task<Result<string>> PromptWithModelAsync(string modelId, string prompt, CancellationToken ct = default)
     {
-        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
-        if (useGemini)
-        {
-            return await _geminiService.GenerateAsync(null!, prompt, ct).ConfigureAwait(false);
-        }
-
         var manifest = await _modelRegistry.GetModelAsync(modelId).ConfigureAwait(false);
         if (manifest == null) return Result<string>.Failure("Model not found.");
 
@@ -170,27 +153,30 @@ public class AIOrchestrator : IAIOrchestrator
 
     public async IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
-        if (useGemini)
+        var context = await GetRagContextAsync(userPrompt, ct).ConfigureAwait(false);
+        var effectiveUserPrompt = userPrompt;
+        var effectiveSystemPrompt = systemPrompt;
+
+        if (context != null)
         {
-            var fullPrompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
-            await foreach (var token in _geminiService.GenerateStreamingAsync(null!, fullPrompt, ct).ConfigureAwait(false))
-            {
-                yield return token;
-            }
-            yield break;
+            var searchPrompt = await RewriteQueryAsync(userPrompt, ct).ConfigureAwait(false);
+            var condensedContext = await CondenseContextAsync(context, searchPrompt, ct).ConfigureAwait(false);
+            
+            effectiveSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
+                ? "You are Mnemo, an expert assistant. Use the provided context to answer the user's question accurately. If the answer is not in the context, politely state that you don't have that information. Keep answers professional and grounded in the provided facts."
+                : systemPrompt;
+
+            effectiveUserPrompt = $"Context:\n{condensedContext}\n\nQuestion: {userPrompt}";
         }
 
-        // For simplicity in the first version, we skip RAG for streaming if it requires complex rewriting,
-        // but we can still use the basic user prompt.
-        var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
+        var targetModel = await SelectModelAsync(effectiveUserPrompt, ct).ConfigureAwait(false);
         if (targetModel == null) yield break;
 
-        var effectiveSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
+        var finalSystemPrompt = string.IsNullOrWhiteSpace(effectiveSystemPrompt)
             ? "You are Mnemo, a helpful and concise AI assistant."
-            : systemPrompt;
+            : effectiveSystemPrompt;
 
-        var formattedPrompt = FormatPrompt(targetModel.PromptTemplate, effectiveSystemPrompt, userPrompt);
+        var formattedPrompt = FormatPrompt(targetModel.PromptTemplate, finalSystemPrompt, effectiveUserPrompt);
 
         await _governor.AcquireModelAsync(targetModel, ct).ConfigureAwait(false);
         try
@@ -209,7 +195,15 @@ public class AIOrchestrator : IAIOrchestrator
     private async Task<AIModelManifest?> SelectModelAsync(string userPrompt, CancellationToken ct)
     {
         bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
-        if (useGemini) return null; // We handle Gemini separately in PromptStreaming/ExecutePrompt
+        if (useGemini)
+        {
+            return new AIModelManifest 
+            { 
+                Id = "gemini", 
+                DisplayName = "Gemini 2.5 Flash",
+                Type = AIModelType.Text
+            };
+        }
 
         bool smartSwitchEnabled = await _settings.GetAsync("AI.SmartSwitch", false).ConfigureAwait(false);
         var models = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
@@ -242,23 +236,20 @@ public class AIOrchestrator : IAIOrchestrator
 
     private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct)
     {
-        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
-        if (useGemini)
-        {
-            var fullPrompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
-            return await _geminiService.GenerateAsync(null!, fullPrompt, ct).ConfigureAwait(false);
-        }
-
         var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
-
         if (targetModel == null) return Result<string>.Failure("No suitable text model found.");
 
         var effectiveSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt) 
             ? "You are Mnemo, a helpful and concise AI assistant." 
             : systemPrompt;
 
+        if (targetModel.Id == "gemini")
+        {
+            var fullPrompt = string.IsNullOrWhiteSpace(effectiveSystemPrompt) ? userPrompt : $"{effectiveSystemPrompt}\n\n{userPrompt}";
+            return await _textService.GenerateAsync(targetModel, fullPrompt, ct).ConfigureAwait(false);
+        }
+
         var formattedPrompt = FormatPrompt(targetModel.PromptTemplate, effectiveSystemPrompt, userPrompt);
-        
         return await PromptWithModelAsync(targetModel.Id, formattedPrompt, ct).ConfigureAwait(false);
     }
 

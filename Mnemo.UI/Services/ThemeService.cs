@@ -58,14 +58,14 @@ public class ThemeService : IThemeService
             { 
                 Name = "Dawn", 
                 DisplayName = "Dawn", 
-                Description = "Light and airy workspace",
+                Description = "Default light theme",
                 PreviewColors = new List<string> { "#F5F5F7", "#FFFFFF", "#E5E5E7" }
             },
             new ThemeManifest 
             { 
                 Name = "Dusk", 
                 DisplayName = "Dusk", 
-                Description = "Deep and focused dark mode",
+                Description = "Default dark theme",
                 PreviewColors = new List<string> { "#1A1A1C", "#2A2A2C", "#3A3A3C" }
             }
         };

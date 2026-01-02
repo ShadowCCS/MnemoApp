@@ -9,6 +9,6 @@ public interface IKnowledgeService
 {
     Task<Result> IngestDocumentAsync(string path, CancellationToken ct = default);
     Task<Result<IEnumerable<KnowledgeChunk>>> SearchAsync(string query, int limit = 5, CancellationToken ct = default);
-    Task<Result> RemoveSourceAsync(string sourceId);
+    Task<Result> RemoveSourceAsync(string sourceId, CancellationToken ct = default);
 }
 

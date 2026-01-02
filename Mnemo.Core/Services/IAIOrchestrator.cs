@@ -13,6 +13,7 @@ public interface IAIOrchestrator
     
     // RAG enabled prompt
     Task<Result<string>> PromptWithContextAsync(string prompt, IEnumerable<KnowledgeChunk> context, CancellationToken ct = default);
+    Task<Result<string>> PromptWithContextAsync(string systemPrompt, string prompt, IEnumerable<KnowledgeChunk> context, CancellationToken ct = default);
 }
 
 

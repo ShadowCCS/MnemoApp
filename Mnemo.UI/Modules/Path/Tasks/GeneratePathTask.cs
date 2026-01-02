@@ -85,11 +85,19 @@ public class GeneratePathTask : AITaskBase
         {
             if (string.IsNullOrWhiteSpace(input)) return string.Empty;
 
-            // 1. Try to find markdown JSON block
-            var match = System.Text.RegularExpressions.Regex.Match(input, @"```(?:json)?\s*([\s\S]*?)\s*```");
+            // 1. Try to find markdown JSON block (case-insensitive for language tag)
+            var match = System.Text.RegularExpressions.Regex.Match(
+                input, 
+                @"```(?:json)?\s*([\s\S]*?)\s*```", 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (match.Success)
             {
-                return match.Groups[1].Value.Trim();
+                var extracted = match.Groups[1].Value.Trim();
+                // Ensure we extracted actual JSON content, not empty
+                if (!string.IsNullOrEmpty(extracted) && extracted.StartsWith("{"))
+                {
+                    return extracted;
+                }
             }
 
             // 2. Fallback to finding first { and last }
@@ -130,17 +138,8 @@ public class GeneratePathTask : AITaskBase
 
                 // 2. RAG Search
                 var searchQuery = $"{_parent._topic} {_parent._instructions}";
-                var searchResult = await _parent._knowledge.SearchAsync(searchQuery, 10, ct);
+                var searchResult = await _parent._knowledge.SearchAsync(searchQuery, 15, ct);
                 var chunks = searchResult.IsSuccess && searchResult.Value != null ? searchResult.Value : Enumerable.Empty<KnowledgeChunk>();
-
-                var contextBuilder = new StringBuilder();
-                foreach (var chunk in chunks)
-                {
-                    // Normalize backslashes to forward slashes to prevent AI from generating invalid JSON on Windows
-                    var safeSourceId = chunk.SourceId.Replace("\\", "/");
-                    contextBuilder.AppendLine($"--- Source: {safeSourceId} ---");
-                    contextBuilder.AppendLine(chunk.Content);
-                }
 
                 Progress = 0.4;
 
@@ -152,9 +151,6 @@ Follow the exact schema provided. Ensure all strings are correctly escaped for J
 
                 var userPrompt = $@"Create a learning path for the topic: '{_parent._topic}'
 Additional Instructions: {_parent._instructions}
-
-Source Materials Context:
-{contextBuilder}
 
 RESPOND ONLY WITH THIS JSON STRUCTURE:
 {{
@@ -180,7 +176,7 @@ RESPOND ONLY WITH THIS JSON STRUCTURE:
   ]
 }}";
 
-                var aiResult = await _parent._orchestrator.PromptAsync(systemPrompt, userPrompt, ct);
+                var aiResult = await _parent._orchestrator.PromptWithContextAsync(systemPrompt, userPrompt, chunks, ct);
                 if (!aiResult.IsSuccess || aiResult.Value == null) return Result.Failure(aiResult.ErrorMessage ?? "AI failed to respond.");
 
                 var json = ExtractJson(aiResult.Value);
@@ -254,7 +250,7 @@ RESPOND ONLY WITH THIS JSON STRUCTURE:
                 Description = unit.Goal;
 
                 // 1. Gather material for this unit
-                var contextBuilder = new StringBuilder();
+                var chunks = new List<KnowledgeChunk>();
                 if (unit.AllocatedMaterial.ChunkIds.Count > 0)
                 {
                     // For now we might not have the chunks directly by ID if they weren't stored in the model with content.
@@ -262,10 +258,7 @@ RESPOND ONLY WITH THIS JSON STRUCTURE:
                     var searchResult = await _parent._knowledge.SearchAsync($"{unit.Title} {unit.Goal}", 5, ct);
                     if (searchResult.IsSuccess && searchResult.Value != null)
                     {
-                        foreach (var chunk in searchResult.Value)
-                        {
-                            contextBuilder.AppendLine(chunk.Content);
-                        }
+                        chunks.AddRange(searchResult.Value);
                     }
                 }
 
@@ -290,12 +283,9 @@ Current Unit: {unit.Title}
 Goal: {unit.Goal}
 Focus: {string.Join(", ", unit.GenerationHints.Focus)}
 Avoid: {string.Join(", ", unit.GenerationHints.Avoid)}
-Prerequisites: {string.Join(", ", unit.GenerationHints.Prerequisites)}
+Prerequisites: {string.Join(", ", unit.GenerationHints.Prerequisites)}";
 
-Source Material Context:
-{contextBuilder}";
-
-                var aiResult = await _parent._orchestrator.PromptAsync(systemPrompt, userPrompt, ct);
+                var aiResult = await _parent._orchestrator.PromptWithContextAsync(systemPrompt, userPrompt, chunks, ct);
                 if (!aiResult.IsSuccess) return Result.Failure(aiResult.ErrorMessage!);
 
                 unit.Content = aiResult.Value;

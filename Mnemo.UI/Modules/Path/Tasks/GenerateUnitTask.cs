@@ -66,14 +66,11 @@ public class GenerateUnitTask : AITaskBase
                 Description = unit.Goal;
 
                 // 1. Gather material for this unit
-                var contextBuilder = new StringBuilder();
+                var chunks = Enumerable.Empty<KnowledgeChunk>();
                 var searchResult = await _parent._knowledge.SearchAsync($"{unit.Title} {unit.Goal}", 5, ct);
                 if (searchResult is { IsSuccess: true, Value: not null })
                 {
-                    foreach (var chunk in searchResult.Value)
-                    {
-                        contextBuilder.AppendLine(chunk.Content);
-                    }
+                    chunks = searchResult.Value;
                 }
 
                 Progress = 0.3;
@@ -99,12 +96,9 @@ Current Unit: {unit.Title}
 Goal: {unit.Goal}
 Focus: {string.Join(", ", unit.GenerationHints.Focus)}
 Avoid: {string.Join(", ", unit.GenerationHints.Avoid)}
-Prerequisites: {string.Join(", ", unit.GenerationHints.Prerequisites)}
+Prerequisites: {string.Join(", ", unit.GenerationHints.Prerequisites)}";
 
-Source Material Context:
-{contextBuilder}";
-
-                var aiResult = await _parent._orchestrator.PromptAsync(systemPrompt, userPrompt, ct);
+                var aiResult = await _parent._orchestrator.PromptWithContextAsync(systemPrompt, userPrompt, chunks, ct);
                 if (!aiResult.IsSuccess) return Result.Failure(aiResult.ErrorMessage!);
 
                 unit.Content = aiResult.Value;
