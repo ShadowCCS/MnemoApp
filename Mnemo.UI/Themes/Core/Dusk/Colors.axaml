@@ -348,6 +348,9 @@
     <Color x:Key="AccentPrimary">#e95b45</Color>
     <!-- Mindmap -->
     <Color x:Key="MindmapNodeBorder">#e95b45</Color>
+    <Color x:Key="MindmapNodeBorderHover">#FF6B55</Color>
+    <Color x:Key="MindmapNodeBorderSelected">#D14F3B</Color>
+    <Color x:Key="MindmapNodeBackgroundHover">#464549</Color>
     <Color x:Key="MindmapEdgeStroke">#797573</Color>
     <Color x:Key="MindmapGridColor">#40FFFFFF</Color>
 </ResourceDictionary>

@@ -127,11 +127,15 @@
                 </Canvas.RenderTransform>
             </Canvas>
 
-            <Panel Name="TransformCanvas" Background="Transparent">
-                    <ItemsControl ItemsSource="{Binding Edges}">
+            <Panel Name="TransformCanvas" Background="Transparent" ClipToBounds="False">
+                <Panel.RenderTransform>
+                    <MatrixTransform />
+                </Panel.RenderTransform>
+                
+                    <ItemsControl ItemsSource="{Binding Edges}" ClipToBounds="False">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <Canvas Background="Transparent"/>
+                                <Canvas Background="Transparent" ClipToBounds="False"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
@@ -154,10 +158,10 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <ItemsControl ItemsSource="{Binding Nodes}">
+                    <ItemsControl ItemsSource="{Binding Nodes}" ClipToBounds="False">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <Canvas Background="Transparent"/>
+                                <Canvas Background="Transparent" ClipToBounds="False"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.Styles>

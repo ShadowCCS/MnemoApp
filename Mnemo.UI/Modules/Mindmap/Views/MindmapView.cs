@@ -88,6 +88,20 @@ public partial class MindmapView : UserControl
         if (DataContext is MindmapViewModel vm)
         {
             vm.RecenterRequested += OnRecenterRequested;
+            vm.Nodes.CollectionChanged += OnNodesCollectionChanged;
+        }
+    }
+
+    private void OnNodesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        // Auto-recenter after nodes are loaded, with a delay to allow layout
+        if (DataContext is MindmapViewModel vm && vm.Nodes.Any())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                await Task.Delay(50); // Allow layout to complete
+                RecenterView();
+            });
         }
     }
 
