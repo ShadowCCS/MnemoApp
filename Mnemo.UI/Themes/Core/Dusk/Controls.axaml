@@ -393,6 +393,14 @@
     <!-- Rich Text Highlighting Brushes -->
     <SolidColorBrush x:Key="HighlightedTextBrush" Color="{DynamicResource HighlightedText}"/>
 
+    <!-- Generic border / accent -->
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource Border}"/>
+    <SolidColorBrush x:Key="AccentPrimaryBrush" Color="{DynamicResource AccentPrimary}"/>
+    <!-- Mindmap -->
+    <SolidColorBrush x:Key="MindmapNodeBorderBrush" Color="{DynamicResource MindmapNodeBorder}"/>
+    <SolidColorBrush x:Key="MindmapEdgeStrokeBrush" Color="{DynamicResource MindmapEdgeStroke}"/>
+    <BoxShadows x:Key="MindmapNodeBoxShadow">0 2 4 0 #20000000</BoxShadows>
+    <BoxShadows x:Key="MindmapToolbarBoxShadow">0 4 12 0 #30000000</BoxShadows>
 </ResourceDictionary>
 
 

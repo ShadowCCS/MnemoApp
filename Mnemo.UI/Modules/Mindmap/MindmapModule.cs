@@ -1,4 +1,5 @@
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services;
 using Mnemo.UI.Modules.Mindmap.ViewModels;
 
 namespace Mnemo.UI.Modules.Mindmap;
@@ -7,6 +8,7 @@ public class MindmapModule : IModule
 {
     public void ConfigureServices(IServiceRegistrar services)
     {
+        services.AddSingleton<IMindmapService, MindmapService>();
         services.AddTransient<MindmapViewModel>();
     }
 

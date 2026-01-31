@@ -341,6 +341,14 @@
     
     <!-- Rich Text Highlighting -->
     <Color x:Key="HighlightedText">#312e2d</Color>
+
+    <!-- Generic border (card/panel dividers) -->
+    <Color x:Key="Border">#312e2d</Color>
+    <!-- Primary accent (icons, highlights) -->
+    <Color x:Key="AccentPrimary">#e95b45</Color>
+    <!-- Mindmap -->
+    <Color x:Key="MindmapNodeBorder">#e95b45</Color>
+    <Color x:Key="MindmapEdgeStroke">#797573</Color>
 </ResourceDictionary>
 
 
