@@ -349,6 +349,7 @@
     <!-- Mindmap -->
     <Color x:Key="MindmapNodeBorder">#e95b45</Color>
     <Color x:Key="MindmapEdgeStroke">#797573</Color>
+    <Color x:Key="MindmapGridColor">#40FFFFFF</Color>
 </ResourceDictionary>
 
 

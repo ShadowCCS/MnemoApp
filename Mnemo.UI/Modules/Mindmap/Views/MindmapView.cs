@@ -12,19 +12,29 @@ namespace Mnemo.UI.Modules.Mindmap.Views;
 
 public partial class MindmapView : UserControl
 {
+    private const string MindmapGridColorKey = "MindmapGridColor";
+    private const double GridSpacing = 100.0;
+    private const double DotScaleExponent = 0.35;
+    private const double BaseDotScreenPixels = 3.5;
+    private const double MinDotSourceSize = 1.0;
+    private const double MaxDotSourceSize = 4.0;
+
     private bool _isDragging;
     private bool _isPanning;
     private Point _lastPointerPosition;
     private NodeViewModel? _draggedNode;
     private Matrix _transformMatrix = Matrix.Identity;
+    private VisualBrush? _gridBrush;
 
     public MindmapView()
     {
         InitializeComponent();
+
         var canvas = this.FindControl<Panel>("MainCanvas");
         if (canvas != null)
         {
             canvas.PointerWheelChanged += OnCanvasPointerWheelChanged;
+            canvas.SizeChanged += OnMainCanvasSizeChanged;
         }
 
         DataContextChanged += OnDataContextChanged;
@@ -41,6 +51,14 @@ public partial class MindmapView : UserControl
     private void OnRecenterRequested(object? sender, EventArgs e)
     {
         RecenterView();
+    }
+
+    private void OnMainCanvasSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (e.NewSize.Width > 0 && e.NewSize.Height > 0)
+        {
+            UpdateTransform();
+        }
     }
 
     public void RecenterView()
@@ -74,7 +92,7 @@ public partial class MindmapView : UserControl
         double scaleX = (viewportWidth - padding * 2) / Math.Max(width, 1);
         double scaleY = (viewportHeight - padding * 2) / Math.Max(height, 1);
         double scale = Math.Min(scaleX, scaleY);
-        scale = Math.Min(Math.Max(scale, 0.1), 5.0); // Clamp between 0.1 and 5.0
+        scale = Math.Clamp(scale, MinScale, MaxScale);
 
         // Reset transform
         _transformMatrix = Matrix.Identity;
@@ -87,10 +105,23 @@ public partial class MindmapView : UserControl
         UpdateTransform();
     }
 
+    private const double MinScale = 0.1;
+    private const double MaxScale = 5.0;
+
     private void OnCanvasPointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
         var zoomDelta = e.Delta.Y > 0 ? 1.1 : 0.9;
         var pointerPos = e.GetPosition(this);
+
+        double det = _transformMatrix.M11 * _transformMatrix.M22 - _transformMatrix.M12 * _transformMatrix.M21;
+        if (Math.Abs(det) < 1e-10)
+            _transformMatrix = Matrix.Identity;
+
+        double currentScale = GetScaleFromMatrix(_transformMatrix);
+        double newScale = currentScale * zoomDelta;
+        newScale = Math.Clamp(newScale, MinScale, MaxScale);
+        zoomDelta = newScale / currentScale;
+        if (Math.Abs(zoomDelta - 1.0) < 1e-6) return; // No change
 
         // Get the point in canvas coordinates before zoom
         var inverseMatrix = _transformMatrix.Invert();
@@ -117,6 +148,84 @@ public partial class MindmapView : UserControl
         {
             canvas.RenderTransform = new MatrixTransform(_transformMatrix);
         }
+
+        UpdateGrid();
+    }
+
+    private Color? GetGridColorFromTheme()
+    {
+        return this.TryFindResource(MindmapGridColorKey, out var value) && value is Color color ? color : null;
+    }
+
+    private VisualBrush CreateGridBrush(Color gridColor)
+    {
+        var stroke = new SolidColorBrush(gridColor);
+        var canvas = new Canvas
+        {
+            Width = GridSpacing,
+            Height = GridSpacing,
+            Background = Brushes.Transparent
+        };
+
+        canvas.Children.Add(new Avalonia.Controls.Shapes.Ellipse
+        {
+            Width = MinDotSourceSize,
+            Height = MinDotSourceSize,
+            Fill = stroke,
+            [Canvas.LeftProperty] = 0,
+            [Canvas.TopProperty] = 0
+        });
+
+        return new VisualBrush
+        {
+            Visual = canvas,
+            TileMode = TileMode.Tile,
+            SourceRect = new RelativeRect(0, 0, GridSpacing, GridSpacing, RelativeUnit.Absolute),
+            DestinationRect = new RelativeRect(0, 0, GridSpacing, GridSpacing, RelativeUnit.Absolute)
+        };
+    }
+
+    private void UpdateGrid()
+    {
+        var gridCanvas = this.FindControl<Canvas>("GridCanvas");
+        if (gridCanvas == null) return;
+
+        var gridColor = GetGridColorFromTheme();
+        if (gridColor == null)
+        {
+            gridCanvas.Background = null;
+            return;
+        }
+
+        if (_gridBrush == null)
+        {
+            _gridBrush = CreateGridBrush(gridColor.Value);
+        }
+
+        double scale = GetScaleFromMatrix(_transformMatrix);
+        double dotScreenSize = BaseDotScreenPixels * Math.Pow(scale, DotScaleExponent);
+        double dotSizeSource = Math.Clamp(dotScreenSize / scale, MinDotSourceSize, MaxDotSourceSize);
+
+        if (_gridBrush.Visual is Canvas visualCanvas && visualCanvas.Children.FirstOrDefault() is Avalonia.Controls.Shapes.Ellipse ellipse)
+        {
+            ellipse.Width = dotSizeSource;
+            ellipse.Height = dotSizeSource;
+        }
+
+        double scaledSpacing = GridSpacing * scale;
+        double offsetX = _transformMatrix.M31 % scaledSpacing;
+        double offsetY = _transformMatrix.M32 % scaledSpacing;
+        if (offsetX < 0) offsetX += scaledSpacing;
+        if (offsetY < 0) offsetY += scaledSpacing;
+
+        _gridBrush.DestinationRect = new RelativeRect(offsetX, offsetY, scaledSpacing, scaledSpacing, RelativeUnit.Absolute);
+        gridCanvas.Background = _gridBrush;
+    }
+
+    private static double GetScaleFromMatrix(Matrix matrix)
+    {
+        double scale = Math.Sqrt(matrix.M11 * matrix.M11 + matrix.M12 * matrix.M12);
+        return scale <= 0 ? 1.0 : scale;
     }
 
     private void OnCanvasPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -166,8 +275,26 @@ public partial class MindmapView : UserControl
             // Adjust delta by current zoom
             double scale = Math.Sqrt(_transformMatrix.M11 * _transformMatrix.M11 + _transformMatrix.M12 * _transformMatrix.M12);
             
-            _draggedNode.X += delta.X / scale;
-            _draggedNode.Y += delta.Y / scale;
+            var dx = delta.X / scale;
+            var dy = delta.Y / scale;
+
+            if (DataContext is MindmapViewModel vm)
+            {
+                var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
+                if (selectedNodes.Contains(_draggedNode))
+                {
+                    foreach (var node in selectedNodes)
+                    {
+                        node.X += dx;
+                        node.Y += dy;
+                    }
+                }
+                else
+                {
+                    _draggedNode.X += dx;
+                    _draggedNode.Y += dy;
+                }
+            }
             
             _lastPointerPosition = currentPosition;
             e.Handled = true;
@@ -189,7 +316,19 @@ public partial class MindmapView : UserControl
     {
         if (_isDragging && _draggedNode != null && DataContext is MindmapViewModel vm)
         {
-            await vm.UpdateNodePositionAsync(_draggedNode, _draggedNode.X, _draggedNode.Y);
+            var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
+            if (selectedNodes.Contains(_draggedNode))
+            {
+                foreach (var node in selectedNodes)
+                {
+                    await vm.UpdateNodePositionAsync(node, node.X, node.Y);
+                }
+            }
+            else
+            {
+                await vm.UpdateNodePositionAsync(_draggedNode, _draggedNode.X, _draggedNode.Y);
+            }
+            
             _isDragging = false;
             _draggedNode = null;
             e.Handled = true;

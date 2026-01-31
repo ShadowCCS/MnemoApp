@@ -352,4 +352,5 @@
     <Color x:Key="MindmapNodeBorderSelected">#D14F3B</Color>
     <Color x:Key="MindmapNodeBackgroundHover">#FFF0EE</Color>
     <Color x:Key="MindmapEdgeStroke">#888888</Color>
+    <Color x:Key="MindmapGridColor">#0A000000</Color>
 </ResourceDictionary>

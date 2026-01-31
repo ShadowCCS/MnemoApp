@@ -127,6 +127,23 @@ public partial class SettingsViewModel : ViewModelBase
         
         appearance.Groups.Add(themeGroup);
 
+        // Mindmap Category
+        var mindmap = new SettingsCategoryViewModel("Mindmap", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg");
+        
+        var gridGroup = new SettingsGroupViewModel("Grid & Background");
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridType", "Grid Type", "Choose the background grid style.", new[] { "None", "Dotted", "Lines" }, "Dotted"));
+        gridGroup.Items.Add(new SliderSettingViewModel(_settingsService, "Mindmap.GridSize", "Grid Size", "Adjust the distance between grid points.", 10, 100, 5, 40));
+        gridGroup.Items.Add(new SliderSettingViewModel(_settingsService, "Mindmap.GridDotSize", "Grid Dot Size", "Adjust the size of the grid dots.", 0.5, 5, 0.5, 1.5));
+        gridGroup.Items.Add(new SliderSettingViewModel(_settingsService, "Mindmap.GridOpacity", "Grid Opacity", "Adjust the transparency of the grid.", 0, 1, 0.1, 0.2));
+        
+        var behaviorGroup = new SettingsGroupViewModel("Behavior");
+        behaviorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Mindmap.SnapToGrid", "Snap to Grid", "Automatically align nodes to the grid when moving them.", true));
+        behaviorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Mindmap.AutoLayout", "Auto Layout", "Automatically arrange nodes when they are added."));
+        behaviorGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.DefaultAlgorithm", "Default Layout Algorithm", "Choose the default algorithm for auto-layout.", new[] { "Freeform", "Tree", "Force-Directed" }, "Freeform"));
+
+        mindmap.Groups.Add(gridGroup);
+        mindmap.Groups.Add(behaviorGroup);
+
         // Hotkeys Category
         var hotkeys = new SettingsCategoryViewModel("Hotkeys", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg");
         var hotkeysGroup = new SettingsGroupViewModel("Shortcuts");
@@ -138,6 +155,7 @@ public partial class SettingsViewModel : ViewModelBase
         Categories.Add(general);
         Categories.Add(editor);
         Categories.Add(aiTools);
+        Categories.Add(mindmap);
         Categories.Add(appearance);
         Categories.Add(hotkeys);
         

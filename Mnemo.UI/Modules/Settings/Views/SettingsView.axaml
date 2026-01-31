@@ -333,6 +333,29 @@
             </components:SettingsCard>
         </DataTemplate>
 
+        <!-- Slider Setting Template -->
+        <DataTemplate x:Key="SliderSettingTemplate" x:DataType="vm:SliderSettingViewModel">
+            <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
+                <components:SettingsCard.RightContent>
+                    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <Slider Value="{Binding Value}" 
+                                Minimum="{Binding Minimum}" 
+                                Maximum="{Binding Maximum}" 
+                                SmallChange="{Binding Increment}"
+                                LargeChange="{Binding Increment}"
+                                Width="150"
+                                VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Value, StringFormat={}{0:F1}}" 
+                                   Width="35" 
+                                   VerticalAlignment="Center"
+                                   FontSize="13"
+                                   FontFamily="{DynamicResource Font.Medium}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </components:SettingsCard.RightContent>
+            </components:SettingsCard>
+        </DataTemplate>
+
     </UserControl.Resources>
 
     <Grid ColumnDefinitions="300,*">
@@ -460,6 +483,7 @@
                                                             <StaticResource ResourceKey="ProfilePictureSettingTemplate"/>
                                                             <StaticResource ResourceKey="NameSettingTemplate"/>
                                                             <StaticResource ResourceKey="TextSettingTemplate"/>
+                                                            <StaticResource ResourceKey="SliderSettingTemplate"/>
                                                         </ContentControl.DataTemplates>
                                                     </ContentControl>
                                                 </DataTemplate>

@@ -112,14 +112,22 @@
         </Border>
 
         <!-- Mindmap Canvas Area -->
-        <Panel Grid.Row="1" Background="{DynamicResource WorkspaceBackgroundBrush}">
-            <Panel Background="Transparent" 
-                   Name="MainCanvas"
-                   ClipToBounds="False"
-                   PointerPressed="OnCanvasPointerPressed"
-                   PointerMoved="OnNodePointerMoved"
-                   PointerReleased="OnNodePointerReleased">
-                <Panel Name="TransformCanvas" Background="Transparent">
+    <Panel Grid.Row="1" Background="{DynamicResource WorkspaceBackgroundBrush}">
+        <Panel Background="Transparent" 
+               Name="MainCanvas"
+               ClipToBounds="True"
+               PointerPressed="OnCanvasPointerPressed"
+               PointerMoved="OnNodePointerMoved"
+               PointerReleased="OnNodePointerReleased">
+            
+            <!-- Background Grid -->
+            <Canvas Name="GridCanvas" Background="Transparent" IsHitTestVisible="False">
+                <Canvas.RenderTransform>
+                    <MatrixTransform />
+                </Canvas.RenderTransform>
+            </Canvas>
+
+            <Panel Name="TransformCanvas" Background="Transparent">
                     <ItemsControl ItemsSource="{Binding Edges}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -184,6 +192,9 @@
                     </Button>
                     <Button Command="{Binding ConnectSelectedCommand}" ToolTip.Tip="Connect Selected (Ctrl+L)" Width="40" Height="40" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
                         <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" Width="20" Height="20" Color="{DynamicResource CardIconColorBrush}"/>
+                    </Button>
+                    <Button Command="{Binding DetachSelectedCommand}" ToolTip.Tip="Detach Selected" Width="40" Height="40" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link-off.svg" Width="20" Height="20" Color="{DynamicResource CardIconColorBrush}"/>
                     </Button>
                     <Button Command="{Binding AutoLayoutCommand}" ToolTip.Tip="Auto Layout" Width="40" Height="40" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
                         <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout.svg" Width="20" Height="20" Color="{DynamicResource CardIconColorBrush}"/>

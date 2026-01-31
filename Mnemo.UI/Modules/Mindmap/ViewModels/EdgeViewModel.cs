@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Mnemo.UI.Modules.Mindmap.ViewModels;
 
-public partial class EdgeViewModel : ViewModelBase
+public partial class EdgeViewModel : ViewModelBase, IDisposable
 {
     private readonly MindmapEdge _edge;
     private readonly NodeViewModel _from;
@@ -65,6 +65,13 @@ public partial class EdgeViewModel : ViewModelBase
         {
             UpdatePoints();
         }
+    }
+
+    public void Dispose()
+    {
+        _from.PropertyChanged -= OnNodePropertyChanged;
+        _to.PropertyChanged -= OnNodePropertyChanged;
+        GC.SuppressFinalize(this);
     }
 
     private void UpdatePoints()

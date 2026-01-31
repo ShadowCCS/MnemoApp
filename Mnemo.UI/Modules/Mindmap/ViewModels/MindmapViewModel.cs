@@ -33,6 +33,7 @@ public partial class MindmapViewModel : ViewModelBase
     public ICommand AddNodeCommand { get; }
     public ICommand DeleteSelectedCommand { get; }
     public ICommand ConnectSelectedCommand { get; }
+    public ICommand DetachSelectedCommand { get; }
     public ICommand AutoLayoutCommand { get; }
     public ICommand RecenterCommand { get; }
 
@@ -44,6 +45,7 @@ public partial class MindmapViewModel : ViewModelBase
         AddNodeCommand = new AsyncRelayCommand(AddNodeAsync);
         DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync);
         ConnectSelectedCommand = new AsyncRelayCommand(ConnectSelectedAsync);
+        DetachSelectedCommand = new AsyncRelayCommand(DetachSelectedAsync);
         AutoLayoutCommand = new AsyncRelayCommand(AutoLayoutAsync);
         RecenterCommand = new RelayCommand(RecenterView);
 
@@ -90,6 +92,7 @@ public partial class MindmapViewModel : ViewModelBase
     {
         if (_currentMindmap == null) return;
 
+        foreach (var edge in Edges) edge.Dispose();
         Nodes.Clear();
         Edges.Clear();
         _outgoing.Clear();
@@ -165,12 +168,67 @@ public partial class MindmapViewModel : ViewModelBase
         var selected = Nodes.Where(n => n.IsSelected).ToList();
         if (selected.Count < 2) return;
 
+        // Connect first selected to all others
         var from = selected[0];
+        bool changed = false;
         for (int i = 1; i < selected.Count; i++)
         {
-            await _mindmapService.AddEdgeAsync(_currentMindmap.Id, from.Id, selected[i].Id, MindmapEdgeKind.Link);
+            var to = selected[i];
+            // Check if already connected to avoid duplicates
+            if (!_currentMindmap.Edges.Any(e => (e.FromId == from.Id && e.ToId == to.Id) || (e.FromId == to.Id && e.ToId == from.Id)))
+            {
+                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, from.Id, to.Id, MindmapEdgeKind.Hierarchy);
+                changed = true;
+            }
         }
-        await LoadMindmapAsync(_currentMindmap.Id);
+        
+        if (changed)
+        {
+            await LoadMindmapAsync(_currentMindmap.Id);
+        }
+    }
+
+    private async Task DetachSelectedAsync()
+    {
+        if (_currentMindmap == null) return;
+        var selectedIds = Nodes.Where(n => n.IsSelected).Select(n => n.Id).ToHashSet();
+        
+        // If only one node is selected, we might want to detach all its edges?
+        // But the user asked to select two nodes and click it to detach them.
+        // Let's support both: if 2+ selected, detach between them. If 1 selected, do nothing (or we could detach all).
+        if (selectedIds.Count < 1) return;
+
+        List<MindmapEdge> edgesToRemove;
+        if (selectedIds.Count == 1)
+        {
+            // If only one node selected, maybe detach all its connections?
+            // Actually, let's stick to the "select two nodes" requirement first but be more lenient.
+            var singleId = selectedIds.First();
+            edgesToRemove = _currentMindmap.Edges
+                .Where(e => e.FromId == singleId || e.ToId == singleId)
+                .ToList();
+        }
+        else
+        {
+            // Detach only between selected nodes
+            edgesToRemove = _currentMindmap.Edges
+                .Where(e => selectedIds.Contains(e.FromId) && selectedIds.Contains(e.ToId))
+                .ToList();
+        }
+
+        if (!edgesToRemove.Any()) return;
+
+        bool changed = false;
+        foreach (var edge in edgesToRemove)
+        {
+            var result = await _mindmapService.RemoveEdgeAsync(_currentMindmap.Id, edge.Id);
+            if (result.IsSuccess) changed = true;
+        }
+
+        if (changed)
+        {
+            await LoadMindmapAsync(_currentMindmap.Id);
+        }
     }
 
     private async Task DeleteSelectedAsync()
