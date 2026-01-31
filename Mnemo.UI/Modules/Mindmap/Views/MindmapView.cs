@@ -13,11 +13,15 @@ namespace Mnemo.UI.Modules.Mindmap.Views;
 public partial class MindmapView : UserControl
 {
     private const string MindmapGridColorKey = "MindmapGridColor";
-    private const double GridSpacing = 100.0;
+    private double _gridSpacing = 40.0;
+    private double _gridDotSize = 1.5;
+    private double _gridOpacity = 0.2;
+    private string _gridType = "Dotted";
+
     private const double DotScaleExponent = 0.35;
     private const double BaseDotScreenPixels = 3.5;
-    private const double MinDotSourceSize = 1.0;
-    private const double MaxDotSourceSize = 4.0;
+    private const double MinDotSourceSize = 0.5;
+    private const double MaxDotSourceSize = 10.0;
 
     private bool _isDragging;
     private bool _isPanning;
@@ -25,6 +29,7 @@ public partial class MindmapView : UserControl
     private NodeViewModel? _draggedNode;
     private Matrix _transformMatrix = Matrix.Identity;
     private VisualBrush? _gridBrush;
+    private ISettingsService? _settingsService;
 
     public MindmapView()
     {
@@ -38,6 +43,44 @@ public partial class MindmapView : UserControl
         }
 
         DataContextChanged += OnDataContextChanged;
+        
+        // Try to get settings service from global locator or wait for DataContext
+        if (Application.Current is Mnemo.UI.App mnemoApp && mnemoApp.Services != null)
+        {
+            _settingsService = (ISettingsService?)mnemoApp.Services.GetService(typeof(ISettingsService));
+        }
+
+        if (_settingsService != null)
+        {
+            _settingsService.SettingChanged += OnSettingChanged;
+            _ = LoadSettingsAsync();
+        }
+    }
+
+    private void OnSettingChanged(object? sender, string key)
+    {
+        if (key.StartsWith("Mindmap.Grid"))
+        {
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () => {
+                await LoadSettingsAsync();
+                _gridBrush = null; // Force recreation
+                UpdateGrid();
+            });
+        }
+    }
+
+    private async Task LoadSettingsAsync()
+    {
+        if (_settingsService == null) return;
+        
+        _gridType = await _settingsService.GetAsync("Mindmap.GridType", "Dotted");
+        var sizeStr = await _settingsService.GetAsync("Mindmap.GridSize", "40");
+        var dotSizeStr = await _settingsService.GetAsync("Mindmap.GridDotSize", "1.5");
+        var opacityStr = await _settingsService.GetAsync("Mindmap.GridOpacity", "0.2");
+
+        if (double.TryParse(sizeStr, System.Globalization.CultureInfo.InvariantCulture, out var size)) _gridSpacing = size;
+        if (double.TryParse(dotSizeStr, System.Globalization.CultureInfo.InvariantCulture, out var dotSize)) _gridDotSize = dotSize;
+        if (double.TryParse(opacityStr, System.Globalization.CultureInfo.InvariantCulture, out var opacity)) _gridOpacity = opacity;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -159,29 +202,51 @@ public partial class MindmapView : UserControl
 
     private VisualBrush CreateGridBrush(Color gridColor)
     {
-        var stroke = new SolidColorBrush(gridColor);
-        var canvas = new Canvas
+        if (_gridType == "None") return new VisualBrush();
+
+        var stroke = new SolidColorBrush(gridColor) { Opacity = _gridOpacity };
+        var gridCanvas = new Canvas
         {
-            Width = GridSpacing,
-            Height = GridSpacing,
+            Width = _gridSpacing,
+            Height = _gridSpacing,
             Background = Brushes.Transparent
         };
 
-        canvas.Children.Add(new Avalonia.Controls.Shapes.Ellipse
+        if (_gridType == "Dotted")
         {
-            Width = MinDotSourceSize,
-            Height = MinDotSourceSize,
-            Fill = stroke,
-            [Canvas.LeftProperty] = 0,
-            [Canvas.TopProperty] = 0
-        });
+            gridCanvas.Children.Add(new Avalonia.Controls.Shapes.Ellipse
+            {
+                Width = _gridDotSize,
+                Height = _gridDotSize,
+                Fill = stroke,
+                [Canvas.LeftProperty] = 0,
+                [Canvas.TopProperty] = 0
+            });
+        }
+        else if (_gridType == "Lines")
+        {
+            gridCanvas.Children.Add(new Avalonia.Controls.Shapes.Line
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(_gridSpacing, 0),
+                Stroke = stroke,
+                StrokeThickness = _gridDotSize
+            });
+            gridCanvas.Children.Add(new Avalonia.Controls.Shapes.Line
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(0, _gridSpacing),
+                Stroke = stroke,
+                StrokeThickness = _gridDotSize
+            });
+        }
 
         return new VisualBrush
         {
-            Visual = canvas,
+            Visual = gridCanvas,
             TileMode = TileMode.Tile,
-            SourceRect = new RelativeRect(0, 0, GridSpacing, GridSpacing, RelativeUnit.Absolute),
-            DestinationRect = new RelativeRect(0, 0, GridSpacing, GridSpacing, RelativeUnit.Absolute)
+            SourceRect = new RelativeRect(0, 0, _gridSpacing, _gridSpacing, RelativeUnit.Absolute),
+            DestinationRect = new RelativeRect(0, 0, _gridSpacing, _gridSpacing, RelativeUnit.Absolute)
         };
     }
 
@@ -189,6 +254,12 @@ public partial class MindmapView : UserControl
     {
         var gridCanvas = this.FindControl<Canvas>("GridCanvas");
         if (gridCanvas == null) return;
+
+        if (_gridType == "None")
+        {
+            gridCanvas.Background = null;
+            return;
+        }
 
         var gridColor = GetGridColorFromTheme();
         if (gridColor == null)
@@ -203,16 +274,21 @@ public partial class MindmapView : UserControl
         }
 
         double scale = GetScaleFromMatrix(_transformMatrix);
-        double dotScreenSize = BaseDotScreenPixels * Math.Pow(scale, DotScaleExponent);
-        double dotSizeSource = Math.Clamp(dotScreenSize / scale, MinDotSourceSize, MaxDotSourceSize);
-
-        if (_gridBrush.Visual is Canvas visualCanvas && visualCanvas.Children.FirstOrDefault() is Avalonia.Controls.Shapes.Ellipse ellipse)
+        
+        // Adjust dot size based on zoom if it's dotted
+        if (_gridType == "Dotted")
         {
-            ellipse.Width = dotSizeSource;
-            ellipse.Height = dotSizeSource;
+            double dotScreenSize = _gridDotSize * scale * Math.Pow(scale, DotScaleExponent - 1);
+            double dotSizeSource = Math.Clamp(dotScreenSize / scale, MinDotSourceSize, MaxDotSourceSize);
+
+            if (_gridBrush.Visual is Canvas visualCanvas && visualCanvas.Children.FirstOrDefault() is Avalonia.Controls.Shapes.Ellipse ellipse)
+            {
+                ellipse.Width = dotSizeSource;
+                ellipse.Height = dotSizeSource;
+            }
         }
 
-        double scaledSpacing = GridSpacing * scale;
+        double scaledSpacing = _gridSpacing * scale;
         double offsetX = _transformMatrix.M31 % scaledSpacing;
         double offsetY = _transformMatrix.M32 % scaledSpacing;
         if (offsetX < 0) offsetX += scaledSpacing;
