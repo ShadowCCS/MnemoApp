@@ -5,11 +5,8 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Mnemo.Core.Models.Mindmap;
 using Mnemo.Core.Services;
 using Mnemo.UI.ViewModels;
-using Mnemo.UI.Components;
-
 using Mnemo.UI.Components.Overlays;
 
 namespace Mnemo.UI.Modules.Mindmap.ViewModels;
@@ -59,7 +56,9 @@ public partial class MindmapOverviewViewModel : ViewModelBase
 
     private async Task LoadMindmapsAsync()
     {
+        if (IsLoading) return;
         IsLoading = true;
+        
         try
         {
             var result = await _mindmapService.GetAllMindmapsAsync();
@@ -67,22 +66,73 @@ public partial class MindmapOverviewViewModel : ViewModelBase
             {
                 var mindmaps = result.Value.ToList();
                 
+                // Process preview data off the UI thread
+                var viewModels = mindmaps.Select(m => 
+                {
+                    var vm = new MindmapItemViewModel
+                    {
+                        Id = m.Id,
+                        Name = m.Title,
+                        NodeCount = m.Nodes.Count,
+                        EdgeCount = m.Edges.Count,
+                        LastModified = DateTime.Now.ToString("MM/dd/yyyy")
+                    };
+
+                    // Generate simple preview
+                    if (m.Layout?.Nodes != null && m.Layout.Nodes.Count > 0)
+                    {
+                        var nodes = m.Layout.Nodes.Values.ToList();
+                        double minX = nodes.Min(n => n.X);
+                        double maxX = nodes.Max(n => n.X);
+                        double minY = nodes.Min(n => n.Y);
+                        double maxY = nodes.Max(n => n.Y);
+
+                        double width = maxX - minX;
+                        double height = maxY - minY;
+                        
+                        // Scale to fit card preview area
+                        double padding = 20;
+                        double targetW = 240;
+                        double targetH = 120;
+
+                        double scaleX = width > 0 ? (targetW - padding * 2) / width : 1;
+                        double scaleY = height > 0 ? (targetH - padding * 2) / height : 1;
+                        double scale = Math.Min(scaleX, scaleY);
+
+                        foreach (var nodeEntry in m.Layout.Nodes)
+                        {
+                            vm.NodePreviews.Add(new NodePreviewViewModel
+                            {
+                                X = (nodeEntry.Value.X - minX) * scale + padding,
+                                Y = (nodeEntry.Value.Y - minY) * scale + padding
+                            });
+                        }
+
+                        foreach (var edge in m.Edges)
+                        {
+                            if (m.Layout.Nodes.TryGetValue(edge.FromId, out var source) &&
+                                m.Layout.Nodes.TryGetValue(edge.ToId, out var target))
+                            {
+                                vm.EdgePreviews.Add(new EdgePreviewViewModel
+                                {
+                                    X1 = (source.X - minX) * scale + padding,
+                                    Y1 = (source.Y - minY) * scale + padding,
+                                    X2 = (target.X - minX) * scale + padding,
+                                    Y2 = (target.Y - minY) * scale + padding
+                                });
+                            }
+                        }
+                    }
+                    return vm;
+                }).ToList();
+
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     AllItems.Clear();
                     FrequentlyUsedItems.Clear();
 
-                    foreach (var m in mindmaps)
+                    foreach (var vm in viewModels)
                     {
-                        var vm = new MindmapItemViewModel
-                        {
-                            Id = m.Id,
-                            Name = m.Title,
-                            NodeCount = m.Nodes.Count,
-                            EdgeCount = m.Edges.Count,
-                            LastModified = DateTime.Now.ToString("MM/dd/yyyy"), // Assuming we don't have last modified in model yet
-                            PreviewColor = GetRandomColor(m.Id)
-                        };
                         AllItems.Add(vm);
                     }
 
@@ -175,34 +225,4 @@ public partial class MindmapOverviewViewModel : ViewModelBase
             }
         };
     }
-
-    private string GetRandomColor(string seed)
-    {
-        var colors = new[] { "#7C4DFF", "#FF5252", "#00E676", "#00B0FF", "#FFAB00", "#FF4081" };
-        var index = Math.Abs(seed.GetHashCode()) % colors.Length;
-        return colors[index];
-    }
-}
-
-public partial class MindmapItemViewModel : ViewModelBase
-{
-    [ObservableProperty]
-    private string _id = string.Empty;
-
-    [ObservableProperty]
-    private string _name = string.Empty;
-
-    [ObservableProperty]
-    private string _lastModified = string.Empty;
-
-    [ObservableProperty]
-    private int _nodeCount;
-
-    [ObservableProperty]
-    private int _edgeCount;
-
-    [ObservableProperty]
-    private string _previewColor = "#7C4DFF"; // Default accent color
-
-    public string Stats => $"{NodeCount} nodes, {EdgeCount} edges";
 }

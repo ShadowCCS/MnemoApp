@@ -32,9 +32,11 @@ public class MindmapService : IMindmapService
             }
 
             var mindmaps = new List<Mindmap>();
-            foreach (var id in listResult.Value)
+            var tasks = listResult.Value.Select(GetMindmapAsync);
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            foreach (var mapResult in results)
             {
-                var mapResult = await GetMindmapAsync(id).ConfigureAwait(false);
                 if (mapResult.IsSuccess && mapResult.Value != null)
                 {
                     mindmaps.Add(mapResult.Value);
