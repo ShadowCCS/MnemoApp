@@ -116,6 +116,7 @@
         <Panel Background="Transparent" 
                Name="MainCanvas"
                ClipToBounds="True"
+               Focusable="True"
                PointerPressed="OnCanvasPointerPressed"
                PointerMoved="OnNodePointerMoved"
                PointerReleased="OnNodePointerReleased">

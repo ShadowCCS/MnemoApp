@@ -320,17 +320,23 @@ public partial class MindmapView : UserControl
 
     private void OnCanvasPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        // Only when click was on empty space (node handler sets e.Handled when clicking a node)
+        if (!e.Handled)
         {
-            // Only deselect if we didn't click a node (handled by e.Handled in OnNodePointerPressed)
             if (DataContext is MindmapViewModel vm)
             {
                 foreach (var node in vm.Nodes) node.IsSelected = false;
             }
-            
-            _isPanning = true;
-            _lastPointerPosition = e.GetPosition(this);
+
+            // Move focus to canvas so the node TextBox loses focus (deselects visually)
+            if (sender is Control focusTarget)
+                focusTarget.Focus();
         }
+
+        _isPanning = !e.Handled;
+        _lastPointerPosition = e.GetPosition(this);
     }
 
     private void OnNodePointerPressed(object? sender, PointerPressedEventArgs e)
