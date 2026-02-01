@@ -346,7 +346,7 @@ public partial class MindmapView : UserControl
             if (DataContext is MindmapViewModel vm)
             {
                 // Multi-select with Ctrl, otherwise single select
-                if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
+                if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift))
                 {
                     foreach (var n in vm.Nodes) n.IsSelected = false;
                 }
