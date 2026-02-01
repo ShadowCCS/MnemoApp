@@ -10,11 +10,13 @@ public class MindmapModule : IModule
     {
         services.AddSingleton<IMindmapService, MindmapService>();
         services.AddTransient<MindmapViewModel>();
+        services.AddTransient<MindmapOverviewViewModel>();
     }
 
     public void RegisterRoutes(INavigationRegistry registry)
     {
-        registry.RegisterRoute("mindmap", typeof(MindmapViewModel));
+        registry.RegisterRoute("mindmap", typeof(MindmapOverviewViewModel));
+        registry.RegisterRoute("mindmap-detail", typeof(MindmapViewModel));
     }
 
     public void RegisterSidebarItems(ISidebarService sidebarService)

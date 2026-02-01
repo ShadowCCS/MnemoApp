@@ -180,6 +180,8 @@
     <Color x:Key="TextControlBorderDisabled">#F5F5F5</Color>
     <Color x:Key="TextControlPlaceholderForeground">#888888</Color>
     <Color x:Key="TextControlSelectionHighlightColor">#FFD700</Color>
+    <Color x:Key="InputDialogSelectionForeground">#1A1A1A</Color>
+    <Color x:Key="InputDialogButtonHoverForeground">#1A1A1A</Color>
     
     <!-- ListBox -->
     <Color x:Key="ListBoxBackground">#FFFFFF</Color>

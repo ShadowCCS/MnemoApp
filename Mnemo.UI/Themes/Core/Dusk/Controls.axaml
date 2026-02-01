@@ -205,6 +205,8 @@
     <SolidColorBrush x:Key="TextControlBorderDisabledBrush" Color="{DynamicResource TextControlBorderDisabled}"/>
     <SolidColorBrush x:Key="TextControlPlaceholderForegroundBrush" Color="{DynamicResource TextControlPlaceholderForeground}"/>
     <SolidColorBrush x:Key="TextControlSelectionHighlightColorBrush" Color="{DynamicResource TextControlSelectionHighlightColor}"/>
+    <SolidColorBrush x:Key="InputDialogSelectionForegroundBrush" Color="{DynamicResource InputDialogSelectionForeground}"/>
+    <SolidColorBrush x:Key="InputDialogButtonHoverForegroundBrush" Color="{DynamicResource InputDialogButtonHoverForeground}"/>
     <SolidColorBrush x:Key="QuickActionsTextPrimaryBrush" Color="{DynamicResource QuickActionsTextPrimary}"/>
     <SolidColorBrush x:Key="QuickActionsTextSecondaryBrush" Color="{DynamicResource QuickActionsTextSecondary}"/>
     

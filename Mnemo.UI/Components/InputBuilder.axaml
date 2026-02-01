@@ -10,15 +10,23 @@
         <Style Selector="TextBox.InputArea">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
             <Setter Property="CornerRadius" Value="12"/>
             <Setter Property="Padding" Value="16"/>
             <Setter Property="MinHeight" Value="150"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="AcceptsReturn" Value="True"/>
-            <Style Selector="^:focus /template/ Border#PART_BorderElement">
-                <Setter Property="BorderThickness" Value="1.5"/>
-                <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="SelectionForegroundBrush" Value="{DynamicResource InputDialogSelectionForegroundBrush}"/>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="{DynamicResource TextControlForegroundPointerOverBrush}" />
+            </Style>
+            <Style Selector="^:focus">
+                <Setter Property="Foreground" Value="{DynamicResource TextControlForegroundFocusedBrush}" />
+                <Style Selector="^ /template/ Border#PART_BorderElement">
+                    <Setter Property="BorderThickness" Value="1.5"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+                </Style>
             </Style>
         </Style>
 
@@ -28,6 +36,10 @@
             <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="CornerRadius" Value="8"/>
+            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource CardAccentBrush}"/>
+                <Setter Property="Opacity" Value="0.1"/>
+            </Style>
         </Style>
 
         <Style Selector="Border.FileItem">
@@ -38,7 +50,15 @@
         </Style>
     </UserControl.Styles>
 
-    <StackPanel Spacing="20">
+    <Border Background="{DynamicResource OverlayBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="20"
+            Padding="32"
+            MinWidth="500"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center">
+        <StackPanel Spacing="20">
         <StackPanel Spacing="8">
             <TextBlock Text="What do you want to learn?" 
                        FontSize="18" FontWeight="SemiBold"
@@ -96,8 +116,10 @@
                 CornerRadius="12"
                 Click="Generate_Click">
             <TextBlock Text="Generate Learning Path" FontWeight="Bold" FontSize="16"
+                       Foreground="White"
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Button>
     </StackPanel>
+    </Border>
 </UserControl>
 

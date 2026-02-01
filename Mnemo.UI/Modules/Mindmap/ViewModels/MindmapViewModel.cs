@@ -13,7 +13,7 @@ using MindmapModel = Mnemo.Core.Models.Mindmap.Mindmap;
 
 namespace Mnemo.UI.Modules.Mindmap.ViewModels;
 
-public partial class MindmapViewModel : ViewModelBase
+public partial class MindmapViewModel : ViewModelBase, INavigationAware
 {
     private readonly IMindmapService _mindmapService;
     private MindmapModel? _currentMindmap;
@@ -48,8 +48,18 @@ public partial class MindmapViewModel : ViewModelBase
         DetachSelectedCommand = new AsyncRelayCommand(DetachSelectedAsync);
         AutoLayoutCommand = new AsyncRelayCommand(AutoLayoutAsync);
         RecenterCommand = new RelayCommand(RecenterView);
+    }
 
-        _ = LoadInitialMindmapAsync();
+    public void OnNavigatedTo(object? parameter)
+    {
+        if (parameter is string id)
+        {
+            _ = LoadMindmapAsync(id);
+        }
+        else
+        {
+            _ = LoadInitialMindmapAsync();
+        }
     }
 
     private async Task LoadInitialMindmapAsync()

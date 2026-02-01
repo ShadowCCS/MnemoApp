@@ -3,8 +3,41 @@
              xmlns:local="using:Mnemo.UI.Components.Overlays"
              x:Class="Mnemo.UI.Components.Overlays.InputDialogOverlay"
              x:DataType="local:InputDialogOverlay">
-  <Border Background="{DynamicResource OverlayBackgroundBrush}"
-          BorderBrush="{DynamicResource IconsSeparationBarBrush}"
+    <UserControl.Styles>
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="SelectionForegroundBrush" Value="{DynamicResource InputDialogSelectionForegroundBrush}"/>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="{DynamicResource TextControlForegroundPointerOverBrush}" />
+            </Style>
+            <Style Selector="^:focus">
+                <Setter Property="Foreground" Value="{DynamicResource TextControlForegroundFocusedBrush}" />
+                <Style Selector="^ /template/ Border#PART_BorderElement">
+                    <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}"/>
+                    <Setter Property="BorderThickness" Value="1.5"/>
+                </Style>
+            </Style>
+        </Style>
+
+        <Style Selector="Button">
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16,8"/>
+        </Style>
+        <Style Selector="Button.Subtle">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="{DynamicResource InputDialogButtonHoverForegroundBrush}"/>
+            </Style>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="{DynamicResource OverlayBackgroundBrush}"
+          BorderBrush="{DynamicResource BorderBrush}"
           BorderThickness="1"
           CornerRadius="12"
           Padding="16"
