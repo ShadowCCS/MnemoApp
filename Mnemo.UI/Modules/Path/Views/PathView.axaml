@@ -160,7 +160,7 @@
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="vm:PathItemViewModel">
-                            <Button Command="{Binding #root.((vm:PathViewModel)DataContext).OpenPathCommand}"
+                            <Button Command="{Binding #root.DataContext.OpenPathCommand, FallbackValue={x:Null}}"
                                     CommandParameter="{Binding}"
                                     Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,20,0">
                                 <Border Width="280" Height="170" 
@@ -185,7 +185,7 @@
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                     </Border>
                                                     <Button HorizontalAlignment="Right" 
-                                                            Command="{Binding #root.((vm:PathViewModel)DataContext).DeletePathCommand}"
+                                                            Command="{Binding #root.DataContext.DeletePathCommand, FallbackValue={x:Null}}"
                                                             CommandParameter="{Binding}"
                                                             Background="Transparent" 
                                                             BorderThickness="0" 
@@ -277,7 +277,7 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="vm:PathBaseViewModel">
-                                <Button Command="{Binding #root.((vm:PathViewModel)DataContext).OpenPathCommand}"
+                                <Button Command="{Binding #root.DataContext.OpenPathCommand, FallbackValue={x:Null}}"
                                         CommandParameter="{Binding}"
                                         Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,20,20">
                                     <Border Padding="20" Background="{DynamicResource CardBackgroundPrimaryBrush}" Cursor="Hand" 
@@ -300,7 +300,7 @@
                                                     </StackPanel>
                                                 </StackPanel>
                                                 <Button HorizontalAlignment="Right" 
-                                                        Command="{Binding #root.((vm:PathViewModel)DataContext).DeletePathCommand}"
+                                                        Command="{Binding #root.DataContext.DeletePathCommand, FallbackValue={x:Null}}"
                                                         CommandParameter="{Binding}"
                                                         Background="Transparent" 
                                                         BorderThickness="0" 
@@ -365,7 +365,7 @@
                         <ListBox ItemsSource="{Binding AllItems}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="vm:PathBaseViewModel">
-                                    <Button Command="{Binding #root.((vm:PathViewModel)DataContext).OpenPathCommand}"
+                                    <Button Command="{Binding #root.DataContext.OpenPathCommand, FallbackValue={x:Null}}"
                                             CommandParameter="{Binding}"
                                             Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Stretch">
                                         <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" CornerRadius="16" Margin="0,0,0,8" Padding="12" Classes="CardHover" ClipToBounds="True" Cursor="Hand">
@@ -422,7 +422,7 @@
                                                 <Button Grid.Column="5"
                                                         HorizontalAlignment="Center"
                                                         VerticalAlignment="Center"
-                                                        Command="{Binding #root.((vm:PathViewModel)DataContext).DeletePathCommand}"
+                                                        Command="{Binding #root.DataContext.DeletePathCommand, FallbackValue={x:Null}}"
                                                         CommandParameter="{Binding}"
                                                         Background="Transparent" 
                                                         BorderThickness="0" 

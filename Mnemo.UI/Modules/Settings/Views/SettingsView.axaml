@@ -394,7 +394,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SettingsCategoryViewModel">
                                     <controls:NavigationButton IsSelected="{Binding IsSelected}"
-                                                               Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SelectCategoryCommand}"
+                                                               Command="{Binding $parent[UserControl].DataContext.SelectCategoryCommand, FallbackValue={x:Null}}"
                                                                CommandParameter="{Binding}"
                                                                HorizontalAlignment="Stretch"
                                                                Margin="12,0,12,4"
