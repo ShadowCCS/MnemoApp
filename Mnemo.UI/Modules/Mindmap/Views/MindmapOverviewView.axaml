@@ -14,6 +14,8 @@
 
     <UserControl.Resources>
         <converters:BoolNegationConverter x:Key="BoolNegationConverter"/>
+        <converters:DataContextToOverviewCommandConverter x:Key="OpenMindmapCommandConverter" ReturnDeleteCommand="False"/>
+        <converters:DataContextToOverviewCommandConverter x:Key="DeleteMindmapCommandConverter" ReturnDeleteCommand="True"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -155,7 +157,7 @@
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="vm:MindmapItemViewModel">
-                            <Button Command="{Binding #root.DataContext.OpenMindmapCommand, FallbackValue={x:Null}}"
+                            <Button Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource OpenMindmapCommandConverter}}"
                                     CommandParameter="{Binding}"
                                     Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,20,0">
                                 <Border Width="280" Height="170" 
@@ -216,7 +218,7 @@
                                                         </StackPanel>
                                                     </Border>
                                                     <Button HorizontalAlignment="Right" 
-                                                            Command="{Binding #root.DataContext.DeleteMindmapCommand, FallbackValue={x:Null}}"
+                                                            Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource DeleteMindmapCommandConverter}}"
                                                             CommandParameter="{Binding}"
                                                             Background="Transparent" 
                                                             BorderThickness="0" 
@@ -316,7 +318,7 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="vm:MindmapItemViewModel">
-                                <Button Command="{Binding #root.DataContext.OpenMindmapCommand, FallbackValue={x:Null}}"
+                                <Button Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource OpenMindmapCommandConverter}}"
                                         CommandParameter="{Binding}"
                                         Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,20,20">
                                     <Border Padding="20" Background="{DynamicResource CardBackgroundPrimaryBrush}" Cursor="Hand" 
@@ -336,7 +338,7 @@
                                                     </StackPanel>
                                                 </StackPanel>
                                                 <Button HorizontalAlignment="Right" 
-                                                        Command="{Binding #root.DataContext.DeleteMindmapCommand, FallbackValue={x:Null}}"
+                                                        Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource DeleteMindmapCommandConverter}}"
                                                         CommandParameter="{Binding}"
                                                         Background="Transparent" 
                                                         BorderThickness="0" 
@@ -409,7 +411,7 @@
                         <ListBox ItemsSource="{Binding AllItems}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="vm:MindmapItemViewModel">
-                                    <Button Command="{Binding #root.DataContext.OpenMindmapCommand, FallbackValue={x:Null}}"
+                                    <Button Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource OpenMindmapCommandConverter}}"
                                             CommandParameter="{Binding}"
                                             Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Stretch">
                                         <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" CornerRadius="16" Margin="0,0,0,8" Padding="12" Classes="CardHover" ClipToBounds="True" Cursor="Hand">
@@ -452,7 +454,7 @@
                                                 <Button Grid.Column="4"
                                                         HorizontalAlignment="Center"
                                                         VerticalAlignment="Center"
-                                                        Command="{Binding #root.DataContext.DeleteMindmapCommand, FallbackValue={x:Null}}"
+                                                        Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource DeleteMindmapCommandConverter}}"
                                                         CommandParameter="{Binding}"
                                                         Background="Transparent" 
                                                         BorderThickness="0" 
