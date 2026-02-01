@@ -213,6 +213,17 @@
                     </Button>
                 </StackPanel>
             </Border>
+
+            <!-- Selection Box -->
+            <Border Name="SelectionBox" 
+                    Background="{DynamicResource AccentPrimaryBrush}" 
+                    Opacity="0.2" 
+                    BorderBrush="{DynamicResource AccentPrimaryBrush}" 
+                    BorderThickness="1" 
+                    IsVisible="False" 
+                    IsHitTestVisible="False"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"/>
         </Panel>
     </Grid>
 </UserControl>

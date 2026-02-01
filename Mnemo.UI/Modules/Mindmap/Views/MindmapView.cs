@@ -17,6 +17,7 @@ public partial class MindmapView : UserControl
     private double _gridDotSize = 1.5;
     private double _gridOpacity = 0.2;
     private string _gridType = "Dotted";
+    private string _modifierBehaviour = "Selecting";
 
     private const double DotScaleExponent = 0.35;
     private const double BaseDotScreenPixels = 3.5;
@@ -25,11 +26,18 @@ public partial class MindmapView : UserControl
 
     private bool _isDragging;
     private bool _isPanning;
+    private bool _isSelecting;
+    private bool _addToSelectionOnBoxSelect;
+    private bool _hasMovedSignificantly;
+    private Point _selectionStart;
     private Point _lastPointerPosition;
     private NodeViewModel? _draggedNode;
     private Matrix _transformMatrix = Matrix.Identity;
     private VisualBrush? _gridBrush;
     private ISettingsService? _settingsService;
+    private Border? _selectionBox;
+
+    private const double ClickDragThreshold = 5.0; // pixels
 
     public MindmapView()
     {
@@ -41,6 +49,8 @@ public partial class MindmapView : UserControl
             canvas.PointerWheelChanged += OnCanvasPointerWheelChanged;
             canvas.SizeChanged += OnMainCanvasSizeChanged;
         }
+
+        _selectionBox = this.FindControl<Border>("SelectionBox");
 
         DataContextChanged += OnDataContextChanged;
         
@@ -67,6 +77,10 @@ public partial class MindmapView : UserControl
                 UpdateGrid();
             });
         }
+        else if (key == "Mindmap.ModifierBehaviour")
+        {
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(LoadSettingsAsync);
+        }
     }
 
     private async Task LoadSettingsAsync()
@@ -74,6 +88,7 @@ public partial class MindmapView : UserControl
         if (_settingsService == null) return;
         
         _gridType = await _settingsService.GetAsync("Mindmap.GridType", "Dotted");
+        _modifierBehaviour = await _settingsService.GetAsync("Mindmap.ModifierBehaviour", "Selecting");
         var sizeStr = await _settingsService.GetAsync("Mindmap.GridSize", "40");
         var dotSizeStr = await _settingsService.GetAsync("Mindmap.GridDotSize", "1.5");
         var opacityStr = await _settingsService.GetAsync("Mindmap.GridOpacity", "0.2");
@@ -320,23 +335,66 @@ public partial class MindmapView : UserControl
 
     private void OnCanvasPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        var properties = e.GetCurrentPoint(this).Properties;
+        if (!properties.IsLeftButtonPressed) return;
+
+        bool isShiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        // When ModifierBehaviour is "Selecting": Shift + drag = select, no modifier = pan. When "Panning": opposite.
+        bool modifierMeansSelect = _modifierBehaviour == "Selecting";
+        bool doPan = modifierMeansSelect ? !isShiftPressed : isShiftPressed;
+        bool doSelect = !doPan;
+
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
 
         // Only when click was on empty space (node handler sets e.Handled when clicking a node)
         if (!e.Handled)
         {
-            if (DataContext is MindmapViewModel vm)
-            {
-                foreach (var node in vm.Nodes) node.IsSelected = false;
-            }
+            _hasMovedSignificantly = false; // Reset movement tracking
 
             // Move focus to canvas so the node TextBox loses focus (deselects visually)
             if (sender is Control focusTarget)
                 focusTarget.Focus();
+
+            if (doPan)
+            {
+                _isPanning = true;
+                _isSelecting = false;
+                // Don't deselect here - wait for release to see if it was a click or drag
+            }
+            else
+            {
+                _isPanning = false;
+                _isSelecting = true;
+                _addToSelectionOnBoxSelect = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+                _selectionStart = mainCanvas != null ? e.GetPosition(mainCanvas) : e.GetPosition(this);
+                UpdateSelectionBox(_selectionStart, _selectionStart);
+                if (_selectionBox != null) _selectionBox.IsVisible = true;
+            }
+        }
+        else
+        {
+            _isPanning = false;
+            _isSelecting = false;
         }
 
-        _isPanning = !e.Handled;
         _lastPointerPosition = e.GetPosition(this);
+    }
+
+    private void UpdateSelectionBox(Point start, Point end)
+    {
+        if (_selectionBox == null) return;
+
+        // Calculate box bounds - one corner is at start (where mouse was pressed)
+        // and the opposite corner follows the current mouse position
+        double x = Math.Min(start.X, end.X);
+        double y = Math.Min(start.Y, end.Y);
+        double width = Math.Abs(end.X - start.X);
+        double height = Math.Abs(end.Y - start.Y);
+
+        // Position the box using margin instead of transform for cleaner positioning
+        _selectionBox.Margin = new Thickness(x, y, 0, 0);
+        _selectionBox.Width = width;
+        _selectionBox.Height = height;
     }
 
     private void OnNodePointerPressed(object? sender, PointerPressedEventArgs e)
@@ -369,7 +427,7 @@ public partial class MindmapView : UserControl
             var delta = currentPosition - _lastPointerPosition;
             
             // Adjust delta by current zoom
-            double scale = Math.Sqrt(_transformMatrix.M11 * _transformMatrix.M11 + _transformMatrix.M12 * _transformMatrix.M12);
+            double scale = GetScaleFromMatrix(_transformMatrix);
             
             var dx = delta.X / scale;
             var dy = delta.Y / scale;
@@ -400,10 +458,52 @@ public partial class MindmapView : UserControl
             var currentPosition = e.GetPosition(this);
             var delta = currentPosition - _lastPointerPosition;
             
+            // Track if we've moved significantly
+            if (Math.Abs(delta.X) > ClickDragThreshold || Math.Abs(delta.Y) > ClickDragThreshold)
+            {
+                _hasMovedSignificantly = true;
+            }
+            
             _transformMatrix = _transformMatrix * Matrix.CreateTranslation(delta.X, delta.Y);
             UpdateTransform();
             
             _lastPointerPosition = currentPosition;
+            e.Handled = true;
+        }
+        else if (_isSelecting)
+        {
+            var mainCanvas = this.FindControl<Panel>("MainCanvas");
+            var currentPosition = mainCanvas != null ? e.GetPosition(mainCanvas) : e.GetPosition(this);
+            
+            // Track if we've moved significantly
+            var delta = currentPosition - _selectionStart;
+            if (Math.Abs(delta.X) > ClickDragThreshold || Math.Abs(delta.Y) > ClickDragThreshold)
+            {
+                _hasMovedSignificantly = true;
+            }
+            
+            UpdateSelectionBox(_selectionStart, currentPosition);
+            
+            if (DataContext is MindmapViewModel vm)
+            {
+                var inv = _transformMatrix.Invert();
+                var startInCanvas = _selectionStart * inv;
+                var currentInCanvas = currentPosition * inv;
+                
+                var minX = Math.Min(startInCanvas.X, currentInCanvas.X);
+                var maxX = Math.Max(startInCanvas.X, currentInCanvas.X);
+                var minY = Math.Min(startInCanvas.Y, currentInCanvas.Y);
+                var maxY = Math.Max(startInCanvas.Y, currentInCanvas.Y);
+                
+                var rect = new Rect(minX, minY, maxX - minX, maxY - minY);
+                
+                foreach (var node in vm.Nodes)
+                {
+                    var nodeRect = new Rect(node.X, node.Y, node.Width ?? 0, node.Height ?? 0);
+                    bool inBox = rect.Intersects(nodeRect);
+                    node.IsSelected = _addToSelectionOnBoxSelect ? (node.IsSelected || inBox) : inBox;
+                }
+            }
             e.Handled = true;
         }
     }
@@ -429,7 +529,25 @@ public partial class MindmapView : UserControl
             _draggedNode = null;
             e.Handled = true;
         }
-        _isPanning = false;
+        
+        if (_isSelecting)
+        {
+            _isSelecting = false;
+            if (_selectionBox != null) _selectionBox.IsVisible = false;
+            e.Handled = true;
+        }
+        
+        if (_isPanning)
+        {
+            // If we're panning and didn't move significantly, it was a click - deselect all nodes
+            if (!_hasMovedSignificantly && DataContext is MindmapViewModel viewModel)
+            {
+                foreach (var node in viewModel.Nodes) node.IsSelected = false;
+            }
+            
+            _isPanning = false;
+            e.Handled = true;
+        }
     }
 
     private async void OnNodeTextBoxLostFocus(object? sender, RoutedEventArgs e)

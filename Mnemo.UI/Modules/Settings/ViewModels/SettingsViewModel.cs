@@ -136,7 +136,11 @@ public partial class SettingsViewModel : ViewModelBase
         gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridDotSize", "Grid Dot Size", "Adjust the size of the grid dots.", new[] { "0.5", "1.0", "1.5", "2.0", "2.5", "3.0" }, "1.5"));
         gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridOpacity", "Grid Opacity", "Adjust the transparency of the grid.", new[] { "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.8", "1.0" }, "0.2"));
         
+        var behaviourGroup = new SettingsGroupViewModel("Interaction");
+        behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.ModifierBehaviour", "Shift Behaviour", "What Shift + drag does on empty canvas. Ctrl + box select adds to selection.", new[] { "Selecting", "Panning" }, "Selecting"));
+        
         mindmap.Groups.Add(gridGroup);
+        mindmap.Groups.Add(behaviourGroup);
 
         // Hotkeys Category
         var hotkeys = new SettingsCategoryViewModel("Hotkeys", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg");
