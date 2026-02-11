@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Mnemo.UI.Services.LaTeX.Layout.Boxes;
 
@@ -25,7 +24,8 @@ public class VBox : Box
             totalHeight += child.TotalHeight;
         }
 
-        Height = totalHeight; 
-        Depth = 0;
+        // Split total height evenly above/below baseline for centering
+        Height = totalHeight / 2;
+        Depth = totalHeight / 2;
     }
 }

@@ -185,26 +185,50 @@ public class LayoutBuilder
         
         var hbox = new HBox();
         
+        // Calculate scaling for left delimiter to match content height
+        // Standard height is height + depth of the character
+        var standardMetrics = FontMetrics.Instance.MeasureChar(delim.LeftDelim, _fontSize);
+        var targetHeight = content.TotalHeight;
+        var standardTotal = standardMetrics.height + standardMetrics.depth;
+        
+        // Ensure we don't shrink below standard size
+        var scale = Math.Max(1.0, targetHeight / Math.Max(0.1, standardTotal));
+        var delimFontSize = _fontSize * scale;
+        
         // Add left delimiter
-        var (leftWidth, leftHeight, leftDepth) = FontMetrics.Instance.MeasureChar(delim.LeftDelim, _fontSize * 1.2);
-        var leftBox = new CharBox(delim.LeftDelim, _fontSize * 1.2)
+        var (leftWidth, leftHeight, leftDepth) = FontMetrics.Instance.MeasureChar(delim.LeftDelim, delimFontSize);
+        
+        // Adjust for slight over-scaling if needed, or centering
+        // For simple scaling, we just use the new metrics
+        var leftBox = new CharBox(delim.LeftDelim, delimFontSize)
         {
             Width = leftWidth,
-            Height = Math.Max(leftHeight, content.Height),
-            Depth = Math.Max(leftDepth, content.Depth)
+            Height = leftHeight,
+            Depth = leftDepth
         };
+        
+        // Center the delimiter vertically relative to content axis if possible, 
+        // but here we just align baselines or ensure coverage.
+        // A simple heuristic: Shift down slightly if it's a bracket to center on math axis.
+        // For now, let's keep shift 0 and rely on the font's baseline.
+        
         hbox.Add(leftBox);
         
         // Add content
         hbox.Add(content);
         
-        // Add right delimiter
-        var (rightWidth, rightHeight, rightDepth) = FontMetrics.Instance.MeasureChar(delim.RightDelim, _fontSize * 1.2);
-        var rightBox = new CharBox(delim.RightDelim, _fontSize * 1.2)
+        // Right delimiter
+        var rightMetrics = FontMetrics.Instance.MeasureChar(delim.RightDelim, _fontSize);
+        var rightStandardTotal = rightMetrics.height + rightMetrics.depth;
+        var rightScale = Math.Max(1.0, targetHeight / Math.Max(0.1, rightStandardTotal));
+        var rightFontSize = _fontSize * rightScale;
+        
+        var (rightWidth, rightHeight, rightDepth) = FontMetrics.Instance.MeasureChar(delim.RightDelim, rightFontSize);
+        var rightBox = new CharBox(delim.RightDelim, rightFontSize)
         {
             Width = rightWidth,
-            Height = Math.Max(rightHeight, content.Height),
-            Depth = Math.Max(rightDepth, content.Depth)
+            Height = rightHeight,
+            Depth = rightDepth
         };
         hbox.Add(rightBox);
         

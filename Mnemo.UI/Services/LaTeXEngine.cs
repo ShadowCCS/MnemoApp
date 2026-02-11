@@ -2,7 +2,6 @@ using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services.LaTeX;
 using Mnemo.Infrastructure.Services.LaTeX.Parser;
 using Mnemo.Infrastructure.Services.LaTeX.Parser.Nodes;
-using Mnemo.Infrastructure.Services.LaTeX.Symbols;
 using Mnemo.UI.Services.LaTeX.Layout;
 using Mnemo.UI.Services.LaTeX.Layout.Boxes;
 using Mnemo.UI.Services.LaTeX.Metrics;
@@ -10,18 +9,20 @@ using Mnemo.UI.Controls;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using System;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Mnemo.UI.Services;
 
-public class LaTeXEngine : ILateXEngine
+public class LaTeXEngine : ILaTeXEngine
 {
     private static readonly LRUCache<(string, double), Box> _layoutCache = new(1000);
     private static readonly LRUCache<string, LaTeXNode> _parseCache = new(500);
-    private static bool _fontMetricsInitialized = false;
+    private static bool _fontMetricsInitialized;
     private static readonly object _initLock = new();
 
-    public async Task<object> RenderAsync(string tex, double fontSize = 16.0)
+    public async Task<object?> BuildLayoutAsync(string tex, double fontSize = 16.0, CancellationToken cancellationToken = default)
     {
         // Ensure FontMetrics is initialized on UI thread before going to background
         if (!_fontMetricsInitialized)
@@ -30,7 +31,6 @@ public class LaTeXEngine : ILateXEngine
             {
                 if (!_fontMetricsInitialized)
                 {
-                    // Force initialization on UI thread
                     _ = FontMetrics.Instance;
                     _fontMetricsInitialized = true;
                 }
@@ -39,6 +39,8 @@ public class LaTeXEngine : ILateXEngine
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            
             var ast = await Task.Run(() =>
             {
                 if (!_parseCache.TryGetValue(tex, out var cachedAst))
@@ -51,7 +53,9 @@ public class LaTeXEngine : ILateXEngine
                     _parseCache.Add(tex, cachedAst);
                 }
                 return cachedAst;
-            }).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             return await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -63,15 +67,16 @@ public class LaTeXEngine : ILateXEngine
                     _layoutCache.Add(cacheKey, layout);
                 }
 
-                var renderer = new LaTeXRenderer
-                {
-                    Layout = layout
-                };
-                return (object)renderer;
+                return new LaTeXRenderer { Layout = layout };
             });
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"LaTeX rendering error: {ex.Message}");
             return await Dispatcher.UIThread.InvokeAsync(() => new TextBlock
             {
                 Text = $"LaTeX Error: {ex.Message}",

@@ -18,13 +18,13 @@ namespace Mnemo.UI.Services;
 
 public class MarkdownRenderer : IMarkdownRenderer
 {
-    private readonly ILateXEngine _latexEngine;
+    private readonly ILaTeXEngine _latexEngine;
     private readonly ISettingsService _settingsService;
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
-    public MarkdownRenderer(ILateXEngine latexEngine, ISettingsService settingsService)
+    public MarkdownRenderer(ILaTeXEngine latexEngine, ISettingsService settingsService)
     {
         _latexEngine = latexEngine;
         _settingsService = settingsService;
@@ -281,8 +281,11 @@ public class MarkdownRenderer : IMarkdownRenderer
                         if (await _settingsService.GetAsync("Markdown.RenderMath", true))
                         {
                             var displayFontSize = await GetMathFontSizeAsync(true);
-                            var displayMathControl = (Control)await _latexEngine.RenderAsync(inlineData.Content, displayFontSize);
-                            inlines.Add(new InlineUIContainer { Child = displayMathControl, BaselineAlignment = BaselineAlignment.Center });
+                            var displayMathControl = await _latexEngine.BuildLayoutAsync(inlineData.Content, displayFontSize) as Control;
+                            if (displayMathControl != null)
+                            {
+                                inlines.Add(new InlineUIContainer { Child = displayMathControl, BaselineAlignment = BaselineAlignment.Center });
+                            }
                         }
                         else
                         {
@@ -294,8 +297,11 @@ public class MarkdownRenderer : IMarkdownRenderer
                         if (await _settingsService.GetAsync("Markdown.RenderMath", true))
                         {
                             var inlineFontSize = await GetMathFontSizeAsync(false);
-                            var inlineMathControl = (Control)await _latexEngine.RenderAsync(inlineData.Content, inlineFontSize);
-                            inlines.Add(new InlineUIContainer { Child = inlineMathControl, BaselineAlignment = BaselineAlignment.Center });
+                            var inlineMathControl = await _latexEngine.BuildLayoutAsync(inlineData.Content, inlineFontSize) as Control;
+                            if (inlineMathControl != null)
+                            {
+                                inlines.Add(new InlineUIContainer { Child = inlineMathControl, BaselineAlignment = BaselineAlignment.Center });
+                            }
                         }
                         else
                         {

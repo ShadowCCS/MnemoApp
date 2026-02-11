@@ -1,15 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using Avalonia.Platform;
-using Avalonia.Rendering.SceneGraph;
-using Avalonia.Skia;
-using Mnemo.UI.Services.LaTeX.Layout;
+using Mnemo.Infrastructure.Services.LaTeX;
 using Mnemo.UI.Services.LaTeX.Layout.Boxes;
-using SkiaSharp;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Mnemo.UI.Controls;
 
@@ -21,11 +15,10 @@ public class LaTeXRenderer : Control
     public static readonly StyledProperty<IBrush?> ForegroundProperty =
         AvaloniaProperty.Register<LaTeXRenderer, IBrush?>(nameof(Foreground));
 
-    // Cache commonly used objects to reduce allocations
-    private readonly Dictionary<(string, double, uint), FormattedText> _formattedTextCache = new();
-    private Typeface? _cachedTypeface;
+    private readonly LRUCache<(string, double, uint), FormattedText> _formattedTextCache = new(500);
 
-    private const double DefaultPadding = 12;
+    private const double DefaultPadding = 16;
+    private const double VerticalBuffer = 8;
     private const double DelimiterOffset = 15;
     private const double DelimiterThickness = 1.5;
 
@@ -40,8 +33,6 @@ public class LaTeXRenderer : Control
         get => GetValue(ForegroundProperty);
         set => SetValue(ForegroundProperty, value);
     }
-
-    private readonly int _maxCacheSize = 500;
 
     static LaTeXRenderer()
     {
@@ -69,20 +60,22 @@ public class LaTeXRenderer : Control
         }
     }
 
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        
+        if (Application.Current != null)
+        {
+            Application.Current.ActualThemeVariantChanged -= OnThemeChanged;
+        }
+        
+        _formattedTextCache.Clear();
+    }
+
     private void OnThemeChanged(object? sender, EventArgs e)
     {
         _formattedTextCache.Clear();
         InvalidateVisual();
-    }
-
-    private void AddToCache((string, double, uint) key, FormattedText text)
-    {
-        if (_formattedTextCache.Count >= _maxCacheSize)
-        {
-            var firstKey = _formattedTextCache.Keys.First();
-            _formattedTextCache.Remove(firstKey);
-        }
-        _formattedTextCache[key] = text;
     }
 
     protected override Size MeasureOverride(Size availableSize)
@@ -90,8 +83,12 @@ public class LaTeXRenderer : Control
         if (Layout == null)
             return new Size(0, 0);
 
-        var totalHeight = Layout.Height + Layout.Depth + DefaultPadding * 2;
-        return new Size(Layout.Width + DefaultPadding * 2, totalHeight);
+        // Increase padding and buffer significantly to test if it resolves cropping
+        const double extraSafety = 10.0;
+        var totalHeight = Layout.Height + Layout.Depth + (DefaultPadding * 2) + VerticalBuffer + extraSafety;
+        var totalWidth = Layout.Width + (DefaultPadding * 2) + extraSafety;
+        
+        return new Size(totalWidth, totalHeight);
     }
 
     public override void Render(DrawingContext context)
@@ -101,8 +98,9 @@ public class LaTeXRenderer : Control
         if (Layout == null)
             return;
 
-        var baseline = Layout.Height + DefaultPadding;
-        RenderBox(context, Layout, DefaultPadding, baseline);
+        // Ensure the baseline is centered within the padded area
+        var baseline = Layout.Height + DefaultPadding + (VerticalBuffer / 2) + 5.0; // Extra 5px offset
+        RenderBox(context, Layout, DefaultPadding + 5.0, baseline);
     }
 
     private void RenderBox(DrawingContext context, Box box, double x, double baseline)
@@ -110,14 +108,14 @@ public class LaTeXRenderer : Control
         switch (box)
         {
             case CharBox charBox:
-                RenderChar(context, charBox, x, baseline);
+                RenderChar(context, charBox, x, baseline + charBox.Shift);
                 break;
 
             case HBox hbox:
                 var currentX = x;
                 foreach (var child in hbox.Children)
                 {
-                    RenderBox(context, child, currentX, baseline + child.Shift);
+                    RenderBox(context, child, currentX, baseline - child.Shift);
                     currentX += child.Width;
                 }
                 break;
@@ -133,16 +131,16 @@ public class LaTeXRenderer : Control
 
             case FractionBox fracBox:
                 var numX = x + (box.Width - fracBox.Numerator.Width) / 2;
-                var numY = baseline - fracBox.NumeratorSpacing - fracBox.RuleThickness / 2 - fracBox.Numerator.Depth;
-                RenderBox(context, fracBox.Numerator, numX, numY);
+                var numY = baseline - fracBox.NumeratorSpacing - fracBox.RuleThickness / 2;
+                RenderBox(context, fracBox.Numerator, numX, numY - fracBox.Numerator.Shift);
 
                 var lineY = baseline - fracBox.RuleThickness / 2;
                 var pen = new Pen(GetTextBrush(), fracBox.RuleThickness);
                 context.DrawLine(pen, new Point(x, lineY), new Point(x + box.Width, lineY));
 
                 var denomX = x + (box.Width - fracBox.Denominator.Width) / 2;
-                var denomY = baseline + fracBox.DenominatorSpacing + fracBox.RuleThickness / 2 + fracBox.Denominator.Height;
-                RenderBox(context, fracBox.Denominator, denomX, denomY);
+                var denomY = baseline + fracBox.DenominatorSpacing + fracBox.RuleThickness / 2;
+                RenderBox(context, fracBox.Denominator, denomX, denomY - fracBox.Denominator.Shift);
                 break;
 
             case ScriptBox scriptBox:
@@ -151,21 +149,19 @@ public class LaTeXRenderer : Control
 
                 if (scriptBox.Superscript != null)
                 {
-                    var supY = baseline - scriptBox.Height + scriptBox.Superscript.Height;
-                    RenderBox(context, scriptBox.Superscript, scriptX, supY);
+                    RenderBox(context, scriptBox.Superscript, scriptX, baseline - scriptBox.Superscript.Shift);
                 }
 
                 if (scriptBox.Subscript != null)
                 {
-                    var subY = baseline + scriptBox.Depth - scriptBox.Subscript.Depth;
-                    RenderBox(context, scriptBox.Subscript, scriptX, subY);
+                    RenderBox(context, scriptBox.Subscript, scriptX, baseline - scriptBox.Subscript.Shift);
                 }
                 break;
 
             case SqrtBox sqrtBox:
-                var contentTop = baseline - sqrtBox.Content.Height;
-                var contentBottom = baseline + sqrtBox.Content.Depth;
-                var overlineY = baseline - box.Height + sqrtBox.RuleThickness / 2;
+                var contentTop = baseline - sqrtBox.Content.Height - sqrtBox.Content.Shift;
+                var contentBottom = baseline + sqrtBox.Content.Depth - sqrtBox.Content.Shift;
+                var overlineY = baseline - sqrtBox.Height + sqrtBox.RuleThickness / 2;
                 var checkWidth = sqrtBox.SymbolWidth * 0.3;
                 var kneeWidth = sqrtBox.SymbolWidth * 0.35;
                 
@@ -187,7 +183,7 @@ public class LaTeXRenderer : Control
 
                 context.DrawGeometry(null, new Pen(GetTextBrush(), sqrtBox.RuleThickness), sqrtPath);
 
-                RenderBox(context, sqrtBox.Content, x + sqrtBox.SymbolWidth, baseline);
+                RenderBox(context, sqrtBox.Content, x + sqrtBox.SymbolWidth, baseline - sqrtBox.Content.Shift);
                 break;
 
             case SpaceBox:
@@ -301,18 +297,8 @@ public class LaTeXRenderer : Control
 
     private void RenderChar(DrawingContext context, CharBox charBox, double x, double baseline)
     {
-        if (_cachedTypeface == null)
-        {
-            try
-            {
-                var fontFamily = Application.Current?.FindResource("MathFontFamily") as FontFamily;
-                _cachedTypeface = new Typeface(fontFamily ?? new FontFamily("STIX Two Math"));
-            }
-            catch
-            {
-                _cachedTypeface = new Typeface("STIX Two Math");
-            }
-        }
+        var typeface = Mnemo.UI.Services.LaTeX.Metrics.FontMetrics.Instance.Typeface;
+        
         var foreground = GetTextBrush();
         var color = (foreground as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF000000;
 
@@ -323,15 +309,23 @@ public class LaTeXRenderer : Control
                 charBox.Character,
                 System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
-                _cachedTypeface ?? new Typeface(new FontFamily("STIX Two Math")),
+                typeface,
                 charBox.FontSize,
                 foreground
             );
 
-            AddToCache(cacheKey, formattedText);
+            _formattedTextCache.Add(cacheKey, formattedText);
         }
 
-        context.DrawText(formattedText, new Point(x, baseline - charBox.Height));
+        context.DrawText(formattedText, new Point(x, baseline - formattedText.Baseline));
+    }
+
+    private Typeface CreateTypeface()
+    {
+        var fontFamily = Application.Current?.TryFindResource("MathFontFamily", out var res) == true && res is FontFamily ff
+            ? ff
+            : new FontFamily("STIX Two Math");
+        return new Typeface(fontFamily);
     }
 
     private IBrush GetTextBrush()

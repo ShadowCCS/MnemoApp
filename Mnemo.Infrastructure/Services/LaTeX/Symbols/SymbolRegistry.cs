@@ -1,10 +1,11 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace Mnemo.Infrastructure.Services.LaTeX.Symbols;
 
 public static class SymbolRegistry
 {
-    private static readonly Dictionary<string, string> _symbols = new()
+    private static readonly ConcurrentDictionary<string, string> _symbols = new()
     {
         // Greek lowercase
         ["alpha"] = "α",
@@ -270,6 +271,6 @@ public static class SymbolRegistry
 
     public static void RegisterSymbol(string command, string unicode)
     {
-        _symbols[command] = unicode;
+        _symbols.AddOrUpdate(command, unicode, (_, _) => unicode);
     }
 }

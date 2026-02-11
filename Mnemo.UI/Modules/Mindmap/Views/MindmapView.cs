@@ -30,6 +30,8 @@ public partial class MindmapView : UserControl
     private bool _addToSelectionOnBoxSelect;
     private bool _hasMovedSignificantly;
     private Point _selectionStart;
+    private Point _selectionStartInCanvas; // content-space start, fixed at press so zoom doesn't break hit-test
+    private Point _selectionCurrentInCanvas; // content-space current position, updated as mouse moves
     private Point _lastPointerPosition;
     private NodeViewModel? _draggedNode;
     private Matrix _transformMatrix = Matrix.Identity;
@@ -170,10 +172,12 @@ public partial class MindmapView : UserControl
         _transformMatrix = Matrix.Identity;
 
         // Center the content
+        // offset = viewportCenter - contentCenter * scale (for S * T order)
         double offsetX = viewportWidth / 2 - centerX * scale;
         double offsetY = viewportHeight / 2 - centerY * scale;
 
-        _transformMatrix = Matrix.CreateTranslation(offsetX, offsetY) * Matrix.CreateScale(scale, scale);
+        // Scale first, then translate: point * scale + offset
+        _transformMatrix = Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(offsetX, offsetY);
         UpdateTransform();
     }
 
@@ -183,7 +187,9 @@ public partial class MindmapView : UserControl
     private void OnCanvasPointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
         var zoomDelta = e.Delta.Y > 0 ? 1.1 : 0.9;
-        var pointerPos = e.GetPosition(this);
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
+        // Use MainCanvas coordinates consistently with selection/panning
+        var pointerPos = mainCanvas != null ? e.GetPosition(mainCanvas) : e.GetPosition(this);
 
         double det = _transformMatrix.M11 * _transformMatrix.M22 - _transformMatrix.M12 * _transformMatrix.M21;
         if (Math.Abs(det) < 1e-10)
@@ -206,10 +212,22 @@ public partial class MindmapView : UserControl
         var screenPointAfter = canvasPointBefore * _transformMatrix;
 
         // Calculate the offset and adjust translation to keep the point under the cursor
+        // Translation on right = screen-space offset (applied after existing transform)
         var offset = pointerPos - screenPointAfter;
-        _transformMatrix = Matrix.CreateTranslation(offset.X, offset.Y) * _transformMatrix;
+        _transformMatrix = _transformMatrix * Matrix.CreateTranslation(offset.X, offset.Y);
 
         UpdateTransform();
+        
+        // Update selection box visual position if we're currently selecting
+        if (_isSelecting)
+        {
+            // Update current selection position to match where the cursor now is in content-space
+            // This keeps the selection's "current" corner tracking the mouse during zoom
+            var inv = _transformMatrix.Invert();
+            _selectionCurrentInCanvas = pointerPos * inv;
+            UpdateSelectionBoxFromContentSpace();
+        }
+        
         e.Handled = true;
     }
 
@@ -367,6 +385,9 @@ public partial class MindmapView : UserControl
                 _isSelecting = true;
                 _addToSelectionOnBoxSelect = e.KeyModifiers.HasFlag(KeyModifiers.Control);
                 _selectionStart = mainCanvas != null ? e.GetPosition(mainCanvas) : e.GetPosition(this);
+                var inv = _transformMatrix.Invert();
+                _selectionStartInCanvas = _selectionStart * inv;
+                _selectionCurrentInCanvas = _selectionStartInCanvas; // Initialize to start position
                 UpdateSelectionBox(_selectionStart, _selectionStart);
                 if (_selectionBox != null) _selectionBox.IsVisible = true;
             }
@@ -482,30 +503,46 @@ public partial class MindmapView : UserControl
                 _hasMovedSignificantly = true;
             }
             
-            UpdateSelectionBox(_selectionStart, currentPosition);
-            
             if (DataContext is MindmapViewModel vm)
             {
                 var inv = _transformMatrix.Invert();
-                var startInCanvas = _selectionStart * inv;
-                var currentInCanvas = currentPosition * inv;
-                
-                var minX = Math.Min(startInCanvas.X, currentInCanvas.X);
-                var maxX = Math.Max(startInCanvas.X, currentInCanvas.X);
-                var minY = Math.Min(startInCanvas.Y, currentInCanvas.Y);
-                var maxY = Math.Max(startInCanvas.Y, currentInCanvas.Y);
-                
-                var rect = new Rect(minX, minY, maxX - minX, maxY - minY);
-                
-                foreach (var node in vm.Nodes)
-                {
-                    var nodeRect = new Rect(node.X, node.Y, node.Width ?? 0, node.Height ?? 0);
-                    bool inBox = rect.Intersects(nodeRect);
-                    node.IsSelected = _addToSelectionOnBoxSelect ? (node.IsSelected || inBox) : inBox;
-                }
+                _selectionCurrentInCanvas = currentPosition * inv;
+
+                UpdateNodeSelection(vm);
             }
             e.Handled = true;
         }
+    }
+
+    private void UpdateNodeSelection(MindmapViewModel vm)
+    {
+        var minX = Math.Min(_selectionStartInCanvas.X, _selectionCurrentInCanvas.X);
+        var maxX = Math.Max(_selectionStartInCanvas.X, _selectionCurrentInCanvas.X);
+        var minY = Math.Min(_selectionStartInCanvas.Y, _selectionCurrentInCanvas.Y);
+        var maxY = Math.Max(_selectionStartInCanvas.Y, _selectionCurrentInCanvas.Y);
+
+        var contentRect = new Rect(minX, minY, maxX - minX, maxY - minY);
+        
+        // Convert content rect back to screen space for visual selection box
+        var topLeft = new Point(contentRect.X, contentRect.Y) * _transformMatrix;
+        var bottomRight = new Point(contentRect.Right, contentRect.Bottom) * _transformMatrix;
+        UpdateSelectionBox(topLeft, bottomRight);
+        
+        foreach (var node in vm.Nodes)
+        {
+            var nodeRect = new Rect(node.X, node.Y, node.Width ?? 0, node.Height ?? 0);
+            bool inBox = contentRect.Intersects(nodeRect);
+            node.IsSelected = _addToSelectionOnBoxSelect ? (node.IsSelected || inBox) : inBox;
+        }
+    }
+
+    private void UpdateSelectionBoxFromContentSpace()
+    {
+        if (DataContext is not MindmapViewModel vm) return;
+        
+        // Re-compute visual box from stored content-space coordinates
+        // Both start and current are already in content space and don't change during zoom
+        UpdateNodeSelection(vm);
     }
 
     private async void OnNodePointerReleased(object? sender, PointerReleasedEventArgs e)

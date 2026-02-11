@@ -102,17 +102,9 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto, *">
-        <!-- Title bar -->
-        <Border Grid.Row="0" Background="{DynamicResource CardBackgroundSecondaryBrush}" Padding="15,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg" Width="20" Height="20" Color="{DynamicResource AccentPrimaryBrush}"/>
-                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
-            </StackPanel>
-        </Border>
-
+    <Grid RowDefinitions="*">
         <!-- Mindmap Canvas Area -->
-    <Panel Grid.Row="1" Background="{DynamicResource WorkspaceBackgroundBrush}">
+    <Panel Grid.Row="0" Background="{DynamicResource WorkspaceBackgroundBrush}">
         <Panel Background="Transparent" 
                Name="MainCanvas"
                ClipToBounds="True"
@@ -128,7 +120,7 @@
                 </Canvas.RenderTransform>
             </Canvas>
 
-            <Panel Name="TransformCanvas" Background="Transparent" ClipToBounds="False">
+            <Panel Name="TransformCanvas" Background="Transparent" ClipToBounds="False" RenderTransformOrigin="0,0">
                 <Panel.RenderTransform>
                     <MatrixTransform />
                 </Panel.RenderTransform>

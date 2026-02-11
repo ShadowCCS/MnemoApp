@@ -21,7 +21,7 @@ public static class Bootstrapper
         services.AddSingleton<ILoggerService, LoggerService>();
         services.AddSingleton<IStorageProvider, SqliteStorageProvider>();
         services.AddSingleton<ISettingsService, SettingsService>();
-        services.AddSingleton<ILateXEngine, LaTeXEngine>();
+        services.AddSingleton<ILaTeXEngine, LaTeXEngine>();
         services.AddSingleton<IMarkdownProcessor, MarkdownProcessor>();
         services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
 

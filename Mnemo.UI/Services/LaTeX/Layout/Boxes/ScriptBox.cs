@@ -8,6 +8,8 @@ public class ScriptBox : Box
     public Box? Subscript { get; }
     public Box? Superscript { get; }
 
+    private const double ScriptBuffer = 4.0;
+
     public ScriptBox(Box baseBox, Box? subscript, Box? superscript)
     {
         Base = baseBox;
@@ -16,22 +18,24 @@ public class ScriptBox : Box
 
         Width = baseBox.Width + Math.Max(subscript?.Width ?? 0, superscript?.Width ?? 0);
         
+        // Calculate height considering superscript shift (positive shift = up)
+        var baseHeight = baseBox.Height;
         if (superscript != null)
         {
-            Height = baseBox.Height + superscript.TotalHeight;
+            // Superscript shift is positive, so we need height = superscript top position
+            var supTop = superscript.Shift + superscript.Height;
+            baseHeight = Math.Max(baseHeight, supTop + ScriptBuffer);
         }
-        else
-        {
-            Height = baseBox.Height;
-        }
+        Height = baseHeight;
 
+        // Calculate depth considering subscript shift (negative shift = down)
+        var baseDepth = baseBox.Depth;
         if (subscript != null)
         {
-            Depth = baseBox.Depth + subscript.TotalHeight;
+            // Subscript shift is negative, so depth = |shift| + subscript depth
+            var subBottom = Math.Abs(subscript.Shift) + subscript.Depth;
+            baseDepth = Math.Max(baseDepth, subBottom + ScriptBuffer);
         }
-        else
-        {
-            Depth = baseBox.Depth;
-        }
+        Depth = baseDepth;
     }
 }
