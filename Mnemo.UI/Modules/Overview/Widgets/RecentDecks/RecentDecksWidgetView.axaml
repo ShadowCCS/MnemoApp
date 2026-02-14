@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Mnemo.UI.Modules.Overview.Widgets.RecentDecks"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="240"
+             x:Class="Mnemo.UI.Modules.Overview.Widgets.RecentDecks.RecentDecksWidgetView"
+             x:DataType="vm:RecentDecksWidgetViewModel">
+
+    <Grid RowDefinitions="*">
+        <!-- Header removed to avoid duplication with WidgetContainer header -->
+        
+        <!-- Recent Decks List -->
+        <ScrollViewer Grid.Row="0" 
+                      VerticalScrollBarVisibility="Hidden"
+                      HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding RecentDecks}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:RecentDeckItem">
+                        <Border Background="Transparent"
+                                Padding="12,10"
+                                Margin="0,0,0,8"
+                                CornerRadius="12"
+                                Cursor="Hand">
+                            <Border.Styles>
+                                <Style Selector="Border:pointerover">
+                                    <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
+                                </Style>
+                            </Border.Styles>
+
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <!-- Icon -->
+                                <Border Grid.Column="0"
+                                        Background="{DynamicResource CardAccentBrush}"
+                                        Width="36"
+                                        Height="36"
+                                        CornerRadius="10"
+                                        Margin="0,0,12,0">
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg"
+                                                      Width="18" Height="18"
+                                                      Color="{DynamicResource TextPrimaryBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Deck Info -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="13"
+                                               FontFamily="{DynamicResource Font.SemiBold}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Margin="0,2,0,0">
+                                        <Run Text="{Binding Subject}"/>
+                                        <Run Text="•"/>
+                                        <Run Text="{Binding CardCount}"/>
+                                        <Run Text="cards"/>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <!-- Last Practiced -->
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding LastPracticedText}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="12,0,0,0"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

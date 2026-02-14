@@ -46,6 +46,7 @@
     <SolidColorBrush x:Key="NavElementHoverBackgroundBrush" Color="{DynamicResource NavElementHoverBackground}"/>
     <SolidColorBrush x:Key="WidgetBackgroundPrimaryBrush" Color="{DynamicResource WidgetBackgroundPrimary}"/>
     <SolidColorBrush x:Key="WidgetBackgroundSecondaryBrush" Color="{DynamicResource WidgetBackgroundSecondary}"/>
+    <SolidColorBrush x:Key="WidgetBackgroundHoverBrush" Color="{DynamicResource WidgetBackgroundHover}"/>
     <SolidColorBrush x:Key="WidgetIconBackground1Brush" Color="{DynamicResource WidgetIconBackground1}"/>
     <SolidColorBrush x:Key="WidgetIconBackground2Brush" Color="{DynamicResource WidgetIconBackground2}"/>
     <SolidColorBrush x:Key="WidgetIconBackground3Brush" Color="{DynamicResource WidgetIconBackground3}"/>

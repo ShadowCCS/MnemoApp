@@ -24,5 +24,10 @@ public class SettingsModule : IModule
     {
         // No tools for settings yet
     }
+
+    public void RegisterWidgets(IWidgetRegistry registry)
+    {
+        // No widgets for settings
+    }
 }
 

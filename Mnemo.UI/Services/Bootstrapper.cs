@@ -53,6 +53,7 @@ public static class Bootstrapper
         services.AddSingleton<ISidebarService>(sp => sp.GetRequiredService<SidebarService>());
         
         services.AddSingleton<IFunctionRegistry, FunctionRegistry>();
+        services.AddSingleton<IWidgetRegistry, WidgetRegistry>();
 
         // 3. Discover and Configure Modules
         // We scan for modules before building the final provider
@@ -68,16 +69,18 @@ public static class Bootstrapper
         // 4. Initialize AI Model Registry
         _ = serviceProvider.GetRequiredService<IAIModelRegistry>().RefreshAsync();
 
-        // 5. Register Routes, Sidebar Items and Tools
+        // 5. Register Routes, Sidebar Items, Tools and Widgets
         var navRegistry = serviceProvider.GetRequiredService<INavigationRegistry>();
         var funcRegistry = serviceProvider.GetRequiredService<IFunctionRegistry>();
         var sidebarService = serviceProvider.GetRequiredService<ISidebarService>();
+        var widgetRegistry = serviceProvider.GetRequiredService<IWidgetRegistry>();
 
         foreach (var module in modules)
         {
             module.RegisterRoutes(navRegistry);
             module.RegisterSidebarItems(sidebarService);
             module.RegisterTools(funcRegistry);
+            module.RegisterWidgets(widgetRegistry);
         }
 
         return serviceProvider;

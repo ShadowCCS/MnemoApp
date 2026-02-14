@@ -3,92 +3,206 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Mnemo.UI.Modules.Overview.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:controls="using:Mnemo.UI.Modules.Overview.Controls"
+             xmlns:ui="using:Mnemo.UI.Controls"
+             xmlns:converters="using:Mnemo.UI.Converters"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="Mnemo.UI.Modules.Overview.Views.OverviewView"
              x:DataType="vm:OverviewViewModel">
-    <ScrollViewer>
-        <StackPanel Margin="40" MaxWidth="900">
-            <!-- Header -->
-            <TextBlock Text="Welcome to Mnemo" 
-                       FontSize="{DynamicResource FontSize.Heading1}" 
-                       FontFamily="{DynamicResource Font.SemiBold}"
-                       Margin="0,0,0,12" 
-                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-            
-            <TextBlock Text="A fresh start for a better application" 
-                       FontSize="{DynamicResource FontSize.Body.Large}" 
-                       Margin="0,0,0,40" 
-                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-            
-            <!-- Main Content -->
-            <StackPanel Spacing="32">
-                <!-- What's Happening Section -->
-                <StackPanel Spacing="12">
-                    <TextBlock Text="What's Happening" 
-                               FontSize="{DynamicResource FontSize.Heading3}" 
-                               FontFamily="{DynamicResource Font.SemiBold}"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    <TextBlock Text="We're currently creating a fresh project to migrate, refactor, and rewrite large portions of the Mnemo application. The previous version had architectural flaws that we're addressing with this rewrite." 
-                               FontSize="{DynamicResource FontSize.Body.Medium}" 
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               LineHeight="24"/>
-                </StackPanel>
-                
-                <!-- Improvements Section -->
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Key Improvements" 
-                               FontSize="{DynamicResource FontSize.Heading3}" 
-                               FontFamily="{DynamicResource Font.SemiBold}"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    
-                    <StackPanel Spacing="16" Margin="0,8,0,0">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="Faster loading times and improved performance" 
-                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="More lightweight architecture with reduced overhead" 
-                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="Better code structure and organization" 
-                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="More robust systems, less prone to problems" 
-                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="Faster, more efficient systems throughout" 
-                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="•" FontSize="{DynamicResource FontSize.Body.Medium}" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="UI improvements with better design and usability" 
-                                       FontSize="{DynamicResource FontSize.Body.Medium}" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </StackPanel>
-            
-            </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
-</UserControl>
 
+    <UserControl.Resources>
+        <converters:GridColumnToPixelsConverter x:Key="GridColumnToPixelsConverter"/>
+        <converters:GridRowToPixelsConverter x:Key="GridRowToPixelsConverter"/>
+        <converters:ColSpanToWidthConverter x:Key="ColSpanToWidthConverter"/>
+        <converters:RowSpanToHeightConverter x:Key="RowSpanToHeightConverter"/>
+        <converters:EditModeConverter x:Key="EditModeConverter"/>
+        <converters:PathToImageConverter x:Key="PathToImageConverter"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- Dashboard Canvas -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Hidden"
+                      Padding="40,24">
+            <StackPanel Spacing="28">
+                <!-- Header: Avatar | Title + Greeting | Edit toolbar -->
+                <Grid ColumnDefinitions="Auto, *, Auto" Margin="0,0,0,4">
+                    <!-- Profile picture (smaller, less dominant) -->
+                    <Border Grid.Column="0"
+                            Width="48" Height="48"
+                            CornerRadius="24"
+                            ClipToBounds="True"
+                            Margin="0,0,20,0"
+                            VerticalAlignment="Center"
+                            BorderBrush="{DynamicResource SidebarBorderBrush}"
+                            BorderThickness="1">
+                        <Image Source="{Binding ProfilePicturePath, Converter={StaticResource PathToImageConverter}}" 
+                               Stretch="UniformToFill"/>
+                    </Border>
+
+                    <!-- Title + greeting -->
+                    <StackPanel Grid.Column="1" 
+                                VerticalAlignment="Center" 
+                                Spacing="2">
+                        <TextBlock Text="Overview"
+                                   FontSize="{DynamicResource FontSize.Heading1}"
+                                   FontFamily="{DynamicResource Font.Bold}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock FontSize="{DynamicResource FontSize.Body.Medium}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}">
+                            <Run Text="{Binding GreetingName, StringFormat='Hello, {0}!'}"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Edit / Add toolbar -->
+                    <StackPanel Grid.Column="2" 
+                                Orientation="Horizontal" 
+                                Spacing="4"
+                                VerticalAlignment="Center">
+                        <Button Command="{Binding ToggleEditModeCommand}"
+                                Padding="10"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                CornerRadius="8"
+                                ToolTip.Tip="{Binding IsEditMode, Converter={StaticResource EditModeConverter}}">
+                            <Path Data="M3,17.25V21h3.75L17.81,9.94l-3.75-3.75L3,17.25z M20.71,7.04c0.39-0.39,0.39-1.02,0-1.41l-2.34-2.34c-0.39-0.39-1.02-0.39-1.41,0l-1.83,1.83l3.75,3.75L20.71,7.04z" 
+                                  Fill="{DynamicResource TextPrimaryBrush}"
+                                  Stretch="Uniform"
+                                  Width="14" Height="14"/>
+                        </Button>
+                        <Border Width="1" Height="20" Background="{DynamicResource SidebarBorderBrush}" Margin="2,0" IsVisible="{Binding IsEditMode}" VerticalAlignment="Center"/>
+                        <Button Command="{Binding AddWidgetCommand}"
+                                IsVisible="{Binding IsEditMode}"
+                                Padding="10"
+                                Background="Transparent"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                BorderThickness="0"
+                                CornerRadius="8"
+                                ToolTip.Tip="Add Widget">
+                            <Path Data="M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6V13z" 
+                                  Fill="{DynamicResource AccentPrimaryBrush}"
+                                  Stretch="Uniform"
+                                  Width="14" Height="14"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Dashboard content -->
+                <Grid MinHeight="800">
+                <!-- Grid Background (Visible in Edit Mode) -->
+                <Canvas IsVisible="{Binding IsEditMode}" Opacity="0.05">
+                    <Canvas.Background>
+                        <VisualBrush TileMode="Tile" 
+                                     SourceRect="0,0,136,136" 
+                                     DestinationRect="0,0,136,136">
+                            <VisualBrush.Visual>
+                                <Border Width="136" Height="136">
+                                    <Border Width="120" Height="120" 
+                                            BorderBrush="{DynamicResource TextPrimaryBrush}" 
+                                            BorderThickness="1" 
+                                            CornerRadius="16"/>
+                                </Border>
+                            </VisualBrush.Visual>
+                        </VisualBrush>
+                    </Canvas.Background>
+                </Canvas>
+
+                <!-- Ghost Widget Layer (binds to pixel values to avoid null GhostWidget binding errors) -->
+                <Canvas IsVisible="{Binding IsGhostVisible}" ZIndex="1">
+                    <Border Background="{DynamicResource CardAccentBrush}"
+                            Opacity="0.15"
+                            CornerRadius="20"
+                            BorderBrush="{DynamicResource CardAccentBrush}"
+                            BorderThickness="2"
+                            Canvas.Left="{Binding GhostLeftPixels}"
+                            Canvas.Top="{Binding GhostTopPixels}"
+                            Width="{Binding GhostWidthPixels}"
+                            Height="{Binding GhostHeightPixels}">
+                        <TextBlock Text="Placement" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Opacity="0.5"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+                    </Border>
+                </Canvas>
+
+                <!-- Widgets Layer: use class to scope style so nested ItemsControls (e.g. inside widgets) are not affected -->
+                <ItemsControl x:Name="DashboardWidgets" 
+                              ItemsSource="{Binding Widgets}" 
+                              ZIndex="10"
+                              Classes="DashboardWidgets">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <Canvas MinHeight="800" Background="Transparent"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.Styles>
+                        <Style Selector="ItemsControl.DashboardWidgets > ContentPresenter" x:DataType="vm:DashboardWidgetViewModel">
+                            <Setter Property="Canvas.Left" Value="{Binding Position.Column, Converter={StaticResource GridColumnToPixelsConverter}}"/>
+                            <Setter Property="Canvas.Top" Value="{Binding Position.Row, Converter={StaticResource GridRowToPixelsConverter}}"/>
+                            <Setter Property="Transitions">
+                                <Transitions>
+                                    <DoubleTransition Property="Canvas.Left" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+                                    <DoubleTransition Property="Canvas.Top" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+                                </Transitions>
+                            </Setter>
+                        </Style>
+                    </ItemsControl.Styles>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:DashboardWidgetViewModel">
+                            <controls:WidgetContainer 
+                                Widget="{Binding}"
+                                IsEditMode="{Binding IsEditMode}"
+                                Width="{Binding Size.ColSpan, Converter={StaticResource ColSpanToWidthConverter}}"
+                                Height="{Binding Size.RowSpan, Converter={StaticResource RowSpanToHeightConverter}}"
+                                DragStarted="OnWidgetDragStarted"
+                                DragDelta="OnWidgetDragDelta"
+                                DragCompleted="OnWidgetDragCompleted"
+                                RemoveRequested="OnWidgetRemoveRequested">
+                                <!-- Transparent hit-test surface to prevent click-through to canvas -->
+                                <Border Background="Transparent"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch">
+                                    <ContentControl Content="{Binding Content}"/>
+                                </Border>
+                            </controls:WidgetContainer>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Empty State -->
+                <StackPanel IsVisible="{Binding !Widgets.Count}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="16"
+                            Opacity="0.6">
+                    <Border Background="{DynamicResource CardAccentBrush}"
+                            Opacity="0.2"
+                            Width="64" Height="64"
+                            CornerRadius="16"
+                            HorizontalAlignment="Center">
+                        <ui:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-grid.svg"
+                                    Width="32" Height="32"
+                                    Color="{DynamicResource CardAccentBrush}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Your Dashboard is Empty"
+                               FontSize="{DynamicResource FontSize.Heading2}"
+                               FontFamily="{DynamicResource Font.SemiBold}"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               HorizontalAlignment="Center"/>
+                    <Button Content="Add First Widget"
+                            Command="{Binding ToggleEditModeCommand}"
+                            Classes="accent"
+                            HorizontalAlignment="Center"/>
+                </StackPanel>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -24,6 +24,10 @@ public class NotesModule : IModule
     {
         // Tools for AI to interact with notes could be registered here
     }
-}
 
+    public void RegisterWidgets(IWidgetRegistry registry)
+    {
+        // No widgets for notes
+    }
+}
 

@@ -47,6 +47,7 @@
     <Color x:Key="NavElementHoverBackground">#E5E5E5</Color>
     <Color x:Key="WidgetBackgroundPrimary">#F0F0F0</Color>
     <Color x:Key="WidgetBackgroundSecondary">#E5E5E5</Color>
+    <Color x:Key="WidgetBackgroundHover">#FAFAFA</Color>
     <Color x:Key="WidgetIconBackground1">#A4C5F0</Color>
     <Color x:Key="WidgetIconBackground2">#B5FFA7</Color>
     <Color x:Key="WidgetIconBackground3">#FFE48F</Color>

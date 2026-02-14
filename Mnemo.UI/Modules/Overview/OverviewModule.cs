@@ -24,5 +24,13 @@ public class OverviewModule : IModule
     {
         // No tools for overview yet
     }
+
+    public void RegisterWidgets(IWidgetRegistry registry)
+    {
+        // Register the sample widgets
+        registry.RegisterWidget(new Widgets.FlashcardStats.FlashcardStatsWidget());
+        registry.RegisterWidget(new Widgets.RecentDecks.RecentDecksWidget());
+        registry.RegisterWidget(new Widgets.StudyGoals.StudyGoalsWidget());
+    }
 }
 

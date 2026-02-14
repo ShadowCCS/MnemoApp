@@ -1,7 +1,7 @@
 namespace Mnemo.Core.Services;
 
 /// <summary>
-/// Defines a module that can register services, routes, and AI tools.
+/// Defines a module that can register services, routes, widgets, and AI tools.
 /// </summary>
 public interface IModule
 {
@@ -9,5 +9,6 @@ public interface IModule
     void RegisterRoutes(INavigationRegistry registry);
     void RegisterSidebarItems(ISidebarService sidebarService);
     void RegisterTools(IFunctionRegistry registry);
+    void RegisterWidgets(IWidgetRegistry registry);
 }
 

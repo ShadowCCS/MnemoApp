@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Mnemo.UI.Modules.Overview.ViewModels"
+             xmlns:models="using:Mnemo.Core.Models.Widgets"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:DataType="vm:AddWidgetViewModel"
+             x:Class="Mnemo.UI.Modules.Overview.Views.AddWidgetView">
+
+    <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
+            CornerRadius="16"
+            BoxShadow="0 8 16 0 #33000000"
+            Padding="24"
+            Width="800"
+            Height="600">
+        <Grid RowDefinitions="Auto, *, Auto">
+            <TextBlock Text="Add Widget"
+                       FontSize="{DynamicResource FontSize.Heading2}"
+                       FontFamily="{DynamicResource Font.SemiBold}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       Margin="0,0,0,24"/>
+
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Hidden">
+                <ItemsControl ItemsSource="{Binding AvailableWidgets}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemWidth="280" ItemHeight="160"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="models:WidgetMetadata">
+                            <Button Command="{Binding $parent[UserControl].((vm:AddWidgetViewModel)DataContext).AddWidgetCommand}"
+                                    CommandParameter="{Binding}"
+                                    Margin="0,0,16,16"
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderThickness="0">
+                                <Button.Styles>
+                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                    </Style>
+                                </Button.Styles>
+                                <Border Background="{DynamicResource WidgetBackgroundPrimaryBrush}"
+                                        BorderBrush="{DynamicResource SidebarBorderBrush}"
+                                        BorderThickness="0"
+                                        CornerRadius="16"
+                                        Padding="16"
+                                        Width="264"
+                                        Height="144"
+                                        BoxShadow="0 4 8 0 #30000000">
+                                    <Border.Styles>
+                                        <Style Selector="Border:pointerover">
+                                            <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
+                                            <Setter Property="RenderTransform" Value="translateY(-2px)"/>
+                                            <Setter Property="BoxShadow" Value="0 6 12 0 #40000000"/>
+                                        </Style>
+                                    </Border.Styles>
+                                    <Border.Transitions>
+                                        <Transitions>
+                                            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+                                            <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
+                                            <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                                        </Transitions>
+                                    </Border.Transitions>
+                                    <Grid RowDefinitions="Auto, *">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <!-- Icon -->
+                                            <PathIcon Data="{Binding Icon}" 
+                                                      Width="20" Height="20"
+                                                      Foreground="{DynamicResource CardAccentBrush}"/> 
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                                       FontSize="14"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding Description}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="12"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,8,0,0"/>
+                                    </Grid>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <Button Grid.Row="2"
+                    Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0"/>
+        </Grid>
+    </Border>
+</UserControl>

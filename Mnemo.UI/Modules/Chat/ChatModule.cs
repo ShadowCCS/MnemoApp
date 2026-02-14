@@ -24,5 +24,10 @@ public class ChatModule : IModule
     {
         // No tools for chat yet
     }
+
+    public void RegisterWidgets(IWidgetRegistry registry)
+    {
+        // No widgets for chat
+    }
 }
 

@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Mnemo.UI.Modules.Overview.Widgets.FlashcardStats"
+             mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="240"
+             x:Class="Mnemo.UI.Modules.Overview.Widgets.FlashcardStats.FlashcardStatsWidgetView"
+             x:DataType="vm:FlashcardStatsWidgetViewModel">
+
+    <Grid RowDefinitions="*,Auto">
+        <!-- Icon removed to avoid duplication with container header -->
+        
+        <!-- Main Stats -->
+        <StackPanel Grid.Row="0" 
+                    VerticalAlignment="Center"
+                    Spacing="8">
+            <TextBlock Text="{Binding TotalCardsPracticed}"
+                       FontSize="42"
+                       FontFamily="{DynamicResource Font.Bold}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="Cards Practiced"
+                       FontSize="14"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Secondary Stats -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*" Margin="0,24,0,0">
+            <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Text="{Binding CardsToday}"
+                           FontSize="18"
+                           FontFamily="{DynamicResource Font.SemiBold}"
+                           Foreground="{DynamicResource CardAccentBrush}"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="Today"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Spacing="4">
+                <TextBlock FontSize="18"
+                           FontFamily="{DynamicResource Font.SemiBold}"
+                           Foreground="{DynamicResource CardAccentBrush}"
+                           HorizontalAlignment="Center"
+                           Text="{Binding StudyStreak}"/>
+                <TextBlock Text="Day Streak"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

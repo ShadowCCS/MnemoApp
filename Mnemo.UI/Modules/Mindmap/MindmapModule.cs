@@ -28,5 +28,10 @@ public class MindmapModule : IModule
     {
         // No tools for overview yet
     }
+
+    public void RegisterWidgets(IWidgetRegistry registry)
+    {
+        // No widgets for mindmap
+    }
 }
 

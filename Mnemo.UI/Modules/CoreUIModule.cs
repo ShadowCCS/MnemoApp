@@ -28,5 +28,10 @@ public class CoreUIModule : IModule
     {
         // Global AI tools if any
     }
+
+    public void RegisterWidgets(IWidgetRegistry registry)
+    {
+        // No widgets for core UI
+    }
 }
 

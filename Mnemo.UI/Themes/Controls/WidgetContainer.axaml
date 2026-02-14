@@ -1,0 +1,90 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="using:Mnemo.UI.Modules.Overview.Controls"
+                    x:ClassModifier="internal"
+                    x:CompileBindings="False">
+
+  <ControlTheme x:Key="{x:Type local:WidgetContainer}" TargetType="local:WidgetContainer">
+    <Setter Property="Background" Value="{DynamicResource WidgetBackgroundPrimaryBrush}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_RootBorder"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{DynamicResource SidebarBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="20"
+                BoxShadow="0 4 12 0 #40000000"
+                ClipToBounds="True">
+          <Border.Transitions>
+            <Transitions>
+              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+              <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+              <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
+              <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+              <BrushTransition Property="Background" Duration="0:0:0.2"/>
+            </Transitions>
+          </Border.Transitions>
+
+          <Grid RowDefinitions="Auto, *">
+            <!-- Widget Header -->
+            <Border Grid.Row="0"
+                    Name="PART_Header"
+                    Background="Transparent"
+                    Padding="20,16,20,8">
+              <Grid ColumnDefinitions="Auto, *, Auto">
+                <!-- Left Section: Icon + Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                  <Path Data="{Binding Widget.Metadata.Icon, RelativeSource={RelativeSource TemplatedParent}}"
+                        Fill="{DynamicResource AccentPrimaryBrush}"
+                        Width="16" Height="16"
+                        VerticalAlignment="Center"
+                        Stretch="Uniform"
+                        Opacity="1.0"/>
+                  <TextBlock Text="{Binding Widget.Metadata.Title, RelativeSource={RelativeSource TemplatedParent}}"
+                             FontSize="14"
+                             FontFamily="{DynamicResource Font.SemiBold}"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             VerticalAlignment="Center"
+                             Opacity="1.0"/>
+                </StackPanel>
+                <!-- Remove button (edit mode only) -->
+                <Button Name="PART_RemoveButton"
+                        Grid.Column="2"
+                        IsVisible="{Binding IsEditMode, RelativeSource={RelativeSource TemplatedParent}}"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="6"
+                        CornerRadius="8"
+                        ToolTip.Tip="Remove widget"
+                        Cursor="Arrow">
+                  <Path Data="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                        Fill="{DynamicResource TextSecondaryBrush}"
+                        Width="14" Height="14"
+                        Stretch="Uniform"/>
+                </Button>
+              </Grid>
+            </Border>
+
+            <ContentPresenter Grid.Row="1"
+                              Name="PART_ContentPresenter"
+                              Background="Transparent"
+                              Padding="20,0,20,20"
+                              Content="{TemplateBinding Content}"/>
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+
+    <!-- Dragging state -->
+    <Style Selector="^.dragging /template/ Border#PART_RootBorder">
+      <Setter Property="Opacity" Value="0.6"/>
+      <Setter Property="RenderTransform" Value="scale(0.98) translateY(-2px)"/>
+      <Setter Property="BoxShadow" Value="0 2 8 0 #20000000"/>
+    </Style>
+
+    <!-- Edit mode cursor -->
+    <Style Selector="^[IsEditMode=true]">
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+  </ControlTheme>
+</ResourceDictionary>
