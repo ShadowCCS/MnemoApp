@@ -1,3 +1,5 @@
+using Mnemo.UI.Services.LaTeX.Rendering;
+
 namespace Mnemo.UI.Services.LaTeX.Layout.Boxes;
 
 public class CharBox : Box
@@ -9,5 +11,10 @@ public class CharBox : Box
     {
         Character = character;
         FontSize = fontSize;
+    }
+
+    public override void Render(IMathRenderContext ctx, double x, double baselineY)
+    {
+        ctx.DrawText(Character, FontSize, x, baselineY + Shift);
     }
 }

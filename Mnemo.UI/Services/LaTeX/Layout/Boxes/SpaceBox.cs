@@ -1,3 +1,5 @@
+using Mnemo.UI.Services.LaTeX.Rendering;
+
 namespace Mnemo.UI.Services.LaTeX.Layout.Boxes;
 
 public class SpaceBox : Box
@@ -8,5 +10,7 @@ public class SpaceBox : Box
         Height = 0;
         Depth = 0;
     }
+
+    public override void Render(IMathRenderContext ctx, double x, double baselineY) { }
 }
 

@@ -1,9 +1,10 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Mnemo.Infrastructure.Services.LaTeX;
 using Mnemo.UI.Services.LaTeX.Layout.Boxes;
-using System;
+using Mnemo.UI.Services.LaTeX.Rendering;
 
 namespace Mnemo.UI.Controls;
 
@@ -15,12 +16,22 @@ public class LaTeXRenderer : Control
     public static readonly StyledProperty<IBrush?> ForegroundProperty =
         AvaloniaProperty.Register<LaTeXRenderer, IBrush?>(nameof(Foreground));
 
+    public static readonly StyledProperty<bool> IsInlineModeProperty =
+        AvaloniaProperty.Register<LaTeXRenderer, bool>(nameof(IsInlineMode), false);
+
     private readonly LRUCache<(string, double, uint), FormattedText> _formattedTextCache = new(500);
 
-    private const double DefaultPadding = 16;
-    private const double VerticalBuffer = 8;
-    private const double DelimiterOffset = 15;
-    private const double DelimiterThickness = 1.5;
+    /// <summary>Padding from control edge to content on all sides. Content is laid out so it stays inside (padding, padding) to (width-padding, height-padding).</summary>
+    private const double DefaultPadding = 6;
+    /// <summary>Extra pixels added to measured size to avoid clipping from rounding or ink overflow.</summary>
+    private const double BoundsSafety = 2;
+    /// <summary>Safety margin for glyph ink overflow (rendering outside layout bounds).</summary>
+    private const double InkOverflowSafety = 4;
+
+    /// <summary>Minimal horizontal padding for inline mode. Keeps the control compact for embedding in text flow.</summary>
+    private const double InlinePad = 2;
+    /// <summary>Minimal ink overflow safety for inline mode.</summary>
+    private const double InlineOverflow = 1;
 
     public Box? Layout
     {
@@ -34,41 +45,87 @@ public class LaTeXRenderer : Control
         set => SetValue(ForegroundProperty, value);
     }
 
+    /// <summary>
+    /// When true, adjusts layout for inline embedding (e.g., in TextBlock inlines).
+    /// The control's bottom edge will align with the text baseline, and depth extends downward.
+    /// </summary>
+    public bool IsInlineMode
+    {
+        get => GetValue(IsInlineModeProperty);
+        set => SetValue(IsInlineModeProperty, value);
+    }
+
     static LaTeXRenderer()
     {
         AffectsRender<LaTeXRenderer>(LayoutProperty, ForegroundProperty);
-        AffectsMeasure<LaTeXRenderer>(LayoutProperty);
+        AffectsMeasure<LaTeXRenderer>(LayoutProperty, IsInlineModeProperty);
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        
-        if (change.Property == LayoutProperty || change.Property == ForegroundProperty)
+        if (change.Property == LayoutProperty)
         {
             _formattedTextCache.Clear();
+            UpdateMinimumSize();
+        }
+        else if (change.Property == ForegroundProperty)
+        {
+            _formattedTextCache.Clear();
+        }
+        else if (change.Property == IsInlineModeProperty)
+        {
+            UpdateMinimumSize();
+        }
+    }
+
+    private void UpdateMinimumSize()
+    {
+        if (Layout == null)
+        {
+            MinWidth = 0;
+            MinHeight = 0;
+            return;
+        }
+
+        if (IsInlineMode)
+        {
+            // Inline mode: baseline at the very bottom of the control.
+            // Only above-baseline height is included; depth (subscripts etc.) overflows below
+            // and is visible because ClipToBounds defaults to false.
+            // This ensures that when InlineUIContainer uses BaselineAlignment.Baseline
+            // (which aligns the control's bottom edge with the text baseline), the math
+            // baseline lands exactly on the text baseline.
+            var baselineY = InlinePad + Layout.Height;
+            var actualBounds = CalculateActualBounds(Layout, InlinePad, baselineY);
+            var minX = Math.Min(0, actualBounds.Left - InlineOverflow);
+            MinWidth = (actualBounds.Right + InlineOverflow) - minX;
+            MinHeight = Layout.Height + InlinePad;
+        }
+        else
+        {
+            // Standard mode: centered layout with padding on all sides
+            var baselineY = DefaultPadding + Layout.Height;
+            var actualBounds = CalculateActualBounds(Layout, DefaultPadding, baselineY);
+            var minX = Math.Min(0, actualBounds.Left - InkOverflowSafety);
+            var minY = Math.Min(0, actualBounds.Top - InkOverflowSafety);
+            MinWidth = (actualBounds.Right + InkOverflowSafety) - minX;
+            MinHeight = (actualBounds.Bottom + InkOverflowSafety) - minY;
         }
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        
         if (Application.Current != null)
-        {
             Application.Current.ActualThemeVariantChanged += OnThemeChanged;
-        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        
         if (Application.Current != null)
-        {
             Application.Current.ActualThemeVariantChanged -= OnThemeChanged;
-        }
-        
         _formattedTextCache.Clear();
     }
 
@@ -78,266 +135,123 @@ public class LaTeXRenderer : Control
         InvalidateVisual();
     }
 
-    protected override Size MeasureOverride(Size availableSize)
+    /// <summary>
+    /// Returns the size the control needs to display its content. Use this when embedding
+    /// in InlineUIContainer so the host can reserve the correct space (e.g. set Width/Height).
+    /// </summary>
+    public Size GetDesiredSize()
     {
         if (Layout == null)
             return new Size(0, 0);
 
-        // Increase padding and buffer significantly to test if it resolves cropping
-        const double extraSafety = 10.0;
-        var totalHeight = Layout.Height + Layout.Depth + (DefaultPadding * 2) + VerticalBuffer + extraSafety;
-        var totalWidth = Layout.Width + (DefaultPadding * 2) + extraSafety;
+        if (IsInlineMode)
+        {
+            // Inline mode: baseline at the very bottom of the control.
+            // Height includes only above-baseline content + minimal padding.
+            // Depth content (subscripts etc.) overflows below the control bounds.
+            var baselineY = InlinePad + Layout.Height;
+            var actualBounds = CalculateActualBounds(Layout, InlinePad, baselineY);
+            var minX = Math.Min(0, actualBounds.Left - InlineOverflow);
+            var width = Math.Max((actualBounds.Right + InlineOverflow) - minX, MinWidth);
+            var height = Math.Max(Layout.Height + InlinePad, MinHeight);
+
+            return new Size(width, height);
+        }
+        else
+        {
+            // Standard mode: full padding on all sides
+            var baselineY = DefaultPadding + Layout.Height;
+            var actualBounds = CalculateActualBounds(Layout, DefaultPadding, baselineY);
+
+            var minX = Math.Min(0, actualBounds.Left - InkOverflowSafety);
+            var minY = Math.Min(0, actualBounds.Top - InkOverflowSafety);
+            var maxX = Math.Max(actualBounds.Right + InkOverflowSafety, Layout.Width + DefaultPadding * 2);
+            var maxY = Math.Max(actualBounds.Bottom + InkOverflowSafety, Layout.Height + Layout.Depth + DefaultPadding * 2);
+
+            var width = Math.Max(maxX - minX, MinWidth);
+            var height = Math.Max(maxY - minY, MinHeight);
+
+            return new Size(width, height);
+        }
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var desiredSize = GetDesiredSize();
         
-        return new Size(totalWidth, totalHeight);
+        // If explicit Width/Height are set (e.g., when embedded in InlineUIContainer),
+        // respect those but ensure we don't exceed our natural size
+        var finalWidth = !double.IsNaN(Width) ? Width : desiredSize.Width;
+        var finalHeight = !double.IsNaN(Height) ? Height : desiredSize.Height;
+        
+        return new Size(
+            Math.Min(finalWidth, availableSize.Width),
+            Math.Min(finalHeight, availableSize.Height));
     }
 
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-
         if (Layout == null)
             return;
 
-        // Ensure the baseline is centered within the padded area
-        var baseline = Layout.Height + DefaultPadding + (VerticalBuffer / 2) + 5.0; // Extra 5px offset
-        RenderBox(context, Layout, DefaultPadding + 5.0, baseline);
-    }
+        double baselineY, offsetX, offsetY, x;
 
-    private void RenderBox(DrawingContext context, Box box, double x, double baseline)
-    {
-        switch (box)
+        if (IsInlineMode)
         {
-            case CharBox charBox:
-                RenderChar(context, charBox, x, baseline + charBox.Shift);
-                break;
-
-            case HBox hbox:
-                var currentX = x;
-                foreach (var child in hbox.Children)
-                {
-                    RenderBox(context, child, currentX, baseline - child.Shift);
-                    currentX += child.Width;
-                }
-                break;
-
-            case VBox vbox:
-                var currentY = baseline - box.Height;
-                foreach (var child in vbox.Children)
-                {
-                    RenderBox(context, child, x, currentY + child.Height);
-                    currentY += child.TotalHeight;
-                }
-                break;
-
-            case FractionBox fracBox:
-                var numX = x + (box.Width - fracBox.Numerator.Width) / 2;
-                var numY = baseline - fracBox.NumeratorSpacing - fracBox.RuleThickness / 2;
-                RenderBox(context, fracBox.Numerator, numX, numY - fracBox.Numerator.Shift);
-
-                var lineY = baseline - fracBox.RuleThickness / 2;
-                var pen = new Pen(GetTextBrush(), fracBox.RuleThickness);
-                context.DrawLine(pen, new Point(x, lineY), new Point(x + box.Width, lineY));
-
-                var denomX = x + (box.Width - fracBox.Denominator.Width) / 2;
-                var denomY = baseline + fracBox.DenominatorSpacing + fracBox.RuleThickness / 2;
-                RenderBox(context, fracBox.Denominator, denomX, denomY - fracBox.Denominator.Shift);
-                break;
-
-            case ScriptBox scriptBox:
-                RenderBox(context, scriptBox.Base, x, baseline);
-                var scriptX = x + scriptBox.Base.Width;
-
-                if (scriptBox.Superscript != null)
-                {
-                    RenderBox(context, scriptBox.Superscript, scriptX, baseline - scriptBox.Superscript.Shift);
-                }
-
-                if (scriptBox.Subscript != null)
-                {
-                    RenderBox(context, scriptBox.Subscript, scriptX, baseline - scriptBox.Subscript.Shift);
-                }
-                break;
-
-            case SqrtBox sqrtBox:
-                var contentTop = baseline - sqrtBox.Content.Height - sqrtBox.Content.Shift;
-                var contentBottom = baseline + sqrtBox.Content.Depth - sqrtBox.Content.Shift;
-                var overlineY = baseline - sqrtBox.Height + sqrtBox.RuleThickness / 2;
-                var checkWidth = sqrtBox.SymbolWidth * 0.3;
-                var kneeWidth = sqrtBox.SymbolWidth * 0.35;
-                
-                var sqrtPath = new PathGeometry();
-                var sqrtFigure = new PathFigure { 
-                    StartPoint = new Point(x, contentTop * 0.6 + contentBottom * 0.4),
-                    IsClosed = false
-                };
-                sqrtFigure.Segments!.Add(new LineSegment { 
-                    Point = new Point(x + checkWidth, contentBottom) 
-                });
-                sqrtFigure.Segments!.Add(new LineSegment { 
-                    Point = new Point(x + checkWidth + kneeWidth, overlineY) 
-                });
-                sqrtFigure.Segments!.Add(new LineSegment { 
-                    Point = new Point(x + box.Width, overlineY) 
-                });
-                sqrtPath.Figures!.Add(sqrtFigure);
-
-                context.DrawGeometry(null, new Pen(GetTextBrush(), sqrtBox.RuleThickness), sqrtPath);
-
-                RenderBox(context, sqrtBox.Content, x + sqrtBox.SymbolWidth, baseline - sqrtBox.Content.Shift);
-                break;
-
-            case SpaceBox:
-                break;
-
-            case RuleBox ruleBox:
-                var rulePen = new Pen(GetTextBrush(), ruleBox.Height + ruleBox.Depth);
-                context.DrawLine(rulePen, new Point(x, baseline), new Point(x + ruleBox.Width, baseline));
-                break;
-
-            case MatrixBox matrixBox:
-                RenderMatrix(context, matrixBox, x, baseline);
-                break;
+            // Inline mode: baseline is at the very bottom of the control.
+            // When the host InlineUIContainer uses BaselineAlignment.Baseline it aligns
+            // the control's bottom edge with the text baseline, so placing the math
+            // baseline there gives correct vertical alignment with surrounding text.
+            // Depth content (subscripts) renders below the control bounds (ClipToBounds
+            // is false, so it remains visible).
+            baselineY = Bounds.Height;
+            var actualBounds = CalculateActualBounds(Layout, InlinePad, baselineY);
+            var minX = Math.Min(0, actualBounds.Left - InlineOverflow);
+            offsetX = -minX;
+            offsetY = 0;
+            x = InlinePad;
         }
-    }
-
-    private void RenderMatrix(DrawingContext context, MatrixBox matrixBox, double x, double baseline)
-    {
-        var brush = GetTextBrush();
-        var delimiterOffset = 0.0;
-
-        if (matrixBox.MatrixType != "matrix")
+        else
         {
-            delimiterOffset = DelimiterOffset;
-            var delimHeight = (matrixBox.Height + matrixBox.Depth) * 0.9;
-            var delimY = baseline - matrixBox.Height + (matrixBox.Height + matrixBox.Depth - delimHeight) / 2;
-            DrawDelimiter(context, matrixBox.MatrixType, x + 2, delimY, delimHeight, true, brush);
+            // Standard mode: baseline positioned with padding from top
+            baselineY = DefaultPadding + Layout.Height;
+            var actualBounds = CalculateActualBounds(Layout, DefaultPadding, baselineY);
+            var minX = Math.Min(0, actualBounds.Left - InkOverflowSafety);
+            var minY = Math.Min(0, actualBounds.Top - InkOverflowSafety);
+            offsetX = -minX;
+            offsetY = -minY;
+            x = DefaultPadding;
         }
 
-        var currentY = baseline - matrixBox.Height + 4;
-        for (int rowIdx = 0; rowIdx < matrixBox.Cells.Count; rowIdx++)
+        using (context.PushTransform(Matrix.CreateTranslation(offsetX, offsetY)))
         {
-            var row = matrixBox.Cells[rowIdx];
-            var rowHeight = matrixBox.RowHeights[rowIdx];
-            var rowDepth = matrixBox.RowDepths[rowIdx];
-            var rowBaseline = currentY + rowHeight;
-
-            var currentX = x + delimiterOffset;
-            for (int colIdx = 0; colIdx < row.Count; colIdx++)
-            {
-                var cell = row[colIdx];
-                var colWidth = matrixBox.ColumnWidths[colIdx];
-                
-                var cellX = currentX + (colWidth - cell.Width) / 2;
-                RenderBox(context, cell, cellX, rowBaseline);
-
-                currentX += colWidth + matrixBox.CellPadding * 2;
-            }
-
-            currentY += rowHeight + rowDepth + matrixBox.RowSpacing;
+            var renderContext = new MathRenderContext(context, GetTextBrush(), _formattedTextCache);
+            Layout.Render(renderContext, x, baselineY);
         }
-
-        if (matrixBox.MatrixType != "matrix")
-        {
-            var delimHeight = (matrixBox.Height + matrixBox.Depth) * 0.9;
-            var delimY = baseline - matrixBox.Height + (matrixBox.Height + matrixBox.Depth - delimHeight) / 2;
-            DrawDelimiter(context, matrixBox.MatrixType, x + matrixBox.Width - delimiterOffset + 5, 
-                         delimY, delimHeight, false, brush);
-        }
-    }
-
-    private void DrawDelimiter(DrawingContext context, string matrixType, double x, double y, double height, bool isLeft, IBrush brush)
-    {
-        var pen = new Pen(brush, DelimiterThickness);
-        var path = new PathGeometry();
-        var figure = new PathFigure { StartPoint = new Point(x, y), IsClosed = false };
-
-        switch (matrixType)
-        {
-            case "pmatrix":
-                if (isLeft)
-                {
-                    var controlPoint1 = new Point(x - 3, y + height * 0.2);
-                    var controlPoint2 = new Point(x - 3, y + height * 0.8);
-                    figure.Segments!.Add(new BezierSegment { Point1 = controlPoint1, Point2 = controlPoint2, Point3 = new Point(x, y + height) });
-                }
-                else
-                {
-                    var controlPoint1 = new Point(x + 3, y + height * 0.2);
-                    var controlPoint2 = new Point(x + 3, y + height * 0.8);
-                    figure.Segments!.Add(new BezierSegment { Point1 = controlPoint1, Point2 = controlPoint2, Point3 = new Point(x, y + height) });
-                }
-                break;
-
-            case "bmatrix":
-                if (isLeft)
-                {
-                    figure.Segments!.Add(new LineSegment { Point = new Point(x + 4, y) });
-                    figure.Segments!.Add(new LineSegment { Point = new Point(x, y) });
-                    figure.Segments!.Add(new LineSegment { Point = new Point(x, y + height) });
-                    figure.Segments!.Add(new LineSegment { Point = new Point(x + 4, y + height) });
-                }
-                else
-                {
-                    figure.Segments!.Add(new LineSegment { Point = new Point(x - 4, y) });
-                    figure.Segments!.Add(new LineSegment { Point = new Point(x, y) });
-                    figure.Segments!.Add(new LineSegment { Point = new Point(x, y + height) });
-                    figure.Segments!.Add(new LineSegment { Point = new Point(x - 4, y + height) });
-                }
-                break;
-
-            case "vmatrix":
-            case "Vmatrix":
-                figure.Segments!.Add(new LineSegment { Point = new Point(x, y + height) });
-                break;
-        }
-
-        path.Figures!.Add(figure);
-        context.DrawGeometry(null, pen, path);
-    }
-
-    private void RenderChar(DrawingContext context, CharBox charBox, double x, double baseline)
-    {
-        var typeface = Mnemo.UI.Services.LaTeX.Metrics.FontMetrics.Instance.Typeface;
-        
-        var foreground = GetTextBrush();
-        var color = (foreground as ISolidColorBrush)?.Color.ToUInt32() ?? 0xFF000000;
-
-        var cacheKey = (charBox.Character, charBox.FontSize, color);
-        if (!_formattedTextCache.TryGetValue(cacheKey, out var formattedText))
-        {
-            formattedText = new FormattedText(
-                charBox.Character,
-                System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight,
-                typeface,
-                charBox.FontSize,
-                foreground
-            );
-
-            _formattedTextCache.Add(cacheKey, formattedText);
-        }
-
-        context.DrawText(formattedText, new Point(x, baseline - formattedText.Baseline));
-    }
-
-    private Typeface CreateTypeface()
-    {
-        var fontFamily = Application.Current?.TryFindResource("MathFontFamily", out var res) == true && res is FontFamily ff
-            ? ff
-            : new FontFamily("STIX Two Math");
-        return new Typeface(fontFamily);
     }
 
     private IBrush GetTextBrush()
     {
         if (Foreground != null)
             return Foreground;
-
         if (this.TryFindResource("TextPrimaryBrush", out var resource) && resource is IBrush brush)
-        {
             return brush;
-        }
-        
         return Brushes.Black;
+    }
+
+    /// <summary>Recursively walks the box tree and returns the union of all layout bounds (including glyphs and child boxes) in control coordinates.</summary>
+    private static Rect CalculateActualBounds(Box box, double x, double baselineY)
+    {
+        var top = baselineY - box.Height;
+        var left = x;
+        var width = box.Width;
+        var height = box.TotalHeight;
+        var bounds = new Rect(left, top, width, height);
+
+        foreach (var (child, cx, cy) in box.GetChildPositions(x, baselineY))
+            bounds = bounds.Union(CalculateActualBounds(child, cx, cy));
+
+        return bounds;
     }
 }

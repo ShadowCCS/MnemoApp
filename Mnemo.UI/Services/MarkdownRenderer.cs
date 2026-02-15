@@ -118,14 +118,18 @@ public class MarkdownRenderer : IMarkdownRenderer
         var fontSize = await GetBaseFontSizeAsync();
         var lineHeight = await GetLineHeightAsync();
         var letterSpacing = await GetLetterSpacingAsync();
-        var textBlock = new TextBlock
+
+        // Check whether this paragraph contains any display math.
+        // If it does, we render the paragraph as a StackPanel with text segments
+        // separated by standalone (block-level) display math controls, instead of
+        // forcing large formulas into InlineUIContainer which garbles layout.
+        if (ParagraphContainsDisplayMath(paragraph, specialInlines))
         {
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = fontSize,
-            LineHeight = fontSize * lineHeight,
-            LetterSpacing = letterSpacing,
-            Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
-        };
+            return await RenderParagraphWithDisplayMathAsync(paragraph, specialInlines, foreground, fontSize, lineHeight, letterSpacing);
+        }
+
+        // Simple path: no display math — single TextBlock with inline content.
+        var textBlock = CreateParagraphTextBlock(fontSize, lineHeight, letterSpacing, foreground);
 
         if (paragraph.Inline != null && textBlock.Inlines != null)
         {
@@ -136,6 +140,254 @@ public class MarkdownRenderer : IMarkdownRenderer
         }
 
         return textBlock;
+    }
+
+    /// <summary>Returns true if any literal inline in this paragraph references a display-math placeholder.</summary>
+    private static bool ParagraphContainsDisplayMath(ParagraphBlock paragraph, Dictionary<string, MarkdownSpecialInline> specialInlines)
+    {
+        if (paragraph.Inline == null) return false;
+
+        foreach (var inline in paragraph.Inline)
+        {
+            if (inline is not LiteralInline literal) continue;
+            var text = literal.Content.ToString();
+            foreach (var kvp in specialInlines)
+            {
+                if (kvp.Value.Type == MarkdownInlineType.DisplayMath && text.Contains(kvp.Key))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Renders a paragraph that contains display math. The paragraph is split at each
+    /// display-math placeholder: surrounding text is rendered in TextBlocks, and each
+    /// display-math formula is rendered as a standalone centred LaTeX control.
+    /// </summary>
+    private async Task<Control> RenderParagraphWithDisplayMathAsync(
+        ParagraphBlock paragraph,
+        Dictionary<string, MarkdownSpecialInline> specialInlines,
+        IBrush? foreground,
+        double fontSize,
+        double lineHeight,
+        double letterSpacing)
+    {
+        var container = new StackPanel { Spacing = 6 };
+        var currentTextBlock = CreateParagraphTextBlock(fontSize, lineHeight, letterSpacing, foreground);
+
+        if (paragraph.Inline != null)
+        {
+            foreach (var inline in paragraph.Inline)
+            {
+                if (inline is LiteralInline literal)
+                {
+                    // Process the literal text, splitting at display-math placeholders
+                    currentTextBlock = await ProcessLiteralWithDisplayMathAsync(
+                        literal.Content.ToString(),
+                        currentTextBlock,
+                        container,
+                        specialInlines,
+                        foreground,
+                        fontSize, lineHeight, letterSpacing);
+                }
+                else
+                {
+                    // Non-literal inlines go straight into the current TextBlock
+                    if (currentTextBlock.Inlines != null)
+                        await RenderInlineToInlinesAsync(inline, currentTextBlock.Inlines, specialInlines, foreground);
+                }
+            }
+        }
+
+        // Flush remaining text
+        if (currentTextBlock.Inlines?.Count > 0)
+            container.Children.Add(currentTextBlock);
+
+        return container.Children.Count == 1 ? (Control)container.Children[0] : container;
+    }
+
+    /// <summary>
+    /// Walks a literal text segment, emitting runs / inline-math into the current TextBlock
+    /// and breaking out display-math formulas as standalone controls in the container.
+    /// Returns the (possibly new) current TextBlock to continue appending into.
+    /// </summary>
+    private async Task<TextBlock> ProcessLiteralWithDisplayMathAsync(
+        string text,
+        TextBlock currentTextBlock,
+        StackPanel container,
+        Dictionary<string, MarkdownSpecialInline> specialInlines,
+        IBrush? foreground,
+        double fontSize, double lineHeight, double letterSpacing)
+    {
+        if (string.IsNullOrEmpty(text))
+            return currentTextBlock;
+
+        var position = 0;
+
+        while (position < text.Length)
+        {
+            // Find the next placeholder marker
+            var markerIndex = text.IndexOf("Ⓢ", position, StringComparison.Ordinal);
+            if (markerIndex < 0)
+            {
+                // No more markers — append remainder as inline text
+                AppendRunIfNonEmpty(currentTextBlock, text.Substring(position), foreground);
+                break;
+            }
+
+            var endMarkerIndex = text.IndexOf("Ⓢ", markerIndex + 1, StringComparison.Ordinal);
+            if (endMarkerIndex < 0)
+            {
+                AppendRunIfNonEmpty(currentTextBlock, text.Substring(position), foreground);
+                break;
+            }
+
+            var potentialKey = text.Substring(markerIndex, endMarkerIndex - markerIndex + 1);
+
+            if (specialInlines.TryGetValue(potentialKey, out var inlineData))
+            {
+                // Emit any text before the marker into the current TextBlock
+                if (markerIndex > position)
+                    AppendRunIfNonEmpty(currentTextBlock, text.Substring(position, markerIndex - position), foreground);
+
+                if (inlineData.Type == MarkdownInlineType.DisplayMath)
+                {
+                    // ---- Display math: render as a standalone block ----
+                    // Flush the current TextBlock into the container
+                    if (currentTextBlock.Inlines?.Count > 0)
+                    {
+                        container.Children.Add(currentTextBlock);
+                        currentTextBlock = CreateParagraphTextBlock(fontSize, lineHeight, letterSpacing, foreground);
+                    }
+
+                    if (await _settingsService.GetAsync("Markdown.RenderMath", true) && !string.IsNullOrWhiteSpace(inlineData.Content))
+                    {
+                        var displayFontSize = await GetMathFontSizeAsync(true);
+                        if (await _latexEngine.BuildLayoutAsync(inlineData.Content.Trim(), displayFontSize) is Mnemo.UI.Controls.LaTeXRenderer displayMathControl)
+                        {
+                            ApplyInlineMathLayout(displayMathControl, foreground, isInline: false);
+                            // Wrap in a centred border so it sits on its own line
+                            var wrapper = new Border
+                            {
+                                Child = displayMathControl,
+                                HorizontalAlignment = HorizontalAlignment.Center,
+                                Margin = new Thickness(0, 4)
+                            };
+                            container.Children.Add(wrapper);
+                        }
+                    }
+                    else
+                    {
+                        container.Children.Add(new TextBlock
+                        {
+                            Text = $"$${inlineData.Content}$$",
+                            Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!,
+                            TextWrapping = TextWrapping.Wrap
+                        });
+                    }
+                }
+                else
+                {
+                    // Non-display-math special inline — render into the current TextBlock
+                    if (currentTextBlock.Inlines != null)
+                        await RenderSpecialInlineAsync(inlineData, currentTextBlock.Inlines, foreground);
+                }
+
+                position = endMarkerIndex + 1;
+            }
+            else
+            {
+                // Not a recognised placeholder — advance past the first marker
+                position = markerIndex + 1;
+            }
+        }
+
+        return currentTextBlock;
+    }
+
+    /// <summary>Renders a single non-display-math special inline into the given InlineCollection.</summary>
+    private async Task RenderSpecialInlineAsync(MarkdownSpecialInline inlineData, InlineCollection inlines, IBrush? foreground, bool isHeading = false)
+    {
+        switch (inlineData.Type)
+        {
+            case MarkdownInlineType.InlineMath:
+                if (await _settingsService.GetAsync("Markdown.RenderMath", true) && !string.IsNullOrWhiteSpace(inlineData.Content))
+                {
+                    var inlineFontSize = await GetMathFontSizeAsync(false);
+                    if (await _latexEngine.BuildLayoutAsync(inlineData.Content.Trim(), inlineFontSize) is Mnemo.UI.Controls.LaTeXRenderer inlineMathControl)
+                    {
+                        ApplyInlineMathLayout(inlineMathControl, foreground, isInline: true);
+                        inlines.Add(new InlineUIContainer { Child = inlineMathControl, BaselineAlignment = BaselineAlignment.Baseline });
+                    }
+                }
+                else
+                {
+                    inlines.Add(new Run { Text = $"${inlineData.Content}$", Foreground = (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!) });
+                }
+                break;
+
+            case MarkdownInlineType.Highlight:
+                inlines.Add(new Run
+                {
+                    Text = inlineData.Content,
+                    Background = (IBrush)Application.Current!.FindResource("HighlightedTextBrush")!,
+                    Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!))
+                });
+                break;
+
+            case MarkdownInlineType.Superscript:
+                var superscriptTextBlock = new TextBlock
+                {
+                    Text = inlineData.Content,
+                    FontSize = 10,
+                    Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)),
+                };
+                inlines.Add(new InlineUIContainer { Child = superscriptTextBlock, BaselineAlignment = BaselineAlignment.Superscript });
+                break;
+
+            case MarkdownInlineType.Subscript:
+                var subscriptTextBlock = new TextBlock
+                {
+                    Text = inlineData.Content,
+                    FontSize = 10,
+                    Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)),
+                };
+                inlines.Add(new InlineUIContainer { Child = subscriptTextBlock, BaselineAlignment = BaselineAlignment.Subscript });
+                break;
+
+            case MarkdownInlineType.Strikethrough:
+                inlines.Add(new Run
+                {
+                    Text = inlineData.Content,
+                    TextDecorations = TextDecorations.Strikethrough,
+                    Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!))
+                });
+                break;
+        }
+    }
+
+    private static void AppendRunIfNonEmpty(TextBlock textBlock, string text, IBrush? foreground)
+    {
+        if (string.IsNullOrWhiteSpace(text) || textBlock.Inlines == null) return;
+        textBlock.Inlines.Add(new Run
+        {
+            Text = text,
+            Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
+        });
+    }
+
+    private static TextBlock CreateParagraphTextBlock(double fontSize, double lineHeight, double letterSpacing, IBrush? foreground)
+    {
+        return new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = fontSize,
+            LineHeight = fontSize * lineHeight,
+            LetterSpacing = letterSpacing,
+            Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
+        };
     }
 
     private async Task RenderInlineToInlinesAsync(Markdig.Syntax.Inlines.Inline inline, InlineCollection inlines, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, bool isHeading = false)
@@ -232,6 +484,36 @@ public class MarkdownRenderer : IMarkdownRenderer
         }
     }
 
+    /// <summary>
+    /// Applies layout so LaTeXRenderer works correctly inside InlineUIContainer: explicit size
+    /// ensures the text layout reserves the right space and avoids overlap/garbled layout.
+    /// Forces a layout pass to ensure proper measurement before embedding in inline context.
+    /// </summary>
+    private static void ApplyInlineMathLayout(Mnemo.UI.Controls.LaTeXRenderer control, IBrush? foreground, bool isInline)
+    {
+        control.HorizontalAlignment = HorizontalAlignment.Left;
+        control.VerticalAlignment = VerticalAlignment.Bottom;
+        
+        // Enable inline mode for proper baseline alignment
+        control.IsInlineMode = isInline;
+
+        // In inline mode, depth (subscripts etc.) renders below the control bounds.
+        // Ensure the control doesn't clip that overflow.
+        if (isInline)
+            control.ClipToBounds = false;
+        
+        if (foreground != null)
+            control.SetValue(Mnemo.UI.Controls.LaTeXRenderer.ForegroundProperty, foreground);
+        
+        // Force a measure pass with infinite available size to get the natural size
+        control.Measure(Size.Infinity);
+        var size = control.DesiredSize;
+        
+        // Set explicit dimensions for InlineUIContainer layout
+        control.Width = size.Width;
+        control.Height = size.Height;
+    }
+
     private async Task ReplaceSpecialPlaceholdersAsync(string text, InlineCollection inlines, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, bool isHeading = false)
     {
         if (string.IsNullOrEmpty(text) || specialInlines.Count == 0)
@@ -275,77 +557,28 @@ public class MarkdownRenderer : IMarkdownRenderer
                         inlines.Add(new Run { Text = beforeText, Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)) });
                 }
 
-                switch (inlineData.Type)
+                if (inlineData.Type == MarkdownInlineType.DisplayMath)
                 {
-                    case MarkdownInlineType.DisplayMath:
-                        if (await _settingsService.GetAsync("Markdown.RenderMath", true))
+                    // Display math in non-display-math paragraphs (e.g. headings, quotes).
+                    // Fall back to inline rendering since we can't split the block here.
+                    if (await _settingsService.GetAsync("Markdown.RenderMath", true) && !string.IsNullOrWhiteSpace(inlineData.Content))
+                    {
+                        var displayFontSize = await GetMathFontSizeAsync(true);
+                        if (await _latexEngine.BuildLayoutAsync(inlineData.Content.Trim(), displayFontSize) is Mnemo.UI.Controls.LaTeXRenderer displayMathControl)
                         {
-                            var displayFontSize = await GetMathFontSizeAsync(true);
-                            var displayMathControl = await _latexEngine.BuildLayoutAsync(inlineData.Content, displayFontSize) as Control;
-                            if (displayMathControl != null)
-                            {
-                                inlines.Add(new InlineUIContainer { Child = displayMathControl, BaselineAlignment = BaselineAlignment.Center });
-                            }
+                            ApplyInlineMathLayout(displayMathControl, foreground, isInline: false);
+                            inlines.Add(new InlineUIContainer { Child = displayMathControl, BaselineAlignment = BaselineAlignment.Center });
                         }
-                        else
-                        {
-                            inlines.Add(new Run { Text = $"$${inlineData.Content}$$", Foreground = (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!) });
-                        }
-                        break;
-
-                    case MarkdownInlineType.InlineMath:
-                        if (await _settingsService.GetAsync("Markdown.RenderMath", true))
-                        {
-                            var inlineFontSize = await GetMathFontSizeAsync(false);
-                            var inlineMathControl = await _latexEngine.BuildLayoutAsync(inlineData.Content, inlineFontSize) as Control;
-                            if (inlineMathControl != null)
-                            {
-                                inlines.Add(new InlineUIContainer { Child = inlineMathControl, BaselineAlignment = BaselineAlignment.Center });
-                            }
-                        }
-                        else
-                        {
-                            inlines.Add(new Run { Text = $"${inlineData.Content}$", Foreground = (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!) });
-                        }
-                        break;
-
-                    case MarkdownInlineType.Highlight:
-                        inlines.Add(new Run
-                        {
-                            Text = inlineData.Content,
-                            Background = (IBrush)Application.Current!.FindResource("HighlightedTextBrush")!,
-                            Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!))
-                        });
-                        break;
-
-                    case MarkdownInlineType.Superscript:
-                        var superscriptTextBlock = new TextBlock
-                        {
-                            Text = inlineData.Content,
-                            FontSize = 10,
-                            Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)),
-                        };
-                        inlines.Add(new InlineUIContainer { Child = superscriptTextBlock, BaselineAlignment = BaselineAlignment.Superscript });
-                        break;
-
-                    case MarkdownInlineType.Subscript:
-                        var subscriptTextBlock = new TextBlock
-                        {
-                            Text = inlineData.Content,
-                            FontSize = 10,
-                            Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!)),
-                        };
-                        inlines.Add(new InlineUIContainer { Child = subscriptTextBlock, BaselineAlignment = BaselineAlignment.Subscript });
-                        break;
-
-                    case MarkdownInlineType.Strikethrough:
-                        inlines.Add(new Run
-                        {
-                            Text = inlineData.Content,
-                            TextDecorations = TextDecorations.Strikethrough,
-                            Foreground = (isHeading ? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")! : (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!))
-                        });
-                        break;
+                    }
+                    else
+                    {
+                        inlines.Add(new Run { Text = $"$${inlineData.Content}$$", Foreground = (foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!) });
+                    }
+                }
+                else
+                {
+                    // All other special inlines (inline math, highlight, sub/superscript, strikethrough)
+                    await RenderSpecialInlineAsync(inlineData, inlines, foreground, isHeading);
                 }
 
                 position = endMarkerIndex + 1;

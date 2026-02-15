@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Mnemo.UI.Modules.LaTeXTest.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="Mnemo.UI.Modules.LaTeXTest.Views.LaTeXTestView"
+             x:DataType="vm:LaTeXTestViewModel">
+    <ScrollViewer>
+        <StackPanel Margin="24" Spacing="24">
+            <TextBlock Text="LaTeX renderer test"
+                       FontSize="{DynamicResource FontSize.Heading2}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <TextBlock Text="Sample expressions rendered with the built-in LaTeX engine."
+                       FontSize="{DynamicResource FontSize.Body}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"/>
+            <ItemsControl ItemsSource="{Binding Samples}">
+                <ItemsControl.DataTemplates>
+                    <DataTemplate x:DataType="vm:LaTeXSampleItem">
+                        <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                               CornerRadius="8"
+                               Padding="16"
+                               Margin="0,0,0,8">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="{Binding Source}"
+                                           FontFamily="Consolas, monospace"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"/>
+                                <ContentControl Content="{Binding Rendered}"
+                                                HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.DataTemplates>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

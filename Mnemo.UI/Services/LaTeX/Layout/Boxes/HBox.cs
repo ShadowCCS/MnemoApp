@@ -1,10 +1,23 @@
 using System;
 using System.Collections.Generic;
+using Mnemo.UI.Services.LaTeX.Rendering;
 
 namespace Mnemo.UI.Services.LaTeX.Layout.Boxes;
 
 public class HBox : Box
 {
+    public override IReadOnlyList<(Box child, double x, double baselineY)> GetChildPositions(double x, double baselineY)
+    {
+        var list = new List<(Box, double, double)>(Children.Count);
+        var currentX = x;
+        foreach (var child in Children)
+        {
+            list.Add((child, currentX, baselineY - child.Shift));
+            currentX += child.Width;
+        }
+        return list;
+    }
+
     public List<Box> Children { get; } = new();
 
     public void Add(Box box)
@@ -22,14 +35,20 @@ public class HBox : Box
         foreach (var child in Children)
         {
             Width += child.Width;
-            
-            // Positive shift moves up (increases height above baseline)
-            // Negative shift moves down (increases depth below baseline)
             var effectiveHeight = child.Height + Math.Max(0, child.Shift);
             var effectiveDepth = child.Depth + Math.Max(0, -child.Shift);
-            
             Height = Math.Max(Height, effectiveHeight);
             Depth = Math.Max(Depth, effectiveDepth);
+        }
+    }
+
+    public override void Render(IMathRenderContext ctx, double x, double baselineY)
+    {
+        var currentX = x;
+        foreach (var child in Children)
+        {
+            ctx.RenderChild(child, currentX, baselineY - child.Shift);
+            currentX += child.Width;
         }
     }
 }

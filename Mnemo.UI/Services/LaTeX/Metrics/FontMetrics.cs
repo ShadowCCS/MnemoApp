@@ -105,24 +105,22 @@ public class FontMetrics
             // bounds.Top is negative (distance from baseline up)
             // bounds.Bottom is positive (distance from baseline down)
             
-            // Add safety margin
-            const double skiaSafetyMargin = 4.0;
+            // Small ink-overflow margin to prevent clipping
+            const double inkMargin = 2.0;
             
-            height = Math.Max(height, -bounds.Top + skiaSafetyMargin);
-            depth = Math.Max(depth, bounds.Bottom + skiaSafetyMargin);
-            width = Math.Max(width, bounds.Right + skiaSafetyMargin);
+            height = Math.Max(height, -bounds.Top + inkMargin);
+            depth = Math.Max(depth, bounds.Bottom + inkMargin);
+            width = Math.Max(width, bounds.Right + inkMargin);
         }
         else
         {
              // Fallback buffer if Skia unavailable
-             height += 2.0;
-             depth += 2.0;
-             width += 2.0;
+             height += 1.0;
+             depth += 1.0;
+             width += 1.0;
         }
 
-        // Add a global safety margin to every character to prevent tight cropping
-        const double safetyMargin = 4.0;
-        var result = (width + safetyMargin, height + safetyMargin, depth + safetyMargin);
+        var result = (width, height, depth);
         
         _measurementCache.TryAdd(cacheKey, result);
         return result;
@@ -133,7 +131,7 @@ public class FontMetrics
     public double GetScriptShiftDown(double fontSize) => fontSize * 0.3;
     public double GetFractionRuleThickness(double fontSize) => fontSize * 0.08;
     public double GetFractionNumeratorShift(double fontSize) => fontSize * 0.65;
-    public double GetFractionDenominatorShift(double fontSize) => fontSize * 0.05;
+    public double GetFractionDenominatorShift(double fontSize) => fontSize * 0.25;
     public double GetAxisHeight(double fontSize) => fontSize * 0.28;
     public double GetSqrtSymbolWidth(double fontSize) => fontSize * 0.75;
     public double GetSqrtPadding(double fontSize) => fontSize * 0.25;

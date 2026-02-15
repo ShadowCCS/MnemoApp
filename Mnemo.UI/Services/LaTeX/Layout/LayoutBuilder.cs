@@ -103,9 +103,11 @@ public class LayoutBuilder
         var denominator = denomBuilder.BuildLayout(fraction.Denominator);
 
         var thickness = FontMetrics.Instance.GetFractionRuleThickness(_fontSize);
-        var numeratorSpacing = FontMetrics.Instance.GetFractionNumeratorShift(_fontSize);
-        var denominatorSpacing = FontMetrics.Instance.GetFractionDenominatorShift(_fontSize);
-        return new FractionBox(numerator, denominator, thickness, numeratorSpacing, denominatorSpacing);
+        var numShift = FontMetrics.Instance.GetFractionNumeratorShift(_fontSize);
+        var denomShift = FontMetrics.Instance.GetFractionDenominatorShift(_fontSize);
+        var spacing = (numShift + denomShift) / 2.0 * 0.5;
+        var mathAxisHeight = FontMetrics.Instance.GetAxisHeight(_fontSize);
+        return new FractionBox(numerator, denominator, thickness, spacing, spacing, mathAxisHeight);
     }
 
     private Box BuildScript(ScriptNode script)
@@ -144,28 +146,22 @@ public class LayoutBuilder
         {
             var child = group.Children[i];
             var childBox = BuildLayout(child);
-            
-            // Add spacing before this child if it's an operator
+
+            // Add exactly one space between children when either the current child is an operator
+            // (needs space before it) or the previous child was an operator (needs space after it).
+            // This avoids double spacing that occurred when we added both "before" and "after".
             if (i > 0)
             {
-                var spacing = GetSpacingBeforeChild(child);
+                var spacingBefore = GetSpacingBeforeChild(child);
+                var spacingAfterPrev = GetSpacingAfterChild(group.Children[i - 1]);
+                var spacing = Math.Max(spacingBefore, spacingAfterPrev);
                 if (spacing > 0)
                 {
                     hbox.Add(new SpaceBox(spacing));
                 }
             }
-            
+
             hbox.Add(childBox);
-            
-            // Add spacing after this child if it's an operator (but not at the end)
-            if (i < group.Children.Count - 1)
-            {
-                var spacing = GetSpacingAfterChild(child);
-                if (spacing > 0)
-                {
-                    hbox.Add(new SpaceBox(spacing));
-                }
-            }
         }
         return hbox;
     }
@@ -304,8 +300,16 @@ public class LayoutBuilder
         return character is "," or ";" or ":" or "!" or "?" or "." or "…" or "(" or ")" or "[" or "]" or "{" or "}";
     }
 
+    /// <summary>Grouping delimiters do not get operator spacing.</summary>
+    private bool IsGroupingDelimiter(string character)
+    {
+        return character is "(" or ")" or "[" or "]" or "{" or "}";
+    }
+
     private double GetOperatorSpacing(string character)
     {
+        if (IsGroupingDelimiter(character))
+            return 0;
         if (IsBinaryOperator(character))
             return MediumSpace * _fontSize;
         if (IsRelationOperator(character))

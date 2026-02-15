@@ -29,7 +29,7 @@ public class MarkdownProcessor : IMarkdownProcessor
         var processed = DisplayMathRegex.Replace(source, match =>
         {
             var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            inlines[key] = new MarkdownSpecialInline(match.Groups[1].Value, MarkdownInlineType.DisplayMath);
+            inlines[key] = new MarkdownSpecialInline(match.Groups[1].Value.Trim(), MarkdownInlineType.DisplayMath);
             return key;
         });
 
@@ -37,7 +37,7 @@ public class MarkdownProcessor : IMarkdownProcessor
         processed = InlineMathRegex.Replace(processed, match =>
         {
             var key = $"ⓈⓅⒺⒸⒾⒶⓁ{counter++}Ⓢ";
-            inlines[key] = new MarkdownSpecialInline(match.Groups[1].Value, MarkdownInlineType.InlineMath);
+            inlines[key] = new MarkdownSpecialInline(match.Groups[1].Value.Trim(), MarkdownInlineType.InlineMath);
             return key;
         });
 
@@ -45,7 +45,7 @@ public class MarkdownProcessor : IMarkdownProcessor
         // This avoids conflicts with markdown links [text](url)
         processed = BracketMathRegex.Replace(processed, match =>
         {
-            var content = match.Groups[1].Value;
+            var content = match.Groups[1].Value.Trim();
             // Only treat as LaTeX if it contains backslashes (LaTeX commands)
             if (content.Contains('\\'))
             {

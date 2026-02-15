@@ -259,7 +259,7 @@ Generate educational content for the specific unit following these rules:
 5. What to Remember (Short recap, intuition focus)
 
 Tone: Assume learner is capable but new. Never shame. 
-Formatting: Markdown headings, short paragraphs, LaTeX only when needed. Whitespace is key.
+Formatting: Markdown, short paragraphs, LaTeX only when needed (wrapped in $ (inline) or $$ (block) delimiters). Whitespace is key.
 Avoid: Tool instructions, academic-only language, dense formula blocks without explanation, never include a title or heading at the top of your response.";
 
                 var userPrompt = $@"Learning Path: {path.Title}
