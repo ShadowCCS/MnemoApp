@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
-
-using System.Text.Json.Serialization;
 
 namespace Mnemo.Infrastructure.Services;
 
@@ -37,11 +37,22 @@ public class ModelRegistry : IAIModelRegistry
     public async Task RefreshAsync()
     {
         _models.Clear();
-        var directories = Directory.GetDirectories(_modelsPath, "*", SearchOption.AllDirectories);
-
-        foreach (var dir in directories)
+        
+        // Load text models from specific folders: router, fast, smart
+        var textModelsPath = Path.Combine(_modelsPath, "text");
+        var textModelRoles = new[] { "router", "fast", "smart" };
+        var textModelPorts = new Dictionary<string, int>
         {
-            var manifestPath = Path.Combine(dir, "manifest.json");
+            { "router", 8081 },
+            { "fast", 8080 },
+            { "smart", 8082 }
+        };
+
+        foreach (var role in textModelRoles)
+        {
+            var rolePath = Path.Combine(textModelsPath, role);
+            var manifestPath = Path.Combine(rolePath, "manifest.json");
+            
             if (File.Exists(manifestPath))
             {
                 try
@@ -51,7 +62,14 @@ public class ModelRegistry : IAIModelRegistry
 
                     if (manifest != null)
                     {
-                        manifest.LocalPath = dir;
+                        manifest.LocalPath = rolePath;
+                        manifest.Role = role;
+                        
+                        // Default endpoint by role if not specified
+                        if (string.IsNullOrEmpty(manifest.Endpoint))
+                        {
+                            manifest.Endpoint = $"http://127.0.0.1:{textModelPorts[role]}";
+                        }
                         
                         // Set default prompt template if missing
                         if (string.IsNullOrEmpty(manifest.PromptTemplate) || manifest.PromptTemplate == "ChatML")
@@ -60,9 +78,38 @@ public class ModelRegistry : IAIModelRegistry
                             if (name.Contains("llama-3") || name.Contains("llama3")) manifest.PromptTemplate = "LLAMA3";
                             else if (name.Contains("alpaca")) manifest.PromptTemplate = "ALPACA";
                             else if (name.Contains("vicuna")) manifest.PromptTemplate = "VICUNA";
-                            else if (name.Contains("qwen") || name.Contains("phi-3") || name.Contains("chatml")) manifest.PromptTemplate = "CHATML";
+                            else if (name.Contains("qwen") || name.Contains("phi-3") || name.Contains("ministral") || name.Contains("chatml")) manifest.PromptTemplate = "CHATML";
                         }
 
+                        _models[manifest.Id] = manifest;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Log error but continue
+                }
+            }
+        }
+        
+        // Also load other model types (embedding, etc.) from their directories
+        var otherModelDirs = Directory.Exists(_modelsPath) 
+            ? Directory.GetDirectories(_modelsPath, "*", SearchOption.AllDirectories)
+                .Where(d => !d.StartsWith(textModelsPath, StringComparison.OrdinalIgnoreCase))
+            : Array.Empty<string>();
+
+        foreach (var dir in otherModelDirs)
+        {
+            var manifestPath = Path.Combine(dir, "manifest.json");
+            if (File.Exists(manifestPath))
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(manifestPath).ConfigureAwait(false);
+                    var manifest = JsonSerializer.Deserialize<AIModelManifest>(json, _jsonOptions);
+
+                    if (manifest != null && manifest.Type != AIModelType.Text)
+                    {
+                        manifest.LocalPath = dir;
                         _models[manifest.Id] = manifest;
                     }
                 }

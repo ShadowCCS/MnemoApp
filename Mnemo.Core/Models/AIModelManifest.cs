@@ -13,6 +13,8 @@ public class AIModelManifest
     public long EstimatedVramUsageBytes { get; set; }
     public string? TokenizerPath { get; set; }
     public string PromptTemplate { get; set; } = "ChatML"; // Default to ChatML
+    public string? Endpoint { get; set; }
+    public string? Role { get; set; }
     public Dictionary<string, string> Metadata { get; set; } = new();
 }
 

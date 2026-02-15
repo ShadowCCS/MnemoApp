@@ -106,8 +106,6 @@ public partial class SettingsViewModel : ViewModelBase
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", "Enable AI Assistant", "Use AI to help you write, summarize, and organize.", true));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartSwitch", "Smart Switch", "Automatically use the smarter (but slower) model for complex tasks."));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartUnitGeneration", "Smart Unit Generation", "Generate only the first unit on creation, then others on-demand."));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.UseGemini", "Use Gemini (Experimental)", "Enable Google Gemini API for all AI tasks. Bypasses local models and router."));
-        aiGroup.Items.Add(new TextSettingViewModel(_settingsService, "AI.GeminiApiKey", "Gemini API Key", "Your Google AI Studio API key.", "", true));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", "GPU Acceleration", "Use your graphics card to speed up AI inference. Requires NVIDIA GPU with CUDA."));
         aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.UnloadTimeout", "Unload Timeout", "Free up memory when AI models are not in use.", new[] { "Never", "5 Minutes", "15 Minutes", "1 Hour" }));
         

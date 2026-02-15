@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Services;
 using Mnemo.UI.ViewModels;
@@ -145,33 +146,35 @@ When answering:
                 buffer.Append(token);
                 foundResponse = true;
 
-                // Update UI every 50ms or if token is a newline (completes a block)
+                // Update UI on UI thread every ~50ms or on newline so content appears as it's generated
                 if ((DateTime.Now - lastUpdate).TotalMilliseconds > 50 || token.Contains('\n'))
                 {
-                    aiMessage.Content = buffer.ToString();
+                    var content = buffer.ToString();
+                    Dispatcher.UIThread.Post(() => aiMessage.Content = content);
                     lastUpdate = DateTime.Now;
                 }
             }
-            
-            // Final update
-            aiMessage.Content = buffer.ToString();
+
+            // Final update on UI thread so last chunk is visible immediately
+            var finalContent = buffer.ToString();
+            Dispatcher.UIThread.Post(() => aiMessage.Content = finalContent);
             
             if (!foundResponse)
             {
-                aiMessage.Content = "I'm sorry, I couldn't generate a response.";
+                Dispatcher.UIThread.Post(() => aiMessage.Content = "I'm sorry, I couldn't generate a response.");
             }
         }
         catch (OperationCanceledException)
         {
             if (string.IsNullOrEmpty(aiMessage.Content))
             {
-                aiMessage.Content = "Generation stopped.";
+                Dispatcher.UIThread.Post(() => aiMessage.Content = "Generation stopped.");
             }
         }
         catch (Exception ex)
         {
             _logger.Error("Chat", $"Exception in chat: {ex.Message}");
-            aiMessage.Content = "An unexpected error occurred. Please try again later.";
+            Dispatcher.UIThread.Post(() => aiMessage.Content = "An unexpected error occurred. Please try again later.");
         }
         finally
         {

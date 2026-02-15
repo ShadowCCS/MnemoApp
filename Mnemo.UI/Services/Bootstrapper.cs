@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services;
 
@@ -29,8 +33,9 @@ public static class Bootstrapper
         services.AddSingleton<HardwareDetector>();
         services.AddSingleton<IAIModelRegistry, ModelRegistry>();
         services.AddSingleton<IResourceGovernor, ResourceGovernor>();
-        services.AddSingleton<GeminiTextService>();
-        services.AddSingleton<ITextGenerationService, LLamaTextService>();
+        services.AddSingleton<LlamaCppServerManager>();
+        services.AddSingleton<IAIServerManager>(sp => sp.GetRequiredService<LlamaCppServerManager>());
+        services.AddSingleton<ITextGenerationService, LlamaCppHttpTextService>();
         services.AddSingleton<IAIOrchestrator, AIOrchestrator>();
         services.AddSingleton<IAITaskManager, AITaskManager>();
 
@@ -66,10 +71,60 @@ public static class Bootstrapper
 
         var serviceProvider = services.BuildServiceProvider();
 
-        // 4. Initialize AI Model Registry
-        _ = serviceProvider.GetRequiredService<IAIModelRegistry>().RefreshAsync();
+        // 4. Initialize AI Model Registry and set default server path
+        var settingsService = serviceProvider.GetRequiredService<ISettingsService>();
+        _ = Task.Run(async () =>
+        {
+            // Set default llama.cpp server path if not configured
+            var serverPath = await settingsService.GetAsync<string>("AI.LlamaCpp.ServerPath");
+            if (string.IsNullOrEmpty(serverPath))
+            {
+                var defaultPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "mnemo",
+                    "models",
+                    "llamaServer",
+                    "llama-server.exe");
+                
+                await settingsService.SetAsync("AI.LlamaCpp.ServerPath", defaultPath);
+            }
+        });
 
-        // 5. Register Routes, Sidebar Items, Tools and Widgets
+        var modelRegistry = serviceProvider.GetRequiredService<IAIModelRegistry>();
+        _ = modelRegistry.RefreshAsync();
+
+        // 5. Auto-start router model server
+        var serverManager = serviceProvider.GetRequiredService<LlamaCppServerManager>();
+        var logger = serviceProvider.GetRequiredService<ILoggerService>();
+        
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                // Wait a moment for model registry to complete
+                await Task.Delay(500);
+                
+                var models = await modelRegistry.GetAvailableModelsAsync();
+                var routerModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == "router");
+                
+                if (routerModel != null)
+                {
+                    logger.Info("Bootstrapper", "Auto-starting router model server...");
+                    await serverManager.EnsureRunningAsync(routerModel, CancellationToken.None);
+                    logger.Info("Bootstrapper", "Router model server started successfully.");
+                }
+                else
+                {
+                    logger.Warning("Bootstrapper", "No router model found. Router auto-start skipped.");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error("Bootstrapper", "Failed to auto-start router model", ex);
+            }
+        });
+
+        // 6. Register Routes, Sidebar Items, Tools and Widgets
         var navRegistry = serviceProvider.GetRequiredService<INavigationRegistry>();
         var funcRegistry = serviceProvider.GetRequiredService<IFunctionRegistry>();
         var sidebarService = serviceProvider.GetRequiredService<ISidebarService>();

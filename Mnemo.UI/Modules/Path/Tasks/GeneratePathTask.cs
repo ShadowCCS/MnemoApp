@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
+using Mnemo.Core.Schemas;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Common;
 
@@ -143,47 +144,31 @@ public class GeneratePathTask : AITaskBase
 
                 Progress = 0.4;
 
-                // 3. Prompt AI for structure
-                var systemPrompt = @"You are an expert curriculum designer. 
-Generate a comprehensive learning path in JSON format.
-CRITICAL: You must respond ONLY with the JSON object. Do not include any conversational text before or after the JSON.
-Follow the exact schema provided. Ensure all strings are correctly escaped for JSON (use forward slashes for any paths).";
+                // 3. Prompt AI for structure (output shape is enforced by LearningPathJsonSchema via response_format).
+                // Note: The model does not see the schema—only the prompt. Title length rules must be stated here (see llama.cpp grammars README).
+                var systemPrompt = @"You are an expert curriculum designer. Generate a comprehensive learning path. Respond only with a JSON object. No conversational text before or after. Use forward slashes for any paths in strings.
+
+CRITICAL title rules (follow exactly):
+- Learning path ""title"": must be short, clean and concise — maximum 4 words (e.g. ""Introduction to Python"" or ""Data Structures Basics"").
+- Each unit ""title"": maximum 3–5 words, short and clear (e.g. ""Variables and Types"", ""First Program"").";
 
                 var userPrompt = $@"Create a learning path for the topic: '{_parent._topic}'
-Additional Instructions: {_parent._instructions}
+Additional instructions: {_parent._instructions}";
 
-RESPOND ONLY WITH THIS JSON STRUCTURE:
-{{
-  ""title"": ""Title of the path"",
-  ""description"": ""Brief overview"",
-  ""difficulty"": ""beginner | intermediate | advanced"",
-  ""estimated_time_hours"": 10,
-  ""units"": [
-    {{
-      ""order"": 1,
-      ""title"": ""Unit Title"",
-      ""goal"": ""What the learner will achieve"",
-      ""allocated_material"": {{
-        ""chunk_ids"": [],
-        ""summary"": ""Summary of source material used for this unit""
-      }},
-      ""generation_hints"": {{
-        ""focus"": [""key concept 1"", ""key concept 2""],
-        ""avoid"": [""irrelevant topic""],
-        ""prerequisites"": [""previous unit concept""]
-      }}
-    }}
-  ]
-}}";
-
-                var aiResult = await _parent._orchestrator.PromptWithContextAsync(systemPrompt, userPrompt, chunks, ct);
+                var aiResult = await _parent._orchestrator.PromptWithContextAsync(systemPrompt, userPrompt, chunks, ct, LearningPathJsonSchema.GetSchema());
                 if (!aiResult.IsSuccess || aiResult.Value == null) return Result.Failure(aiResult.ErrorMessage ?? "AI failed to respond.");
 
                 var json = ExtractJson(aiResult.Value);
                 
-                try 
+                var jsonOptions = new JsonSerializerOptions
                 {
-                    _parent._generatedPath = JsonSerializer.Deserialize<LearningPath>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true,
+                    ReadCommentHandling = JsonCommentHandling.Skip
+                };
+                try
+                {
+                    _parent._generatedPath = JsonSerializer.Deserialize<LearningPath>(json, jsonOptions);
                 }
                 catch (JsonException ex)
                 {
@@ -222,7 +207,7 @@ RESPOND ONLY WITH THIS JSON STRUCTURE:
         private readonly string _unitId;
         public string Id { get; } = Guid.NewGuid().ToString();
         public string DisplayName { get; private set; } = "Generating Unit";
-        public string Description { get; private set; } = "Creating detailed content.";
+        public string Description { get; private set; } = "Creating unit content.";
         public AITaskStatus Status { get; private set; } = AITaskStatus.Pending;
         public double Progress { get; private set; } = 0;
         public string? ErrorMessage { get; private set; }
@@ -267,16 +252,15 @@ RESPOND ONLY WITH THIS JSON STRUCTURE:
                 // 2. Prompt for content
                 var systemPrompt = @"You are a friendly, patient, and encouraging tutor. 
 Generate educational content for the specific unit following these rules:
-1. Unit Title (Clear, learner-friendly)
-2. Why This Topic Matters (Relevance before definitions, real-world intuition)
-3. Conceptual Introduction (Informal, metaphors, no formulas yet)
-4. Formal Explanation (Definitions, LaTeX for math if needed)
-5. Interpretation & Understanding (What it means, address confusion)
-6. What to Remember (Short recap, intuition focus)
+1. Why This Topic Matters (Relevance before definitions, real-world intuition)
+2. Conceptual Introduction (Informal, metaphors, no formulas yet)
+3. Formal Explanation (Definitions, LaTeX for math if needed)
+4. Interpretation & Understanding (What it means, address confusion)
+5. What to Remember (Short recap, intuition focus)
 
 Tone: Assume learner is capable but new. Never shame. 
 Formatting: Markdown headings, short paragraphs, LaTeX only when needed. Whitespace is key.
-Avoid: Tool instructions, academic-only language, dense formula blocks without explanation.";
+Avoid: Tool instructions, academic-only language, dense formula blocks without explanation, never include a title or heading at the top of your response.";
 
                 var userPrompt = $@"Learning Path: {path.Title}
 Current Unit: {unit.Title}

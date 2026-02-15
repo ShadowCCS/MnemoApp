@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
@@ -11,12 +12,21 @@ namespace Mnemo.Infrastructure.Services.AI;
 
 public class AIOrchestrator : IAIOrchestrator
 {
+    private static readonly TimeSpan ModelListCacheTtl = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan SmartSwitchCacheTtl = TimeSpan.FromSeconds(30);
+
     private readonly IAIModelRegistry _modelRegistry;
     private readonly IKnowledgeService _knowledgeService;
     private readonly ISettingsService _settings;
     private readonly ILoggerService _logger;
     private readonly IResourceGovernor _governor;
     private readonly ITextGenerationService _textService;
+
+    private readonly object _selectModelLock = new();
+    private List<AIModelManifest>? _cachedModels;
+    private DateTime _modelsCacheExpiry = DateTime.MinValue;
+    private bool _cachedSmartSwitch;
+    private DateTime _smartSwitchCacheExpiry = DateTime.MinValue;
 
     public AIOrchestrator(
         IAIModelRegistry modelRegistry,
@@ -36,12 +46,7 @@ public class AIOrchestrator : IAIOrchestrator
 
     public async Task<Result<string>> PromptAsync(string systemPrompt, string userPrompt, CancellationToken ct = default)
     {
-        var context = await GetRagContextAsync(userPrompt, ct).ConfigureAwait(false);
-        if (context != null)
-        {
-            return await PromptWithContextAsync(systemPrompt, userPrompt, context, ct).ConfigureAwait(false);
-        }
-
+        // Chat does not use RAG; go straight to model.
         return await ExecutePromptAsync(systemPrompt, userPrompt, ct).ConfigureAwait(false);
     }
 
@@ -90,7 +95,7 @@ public class AIOrchestrator : IAIOrchestrator
         return await PromptWithContextAsync(string.Empty, prompt, context, ct).ConfigureAwait(false);
     }
 
-    public async Task<Result<string>> PromptWithContextAsync(string systemPrompt, string prompt, IEnumerable<KnowledgeChunk> context, CancellationToken ct = default)
+    public async Task<Result<string>> PromptWithContextAsync(string systemPrompt, string prompt, IEnumerable<KnowledgeChunk> context, CancellationToken ct = default, object? responseJsonSchema = null)
     {
         // Phase A: Smart condensing
         var condensedContext = await CondenseContextAsync(context, prompt, ct).ConfigureAwait(false);
@@ -102,7 +107,7 @@ public class AIOrchestrator : IAIOrchestrator
 
         var fullPrompt = $"Context:\n{condensedContext}\n\nQuestion: {prompt}";
 
-        return await ExecutePromptAsync(finalSystemPrompt, fullPrompt, ct).ConfigureAwait(false);
+        return await ExecutePromptAsync(finalSystemPrompt, fullPrompt, ct, responseJsonSchema).ConfigureAwait(false);
     }
 
     private Task<string> RewriteQueryAsync(string query, CancellationToken ct)
@@ -111,16 +116,14 @@ public class AIOrchestrator : IAIOrchestrator
         return Task.FromResult(query);
     }
 
-    private async Task<string> CondenseContextAsync(IEnumerable<KnowledgeChunk> context, string query, CancellationToken ct)
+    private Task<string> CondenseContextAsync(IEnumerable<KnowledgeChunk> context, string query, CancellationToken ct)
     {
-        await Task.Yield();
-        
         var relevantChunks = context
             .OrderByDescending(c => c.RelevanceScore)
-            .Take(15) 
+            .Take(15)
             .ToList();
 
-        if (!relevantChunks.Any()) return string.Empty;
+        if (!relevantChunks.Any()) return Task.FromResult(string.Empty);
 
         var sb = new StringBuilder();
         foreach (var chunk in relevantChunks)
@@ -130,11 +133,11 @@ public class AIOrchestrator : IAIOrchestrator
             sb.AppendLine(chunk.Content);
             sb.AppendLine();
         }
-        
-        return sb.ToString();
+
+        return Task.FromResult(sb.ToString());
     }
 
-    public async Task<Result<string>> PromptWithModelAsync(string modelId, string prompt, CancellationToken ct = default)
+    public async Task<Result<string>> PromptWithModelAsync(string modelId, string prompt, CancellationToken ct = default, object? responseJsonSchema = null)
     {
         var manifest = await _modelRegistry.GetModelAsync(modelId).ConfigureAwait(false);
         if (manifest == null) return Result<string>.Failure("Model not found.");
@@ -143,7 +146,7 @@ public class AIOrchestrator : IAIOrchestrator
         try
         {
             _logger.Info("AIOrchestrator", $"Executing prompt with model: {manifest.DisplayName}");
-            return await _textService.GenerateAsync(manifest, prompt, ct).ConfigureAwait(false);
+            return await _textService.GenerateAsync(manifest, prompt, ct, responseJsonSchema).ConfigureAwait(false);
         }
         finally
         {
@@ -153,30 +156,15 @@ public class AIOrchestrator : IAIOrchestrator
 
     public async IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        var context = await GetRagContextAsync(userPrompt, ct).ConfigureAwait(false);
-        var effectiveUserPrompt = userPrompt;
-        var effectiveSystemPrompt = systemPrompt;
-
-        if (context != null)
-        {
-            var searchPrompt = await RewriteQueryAsync(userPrompt, ct).ConfigureAwait(false);
-            var condensedContext = await CondenseContextAsync(context, searchPrompt, ct).ConfigureAwait(false);
-            
-            effectiveSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
-                ? "You are Mnemo, an expert assistant. Use the provided context to answer the user's question accurately. If the answer is not in the context, politely state that you don't have that information. Keep answers professional and grounded in the provided facts."
-                : systemPrompt;
-
-            effectiveUserPrompt = $"Context:\n{condensedContext}\n\nQuestion: {userPrompt}";
-        }
-
-        var targetModel = await SelectModelAsync(effectiveUserPrompt, ct).ConfigureAwait(false);
+        // Chat does not use RAG; use prompts as-is.
+        var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
         if (targetModel == null) yield break;
 
-        var finalSystemPrompt = string.IsNullOrWhiteSpace(effectiveSystemPrompt)
+        var finalSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
             ? "You are Mnemo, a helpful and concise AI assistant."
-            : effectiveSystemPrompt;
+            : systemPrompt;
 
-        var formattedPrompt = FormatPrompt(targetModel.PromptTemplate, finalSystemPrompt, effectiveUserPrompt);
+        var formattedPrompt = FormatPrompt(targetModel.PromptTemplate, finalSystemPrompt, userPrompt);
 
         await _governor.AcquireModelAsync(targetModel, ct).ConfigureAwait(false);
         try
@@ -194,26 +182,46 @@ public class AIOrchestrator : IAIOrchestrator
 
     private async Task<AIModelManifest?> SelectModelAsync(string userPrompt, CancellationToken ct)
     {
-        bool useGemini = await _settings.GetAsync("AI.UseGemini", false).ConfigureAwait(false);
-        if (useGemini)
+        var now = DateTime.UtcNow;
+
+        if (_cachedModels == null || now >= _modelsCacheExpiry)
         {
-            return new AIModelManifest 
-            { 
-                Id = "gemini", 
-                DisplayName = "Gemini 2.5 Flash",
-                Type = AIModelType.Text
-            };
+            var modelsEnumerable = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
+            var list = modelsEnumerable.ToList();
+            lock (_selectModelLock)
+            {
+                _cachedModels = list;
+                _modelsCacheExpiry = DateTime.UtcNow + ModelListCacheTtl;
+            }
         }
 
-        bool smartSwitchEnabled = await _settings.GetAsync("AI.SmartSwitch", false).ConfigureAwait(false);
-        var models = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
+        if (now >= _smartSwitchCacheExpiry)
+        {
+            var smartSwitch = await _settings.GetAsync("AI.SmartSwitch", false).ConfigureAwait(false);
+            lock (_selectModelLock)
+            {
+                _cachedSmartSwitch = smartSwitch;
+                _smartSwitchCacheExpiry = DateTime.UtcNow + SmartSwitchCacheTtl;
+            }
+        }
 
-        var fastModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && !m.IsOptional);
-        var smartModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.IsOptional);
+        List<AIModelManifest>? models;
+        bool smartSwitchEnabled;
+        lock (_selectModelLock)
+        {
+            models = _cachedModels;
+            smartSwitchEnabled = _cachedSmartSwitch;
+        }
 
-        AIModelManifest? targetModel = null;
+        var routerModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == "router");
+        var fastModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == "fast");
+        var smartModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == "smart");
 
-        if (smartSwitchEnabled && smartModel != null && fastModel != null)
+        // Default to fast model
+        AIModelManifest? targetModel = fastModel;
+
+        // Only use router-based selection if Smart Switch is enabled AND smart model exists
+        if (smartSwitchEnabled && smartModel != null && routerModel != null && fastModel != null)
         {
             if (IsObviouslySimple(userPrompt))
             {
@@ -221,20 +229,16 @@ public class AIOrchestrator : IAIOrchestrator
             }
             else
             {
-                var routingResult = await RouteRequestAsync(fastModel, userPrompt, ct).ConfigureAwait(false);
-                targetModel = routingResult == "COMPLEX" ? smartModel : fastModel;
+                var routingResult = await RouteRequestAsync(routerModel, userPrompt, ct).ConfigureAwait(false);
+                targetModel = routingResult == "smart" ? smartModel : fastModel;
                 _logger.Info("AIOrchestrator", $"AI Router decided: {routingResult} -> using {targetModel.DisplayName}");
             }
-        }
-        else
-        {
-            targetModel = fastModel;
         }
 
         return targetModel ?? models.FirstOrDefault(m => m.Type == AIModelType.Text);
     }
 
-    private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct)
+    private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct, object? responseJsonSchema = null)
     {
         var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
         if (targetModel == null) return Result<string>.Failure("No suitable text model found.");
@@ -243,14 +247,8 @@ public class AIOrchestrator : IAIOrchestrator
             ? "You are Mnemo, a helpful and concise AI assistant." 
             : systemPrompt;
 
-        if (targetModel.Id == "gemini")
-        {
-            var fullPrompt = string.IsNullOrWhiteSpace(effectiveSystemPrompt) ? userPrompt : $"{effectiveSystemPrompt}\n\n{userPrompt}";
-            return await _textService.GenerateAsync(targetModel, fullPrompt, ct).ConfigureAwait(false);
-        }
-
         var formattedPrompt = FormatPrompt(targetModel.PromptTemplate, effectiveSystemPrompt, userPrompt);
-        return await PromptWithModelAsync(targetModel.Id, formattedPrompt, ct).ConfigureAwait(false);
+        return await PromptWithModelAsync(targetModel.Id, formattedPrompt, ct, responseJsonSchema).ConfigureAwait(false);
     }
 
     private string FormatPrompt(string template, string system, string user)
@@ -297,19 +295,41 @@ public class AIOrchestrator : IAIOrchestrator
 
     private async Task<string> RouteRequestAsync(AIModelManifest routerModel, string userPrompt, CancellationToken ct)
     {
-        var routingPrompt = $"""
-<|im_start|>system
-Analyze the user request and classify it as 'SIMPLE' or 'COMPLEX'. Respond with ONLY the word 'SIMPLE' or 'COMPLEX'.<|im_end|>
-<|im_start|>user
-{userPrompt}<|im_end|>
-<|im_start|>assistant
+        const string routerSystemPrompt = """
+You are a router.
+Return JSON only: {"r":0} or {"r":1}
+0 = SMALL → fast model, single-step, single source, ≤5 concepts, transform/format/summarize existing content
+1 = LARGE → multi-step reasoning, multi-source, >5 concepts, new structure/graph/path, tutoring, or unclear
+Rules:
+- Do not answer the task
+- If unsure → 1
+- Prefer 0 only when clearly simple
 """;
-        
-        var result = await PromptWithModelAsync(routerModel.Id, routingPrompt, ct).ConfigureAwait(false);
-        if (!result.IsSuccess) return "SIMPLE";
 
-        var classification = result.Value?.Trim().ToUpperInvariant() ?? "SIMPLE";
-        return classification.Contains("COMPLEX") ? "COMPLEX" : "SIMPLE";
+        var routingPrompt = FormatPrompt(routerModel.PromptTemplate, routerSystemPrompt, userPrompt);
+
+        var result = await PromptWithModelAsync(routerModel.Id, routingPrompt, ct).ConfigureAwait(false);
+        if (!result.IsSuccess) return "fast";
+
+        var route = ParseRouterResponse(result.Value);
+        return route == 1 ? "smart" : "fast";
+    }
+
+    /// <summary>Parse router JSON {"r":0} or {"r":1}. Returns 1 for smart, 0 for fast. Defaults to 0 on any parse failure.</summary>
+    private static int ParseRouterResponse(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return 0;
+        try
+        {
+            using var doc = JsonDocument.Parse(raw.Trim());
+            if (doc.RootElement.TryGetProperty("r", out var rProp) && rProp.ValueKind == JsonValueKind.Number)
+            {
+                var v = rProp.GetInt32();
+                return v == 1 ? 1 : 0;
+            }
+        }
+        catch (JsonException) { /* fall through to default */ }
+        return 0;
     }
 
     private static bool IsObviouslySimple(string query)

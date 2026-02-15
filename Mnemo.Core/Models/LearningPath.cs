@@ -18,12 +18,6 @@ public partial class LearningPath : ObservableObject
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
 
-    [JsonPropertyName("difficulty")]
-    public string Difficulty { get; set; } = "beginner";
-
-    [JsonPropertyName("estimated_time_hours")]
-    public double EstimatedTimeHours { get; set; }
-
     [JsonPropertyName("source_material")]
     public SourceMaterial SourceMaterial { get; set; } = new();
 

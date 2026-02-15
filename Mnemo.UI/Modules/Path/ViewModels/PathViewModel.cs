@@ -94,7 +94,7 @@ public class PathViewModel : ViewModelBase, IDisposable
                     LastModified = path.Metadata.CreatedAt.ToString("MM/dd/yyyy"), 
                     Size = 0,
                     Progress = path.Progress, 
-                    Category = path.Difficulty.ToUpper() 
+                    Category = string.Empty 
                 };
                 AllItems.Add(vm);
             }
@@ -108,7 +108,7 @@ public class PathViewModel : ViewModelBase, IDisposable
                     LastModified = path.Metadata.CreatedAt.ToString("MM/dd/yyyy"), 
                     Size = 0,
                     Progress = path.Progress, 
-                    Category = path.Difficulty.ToUpper() 
+                    Category = string.Empty 
                 };
                 FrequentlyUsedItems.Add(vm);
             }
