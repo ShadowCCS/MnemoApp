@@ -135,7 +135,7 @@ public class FontMetrics
     public double GetAxisHeight(double fontSize) => fontSize * 0.28;
     public double GetSqrtSymbolWidth(double fontSize) => fontSize * 0.75;
     public double GetSqrtPadding(double fontSize) => fontSize * 0.25;
-    public double GetSqrtRuleThickness(double fontSize) => fontSize * 0.08;
+    public double GetSqrtRuleThickness(double fontSize) => fontSize * 0.06;
 
     public void ClearCache()
     {

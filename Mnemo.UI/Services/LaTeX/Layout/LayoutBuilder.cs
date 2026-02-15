@@ -37,6 +37,7 @@ public class LayoutBuilder
             SpaceNode space => BuildSpace(space),
             TextModeNode textMode => BuildTextMode(textMode),
             MathbbNode mathbb => BuildMathbb(mathbb),
+            MathbfNode mathbf => BuildMathbf(mathbf),
             MatrixNode matrix => BuildMatrix(matrix),
             _ => new SpaceBox(0)
         };
@@ -191,23 +192,13 @@ public class LayoutBuilder
         var scale = Math.Max(1.0, targetHeight / Math.Max(0.1, standardTotal));
         var delimFontSize = _fontSize * scale;
         
-        // Add left delimiter
+        // Add left delimiter (thin-stroke path for parentheses so they don't scale fat)
         var (leftWidth, leftHeight, leftDepth) = FontMetrics.Instance.MeasureChar(delim.LeftDelim, delimFontSize);
-        
-        // Adjust for slight over-scaling if needed, or centering
-        // For simple scaling, we just use the new metrics
-        var leftBox = new CharBox(delim.LeftDelim, delimFontSize)
-        {
-            Width = leftWidth,
-            Height = leftHeight,
-            Depth = leftDepth
-        };
-        
-        // Center the delimiter vertically relative to content axis if possible, 
-        // but here we just align baselines or ensure coverage.
-        // A simple heuristic: Shift down slightly if it's a bracket to center on math axis.
-        // For now, let's keep shift 0 and rely on the font's baseline.
-        
+        var delimStroke = FontMetrics.Instance.GetFractionRuleThickness(_fontSize);
+        var leftBox = IsParen(delim.LeftDelim)
+            ? (Box)new ScaledDelimiterBox(delim.LeftDelim, leftWidth, leftHeight, leftDepth, delimStroke)
+            : new CharBox(delim.LeftDelim, delimFontSize) { Width = leftWidth, Height = leftHeight, Depth = leftDepth };
+
         hbox.Add(leftBox);
         
         // Add content
@@ -220,12 +211,9 @@ public class LayoutBuilder
         var rightFontSize = _fontSize * rightScale;
         
         var (rightWidth, rightHeight, rightDepth) = FontMetrics.Instance.MeasureChar(delim.RightDelim, rightFontSize);
-        var rightBox = new CharBox(delim.RightDelim, rightFontSize)
-        {
-            Width = rightWidth,
-            Height = rightHeight,
-            Depth = rightDepth
-        };
+        var rightBox = IsParen(delim.RightDelim)
+            ? (Box)new ScaledDelimiterBox(delim.RightDelim, rightWidth, rightHeight, rightDepth, delimStroke)
+            : new CharBox(delim.RightDelim, rightFontSize) { Width = rightWidth, Height = rightHeight, Depth = rightDepth };
         hbox.Add(rightBox);
         
         return hbox;
@@ -267,6 +255,29 @@ public class LayoutBuilder
         return BuildLayout(mathbb.Content);
     }
 
+    private Box BuildMathbf(MathbfNode mathbf)
+    {
+        // Handle bold symbols
+        if (mathbf.Content is TextNode textNode)
+        {
+            var symbolKey = $"mathbf{{{textNode.Content}}}";
+            var symbol = SymbolRegistry.GetSymbol(symbolKey);
+            if (symbol != null)
+            {
+                var (width, height, depth) = FontMetrics.Instance.MeasureChar(symbol, _fontSize);
+                return new CharBox(symbol, _fontSize)
+                {
+                    Width = width,
+                    Height = height,
+                    Depth = depth
+                };
+            }
+        }
+
+        // Fallback to regular text
+        return BuildLayout(mathbf.Content);
+    }
+
     private Box BuildMatrix(MatrixNode matrix)
     {
         var cellBoxes = new List<List<Box>>();
@@ -305,6 +316,8 @@ public class LayoutBuilder
     {
         return character is "(" or ")" or "[" or "]" or "{" or "}";
     }
+
+    private static bool IsParen(string character) => character is "(" or ")";
 
     private double GetOperatorSpacing(string character)
     {

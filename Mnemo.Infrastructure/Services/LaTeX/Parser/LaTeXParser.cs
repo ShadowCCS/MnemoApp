@@ -141,10 +141,12 @@ public class LaTeXParser
             "frac" => ParseFraction(),
             "sqrt" => ParseSqrt(),
             "left" => ParseDelimiter(),
+            "right" => ParseRight(),
             "quad" => new SpaceNode(1.0),
             "qquad" => new SpaceNode(2.0),
             "text" => ParseText(),
             "mathbb" => ParseMathbb(),
+            "mathbf" => ParseMathbf(),
             "begin" => ParseEnvironment(),
             "displaystyle" => new SpaceNode(0),
             "textstyle" => new SpaceNode(0),
@@ -188,9 +190,19 @@ public class LaTeXParser
 
     private LaTeXNode ParseDelimiter()
     {
-        // After \left, expect delimiter
-        var leftDelim = Match(LaTeXTokenType.Text) ? Previous().Value : "(";
-        
+        // Consume the left delimiter token after \left (e.g. "(" or ".") so it is not parsed as content
+        var leftDelim = "(";
+        if (!IsAtEnd())
+        {
+            Advance();
+            leftDelim = Previous().Type switch
+            {
+                LaTeXTokenType.OpenParen => "(",
+                LaTeXTokenType.CloseParen => ")",
+                _ => Previous().Value
+            };
+        }
+
         var children = new List<LaTeXNode>();
         while (!Check(LaTeXTokenType.Command) || Peek().Value != "right")
         {
@@ -203,11 +215,27 @@ public class LaTeXParser
         string rightDelim = ")";
         if (Match(LaTeXTokenType.Command) && Previous().Value == "right")
         {
-            rightDelim = Match(LaTeXTokenType.Text) ? Previous().Value : ")";
+            if (!IsAtEnd())
+            {
+                Advance();
+                rightDelim = Previous().Type switch
+                {
+                    LaTeXTokenType.OpenParen => "(",
+                    LaTeXTokenType.CloseParen => ")",
+                    _ => Previous().Value
+                };
+            }
         }
 
         var content = children.Count == 1 ? children[0] : new GroupNode(children);
         return new DelimiterNode(leftDelim, content, rightDelim);
+    }
+
+    private LaTeXNode ParseRight()
+    {
+        // Consume the delimiter that follows \right (e.g. \right) or \right.)
+        Match(LaTeXTokenType.Text);
+        return new SpaceNode(0);
     }
 
     private LaTeXNode ParseText()
@@ -220,6 +248,12 @@ public class LaTeXParser
     {
         var content = ParsePrimary() ?? new TextNode("");
         return new MathbbNode(content);
+    }
+
+    private LaTeXNode ParseMathbf()
+    {
+        var content = ParsePrimary() ?? new TextNode("");
+        return new MathbfNode(content);
     }
 
     private LaTeXNode ParseSymbol(string command)

@@ -42,7 +42,7 @@ public class SqrtBox : Box
         var overlineY = baselineY - Height + RuleThickness / 2;
         var checkWidth = Math.Max(2.0, SymbolWidth * 0.35);
         var kneeWidth = Math.Max(3.0, SymbolWidth * 0.4);
-        var penThickness = Math.Max(1.5, RuleThickness * 1.5);
+        var penThickness = Math.Max(1.0, RuleThickness);
 
         var startY = contentTop * 0.5 + contentBottom * 0.5;
         var path = new PathGeometry();
