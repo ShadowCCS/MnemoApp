@@ -72,7 +72,7 @@ public class LaTeXEngine : ILaTeXEngine
         }
         catch (OperationCanceledException)
         {
-            return null;
+            throw;
         }
         catch (Exception ex)
         {
@@ -83,6 +83,63 @@ public class LaTeXEngine : ILaTeXEngine
                 Foreground = Avalonia.Media.Brushes.Red,
                 FontSize = 12
             });
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<object?> GetLayoutBoxAsync(string tex, double fontSize = 16.0, CancellationToken cancellationToken = default)
+    {
+        if (!_fontMetricsInitialized)
+        {
+            lock (_initLock)
+            {
+                if (!_fontMetricsInitialized)
+                {
+                    _ = FontMetrics.Instance;
+                    _fontMetricsInitialized = true;
+                }
+            }
+        }
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var ast = await Task.Run(() =>
+            {
+                if (!_parseCache.TryGetValue(tex, out var cachedAst))
+                {
+                    var lexer = new LaTeXLexer(tex);
+                    var tokens = lexer.Tokenize();
+                    var parser = new LaTeXParser(tokens);
+                    cachedAst = parser.Parse();
+                    _parseCache.Add(tex, cachedAst);
+                }
+                return cachedAst;
+            }, cancellationToken).ConfigureAwait(false);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var cacheKey = (tex, fontSize);
+                if (!_layoutCache.TryGetValue(cacheKey, out var layout))
+                {
+                    var layoutBuilder = new LayoutBuilder(fontSize);
+                    layout = layoutBuilder.BuildLayout(ast);
+                    _layoutCache.Add(cacheKey, layout);
+                }
+                return layout;
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"LaTeX layout box error: {ex.Message}");
+            return null;
         }
     }
 

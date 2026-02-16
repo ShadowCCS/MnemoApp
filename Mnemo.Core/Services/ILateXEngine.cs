@@ -16,4 +16,5 @@ public interface ILaTeXEngine
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The root layout box, or null if parsing failed.</returns>
     Task<object?> BuildLayoutAsync(string tex, double fontSize = 16.0, CancellationToken cancellationToken = default);
+    Task<object?> GetLayoutBoxAsync(string tex, double fontSize = 16.0, CancellationToken cancellationToken = default);
 }

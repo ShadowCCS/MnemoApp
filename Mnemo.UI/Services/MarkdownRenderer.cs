@@ -13,6 +13,7 @@ using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using Mnemo.Core.Models.Markdown;
 using Mnemo.Core.Services;
+using Mnemo.UI.Services.LaTeX.Layout.Boxes;
 
 namespace Mnemo.UI.Services;
 
@@ -129,13 +130,18 @@ public class MarkdownRenderer : IMarkdownRenderer
         }
 
         // Simple path: no display math — single TextBlock with inline content.
+        var lineHeightPx = fontSize * lineHeight;
+        // Inflate LineHeight to fit inline math so Avalonia allocates enough vertical space
+        // in the line box (Avalonia caps line boxes at LineHeight, unlike WPF).
+        var effectiveLineHeightPx = await GetEffectiveLineHeightAsync(paragraph, specialInlines, lineHeightPx);
         var textBlock = CreateParagraphTextBlock(fontSize, lineHeight, letterSpacing, foreground);
+        textBlock.LineHeight = effectiveLineHeightPx;
 
         if (paragraph.Inline != null && textBlock.Inlines != null)
         {
             foreach (var inline in paragraph.Inline)
             {
-                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, specialInlines, foreground);
+                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, specialInlines, foreground, contextFontSize: fontSize, contextLineHeightPx: effectiveLineHeightPx);
             }
         }
 
@@ -195,8 +201,9 @@ public class MarkdownRenderer : IMarkdownRenderer
                 else
                 {
                     // Non-literal inlines go straight into the current TextBlock
+                    var lineHeightPx = fontSize * lineHeight;
                     if (currentTextBlock.Inlines != null)
-                        await RenderInlineToInlinesAsync(inline, currentTextBlock.Inlines, specialInlines, foreground);
+                        await RenderInlineToInlinesAsync(inline, currentTextBlock.Inlines, specialInlines, foreground, contextFontSize: fontSize, contextLineHeightPx: lineHeightPx);
                 }
             }
         }
@@ -204,6 +211,9 @@ public class MarkdownRenderer : IMarkdownRenderer
         // Flush remaining text
         if (currentTextBlock.Inlines?.Count > 0)
             container.Children.Add(currentTextBlock);
+
+        if (container.Children.Count > 1)
+            container.ClipToBounds = false;
 
         return container.Children.Count == 1 ? (Control)container.Children[0] : container;
     }
@@ -319,7 +329,7 @@ public class MarkdownRenderer : IMarkdownRenderer
                     if (await _latexEngine.BuildLayoutAsync(inlineData.Content.Trim(), inlineFontSize) is Mnemo.UI.Controls.LaTeXRenderer inlineMathControl)
                     {
                         ApplyInlineMathLayout(inlineMathControl, foreground, isInline: true);
-                        inlines.Add(new InlineUIContainer { Child = inlineMathControl, BaselineAlignment = BaselineAlignment.Baseline });
+                        inlines.Add(new InlineUIContainer { Child = inlineMathControl, BaselineAlignment = BaselineAlignment.Center });
                     }
                 }
                 else
@@ -386,11 +396,12 @@ public class MarkdownRenderer : IMarkdownRenderer
             FontSize = fontSize,
             LineHeight = fontSize * lineHeight,
             LetterSpacing = letterSpacing,
-            Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
+            Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!,
+            ClipToBounds = false
         };
     }
 
-    private async Task RenderInlineToInlinesAsync(Markdig.Syntax.Inlines.Inline inline, InlineCollection inlines, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, bool isHeading = false)
+    private async Task RenderInlineToInlinesAsync(Markdig.Syntax.Inlines.Inline inline, InlineCollection inlines, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, bool isHeading = false, double? contextFontSize = null, double? contextLineHeightPx = null)
     {
         switch (inline)
         {
@@ -408,7 +419,7 @@ public class MarkdownRenderer : IMarkdownRenderer
 
                 foreach (var child in emphasis)
                 {
-                    await RenderInlineToInlinesAsync(child, span.Inlines, specialInlines, foreground, isHeading);
+                    await RenderInlineToInlinesAsync(child, span.Inlines, specialInlines, foreground, isHeading, contextFontSize, contextLineHeightPx);
                 }
                 inlines.Add(span);
                 break;
@@ -431,17 +442,23 @@ public class MarkdownRenderer : IMarkdownRenderer
                     Margin = new Thickness(0),
                     MinHeight = 0,
                     MinWidth = 0,
-                    Cursor = new Cursor(StandardCursorType.Hand)
+                    Cursor = new Cursor(StandardCursorType.Hand),
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    VerticalContentAlignment = VerticalAlignment.Bottom
                 };
-                
+
+                var linkFontSize = contextFontSize ?? await GetBaseFontSizeAsync();
+                // Slightly more than font size so link doesn't sit too low; less than full paragraph line height so it doesn't sit above
+                var linkLineHeight = linkFontSize * 1.15;
                 var linkContent = new TextBlock
                 {
+                    FontSize = linkFontSize,
+                    LineHeight = linkLineHeight,
                     Foreground = (IBrush)Application.Current!.FindResource("LinksBrush")!,
                     TextDecorations = TextDecorations.Underline,
-                    Background = Brushes.Transparent,
-                    VerticalAlignment = VerticalAlignment.Center
+                    Background = Brushes.Transparent
                 };
-                
+
                 if (link.FirstChild is LiteralInline linkLiteral)
                 {
                     linkContent.Text = linkLiteral.Content.ToString();
@@ -452,22 +469,22 @@ public class MarkdownRenderer : IMarkdownRenderer
                     {
                         if (linkContent.Inlines != null)
                         {
-                            await RenderInlineToInlinesAsync(child, linkContent.Inlines, specialInlines, foreground, isHeading);
+                            await RenderInlineToInlinesAsync(child, linkContent.Inlines, specialInlines, foreground, isHeading, contextFontSize, contextLineHeightPx);
                         }
                     }
                 }
-                
+
                 linkButton.Content = linkContent;
                 linkButton.Click += (sender, e) =>
                 {
                     HandleLinkClick(link.Url);
                     e.Handled = true;
                 };
-                
-                inlines.Add(new InlineUIContainer 
-                { 
+
+                inlines.Add(new InlineUIContainer
+                {
                     Child = linkButton,
-                    BaselineAlignment = BaselineAlignment.Baseline
+                    BaselineAlignment = BaselineAlignment.Center
                 });
                 break;
 
@@ -478,7 +495,7 @@ public class MarkdownRenderer : IMarkdownRenderer
             case ContainerInline container:
                 foreach (var child in container)
                 {
-                    await RenderInlineToInlinesAsync(child, inlines, specialInlines, foreground, isHeading);
+                    await RenderInlineToInlinesAsync(child, inlines, specialInlines, foreground, isHeading, contextFontSize, contextLineHeightPx);
                 }
                 break;
         }
@@ -617,9 +634,10 @@ public class MarkdownRenderer : IMarkdownRenderer
 
         if (heading.Inline != null && textBlock.Inlines != null)
         {
+            var headingLineHeightPx = fontSize * lineHeight;
             foreach (var inline in heading.Inline)
             {
-                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, specialInlines, foreground, isHeading: true);
+                await RenderInlineToInlinesAsync(inline, textBlock.Inlines, specialInlines, foreground, isHeading: true, contextFontSize: fontSize, contextLineHeightPx: headingLineHeightPx);
             }
         }
 
@@ -929,20 +947,74 @@ public class MarkdownRenderer : IMarkdownRenderer
         };
     }
 
+    /// <summary>
+    /// Returns the effective line height for a paragraph: the normal line height, or the tallest
+    /// inline-math box height if the paragraph contains inline LaTeX. Avalonia caps line boxes at
+    /// the TextBlock.LineHeight value, so we must inflate it to prevent math from overflowing.
+    /// </summary>
+    private async Task<double> GetEffectiveLineHeightAsync(ParagraphBlock paragraph, Dictionary<string, MarkdownSpecialInline> specialInlines, double lineHeightPx)
+    {
+        if (paragraph.Inline == null || specialInlines.Count == 0)
+            return lineHeightPx;
+
+        var inlineFontSize = await GetMathFontSizeAsync(false);
+        const double inlinePad = 2;
+        var maxLaTeXHeight = 0.0;
+
+        foreach (var kvp in specialInlines)
+        {
+            if (kvp.Value.Type != MarkdownInlineType.InlineMath || string.IsNullOrWhiteSpace(kvp.Value.Content))
+                continue;
+            if (!ParagraphContainsPlaceholder(paragraph, kvp.Key))
+                continue;
+
+            var boxObj = await _latexEngine.GetLayoutBoxAsync(kvp.Value.Content.Trim(), inlineFontSize);
+            if (boxObj is Box box)
+                maxLaTeXHeight = Math.Max(maxLaTeXHeight, box.TotalHeight + inlinePad);
+        }
+
+        return maxLaTeXHeight > 0 ? Math.Max(lineHeightPx, maxLaTeXHeight) : lineHeightPx;
+    }
+
+    private static bool ParagraphContainsPlaceholder(ParagraphBlock paragraph, string placeholder)
+    {
+        if (paragraph.Inline == null) return false;
+        foreach (var inline in paragraph.Inline)
+        {
+            if (inline is LiteralInline literal && literal.Content.ToString().Contains(placeholder, StringComparison.Ordinal))
+                return true;
+        }
+        return false;
+    }
+
     private async Task<Control> RenderListAsync(ListBlock list, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, int depth = 0)
     {
-        var container = new StackPanel { Spacing = 4, Margin = new Thickness(0, 4) };
+        // Use same spacing as document block spacing so intro line → list matches list item → list item
+        var listSpacing = await GetBlockSpacingAsync();
+        var container = new StackPanel { Spacing = listSpacing, Margin = new Thickness(0, 0) };
         var fontSize = await GetBaseFontSizeAsync();
         var lineHeight = await GetLineHeightAsync();
         var letterSpacing = await GetLetterSpacingAsync();
+        var lineHeightPx = fontSize * lineHeight;
+        var bulletLineHeight = lineHeightPx;
         int index = 1;
 
         foreach (var item in list.Cast<ListItemBlock>())
         {
+            var firstBlock = item.Cast<Markdig.Syntax.Block>().FirstOrDefault();
+            var firstLineHeight = firstBlock is ParagraphBlock firstParagraph
+                ? await GetEffectiveLineHeightAsync(firstParagraph, specialInlines, lineHeightPx)
+                : lineHeightPx;
+
+            // When the first line is tall (inline math), offset the bullet so it aligns
+            // with the text baseline rather than sitting at the very top of the row.
+            var bulletTopOffset = Math.Max(0, firstLineHeight * 0.6 - bulletLineHeight * 0.5);
+
             var itemContainer = new Grid
             {
                 ColumnDefinitions = new ColumnDefinitions("Auto,*"),
-                Margin = new Thickness(0, 0, 0, 0)
+                ClipToBounds = false,
+                VerticalAlignment = VerticalAlignment.Top
             };
 
             var bulletSize = depth == 0 ? fontSize * 1.1 : fontSize * 0.75;
@@ -950,29 +1022,34 @@ public class MarkdownRenderer : IMarkdownRenderer
             {
                 Text = GetBulletSymbol(depth, list.IsOrdered, index),
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, 0, 8, 0),
+                Margin = new Thickness(0, bulletTopOffset, list.IsOrdered ? 6 : 8, 0),
                 FontSize = bulletSize,
-                LineHeight = fontSize * lineHeight,
+                LineHeight = lineHeightPx,
                 LetterSpacing = letterSpacing,
                 Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!
             };
             Grid.SetColumn(bullet, 0);
 
-            var content = new StackPanel { Spacing = 4 };
+            var content = new StackPanel
+            {
+                Spacing = 4,
+                ClipToBounds = false,
+                VerticalAlignment = VerticalAlignment.Top
+            };
             foreach (var block in item)
             {
-                // Increment depth for nested lists
                 var blockDepth = block is ListBlock ? depth + 1 : depth;
                 var rendered = await RenderBlockAsync(block, specialInlines, foreground, blockDepth);
                 if (rendered != null)
                     content.Children.Add(rendered);
             }
+
             Grid.SetColumn(content, 1);
 
             itemContainer.Children.Add(bullet);
             itemContainer.Children.Add(content);
             container.Children.Add(itemContainer);
-            
+
             if (list.IsOrdered)
                 index++;
         }
