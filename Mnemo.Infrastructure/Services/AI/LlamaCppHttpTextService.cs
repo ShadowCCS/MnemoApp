@@ -44,38 +44,37 @@ public class LlamaCppHttpTextService : ITextGenerationService
                 return Result<string>.Failure($"Model {manifest.DisplayName} has no endpoint configured.");
             }
 
-            // Ensure server is running
             await _serverManager.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
-
-            var endpoint = $"{manifest.Endpoint.TrimEnd('/')}/v1/chat/completions";
-            
-            var (temperature, maxTokens) = GetGenerationParams(manifest);
-
-            object requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: false, manifest, responseJsonSchema);
-
-            _logger.Info("LlamaCppHttpTextService", $"Sending request to {endpoint} (temp={temperature}, max_tokens={maxTokens})");
-
-            var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct).ConfigureAwait(false);
-            
-            if (!response.IsSuccessStatusCode)
+            using (_serverManager.BeginRequest(manifest.Id))
             {
-                var errorBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                return Result<string>.Failure($"HTTP {response.StatusCode}: {errorBody}");
+                var endpoint = $"{manifest.Endpoint.TrimEnd('/')}/v1/chat/completions";
+                var (temperature, maxTokens) = GetGenerationParams(manifest);
+                object requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: false, manifest, responseJsonSchema);
+
+                _logger.Info("LlamaCppHttpTextService", $"Sending request to {endpoint} (temp={temperature}, max_tokens={maxTokens})");
+
+                var response = await _httpClient.PostAsJsonAsync(endpoint, requestBody, ct).ConfigureAwait(false);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    return Result<string>.Failure($"HTTP {response.StatusCode}: {errorBody}");
+                }
+
+                var json = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct).ConfigureAwait(false);
+
+                if (!json.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
+                {
+                    return Result<string>.Failure("Response did not contain choices array.");
+                }
+
+                var messageContent = choices[0]
+                    .GetProperty("message")
+                    .GetProperty("content")
+                    .GetString();
+
+                return Result<string>.Success(messageContent ?? string.Empty);
             }
-
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct).ConfigureAwait(false);
-            
-            if (!json.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
-            {
-                return Result<string>.Failure("Response did not contain choices array.");
-            }
-
-            var messageContent = choices[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString();
-
-            return Result<string>.Success(messageContent ?? string.Empty);
         }
         catch (Exception ex)
         {
@@ -95,7 +94,6 @@ public class LlamaCppHttpTextService : ITextGenerationService
             yield break;
         }
 
-        // Ensure server is running
         try
         {
             await _serverManager.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
@@ -106,7 +104,21 @@ public class LlamaCppHttpTextService : ITextGenerationService
             yield break;
         }
 
-        var endpoint = $"{manifest.Endpoint.TrimEnd('/')}/v1/chat/completions";
+        using (_serverManager.BeginRequest(manifest.Id))
+        {
+            await foreach (var chunk in GetStreamingChunksAsync(manifest, prompt, ct))
+            {
+                yield return chunk;
+            }
+        }
+    }
+
+    private async IAsyncEnumerable<string> GetStreamingChunksAsync(
+        AIModelManifest manifest,
+        string prompt,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var endpoint = $"{manifest.Endpoint!.TrimEnd('/')}/v1/chat/completions";
         var (temperature, maxTokens) = GetGenerationParams(manifest);
         var requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: true, manifest, responseJsonSchema: null);
 
@@ -125,7 +137,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
         try
         {
             response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -144,8 +156,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
                 if (line.StartsWith("data: "))
                 {
                     var jsonData = line["data: ".Length..];
-                    
-                    // Check for [DONE] marker
+
                     if (jsonData.Trim() == "[DONE]")
                     {
                         break;
@@ -157,7 +168,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
                         _logger.Warning("LlamaCppHttpTextService", $"Failed to parse SSE data: {jsonData}");
                         continue;
                     }
-                    
+
                     if (json.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                     {
                         var delta = choices[0].GetProperty("delta");

@@ -37,6 +37,7 @@ public partial class App : Application
 
         // Fallback: ensure server processes are stopped when the process exits (e.g. task manager, crash)
         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
         // Apply saved theme on startup
         _ = themeService.GetCurrentThemeAsync().ContinueWith(t =>
@@ -75,6 +76,7 @@ public partial class App : Application
                 }
 
                 AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
+                AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
 
                 if (Services is IDisposable disposable)
                 {
@@ -90,6 +92,23 @@ public partial class App : Application
 
     private static void OnProcessExit(object? sender, EventArgs e)
     {
+        ShutdownServerManager();
+    }
+
+    private static void OnUnhandledException(object? sender, UnhandledExceptionEventArgs e)
+    {
+        try
+        {
+            ShutdownServerManager();
+        }
+        catch
+        {
+            // Ignore disposal errors during crash
+        }
+    }
+
+    private static void ShutdownServerManager()
+    {
         try
         {
             _serverManagerForShutdown?.Dispose();
@@ -97,7 +116,7 @@ public partial class App : Application
         }
         catch
         {
-            // Ignore disposal errors during process exit
+            // Ignore disposal errors during process exit or crash
         }
     }
 
