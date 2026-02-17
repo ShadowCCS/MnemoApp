@@ -206,7 +206,7 @@
                                                 
                                                 <StackPanel Grid.Row="2" Spacing="8">
                                                     <DockPanel>
-                                                        <TextBlock Text="{Binding Progress, StringFormat={}{0}% complete}" 
+                                                        <TextBlock Text="{Binding Progress, StringFormat={}{0:0}% complete}" 
                                                                    FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                         <TextBlock DockPanel.Dock="Right" Text="{Binding LastModified}" 
