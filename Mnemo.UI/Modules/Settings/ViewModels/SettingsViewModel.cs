@@ -110,8 +110,8 @@ public partial class SettingsViewModel : ViewModelBase
         aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.UnloadTimeout", "Unload Timeout", "Free up memory when AI models are not in use.", new[] { "Never", "5 Minutes", "15 Minutes", "1 Hour" }));
         
         var ragGroup = new SettingsGroupViewModel("Local Knowledge");
-        ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartRAG", "Smart RAG", "Only search your notes when the query is substantial. Skips RAG for greetings and short questions.", true));
-        ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", "Embedding Model", "The model used to index your personal library.", new[] { "bge-small (Fast)", "nomic-embed (Accurate)" }));
+        ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", "Enable RAG", "RAG uses an embedding model to allow the processing of large documents. When off, your uploaded material will be limited.", true));
+        ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", "Embedding Model", "The model used to index your personal library.", new[] { "bge-small (Fast)"}));
         
         aiTools.Groups.Add(aiGroup);
         aiTools.Groups.Add(ragGroup);

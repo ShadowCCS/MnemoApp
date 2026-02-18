@@ -16,6 +16,7 @@ public class GenerateUnitTask : AITaskBase
     private readonly IAIOrchestrator _orchestrator;
     private readonly IKnowledgeService _knowledge;
     private readonly ILearningPathService _pathService;
+    private readonly ISettingsService _settings;
     private readonly ILoggerService _logger;
 
     public override string DisplayName => "Generating Learning Unit";
@@ -26,6 +27,7 @@ public class GenerateUnitTask : AITaskBase
         IAIOrchestrator orchestrator,
         IKnowledgeService knowledge,
         ILearningPathService pathService,
+        ISettingsService settings,
         ILoggerService logger)
     {
         _pathId = pathId;
@@ -33,6 +35,7 @@ public class GenerateUnitTask : AITaskBase
         _orchestrator = orchestrator;
         _knowledge = knowledge;
         _pathService = pathService;
+        _settings = settings;
         _logger = logger;
 
         _steps.Add(new GenerateUnitStep(this));
@@ -65,12 +68,16 @@ public class GenerateUnitTask : AITaskBase
                 DisplayName = $"Generating: {unit.Title}";
                 Description = unit.Goal;
 
-                // 1. Gather material for this unit
+                // 1. Gather material for this unit (scoped to path, only when RAG enabled)
                 var chunks = Enumerable.Empty<KnowledgeChunk>();
-                var searchResult = await _parent._knowledge.SearchAsync($"{unit.Title} {unit.Goal}", 5, ct);
-                if (searchResult is { IsSuccess: true, Value: not null })
+                var ragEnabled = await _parent._settings.GetAsync("AI.EnableRAG", true).ConfigureAwait(false);
+                if (ragEnabled)
                 {
-                    chunks = searchResult.Value;
+                    var searchResult = await _parent._knowledge.SearchAsync($"{unit.Title} {unit.Goal}", 5, _parent._pathId, ct).ConfigureAwait(false);
+                    if (searchResult is { IsSuccess: true, Value: not null })
+                    {
+                        chunks = searchResult.Value;
+                    }
                 }
 
                 Progress = 0.3;

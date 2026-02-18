@@ -149,6 +149,7 @@ public class PathViewModel : ViewModelBase, IDisposable
                 var deleteResult = await _pathService.DeletePathAsync(pathItem.Id);
                 if (deleteResult.IsSuccess)
                 {
+                    await _knowledge.RemoveScopeAsync(pathItem.Id);
                     _ = LoadPathsAsync();
                     _logger.Info("Path", $"Deleted path: {pathItem.Name}");
                 }

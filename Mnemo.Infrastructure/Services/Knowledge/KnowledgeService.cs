@@ -23,7 +23,7 @@ public class KnowledgeService : IKnowledgeService
         _logger = logger;
     }
 
-    public async Task<Result> IngestDocumentAsync(string path, CancellationToken ct = default)
+    public async Task<Result> IngestDocumentAsync(string path, string? scopeId = null, CancellationToken ct = default)
     {
         try
         {
@@ -51,6 +51,7 @@ public class KnowledgeService : IKnowledgeService
                     {
                         Content = chunkText,
                         SourceId = sourceId,
+                        ScopeId = scopeId,
                         Embedding = embeddingResult.Value,
                         Metadata = new Dictionary<string, object> { { "path", path } }
                     });
@@ -67,14 +68,14 @@ public class KnowledgeService : IKnowledgeService
         }
     }
 
-    public async Task<Result<IEnumerable<KnowledgeChunk>>> SearchAsync(string query, int limit = 5, CancellationToken ct = default)
+    public async Task<Result<IEnumerable<KnowledgeChunk>>> SearchAsync(string query, int limit = 5, string? scopeId = null, CancellationToken ct = default)
     {
         try
         {
             var embeddingResult = await _embeddingService.GetEmbeddingAsync(query, ct).ConfigureAwait(false);
             if (!embeddingResult.IsSuccess) return Result<IEnumerable<KnowledgeChunk>>.Failure(embeddingResult.ErrorMessage!);
 
-            var results = await _vectorStore.SearchAsync(embeddingResult.Value!, limit, ct).ConfigureAwait(false);
+            var results = await _vectorStore.SearchAsync(embeddingResult.Value!, limit, scopeId, ct).ConfigureAwait(false);
             return Result<IEnumerable<KnowledgeChunk>>.Success(results);
         }
         catch (Exception ex)
@@ -95,6 +96,20 @@ public class KnowledgeService : IKnowledgeService
         {
             _logger.Error("KnowledgeService", $"Failed to remove source: {sourceId}", ex);
             return Result.Failure($"Failed to remove source: {sourceId}", ex);
+        }
+    }
+
+    public async Task<Result> RemoveScopeAsync(string scopeId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _vectorStore.DeleteByScopeAsync(scopeId, ct).ConfigureAwait(false);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("KnowledgeService", $"Failed to remove scope: {scopeId}", ex);
+            return Result.Failure($"Failed to remove scope: {scopeId}", ex);
         }
     }
 

@@ -83,7 +83,7 @@ public class SqliteStorageProvider : IStorageProvider
                 var data = JsonSerializer.Deserialize<T>(json);
                 return Result<T?>.Success(data);
             }
-            return Result<T?>.Success(default);
+            return Result<T?>.Failure("Key not found");
         }
         catch (Exception ex)
         {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -70,6 +71,37 @@ public class GeneratePathTask : AITaskBase
         await _pathService.SavePathAsync(_generatedPath);
     }
 
+    /// <summary>Reads file contents and returns them as chunks for inline context (RAG off). Truncates to stay within context window.</summary>
+    private static async Task<List<KnowledgeChunk>> ReadFilesAsChunksAsync(string[] filePaths, int maxCharsPerFile, int maxTotalChars, CancellationToken ct)
+    {
+        var chunks = new List<KnowledgeChunk>();
+        int total = 0;
+        foreach (var path in filePaths)
+        {
+            if (total >= maxTotalChars) break;
+            if (!File.Exists(path)) continue;
+            try
+            {
+                var content = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+                var take = Math.Min(content.Length, Math.Min(maxCharsPerFile, maxTotalChars - total));
+                var segment = take < content.Length ? content.AsSpan(0, take).ToString() + "\n\n[Content truncated for context limit.]" : content;
+                chunks.Add(new KnowledgeChunk
+                {
+                    Content = segment,
+                    SourceId = path,
+                    RelevanceScore = 1f,
+                    Metadata = new Dictionary<string, object> { { "path", path } }
+                });
+                total += take;
+            }
+            catch
+            {
+                // Skip unreadable files
+            }
+        }
+        return chunks;
+    }
+
     private class GenerateStructureStep : IAITaskStep
     {
         private readonly GeneratePathTask _parent;
@@ -120,13 +152,16 @@ public class GeneratePathTask : AITaskBase
 
             try 
             {
-                // 1. Ingest files
-                if (_parent._filePaths.Length > 0)
+                bool ragEnabled = await _parent._settings.GetAsync("AI.EnableRAG", true).ConfigureAwait(false);
+                string pathScopeId = Guid.NewGuid().ToString();
+
+                // 1. Ingest files (only when RAG enabled, into this path's scope)
+                if (ragEnabled && _parent._filePaths.Length > 0)
                 {
                     double stepSize = 0.2 / _parent._filePaths.Length;
                     foreach (var file in _parent._filePaths)
                     {
-                        var ingestResult = await _parent._knowledge.IngestDocumentAsync(file, ct);
+                        var ingestResult = await _parent._knowledge.IngestDocumentAsync(file, pathScopeId, ct);
                         if (!ingestResult.IsSuccess)
                         {
                             _parent._logger.Warning("PathGen", $"Failed to ingest {file}: {ingestResult.ErrorMessage}");
@@ -137,10 +172,20 @@ public class GeneratePathTask : AITaskBase
 
                 Progress = 0.3;
 
-                // 2. RAG Search
-                var searchQuery = $"{_parent._topic} {_parent._instructions}";
-                var searchResult = await _parent._knowledge.SearchAsync(searchQuery, 15, ct);
-                var chunks = searchResult.IsSuccess && searchResult.Value != null ? searchResult.Value : Enumerable.Empty<KnowledgeChunk>();
+                // 2. Build context: RAG on = semantic search over ingested docs; RAG off = inline file content (context-window limited)
+                var chunks = new List<KnowledgeChunk>();
+                if (ragEnabled)
+                {
+                    var searchQuery = $"{_parent._topic} {_parent._instructions}";
+                    var searchResult = await _parent._knowledge.SearchAsync(searchQuery, 15, pathScopeId, ct);
+                    if (searchResult.IsSuccess && searchResult.Value != null)
+                        chunks.AddRange(searchResult.Value);
+                }
+                else if (_parent._filePaths.Length > 0)
+                {
+                    var inlineChunks = await ReadFilesAsChunksAsync(_parent._filePaths, 4000, 16000, ct).ConfigureAwait(false);
+                    chunks.AddRange(inlineChunks);
+                }
 
                 Progress = 0.4;
 
@@ -178,6 +223,7 @@ Additional instructions: {_parent._instructions}";
                 
                 if (_parent._generatedPath == null) return Result.Failure("Failed to parse generated path structure.");
 
+                _parent._generatedPath.PathId = pathScopeId;
                 _parent._generatedPath.Title = string.IsNullOrWhiteSpace(_parent._generatedPath.Title) ? _parent._topic : _parent._generatedPath.Title;
                 _parent._generatedPath.Metadata.Model = "AI Assistant";
 
@@ -234,13 +280,12 @@ Additional instructions: {_parent._instructions}";
                 DisplayName = $"Generating: {unit.Title}";
                 Description = unit.Goal;
 
-                // 1. Gather material for this unit
+                // 1. Gather material for this unit (scoped to this path's knowledge)
                 var chunks = new List<KnowledgeChunk>();
-                if (unit.AllocatedMaterial.ChunkIds.Count > 0)
+                bool ragEnabled = await _parent._settings.GetAsync("AI.EnableRAG", true).ConfigureAwait(false);
+                if (ragEnabled && (unit.AllocatedMaterial.ChunkIds.Count > 0 || !string.IsNullOrWhiteSpace(unit.Goal)))
                 {
-                    // For now we might not have the chunks directly by ID if they weren't stored in the model with content.
-                    // But we can search again specifically for this unit's goal.
-                    var searchResult = await _parent._knowledge.SearchAsync($"{unit.Title} {unit.Goal}", 5, ct);
+                    var searchResult = await _parent._knowledge.SearchAsync($"{unit.Title} {unit.Goal}", 5, _pathId, ct);
                     if (searchResult.IsSuccess && searchResult.Value != null)
                     {
                         chunks.AddRange(searchResult.Value);

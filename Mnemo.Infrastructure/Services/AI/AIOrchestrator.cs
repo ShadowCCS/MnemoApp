@@ -52,13 +52,13 @@ public class AIOrchestrator : IAIOrchestrator
 
     private async Task<List<KnowledgeChunk>?> GetRagContextAsync(string userPrompt, CancellationToken ct)
     {
-        var smartRagEnabled = await _settings.GetAsync("AI.SmartRAG", true).ConfigureAwait(false);
-        if (!smartRagEnabled || !ShouldUseRag(userPrompt)) return null;
+        var ragEnabled = await _settings.GetAsync("AI.EnableRAG", true).ConfigureAwait(false);
+        if (!ragEnabled || !ShouldUseRag(userPrompt)) return null;
 
         // Use a simpler query for search if the prompt is very long
         var searchQuery = userPrompt.Length > 200 ? userPrompt[..200] : userPrompt;
         
-        var contextResult = await _knowledgeService.SearchAsync(searchQuery, 10, ct).ConfigureAwait(false);
+        var contextResult = await _knowledgeService.SearchAsync(searchQuery, 10, scopeId: null, ct).ConfigureAwait(false);
         if (contextResult.IsSuccess && contextResult.Value != null)
         {
             var relevantChunks = contextResult.Value.Where(c => c.RelevanceScore > 0.4).ToList();

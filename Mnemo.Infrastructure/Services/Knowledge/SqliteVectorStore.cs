@@ -24,6 +24,20 @@ public class SqliteVectorStore : IVectorStore
         _connectionString = $"Data Source={dbPath}";
     }
 
+    private static async Task EnsureScopeIdColumnAsync(SqliteConnection connection, CancellationToken ct)
+    {
+        try
+        {
+            using var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE KnowledgeChunks ADD COLUMN ScopeId TEXT";
+            await alterCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        catch (SqliteException ex) when (ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+            // Column already exists (e.g. after upgrade)
+        }
+    }
+
     private async Task EnsureInitializedAsync(CancellationToken ct)
     {
         if (_isInitialized) return;
@@ -35,18 +49,26 @@ public class SqliteVectorStore : IVectorStore
 
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(ct).ConfigureAwait(false);
-            using var command = connection.CreateCommand();
-            command.CommandText = @"
-                CREATE TABLE IF NOT EXISTS KnowledgeChunks (
-                    Id TEXT PRIMARY KEY,
-                    Content TEXT,
-                    SourceId TEXT,
-                    Metadata TEXT,
-                    Embedding BLOB
-                );
-                CREATE INDEX IF NOT EXISTS idx_source ON KnowledgeChunks(SourceId);
-            ";
-            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS KnowledgeChunks (
+                        Id TEXT PRIMARY KEY,
+                        Content TEXT,
+                        SourceId TEXT,
+                        Metadata TEXT,
+                        Embedding BLOB
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_source ON KnowledgeChunks(SourceId);
+                ";
+                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            }
+            await EnsureScopeIdColumnAsync(connection, ct).ConfigureAwait(false);
+            using (var idxCmd = connection.CreateCommand())
+            {
+                idxCmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_scope ON KnowledgeChunks(ScopeId)";
+                await idxCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            }
             _isInitialized = true;
         }
         finally
@@ -67,13 +89,14 @@ public class SqliteVectorStore : IVectorStore
             using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = @"
-                INSERT OR REPLACE INTO KnowledgeChunks (Id, Content, SourceId, Metadata, Embedding)
-                VALUES ($id, $content, $sourceId, $metadata, $embedding)
+                INSERT OR REPLACE INTO KnowledgeChunks (Id, Content, SourceId, ScopeId, Metadata, Embedding)
+                VALUES ($id, $content, $sourceId, $scopeId, $metadata, $embedding)
             ";
 
             var idParam = command.Parameters.Add("$id", SqliteType.Text);
             var contentParam = command.Parameters.Add("$content", SqliteType.Text);
             var sourceIdParam = command.Parameters.Add("$sourceId", SqliteType.Text);
+            var scopeIdParam = command.Parameters.Add("$scopeId", SqliteType.Text);
             var metadataParam = command.Parameters.Add("$metadata", SqliteType.Text);
             var embeddingParam = command.Parameters.Add("$embedding", SqliteType.Blob);
 
@@ -84,6 +107,7 @@ public class SqliteVectorStore : IVectorStore
                 idParam.Value = chunk.Id;
                 contentParam.Value = chunk.Content;
                 sourceIdParam.Value = chunk.SourceId;
+                scopeIdParam.Value = chunk.ScopeId ?? (object)DBNull.Value;
                 metadataParam.Value = JsonSerializer.Serialize(chunk.Metadata);
                 
                 var embeddingBytes = new byte[chunk.Embedding!.Length * sizeof(float)];
@@ -102,7 +126,7 @@ public class SqliteVectorStore : IVectorStore
         }
     }
 
-    public async Task<IEnumerable<KnowledgeChunk>> SearchAsync(float[] queryVector, int limit = 5, CancellationToken ct = default)
+    public async Task<IEnumerable<KnowledgeChunk>> SearchAsync(float[] queryVector, int limit = 5, string? scopeId = null, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
         var topChunks = new List<KnowledgeChunk>();
@@ -110,7 +134,12 @@ public class SqliteVectorStore : IVectorStore
         using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id, Content, SourceId, Metadata, Embedding FROM KnowledgeChunks";
+        command.CommandText = "SELECT Id, Content, SourceId, ScopeId, Metadata, Embedding FROM KnowledgeChunks";
+        if (!string.IsNullOrEmpty(scopeId))
+        {
+            command.CommandText += " WHERE ScopeId = $scopeId";
+            command.Parameters.AddWithValue("$scopeId", scopeId);
+        }
 
         using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -124,12 +153,14 @@ public class SqliteVectorStore : IVectorStore
             
             if (topChunks.Count < limit || score > topChunks[^1].RelevanceScore)
             {
+                var scopeIdOrdinal = reader.GetOrdinal("ScopeId");
                 var chunk = new KnowledgeChunk
                 {
                     Id = reader.GetString(0),
                     Content = reader.GetString(1),
                     SourceId = reader.GetString(2),
-                    Metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(reader.GetString(3)) ?? new(),
+                    ScopeId = reader.IsDBNull(scopeIdOrdinal) ? null : reader.GetString(scopeIdOrdinal),
+                    Metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(reader.GetString(4)) ?? new(),
                     Embedding = embedding,
                     RelevanceScore = score
                 };
@@ -157,6 +188,17 @@ public class SqliteVectorStore : IVectorStore
         using var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM KnowledgeChunks WHERE SourceId = $sourceId";
         command.Parameters.AddWithValue("$sourceId", sourceId);
+        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task DeleteByScopeAsync(string scopeId, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM KnowledgeChunks WHERE ScopeId = $scopeId";
+        command.Parameters.AddWithValue("$scopeId", scopeId);
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 

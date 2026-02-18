@@ -182,6 +182,7 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
             _orchestrator,
             _knowledge,
             _pathService,
+            _settings,
             _logger);
 
         _logger.Info("Path", $"Triggering generation for unit: {unit.Title}");
