@@ -12,6 +12,9 @@ namespace Mnemo.Infrastructure.Services.Knowledge;
 
 public class KnowledgeService : IKnowledgeService
 {
+    private const int MinChunkChars = 300;
+    private const int MaxChunkChars = 1000;
+
     private readonly IVectorStore _vectorStore;
     private readonly IEmbeddingService _embeddingService;
     private readonly ILoggerService _logger;
@@ -115,26 +118,26 @@ public class KnowledgeService : IKnowledgeService
 
     private IEnumerable<string> ChunkText(string text)
     {
-        // Split by double newlines (paragraphs) or sentences if paragraphs are too long
+        text = NormalizeWhitespace(text);
         var paragraphs = text.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
-        var chunks = new List<string>();
+        var rawChunks = new List<string>();
 
         foreach (var p in paragraphs)
         {
-            if (p.Length < 1000)
+            if (string.IsNullOrWhiteSpace(p)) continue;
+            if (p.Length <= MaxChunkChars)
             {
-                chunks.Add(p);
+                rawChunks.Add(p.Trim());
             }
             else
             {
-                // Split long paragraphs by sentences
                 var sentences = Regex.Split(p, @"(?<=[.!?])\s+");
                 string currentChunk = "";
                 foreach (var s in sentences)
                 {
-                    if (currentChunk.Length + s.Length > 1000)
+                    if (currentChunk.Length + s.Length > MaxChunkChars)
                     {
-                        chunks.Add(currentChunk);
+                        if (!string.IsNullOrEmpty(currentChunk)) rawChunks.Add(currentChunk.Trim());
                         currentChunk = s;
                     }
                     else
@@ -142,10 +145,48 @@ public class KnowledgeService : IKnowledgeService
                         currentChunk += (currentChunk.Length > 0 ? " " : "") + s;
                     }
                 }
-                if (!string.IsNullOrEmpty(currentChunk)) chunks.Add(currentChunk);
+                if (!string.IsNullOrEmpty(currentChunk)) rawChunks.Add(currentChunk.Trim());
             }
         }
 
-        return chunks;
+        return MergeSmallChunks(rawChunks);
+    }
+
+    /// <summary>Normalize whitespace so character counts reflect real content (e.g. fix PDF line breaks and hyphen splits).</summary>
+    private static string NormalizeWhitespace(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return text;
+        text = Regex.Replace(text, "\r\n", "\n");
+        text = Regex.Replace(text, "\n{3,}", "\n\n");
+        text = Regex.Replace(text, @"-\s*\n\s*", ""); // hyphen at line end -> join with next line
+        text = Regex.Replace(text, @"(?<!\n)\n(?!\n)", " ");
+        return Regex.Replace(text, " +", " ").Trim();
+    }
+
+    /// <summary>Merge chunks smaller than MinChunkChars with the next chunk to reduce embedding count.</summary>
+    private static List<string> MergeSmallChunks(List<string> rawChunks)
+    {
+        var result = new List<string>(rawChunks.Count);
+        int i = 0;
+        while (i < rawChunks.Count)
+        {
+            string c = rawChunks[i];
+            while (c.Length < MinChunkChars && i + 1 < rawChunks.Count)
+            {
+                i++;
+                c = c + " " + rawChunks[i];
+            }
+            result.Add(c);
+            i++;
+        }
+
+        // Last chunk under min: merge backward to avoid one tiny embedding per document
+        if (result.Count > 1 && result[result.Count - 1].Length < MinChunkChars)
+        {
+            result[result.Count - 2] = result[result.Count - 2] + " " + result[result.Count - 1];
+            result.RemoveAt(result.Count - 1);
+        }
+
+        return result;
     }
 }
