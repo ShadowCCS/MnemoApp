@@ -25,6 +25,43 @@ We’ve built Mnemo to be:
 - **Cross-platform** – Windows, macOS, and Linux  
 - **Accessible** – Support features designed for inclusivity
 
+## Screenshots
+
+<table>
+<tr>
+<td width="50%">
+
+**Overview**
+
+![Overview-Edit](https://i.postimg.cc/gjzydrR6/overview_edit.png)
+
+</td>
+<td width="50%">
+
+**Unit View**
+
+![Unit-View](https://i.postimg.cc/BbS5stDF/path.png)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Settings**
+
+![Settings](https://i.postimg.cc/8cpdDsWJ/settings.png)
+
+</td>
+<td width="50%">
+
+**Mindmap**
+
+![Account Settings](https://i.postimg.cc/nrFKZM7s/mindmap.png)
+
+</td>
+</tr>
+</table>
+
 ## Current Status
 
 Mnemo is under active development and not yet feature-complete.
@@ -101,43 +138,6 @@ MnemoApp/
 - **Markdig**: Markdown processing
 - **CommunityToolkit.Mvvm**: MVVM framework
 - **Custom Tools**: Using tons of custom implementations and systems
-
-## Screenshots
-
-<table>
-<tr>
-<td width="50%">
-
-**Learning Path**
-
-![Path](https://i.ibb.co/prwTRhjq/image-17.png)
-
-</td>
-<td width="50%">
-
-**Unit View**
-
-![Unit](https://i.ibb.co/2YMQJd3c/image-19.png)
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-**Settings**
-
-![Settings](https://i.ibb.co/cX8cGcMg/image-20.png)
-
-</td>
-<td width="50%">
-
-**Account Settings**
-
-![Account Settings](https://i.ibb.co/FLyr03VM/image-21.png)
-
-</td>
-</tr>
-</table>
 
 ## Getting Started
 
