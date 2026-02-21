@@ -17,6 +17,9 @@ public interface IAIOrchestrator
 
     /// <param name="responseJsonSchema">Optional. When set, server is asked to return JSON matching this schema (Llama forced output; same mechanism as router).</param>
     Task<Result<string>> PromptWithContextAsync(string systemPrompt, string prompt, IEnumerable<KnowledgeChunk> context, CancellationToken ct = default, object? responseJsonSchema = null);
+
+    /// <summary>Starts the fast model server if not already running, to reduce first-request latency when the user starts typing in chat.</summary>
+    Task WarmUpFastModelAsync(CancellationToken ct = default);
 }
 
 

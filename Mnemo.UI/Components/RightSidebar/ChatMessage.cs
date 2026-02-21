@@ -1,11 +1,31 @@
-using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Mnemo.UI.ViewModels;
 
-namespace Mnemo.UI.Modules.Chat.ViewModels;
+namespace Mnemo.UI.Components.RightSidebar;
 
-public class ChatMessageViewModel : ViewModelBase
+public enum MessageRole
 {
+    User,
+    Assistant
+}
+
+public class ChatMessage : ViewModelBase
+{
+    private MessageRole _role;
+    public MessageRole Role
+    {
+        get => _role;
+        set
+        {
+            if (SetProperty(ref _role, value))
+            {
+                OnPropertyChanged(nameof(IsUser));
+                OnPropertyChanged(nameof(IsAssistant));
+            }
+        }
+    }
+
     private string _content = string.Empty;
     public string Content
     {
@@ -13,25 +33,15 @@ public class ChatMessageViewModel : ViewModelBase
         set => SetProperty(ref _content, value);
     }
 
-    private bool _isUser;
-    public bool IsUser
-    {
-        get => _isUser;
-        set => SetProperty(ref _isUser, value);
-    }
-
-    private DateTime _timestamp = DateTime.Now;
-    public DateTime Timestamp
-    {
-        get => _timestamp;
-        set => SetProperty(ref _timestamp, value);
-    }
-
     private string? _thoughts;
     public string? Thoughts
     {
         get => _thoughts;
-        set => SetProperty(ref _thoughts, value);
+        set
+        {
+            if (SetProperty(ref _thoughts, value))
+                OnPropertyChanged(nameof(IsThinking));
+        }
     }
 
     private List<string>? _sources;
@@ -51,10 +61,13 @@ public class ChatMessageViewModel : ViewModelBase
     public bool IsThinking => !string.IsNullOrEmpty(Thoughts);
 
     private bool _isStreaming;
-    /// <summary>True while the assistant message is still being generated (enables live token display).</summary>
+    /// <summary>True while the assistant message is still being generated.</summary>
     public bool IsStreaming
     {
         get => _isStreaming;
         set => SetProperty(ref _isStreaming, value);
     }
+
+    public bool IsUser => Role == MessageRole.User;
+    public bool IsAssistant => Role == MessageRole.Assistant;
 }

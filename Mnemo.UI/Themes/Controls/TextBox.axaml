@@ -281,6 +281,21 @@
         </Template>
       </Setter>
     </Style>
+
+    <!-- Transparent background: theme-bindable, no fill in any state (e.g. prompt input) -->
+    <Style Selector="^.TransparentBackground /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource TextControlTransparentBackgroundBrush}"/>
+    </Style>
+    <Style Selector="^.TransparentBackground:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource TextControlTransparentBackgroundBrush}"/>
+    </Style>
+    <Style Selector="^.TransparentBackground:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource TextControlTransparentBackgroundBrush}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="^.TransparentBackground:disabled /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource TextControlTransparentBackgroundBrush}"/>
+    </Style>
   </ControlTheme>
 </ResourceDictionary>
 

@@ -21,6 +21,7 @@ public class AIOrchestrator : IAIOrchestrator
     private readonly ILoggerService _logger;
     private readonly IResourceGovernor _governor;
     private readonly ITextGenerationService _textService;
+    private readonly IAIServerManager _serverManager;
 
     private readonly object _selectModelLock = new();
     private List<AIModelManifest>? _cachedModels;
@@ -34,7 +35,8 @@ public class AIOrchestrator : IAIOrchestrator
         ISettingsService settings,
         ILoggerService logger,
         IResourceGovernor governor,
-        ITextGenerationService textService)
+        ITextGenerationService textService,
+        IAIServerManager serverManager)
     {
         _modelRegistry = modelRegistry;
         _knowledgeService = knowledgeService;
@@ -42,6 +44,7 @@ public class AIOrchestrator : IAIOrchestrator
         _logger = logger;
         _governor = governor;
         _textService = textService;
+        _serverManager = serverManager;
     }
 
     public async Task<Result<string>> PromptAsync(string systemPrompt, string userPrompt, CancellationToken ct = default)
@@ -236,6 +239,21 @@ public class AIOrchestrator : IAIOrchestrator
         }
 
         return targetModel ?? models.FirstOrDefault(m => m.Type == AIModelType.Text);
+    }
+
+    public async Task WarmUpFastModelAsync(CancellationToken ct = default)
+    {
+        var models = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
+        var fastModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == "fast");
+        if (fastModel == null) return;
+        try
+        {
+            await _serverManager.EnsureRunningAsync(fastModel, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning("AIOrchestrator", $"Fast model warm-up failed: {ex.Message}");
+        }
     }
 
     private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct, object? responseJsonSchema = null)

@@ -88,6 +88,8 @@
     <Color x:Key="BasicButtonTextColor">#CFCCCB</Color>
     <Color x:Key="DestructiveButtonColor">#ff5050</Color>
     <Color x:Key="DestructiveButtonHoverColor">#FF6868</Color>
+    <Color x:Key="StopButtonBackground">#D32F2F</Color>
+    <Color x:Key="StopButtonForeground">#FFFFFF</Color>
     <Color x:Key="NewButtonBackground">#e95b45</Color>
     <Color x:Key="AccentButtonText">#616161</Color>
     <Color x:Key="GhostButtonBackground">Transparent</Color>
@@ -181,6 +183,7 @@
     <Color x:Key="TextControlBorderDisabled">#1f1f1e</Color>
     <Color x:Key="TextControlPlaceholderForeground">#797573</Color>
     <Color x:Key="TextControlSelectionHighlightColor">#5B3717</Color>
+    <Color x:Key="TextControlTransparentBackground">Transparent</Color>
     <Color x:Key="InputDialogSelectionForeground">#FFFFFF</Color>
     <Color x:Key="InputDialogButtonHoverForeground">#FFFFFF</Color>
     

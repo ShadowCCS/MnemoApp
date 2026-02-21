@@ -88,6 +88,8 @@
     <SolidColorBrush x:Key="BasicButtonTextColorBrush" Color="{DynamicResource BasicButtonTextColor}"/>
     <SolidColorBrush x:Key="DestructiveButtonColorBrush" Color="{DynamicResource DestructiveButtonColor}"/>
     <SolidColorBrush x:Key="DestructiveButtonHoverColorBrush" Color="{DynamicResource DestructiveButtonHoverColor}"/>
+    <SolidColorBrush x:Key="StopButtonBackgroundBrush" Color="{DynamicResource StopButtonBackground}"/>
+    <SolidColorBrush x:Key="StopButtonForegroundBrush" Color="{DynamicResource StopButtonForeground}"/>
     <SolidColorBrush x:Key="NewButtonBackgroundBrush" Color="{DynamicResource NewButtonBackground}"/>
     <SolidColorBrush x:Key="AccentButtonTextBrush" Color="{DynamicResource AccentButtonText}"/>
     <SolidColorBrush x:Key="GhostButtonBackgroundBrush" Color="{DynamicResource GhostButtonBackground}"/>
@@ -206,6 +208,7 @@
     <SolidColorBrush x:Key="TextControlBorderDisabledBrush" Color="{DynamicResource TextControlBorderDisabled}"/>
     <SolidColorBrush x:Key="TextControlPlaceholderForegroundBrush" Color="{DynamicResource TextControlPlaceholderForeground}"/>
     <SolidColorBrush x:Key="TextControlSelectionHighlightColorBrush" Color="{DynamicResource TextControlSelectionHighlightColor}"/>
+    <SolidColorBrush x:Key="TextControlTransparentBackgroundBrush" Color="{DynamicResource TextControlTransparentBackground}"/>
     <SolidColorBrush x:Key="InputDialogSelectionForegroundBrush" Color="{DynamicResource InputDialogSelectionForeground}"/>
     <SolidColorBrush x:Key="InputDialogButtonHoverForegroundBrush" Color="{DynamicResource InputDialogButtonHoverForeground}"/>
     <SolidColorBrush x:Key="QuickActionsTextPrimaryBrush" Color="{DynamicResource QuickActionsTextPrimary}"/>

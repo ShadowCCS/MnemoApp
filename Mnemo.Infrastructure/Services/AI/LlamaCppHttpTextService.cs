@@ -146,7 +146,8 @@ public class LlamaCppHttpTextService : ITextGenerationService
             }
 
             stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            reader = new StreamReader(stream);
+            // Small buffer so we receive SSE lines (and thus tokens) as soon as the server sends them
+            reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 128);
 
             while (!reader.EndOfStream && !ct.IsCancellationRequested)
             {

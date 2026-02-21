@@ -17,7 +17,7 @@ public class ChatModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("AI Chat", "chat", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/ghost-2.svg", "Ecosystem", 3, 0);
+        sidebarService.RegisterItem("AI Chat", "chat", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sparkles-2.svg", "Ecosystem", 3, 0);
     }
 
     public void RegisterTools(IFunctionRegistry registry)

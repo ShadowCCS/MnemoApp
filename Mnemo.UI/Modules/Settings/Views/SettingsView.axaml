@@ -388,7 +388,7 @@
 
                 <Separator Grid.Row="2" Height="1" Background="{DynamicResource SidebarBorderBrush}" Margin="24,0,24,16" Opacity="0.5"/>
                 
-                <ScrollViewer Grid.Row="3">
+                <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Disabled">
                     <Border Padding="12,0,12,24">
                         <ItemsControl ItemsSource="{Binding Categories}">
                             <ItemsControl.ItemTemplate>

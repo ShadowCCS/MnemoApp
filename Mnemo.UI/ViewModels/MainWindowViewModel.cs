@@ -10,7 +10,10 @@ public partial class MainWindowViewModel : ViewModelBase
     public INavigationService Navigation { get; }
     public ISidebarService Sidebar { get; }
     public Components.Sidebar.SidebarViewModel SidebarViewModel { get; }
+    public Components.RightSidebar.RightSidebarViewModel RightSidebarViewModel { get; }
     public Components.TopbarViewModel TopbarViewModel { get; }
+    
+    public System.Windows.Input.ICommand ToggleRightSidebarCommand => RightSidebarViewModel.ToggleCommand;
 
     [ObservableProperty]
     private string _appIconPath = "avares://Mnemo.UI/Assets/AppIcons/AppIconDarkClassic.ico";
@@ -19,12 +22,14 @@ public partial class MainWindowViewModel : ViewModelBase
         INavigationService navigation, 
         ISidebarService sidebar, 
         Components.Sidebar.SidebarViewModel sidebarViewModel, 
+        Components.RightSidebar.RightSidebarViewModel rightSidebarViewModel,
         Components.TopbarViewModel topbarViewModel,
         ISettingsService settingsService)
     {
         Navigation = navigation;
         Sidebar = sidebar;
         SidebarViewModel = sidebarViewModel;
+        RightSidebarViewModel = rightSidebarViewModel;
         TopbarViewModel = topbarViewModel;
         _settingsService = settingsService;
 
