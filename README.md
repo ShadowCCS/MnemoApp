@@ -132,7 +132,7 @@ MnemoApp/
 
 - **.NET 9.0**: Modern C# runtime
 - **Avalonia UI 11.3.6**: Cross-platform UI framework
-- **LLamaSharp**: Local LLM inference
+- **LLama.cpp**: Local LLM inference
 - **ONNX Runtime**: Embedding model inference
 - **SQLite**: Local data and vector storage
 - **Markdig**: Markdown processing
