@@ -159,6 +159,46 @@
                                     <Style Selector="TreeViewItem">
                                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                     </Style>
+                                    <!-- Folders are not selectable: folder-item never shows selected appearance -->
+                                    <Style Selector="TreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot">
+                                        <Setter Property="Background" Value="{DynamicResource TreeViewItemBackground}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource TreeViewItemBorderBrush}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot > ContentPresenter#PART_HeaderPresenter">
+                                        <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForeground}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:selected /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForeground}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:selected /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+                                        <Setter Property="Color" Value="{DynamicResource TreeViewItemForeground}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot:pointerover">
+                                        <Setter Property="Background" Value="{DynamicResource TreeViewItemBackgroundPointerOver}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource TreeViewItemBorderBrushPointerOver}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot:pointerover > ContentPresenter#PART_HeaderPresenter">
+                                        <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundPointerOver}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:selected:pointerover /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundPointerOver}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:selected:pointerover /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+                                        <Setter Property="Color" Value="{DynamicResource TreeViewItemForegroundPointerOver}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:pressed:selected /template/ Border#PART_LayoutRoot">
+                                        <Setter Property="Background" Value="{DynamicResource TreeViewItemBackgroundPressed}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource TreeViewItemBorderBrushPressed}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:pressed:selected /template/ Border#PART_LayoutRoot > ContentPresenter#PART_HeaderPresenter">
+                                        <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundPressed}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:pressed:selected /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundPressed}"/>
+                                    </Style>
+                                    <Style Selector="TreeViewItem.folder-item:pressed:selected /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+                                        <Setter Property="Color" Value="{DynamicResource TreeViewItemForegroundPressed}"/>
+                                    </Style>
                                 </TreeView.Styles>
                                 <TreeView.ItemTemplate>
                                     <TreeDataTemplate DataType="vm:NoteTreeItemViewModel" ItemsSource="{Binding Children}">

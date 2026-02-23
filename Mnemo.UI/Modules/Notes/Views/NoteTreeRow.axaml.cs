@@ -12,12 +12,12 @@ namespace Mnemo.UI.Modules.Notes.Views;
 public partial class NoteTreeRow : UserControl
 {
     private const double DragStartThreshold = 5.0;
+    private const string FolderItemClass = "folder-item";
     private PointerPressedEventArgs? _pendingDragPress;
     private Point _pressPosition;
     private bool _dragStarted;
-    /// <summary>When set, we'll toggle folder expand on pointer release (avoids fighting TreeViewItem's expand-on-click).</summary>
-    private bool? _folderExpandedOnPress;
     private TreeViewItem? _treeViewItem;
+    private EventHandler<PointerPressedEventArgs>? _folderPointerPressedHandler;
 
     public NoteTreeRow()
     {
@@ -43,6 +43,12 @@ public partial class NoteTreeRow : UserControl
         {
             UpdateSelectedClass(_treeViewItem.IsSelected);
             _treeViewItem.PropertyChanged += OnTreeViewItemPropertyChanged;
+            if (DataContext is NoteTreeItemViewModel item && item.IsFolder)
+            {
+                _treeViewItem.Classes.Add(FolderItemClass);
+                _folderPointerPressedHandler = OnFolderTreeViewItemPointerPressedTunnel;
+                _treeViewItem.AddHandler(PointerPressedEvent, _folderPointerPressedHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
+            }
         }
     }
 
@@ -51,6 +57,12 @@ public partial class NoteTreeRow : UserControl
         if (_treeViewItem != null)
         {
             _treeViewItem.PropertyChanged -= OnTreeViewItemPropertyChanged;
+            if (_folderPointerPressedHandler != null)
+            {
+                _treeViewItem.RemoveHandler(PointerPressedEvent, _folderPointerPressedHandler);
+                _folderPointerPressedHandler = null;
+            }
+            _treeViewItem.Classes.Remove(FolderItemClass);
             _treeViewItem = null;
         }
         if (RowBorder != null)
@@ -75,6 +87,12 @@ public partial class NoteTreeRow : UserControl
     private void UpdateSelectedClass(bool isSelected)
     {
         if (RowBorder == null) return;
+        // Folders are not selectable: never show selected state for folder rows.
+        if (DataContext is NoteTreeItemViewModel item && item.IsFolder)
+        {
+            RowBorder.Classes.Remove("selected");
+            return;
+        }
         if (isSelected)
             RowBorder.Classes.Add("selected");
         else
@@ -82,8 +100,21 @@ public partial class NoteTreeRow : UserControl
     }
 
     /// <summary>
-    /// Tunnel: set selection and prepare for possible drag (capture) so we get the event before any child (e.g. Button) can handle it.
-    /// Folders are not selectable: mark event handled so the TreeViewItem never shows selected; toggle expand when clicking the folder row.
+    /// Called on the TreeViewItem (Tunnel) for folder rows only. Only toggle when the click is on the folder header, not on a child item.
+    /// </summary>
+    private void OnFolderTreeViewItemPointerPressedTunnel(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(null).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed) return;
+        if (sender is not TreeViewItem tvi || tvi.DataContext is not NoteTreeItemViewModel item || !item.IsFolder) return;
+        // Only handle if the click was on this folder's header row. If the hit element is inside a child TreeViewItem, do not handle.
+        if (e.Source is Visual source && source.FindAncestorOfType<TreeViewItem>() is TreeViewItem hitTreeViewItem && hitTreeViewItem != tvi)
+            return;
+        e.Handled = true;
+        item.IsExpanded = !item.IsExpanded;
+    }
+
+    /// <summary>
+    /// Tunnel: set selection and prepare for possible drag (capture). For folders we only mark handled (toggle is done on TreeViewItem).
     /// </summary>
     private void OnPointerPressedTunnel(object? sender, PointerPressedEventArgs e)
     {
@@ -93,13 +124,7 @@ public partial class NoteTreeRow : UserControl
         var vm = FindNotesViewModel();
 
         if (item.IsFolder)
-        {
-            // Prevent TreeView from selecting the folder (stops the folder row from showing as selected).
             e.Handled = true;
-            // Defer toggle to pointer release so we use state from before TreeViewItem's expand-on-click runs.
-            var container = this.FindAncestorOfType<TreeViewItem>();
-            _folderExpandedOnPress = container?.IsExpanded ?? item.IsExpanded;
-        }
         else if (vm != null)
         {
             vm.SelectedTreeItem = item;
@@ -130,7 +155,6 @@ public partial class NoteTreeRow : UserControl
 
         _dragStarted = true;
         _pendingDragPress = null;
-        _folderExpandedOnPress = null;
     }
 
     private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
@@ -141,13 +165,6 @@ public partial class NoteTreeRow : UserControl
             if (pt.X >= 0 && pt.Y >= 0 && pt.X <= MoreButton.Bounds.Width && pt.Y <= MoreButton.Bounds.Height)
                 MoreButton.Flyout?.ShowAt(MoreButton);
         }
-
-        // Apply folder expand/collapse toggle on release (state was captured on press, so one click works both ways).
-        if (_pendingDragPress != null && !_dragStarted && _folderExpandedOnPress is { } wasExpanded && DataContext is NoteTreeItemViewModel folderItem && folderItem.IsFolder)
-        {
-            folderItem.IsExpanded = !wasExpanded;
-        }
-        _folderExpandedOnPress = null;
 
         e.Pointer.Capture(null);
         ClearPendingDrag();
@@ -162,7 +179,6 @@ public partial class NoteTreeRow : UserControl
     {
         _pendingDragPress = null;
         _dragStarted = false;
-        _folderExpandedOnPress = null;
     }
 
     private void OnDragOver(object? sender, DragEventArgs e)
