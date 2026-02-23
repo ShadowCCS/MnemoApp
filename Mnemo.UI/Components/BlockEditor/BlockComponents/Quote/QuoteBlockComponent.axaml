@@ -3,23 +3,33 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:CompileBindings="False">
-    <Border
-        BorderBrush="{DynamicResource SystemAccentColor}"
-        BorderThickness="3,0,0,0"
-        Padding="12,4,0,4">
-        <TextBox
-            x:Name="InputTextBox"
-            AcceptsReturn="False"
-            Background="Transparent"
-            BorderThickness="0"
-            FontSize="14"
-            FontStyle="Italic"
-            Opacity="0.8"
-            Padding="0"
-            Text="{Binding Content, Mode=TwoWay}"
-            TextWrapping="Wrap"
-            Watermark="{Binding Watermark}" />
-    </Border>
+    <Grid ColumnDefinitions="3,*">
+        <!-- Vertical quote line (full height, always visible) -->
+        <Border
+            Grid.Column="0"
+            Width="3"
+            Margin="0,4,0,4"
+            VerticalAlignment="Stretch"
+            Background="{DynamicResource QuoteLineBrush}" />
+        <!-- Text content -->
+        <Border
+            Grid.Column="1"
+            Padding="12,4,0,4"
+            Background="Transparent">
+            <TextBox
+                x:Name="InputTextBox"
+                AcceptsReturn="False"
+                Background="Transparent"
+                BorderThickness="0"
+                FontSize="14"
+                FontStyle="Italic"
+                Opacity="0.8"
+                Padding="0"
+                Text="{Binding Content, Mode=TwoWay}"
+                TextWrapping="Wrap"
+                Watermark="{Binding Watermark}" />
+        </Border>
+    </Grid>
 </UserControl>
 
 

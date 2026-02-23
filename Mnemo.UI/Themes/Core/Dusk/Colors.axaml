@@ -160,8 +160,8 @@
     
     <!-- Accent Button -->
     <Color x:Key="AccentButtonBackground">#e95b45</Color>
-    <Color x:Key="AccentButtonBackgroundPointerOver">#1C6DD6</Color>
-    <Color x:Key="AccentButtonBackgroundPressed">#1861C2</Color>
+    <Color x:Key="AccentButtonBackgroundPointerOver">#FF6B55</Color>
+    <Color x:Key="AccentButtonBackgroundPressed">#D14F3B</Color>
     <Color x:Key="AccentButtonBackgroundDisabled">#1f1f1e</Color>
     <Color x:Key="AccentButtonForeground">#FFFFFF</Color>
     <Color x:Key="AccentButtonForegroundPointerOver">#FFFFFF</Color>
@@ -194,8 +194,8 @@
     <Color x:Key="ListBoxItemBackgroundSelected">#e95b45</Color>
     <Color x:Key="ListBoxItemBackgroundPointerOver">#464549</Color>
     <Color x:Key="ListBoxItemBackgroundPressed">#312e2d</Color>
-    <Color x:Key="ListBoxItemBackgroundSelectedPointerOver">#1C6DD6</Color>
-    <Color x:Key="ListBoxItemBackgroundSelectedPressed">#1861C2</Color>
+    <Color x:Key="ListBoxItemBackgroundSelectedPointerOver">#FF6B55</Color>
+    <Color x:Key="ListBoxItemBackgroundSelectedPressed">#D14F3B</Color>
     <Color x:Key="ListBoxItemForeground">#CFCCCB</Color>
     <Color x:Key="ListBoxItemForegroundSelected">#FFFFFF</Color>
     <Color x:Key="ListBoxItemForegroundPointerOver">#CFCCCB</Color>
@@ -376,6 +376,8 @@
 
     <!-- Generic border (card/panel dividers) -->
     <Color x:Key="Border">#312e2d</Color>
+    <!-- Block quote vertical line -->
+    <Color x:Key="QuoteLine">#e95b45</Color>
     <!-- Primary accent (icons, highlights) -->
     <Color x:Key="AccentPrimary">#e95b45</Color>
     <!-- Mindmap -->
@@ -385,6 +387,12 @@
     <Color x:Key="MindmapNodeBackgroundHover">#464549</Color>
     <Color x:Key="MindmapEdgeStroke">#797573</Color>
     <Color x:Key="MindmapGridColor">#40FFFFFF</Color>
+
+    <!-- Notes module (pane, section headers, editor) -->
+    <Color x:Key="NotesPaneBackground">#1C1B1A</Color>
+    <Color x:Key="NotesSectionHeaderForeground">#9A9694</Color>
+    <Color x:Key="NotesPaneDivider">#2E2D2C</Color>
+    <Color x:Key="NotesEditorSeparator">#2E2D2C</Color>
 </ResourceDictionary>
 
 

@@ -446,6 +446,7 @@
 
     <!-- Generic border / accent -->
     <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource Border}"/>
+    <SolidColorBrush x:Key="QuoteLineBrush" Color="{DynamicResource QuoteLine}"/>
     <SolidColorBrush x:Key="AccentPrimaryBrush" Color="{DynamicResource AccentPrimary}"/>
     <!-- Mindmap -->
     <SolidColorBrush x:Key="MindmapNodeBorderBrush" Color="{DynamicResource MindmapNodeBorder}"/>
@@ -457,6 +458,12 @@
     <BoxShadows x:Key="MindmapNodeBoxShadowHover">0 4 8 0 #35000000</BoxShadows>
     <BoxShadows x:Key="MindmapNodeBoxShadowSelected">0 0 0 2 #50e95b45</BoxShadows>
     <BoxShadows x:Key="MindmapToolbarBoxShadow">0 4 12 0 #30000000</BoxShadows>
+
+    <!-- Notes module -->
+    <SolidColorBrush x:Key="NotesPaneBackgroundBrush" Color="{DynamicResource NotesPaneBackground}"/>
+    <SolidColorBrush x:Key="NotesSectionHeaderForegroundBrush" Color="{DynamicResource NotesSectionHeaderForeground}"/>
+    <SolidColorBrush x:Key="NotesPaneDividerBrush" Color="{DynamicResource NotesPaneDivider}"/>
+    <SolidColorBrush x:Key="NotesEditorSeparatorBrush" Color="{DynamicResource NotesEditorSeparator}"/>
 </ResourceDictionary>
 
 

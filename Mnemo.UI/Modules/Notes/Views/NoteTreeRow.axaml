@@ -8,33 +8,53 @@
     <UserControl.Resources>
         <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
     </UserControl.Resources>
+    <UserControl.Styles>
+        <!-- Default (unselected) colors -->
+        <Style Selector="Border.note-row TextBlock.note-row-text">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="Border.note-row controls|SvgIcon.note-row-icon">
+            <Setter Property="Color" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
+        <!-- Selected state: white foreground and icons (class toggled from code-behind when parent TreeViewItem.IsSelected) -->
+        <Style Selector="Border.note-row.selected TextBlock.note-row-text">
+            <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundSelected}"/>
+        </Style>
+        <Style Selector="Border.note-row.selected controls|SvgIcon.note-row-icon">
+            <Setter Property="Color" Value="{DynamicResource TreeViewItemForegroundSelected}"/>
+        </Style>
+    </UserControl.Styles>
     <Border x:Name="RowBorder" Classes="note-row" Margin="0,0,0,2" Padding="0,0,8,0">
         <Grid ColumnDefinitions="Auto,*,Auto" MinWidth="0">
-            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" VerticalAlignment="Center"
+            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" Classes="note-row-icon"
                               SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
-                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}"
-                              IsVisible="{Binding IsFolderEmpty}"/>
-            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" VerticalAlignment="Center"
+                              Width="18" Height="18"
+                              IsVisible="{Binding IsFolderEmpty}" IsHitTestVisible="False"/>
+            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" VerticalAlignment="Center" Classes="note-row-icon"
                               SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/folder.svg"
-                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}"
-                              IsVisible="{Binding IsFolderWithChildren}"/>
-            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" VerticalAlignment="Center"
+                              Width="18" Height="18"
+                              IsVisible="{Binding IsFolderWithChildren}" IsHitTestVisible="False"/>
+            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" VerticalAlignment="Center" Classes="note-row-icon"
                               SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
-                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}"
-                              IsVisible="{Binding IsFolder, Converter={StaticResource BoolNegationConverter}}"/>
-            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                              Width="18" Height="18"
+                              IsVisible="{Binding IsFolder, Converter={StaticResource BoolNegationConverter}}" IsHitTestVisible="False"/>
+            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" Classes="note-row-text"
                        FontSize="{DynamicResource FontSize.Body.Medium}"
-                       Foreground="{DynamicResource TextPrimaryBrush}"
                        TextTrimming="CharacterEllipsis"
-                       Margin="6,6,0,6"/>
-            <Button Grid.Column="2" Classes="note-more-button" Background="Transparent" BorderThickness="0" Padding="4,6"
+                       Margin="6,6,0,6" x:Name="NameTextBlock" IsHitTestVisible="False"/>
+            <TextBox Grid.Column="1" x:Name="NameTextBox" IsVisible="False"
+                     FontSize="{DynamicResource FontSize.Body.Medium}"
+                     Margin="4,4,0,4" VerticalAlignment="Center"
+                     LostFocus="OnNameEditLostFocus" KeyDown="OnNameEditKeyDown"/>
+            <Button x:Name="MoreButton" Grid.Column="2" Classes="note-more-button" Background="Transparent" BorderThickness="0" Padding="4,6"
                     VerticalAlignment="Center" Cursor="Hand" ToolTip.Tip="More actions"
                     Tag="{Binding}">
-                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
-                                  Width="16" Height="16"
-                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                <controls:SvgIcon Classes="note-row-icon" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
+                                  Width="16" Height="16"/>
                 <Button.Flyout>
                     <MenuFlyout>
+                        <MenuItem Header="Rename" Tag="{Binding}" Click="OnRenameClick"
+                                  IsVisible="{Binding IsRenamableFolder}"/>
                         <MenuItem Header="Delete" Tag="{Binding}" Click="OnDeleteClick"/>
                     </MenuFlyout>
                 </Button.Flyout>

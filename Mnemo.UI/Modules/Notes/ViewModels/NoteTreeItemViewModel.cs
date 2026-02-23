@@ -29,6 +29,11 @@ public partial class NoteTreeItemViewModel : ObservableObject
     public bool IsFolderWithChildren => IsFolder && Children.Count > 0;
 
     /// <summary>
+    /// True when this item is a real folder that can be renamed (not a synthetic container like "Uncategorized").
+    /// </summary>
+    public bool IsRenamableFolder => IsFolder && Folder != null;
+
+    /// <summary>
     /// Display name for synthetic container nodes (e.g. "Uncategorized"); null for real folders/notes.
     /// </summary>
     private readonly string? _syntheticName;
@@ -64,6 +69,16 @@ public partial class NoteTreeItemViewModel : ObservableObject
     {
         IsFolder = false;
         Note = note;
+    }
+
+    /// <summary>
+    /// Updates the folder name and notifies the view. Only valid when <see cref="Folder"/> is not null.
+    /// </summary>
+    public void SetFolderName(string name)
+    {
+        if (Folder == null) return;
+        Folder.Name = name;
+        OnPropertyChanged(nameof(Name));
     }
 
     private void OnChildrenChanged(object? sender, NotifyCollectionChangedEventArgs e)

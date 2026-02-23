@@ -5,7 +5,7 @@
     x:CompileBindings="False">
     <Border
         Height="1"
-        Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+        Background="{DynamicResource BorderBrush}"
         Margin="0,8" />
 </UserControl>
 

@@ -217,6 +217,7 @@
     <Color x:Key="TreeViewItemForegroundPointerOverColor">#1A1A1A</Color>
     <Color x:Key="TreeViewItemForegroundPressedColor">#1A1A1A</Color>
     <Color x:Key="TreeViewItemForegroundDisabledColor">#CCCCCC</Color>
+    <!-- Selected row: white text and icons on orange background -->
     <Color x:Key="TreeViewItemForegroundSelectedColor">#FFFFFF</Color>
     <Color x:Key="TreeViewItemForegroundSelectedPointerOverColor">#FFFFFF</Color>
     <Color x:Key="TreeViewItemForegroundSelectedPressedColor">#FFFFFF</Color>
@@ -376,6 +377,8 @@
 
     <!-- Generic border (card/panel dividers) -->
     <Color x:Key="Border">#E5E5E5</Color>
+    <!-- Block quote vertical line -->
+    <Color x:Key="QuoteLine">#e95b45</Color>
     <!-- Primary accent (icons, highlights) -->
     <Color x:Key="AccentPrimary">#e95b45</Color>
     <!-- Mindmap -->
@@ -385,4 +388,10 @@
     <Color x:Key="MindmapNodeBackgroundHover">#FFF0EE</Color>
     <Color x:Key="MindmapEdgeStroke">#888888</Color>
     <Color x:Key="MindmapGridColor">#40000000</Color>
+
+    <!-- Notes module (pane, section headers, editor) -->
+    <Color x:Key="NotesPaneBackground">#FAFAF9</Color>
+    <Color x:Key="NotesSectionHeaderForeground">#5C5B5A</Color>
+    <Color x:Key="NotesPaneDivider">#EBEAE9</Color>
+    <Color x:Key="NotesEditorSeparator">#EBEAE9</Color>
 </ResourceDictionary>

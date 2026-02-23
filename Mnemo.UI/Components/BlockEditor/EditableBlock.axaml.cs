@@ -31,6 +31,8 @@ public partial class EditableBlock : UserControl
     private BlockViewModel? _viewModel;
     private BlockEditor? _cachedParentEditor;
     private BlockComponentBase? _currentBlockComponent;
+    private TextBox? _currentTunnelTextBox;
+    private EventHandler<KeyEventArgs>? _backspaceTunnelHandler;
     private string? _slashMenuOverlayId;
     private SlashCommandMenu? _currentSlashMenu;
 
@@ -90,6 +92,7 @@ public partial class EditableBlock : UserControl
             _currentBlockComponent.TextBoxLostFocus -= HandleBlockComponentLostFocus;
             _currentBlockComponent.TextBoxTextChanged -= HandleBlockComponentTextChanged;
             _currentBlockComponent.TextBoxKeyDown -= HandleBlockComponentKeyDown;
+            RemoveBackspaceTunnelHandler();
             _currentBlockComponent = null;
         }
         
@@ -138,6 +141,7 @@ public partial class EditableBlock : UserControl
             _currentBlockComponent.TextBoxLostFocus -= HandleBlockComponentLostFocus;
             _currentBlockComponent.TextBoxTextChanged -= HandleBlockComponentTextChanged;
             _currentBlockComponent.TextBoxKeyDown -= HandleBlockComponentKeyDown;
+            RemoveBackspaceTunnelHandler();
         }
         
         // Find and wire up new component
@@ -155,11 +159,49 @@ public partial class EditableBlock : UserControl
             component.TextBoxLostFocus += HandleBlockComponentLostFocus;
             component.TextBoxTextChanged += HandleBlockComponentTextChanged;
             component.TextBoxKeyDown += HandleBlockComponentKeyDown;
+            
+            // Handle backspace on empty in tunnel phase so we run before TextBox consumes the key
+            if (component.GetInputControl() is TextBox textBox)
+            {
+                _backspaceTunnelHandler = OnBackspaceTunnelKeyDown;
+                textBox.AddHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+                _currentTunnelTextBox = textBox;
+            }
+            else
+            {
+                _currentTunnelTextBox = null;
+            }
         }
         else
         {
             _currentBlockComponent = null;
+            _currentTunnelTextBox = null;
         }
+    }
+    
+    private void RemoveBackspaceTunnelHandler()
+    {
+        if (_currentTunnelTextBox != null && _backspaceTunnelHandler != null)
+        {
+            _currentTunnelTextBox.RemoveHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler);
+            _currentTunnelTextBox = null;
+            _backspaceTunnelHandler = null;
+        }
+    }
+    
+    private void OnBackspaceTunnelKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Back || e.Handled || _viewModel == null || sender is not TextBox textBox)
+            return;
+        var text = textBox.Text ?? string.Empty;
+        var caretIndex = textBox.CaretIndex;
+        var selectionLength = Math.Abs(textBox.SelectionEnd - textBox.SelectionStart);
+        var isEmpty = string.IsNullOrWhiteSpace(text);
+        var isContentEmpty = string.IsNullOrWhiteSpace(_viewModel.Content);
+        if (caretIndex != 0 || selectionLength != 0 || (!isEmpty && !isContentEmpty))
+            return;
+        e.Handled = true;
+        HandleBackspaceOnEmptyBlock();
     }
     
     private void HandleBlockComponentGotFocus(object? sender, TextBox textBox)
@@ -527,6 +569,9 @@ public partial class EditableBlock : UserControl
                 }
             }
         }
+        // Keep focus on this block after conversion (explicit Post needed when IsFocused was already true)
+        _viewModel.IsFocused = true;
+        Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
     }
 
     #endregion
@@ -580,7 +625,8 @@ public partial class EditableBlock : UserControl
         _stateManager.PreviousText = string.Empty;
         _stateManager.SetNormal();
         _focusManager?.ClearCache();
-        
+        // Keep focus on this block after conversion
+        _viewModel.IsFocused = true;
         Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
     }
 

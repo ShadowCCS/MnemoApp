@@ -22,6 +22,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private Note? _selectedNote;
 
+    /// <summary>
+    /// Last selected tree item that was a note (used to keep selection when clicking folders).
+    /// </summary>
+    private NoteTreeItemViewModel? _lastSelectedNoteTreeItem;
+
     [ObservableProperty]
     private NoteTreeItemViewModel? _selectedTreeItem;
 
@@ -227,12 +232,27 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
     partial void OnSelectedTreeItemChanged(NoteTreeItemViewModel? value)
     {
+        // Folders are not selectable: if TreeView selected a folder, revert to last selected note.
+        if (value != null && value.IsFolder)
+        {
+            SelectedTreeItem = _lastSelectedNoteTreeItem;
+            return;
+        }
+
         if (value == null)
+        {
+            _lastSelectedNoteTreeItem = null;
             SelectedNote = null;
+        }
         else if (value.Note != null)
+        {
+            _lastSelectedNoteTreeItem = value;
             SelectedNote = value.Note;
+        }
         else
-            SelectedNote = null; // Folder selected: clear content area
+        {
+            SelectedNote = null;
+        }
     }
 
     partial void OnSelectedNoteChanged(Note? value)
@@ -425,6 +445,13 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         BuildTree(foldersList, notesList);
         RefreshFlattenedTreeItems();
         RefreshFavouriteNotes();
+    }
+
+    [RelayCommand]
+    private async Task RenameFolderAsync(NoteTreeItemViewModel? item)
+    {
+        if (item?.Folder == null) return;
+        await _folderService.SaveFolderAsync(item.Folder);
     }
 
     private static void RemoveNoteTreeItem(ObservableCollection<NoteTreeItemViewModel> collection, NoteTreeItemViewModel item)

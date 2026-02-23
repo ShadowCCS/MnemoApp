@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="using:Mnemo.UI.Converters"
+        xmlns:controls="using:Mnemo.UI.Controls"
         x:ClassModifier="internal">
 
   <Design.PreviewWith>
@@ -60,6 +61,8 @@
     <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForeground}" />
     <Setter Property="MinHeight" Value="{DynamicResource TreeViewItemMinHeight}" />
     <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
       <ControlTemplate>
         <StackPanel>
@@ -140,6 +143,13 @@
     <Style Selector="^:selected /template/ Border#PART_LayoutRoot > ContentPresenter#PART_HeaderPresenter">
       <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundSelected}" />
     </Style>
+    <!--  Selected state: force white on header content (TextBlock and SvgIcon) so custom item templates show white  -->
+    <Style Selector="^:selected /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundSelected}" />
+    </Style>
+    <Style Selector="^:selected /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+      <Setter Property="Color" Value="{DynamicResource TreeViewItemForegroundSelected}" />
+    </Style>
 
     <!--  Selected PointerOver state  -->
     <Style Selector="^:selected /template/ Border#PART_LayoutRoot:pointerover">
@@ -149,6 +159,12 @@
     <Style Selector="^:selected /template/ Border#PART_LayoutRoot:pointerover > ContentPresenter#PART_HeaderPresenter">
       <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundSelectedPointerOver}" />
     </Style>
+    <Style Selector="^:selected:pointerover /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundSelectedPointerOver}" />
+    </Style>
+    <Style Selector="^:selected:pointerover /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+      <Setter Property="Color" Value="{DynamicResource TreeViewItemForegroundSelectedPointerOver}" />
+    </Style>
 
     <!--  Selected Pressed state  -->
     <Style Selector="^:pressed:selected /template/ Border#PART_LayoutRoot:pointerover">
@@ -157,6 +173,12 @@
     </Style>
     <Style Selector="^:pressed:selected /template/ Border#PART_LayoutRoot:pointerover > ContentPresenter#PART_HeaderPresenter">
       <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundSelectedPressed}" />
+    </Style>
+    <Style Selector="^:pressed:selected /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundSelectedPressed}" />
+    </Style>
+    <Style Selector="^:pressed:selected /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+      <Setter Property="Color" Value="{DynamicResource TreeViewItemForegroundSelectedPressed}" />
     </Style>
 
     <!--  Disabled Selected state  -->

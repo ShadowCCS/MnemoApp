@@ -159,8 +159,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void DeleteBlock(BlockViewModel block)
     {
-        // Never delete if it's the only block - just clear it
-        if (Blocks.Count <= 1)
+        var index = Blocks.IndexOf(block);
+        if (index == -1) return; // Block not found, safety check
+
+        // Don't delete if it's the only block - just clear and keep as text
+        if (Blocks.Count == 1)
         {
             block.Content = string.Empty;
             block.Type = BlockType.Text;
@@ -169,9 +172,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        var index = Blocks.IndexOf(block);
-        if (index == -1) return; // Block not found, safety check
-        
         UnsubscribeFromBlock(block);
         Blocks.Remove(block);
 

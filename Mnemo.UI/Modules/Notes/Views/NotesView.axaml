@@ -32,9 +32,9 @@
                IsPaneOpen="True"
                OpenPaneLength="280"
                Background="Transparent"
-               PaneBackground="{DynamicResource CardBackgroundPrimaryBrush}">
+               PaneBackground="{DynamicResource NotesPaneBackgroundBrush}">
         <SplitView.Pane>
-            <Border BorderThickness="0,0,1,0" BorderBrush="{DynamicResource SearchBarBackgroundBrush}"
+            <Border BorderThickness="0,0,1,0" BorderBrush="{DynamicResource NotesPaneDividerBrush}"
                     HorizontalAlignment="Stretch">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               HorizontalAlignment="Stretch">
@@ -98,7 +98,7 @@
                             </Button.Content>
                         </Button>
 
-                        <Rectangle Height="1" Fill="{DynamicResource SearchBarBackgroundBrush}" Margin="0,4,0,8"/>
+                        <Rectangle Height="1" Fill="{DynamicResource NotesPaneDividerBrush}" Margin="0,4,0,8"/>
 
                         <!-- Deleted -->
                         <Button Background="Transparent" BorderThickness="0" Padding="10,8" HorizontalContentAlignment="Stretch"
@@ -117,19 +117,19 @@
                             </Grid>
                         </Button>
 
-                        <Rectangle Height="1" Fill="{DynamicResource SearchBarBackgroundBrush}" Margin="0,4,0,8"/>
+                        <Rectangle Height="1" Fill="{DynamicResource NotesPaneDividerBrush}" Margin="0,4,0,8"/>
 
                         <!-- Favourites (flat list, same row template) -->
                         <TextBlock Text="Favourites" Margin="10,4,10,6"
                                    FontSize="{DynamicResource FontSize.Body.Small}"
                                    FontFamily="{DynamicResource Font.SemiBold}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                   Foreground="{DynamicResource NotesSectionHeaderForegroundBrush}"/>
                         <TreeView ItemsSource="{Binding FavouriteNotes}"
                                   SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
                                   Margin="0,0,0,4" Background="Transparent"
                                   BorderThickness="0"/>
 
-                        <Rectangle Height="1" Fill="{DynamicResource SearchBarBackgroundBrush}" Margin="0,8,0,8"/>
+                        <Rectangle Height="1" Fill="{DynamicResource NotesPaneDividerBrush}" Margin="0,8,0,8"/>
 
                         <!-- My Notes header with New Folder (drop here = move to root) -->
                         <Grid x:Name="MyNotesHeader" Margin="10,4,10,6" ColumnDefinitions="*,Auto"
@@ -137,14 +137,14 @@
                             <TextBlock Grid.Column="0" Text="My Notes"
                                        FontSize="{DynamicResource FontSize.Body.Small}"
                                        FontFamily="{DynamicResource Font.SemiBold}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Foreground="{DynamicResource NotesSectionHeaderForegroundBrush}"
                                        VerticalAlignment="Center"/>
                             <Button Grid.Column="1" Command="{Binding NewFolderCommand}"
                                     Background="Transparent" BorderThickness="0" Padding="6,4"
                                     Cursor="Hand" ToolTip.Tip="New folder">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg"
                                                   Width="16" Height="16"
-                                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                                                  Color="{DynamicResource NotesSectionHeaderForegroundBrush}"/>
                             </Button>
                         </Grid>
 
@@ -155,6 +155,11 @@
                                       SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
                                       Background="Transparent"
                                       BorderThickness="0">
+                                <TreeView.Styles>
+                                    <Style Selector="TreeViewItem">
+                                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                    </Style>
+                                </TreeView.Styles>
                                 <TreeView.ItemTemplate>
                                     <TreeDataTemplate DataType="vm:NoteTreeItemViewModel" ItemsSource="{Binding Children}">
                                         <ContentPresenter Content="{Binding}"/>
@@ -214,7 +219,7 @@
 
                     <!-- Separation line -->
                     <Rectangle Height="1"
-                               Fill="{DynamicResource SearchBarBackgroundBrush}"
+                               Fill="{DynamicResource NotesEditorSeparatorBrush}"
                                Margin="0,0,0,24"/>
 
                     <!-- Editable block content -->
