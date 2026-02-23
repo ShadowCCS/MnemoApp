@@ -1,0 +1,60 @@
+using System;
+using System.Collections.Generic;
+
+namespace Mnemo.Core.Models;
+
+/// <summary>
+/// Represents a single note with metadata and content.
+/// </summary>
+public class Note
+{
+    /// <summary>
+    /// Unique identifier for the note.
+    /// </summary>
+    public string NoteId { get; set; } = Guid.NewGuid().ToString();
+
+    /// <summary>
+    /// Display title of the note.
+    /// </summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Id of the folder containing this note, or null for root.
+    /// </summary>
+    public string? FolderId { get; set; }
+
+    /// <summary>
+    /// Display order among siblings in the same folder (lower = first). Used for drag-reorder.
+    /// </summary>
+    public int Order { get; set; }
+
+    /// <summary>
+    /// Folder path for hierarchy and breadcrumb (e.g. "Folder / Subfolder"). Can be derived from folder tree.
+    /// </summary>
+    public string FolderPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Raw content (legacy/markdown). When <see cref="Blocks"/> is present it is used for editing; Content can be synced for export.
+    /// </summary>
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Block-based content for the editor. When null or empty, editor uses a single text block from <see cref="Content"/>.
+    /// </summary>
+    public List<Block>? Blocks { get; set; }
+
+    /// <summary>
+    /// When the note was created.
+    /// </summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// When the note was last modified.
+    /// </summary>
+    public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Whether the note is marked as a favorite (shown in Favourites in the sidebar).
+    /// </summary>
+    public bool IsFavorite { get; set; }
+}

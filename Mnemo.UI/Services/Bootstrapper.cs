@@ -44,6 +44,8 @@ public static class Bootstrapper
         services.AddSingleton<IEmbeddingService, OnnxEmbeddingService>();
         services.AddSingleton<IKnowledgeService, KnowledgeService>();
         services.AddSingleton<ILearningPathService, LearningPathService>();
+        services.AddSingleton<INoteService, NoteService>();
+        services.AddSingleton<INoteFolderService, NoteFolderService>();
         
         // 2. Register UI-specific Services
         services.AddSingleton<IThemeService, ThemeService>();

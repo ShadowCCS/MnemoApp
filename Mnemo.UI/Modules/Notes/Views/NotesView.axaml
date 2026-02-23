@@ -3,19 +3,237 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Mnemo.UI.Modules.Notes.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:models="using:Mnemo.Core.Models"
+             xmlns:components="using:Mnemo.UI.Components"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:blockEditor="using:Mnemo.UI.Components.BlockEditor"
+             xmlns:converters="using:Mnemo.UI.Converters"
+             xmlns:views="using:Mnemo.UI.Modules.Notes.Views"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
              x:Class="Mnemo.UI.Modules.Notes.Views.NotesView"
-             x:DataType="vm:NotesViewModel">
-    <Grid RowDefinitions="Auto,*">
-        <TextBlock Text="Notes" FontSize="{DynamicResource FontSize.Heading2}" Margin="10" Foreground="{DynamicResource TextPrimaryBrush}"/>
-        <ListBox Grid.Row="1" Margin="10" Foreground="{DynamicResource TextPrimaryBrush}">
-            <ListBoxItem Content="Note 1 - Placeholder" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="{DynamicResource FontSize.Body}"/>
-            <ListBoxItem Content="Note 2 - Placeholder" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="{DynamicResource FontSize.Body}"/>
-        </ListBox>
-    </Grid>
+             x:DataType="vm:NotesViewModel"
+             x:CompileBindings="False"
+             Foreground="{DynamicResource TextSecondaryBrush}">
+
+    <UserControl.Resources>
+        <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
+        <converters:NullToBoolConverter x:Key="NullToBoolInvertedConverter" Invert="True" />
+        <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
+    </UserControl.Resources>
+
+    <!-- DataTemplate for note/folder rows — used by TreeView ItemTemplate (drag-drop and folder icons in NoteTreeRow) -->
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="vm:NoteTreeItemViewModel">
+            <views:NoteTreeRow />
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <SplitView DisplayMode="Inline"
+               IsPaneOpen="True"
+               OpenPaneLength="280"
+               Background="Transparent"
+               PaneBackground="{DynamicResource CardBackgroundPrimaryBrush}">
+        <SplitView.Pane>
+            <Border BorderThickness="0,0,1,0" BorderBrush="{DynamicResource SearchBarBackgroundBrush}"
+                    HorizontalAlignment="Stretch">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              HorizontalAlignment="Stretch">
+                    <StackPanel Margin="12,16,12,12" Spacing="0" HorizontalAlignment="Stretch">
+                        <!-- Action buttons: New Note, Search, Recent -->
+                        <Button Command="{Binding NewNoteCommand}"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="10,10" HorizontalContentAlignment="Stretch"
+                                Cursor="Hand" Margin="0,0,0,2">
+                            <Button.Content>
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg"
+                                                      Width="18" Height="18" Margin="0,0,12,0"
+                                                      Color="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock Grid.Column="1" Text="New Note" VerticalAlignment="Center"
+                                               FontSize="{DynamicResource FontSize.Body.Medium}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,0,12,0"/>
+                                    <TextBlock Grid.Column="2" Text="Ctrl+N" VerticalAlignment="Center"
+                                               FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                </Grid>
+                            </Button.Content>
+                        </Button>
+                        <Button Command="{Binding SearchCommand}"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="10,10" HorizontalContentAlignment="Stretch"
+                                Cursor="Hand" Margin="0,0,0,2">
+                            <Button.Content>
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg"
+                                                      Width="18" Height="18" Margin="0,0,12,0"
+                                                      Color="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock Grid.Column="1" Text="Search" VerticalAlignment="Center"
+                                               FontSize="{DynamicResource FontSize.Body.Medium}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,0,12,0"/>
+                                    <TextBlock Grid.Column="2" Text="Ctrl+S" VerticalAlignment="Center"
+                                               FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                </Grid>
+                            </Button.Content>
+                        </Button>
+                        <Button Command="{Binding RecentCommand}"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="10,10" HorizontalContentAlignment="Stretch"
+                                Cursor="Hand" Margin="0,0,0,8">
+                            <Button.Content>
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/list-details.svg"
+                                                      Width="18" Height="18" Margin="0,0,12,0"
+                                                      Color="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock Grid.Column="1" Text="Recent" VerticalAlignment="Center"
+                                               FontSize="{DynamicResource FontSize.Body.Medium}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,0,12,0"/>
+                                    <TextBlock Grid.Column="2" Text="Ctrl+R" VerticalAlignment="Center"
+                                               FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                               Foreground="{DynamicResource TextTertiaryBrush}"/>
+                                </Grid>
+                            </Button.Content>
+                        </Button>
+
+                        <Rectangle Height="1" Fill="{DynamicResource SearchBarBackgroundBrush}" Margin="0,4,0,8"/>
+
+                        <!-- Deleted -->
+                        <Button Background="Transparent" BorderThickness="0" Padding="10,8" HorizontalContentAlignment="Stretch"
+                                Cursor="Hand" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/square-rounded-x.svg"
+                                                  Width="18" Height="18" Margin="0,0,12,0"
+                                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Grid.Column="1" Text="Deleted" VerticalAlignment="Center"
+                                           FontSize="{DynamicResource FontSize.Body.Medium}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           Margin="0,0,12,0"/>
+                                <TextBlock Grid.Column="2" Text="{Binding DeletedCount}" VerticalAlignment="Center"
+                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                           Foreground="{DynamicResource TextTertiaryBrush}"/>
+                            </Grid>
+                        </Button>
+
+                        <Rectangle Height="1" Fill="{DynamicResource SearchBarBackgroundBrush}" Margin="0,4,0,8"/>
+
+                        <!-- Favourites (flat list, same row template) -->
+                        <TextBlock Text="Favourites" Margin="10,4,10,6"
+                                   FontSize="{DynamicResource FontSize.Body.Small}"
+                                   FontFamily="{DynamicResource Font.SemiBold}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TreeView ItemsSource="{Binding FavouriteNotes}"
+                                  SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
+                                  Margin="0,0,0,4" Background="Transparent"
+                                  BorderThickness="0"/>
+
+                        <Rectangle Height="1" Fill="{DynamicResource SearchBarBackgroundBrush}" Margin="0,8,0,8"/>
+
+                        <!-- My Notes header with New Folder (drop here = move to root) -->
+                        <Grid x:Name="MyNotesHeader" Margin="10,4,10,6" ColumnDefinitions="*,Auto"
+                              Background="Transparent">
+                            <TextBlock Grid.Column="0" Text="My Notes"
+                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Command="{Binding NewFolderCommand}"
+                                    Background="Transparent" BorderThickness="0" Padding="6,4"
+                                    Cursor="Hand" ToolTip.Tip="New folder">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg"
+                                                  Width="16" Height="16"
+                                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                            </Button>
+                        </Grid>
+
+                        <!-- My Notes tree area (drop on tree or empty space below = move to root) -->
+                        <Border x:Name="MyNotesTreeArea" Margin="0,0,0,12" Background="Transparent" MinHeight="80">
+                            <TreeView x:Name="MyNotesTreeView"
+                                      ItemsSource="{Binding RootTreeItems}"
+                                      SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
+                                      Background="Transparent"
+                                      BorderThickness="0">
+                                <TreeView.ItemTemplate>
+                                    <TreeDataTemplate DataType="vm:NoteTreeItemViewModel" ItemsSource="{Binding Children}">
+                                        <ContentPresenter Content="{Binding}"/>
+                                    </TreeDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </SplitView.Pane>
+
+        <ScrollViewer>
+            <StackPanel Margin="32,24,32,32" Spacing="0">
+                <TextBlock Text="{Binding BreadcrumbText}"
+                           FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                           Foreground="{DynamicResource TextTertiaryBrush}"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,0,0,12"
+                           IsVisible="{Binding BreadcrumbText, Converter={StaticResource NullToBoolConverter}}"/>
+
+                <!-- Title, metadata, separator and content (visible when a note is selected) -->
+                <StackPanel IsVisible="{Binding SelectedNote, Converter={StaticResource NullToBoolConverter}}" Spacing="0">
+                    <!-- Title row with favorite star -->
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                        <TextBox Grid.Column="0" Text="{Binding SelectedNote.Title, Mode=TwoWay}"
+                                 FontSize="{DynamicResource FontSize.Heading1}"
+                                 FontFamily="{DynamicResource Font.Bold}"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 Watermark="Note title"
+                                 x:Name="NoteTitleBox"/>
+                        <Button Grid.Column="1" Command="{Binding ToggleFavoriteCommand}"
+                                Background="Transparent" BorderThickness="0" Padding="8,4"
+                                Cursor="Hand" ToolTip.Tip="Toggle favorite">
+                            <Grid>
+                                <controls:SvgIcon x:Name="StarOutline" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/star.svg"
+                                                  Width="22" Height="22" Color="{DynamicResource TextTertiaryBrush}"
+                                                  IsVisible="{Binding IsFavorite, Converter={StaticResource BoolNegationConverter}}"/>
+                                <controls:SvgIcon x:Name="StarFilled" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/star.svg"
+                                                  Width="22" Height="22" Color="{DynamicResource SystemAccentColor}"
+                                                  IsVisible="{Binding IsFavorite}"/>
+                            </Grid>
+                        </Button>
+                    </Grid>
+
+                    <!-- Created and last modified -->
+                    <TextBlock FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                               Foreground="{DynamicResource TextTertiaryBrush}"
+                               Margin="0,0,0,16">
+                        <Run Text="{Binding CreatedText}"/>
+                        <Run Text=" • "/>
+                        <Run Text="{Binding ModifiedText}"/>
+                    </TextBlock>
+
+                    <!-- Separation line -->
+                    <Rectangle Height="1"
+                               Fill="{DynamicResource SearchBarBackgroundBrush}"
+                               Margin="0,0,0,24"/>
+
+                    <!-- Editable block content -->
+                    <blockEditor:BlockEditor x:Name="NoteBlockEditor"/>
+                </StackPanel>
+
+                <!-- Empty state when no note selected -->
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Margin="0,48,0,0"
+                            Spacing="12">
+                    <StackPanel.IsVisible>
+                        <Binding Path="SelectedNote" Converter="{StaticResource NullToBoolInvertedConverter}"/>
+                    </StackPanel.IsVisible>
+                    <TextBlock Text="Select a note or create a new one"
+                               FontSize="{DynamicResource FontSize.Body.Medium}"
+                               Foreground="{DynamicResource TextTertiaryBrush}"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </SplitView>
 </UserControl>
-
-
-
-
-

@@ -1,0 +1,44 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mnemo.UI.Modules.Notes.ViewModels"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:converters="using:Mnemo.UI.Converters"
+             x:Class="Mnemo.UI.Modules.Notes.Views.NoteTreeRow"
+             x:DataType="vm:NoteTreeItemViewModel">
+    <UserControl.Resources>
+        <converters:BoolNegationConverter x:Key="BoolNegationConverter" />
+    </UserControl.Resources>
+    <Border x:Name="RowBorder" Classes="note-row" Margin="0,0,0,2" Padding="0,0,8,0">
+        <Grid ColumnDefinitions="Auto,*,Auto" MinWidth="0">
+            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" VerticalAlignment="Center"
+                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
+                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}"
+                              IsVisible="{Binding IsFolderEmpty}"/>
+            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" VerticalAlignment="Center"
+                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/folder.svg"
+                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}"
+                              IsVisible="{Binding IsFolderWithChildren}"/>
+            <controls:SvgIcon Grid.Column="0" Margin="10,6,0,6" VerticalAlignment="Center"
+                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
+                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}"
+                              IsVisible="{Binding IsFolder, Converter={StaticResource BoolNegationConverter}}"/>
+            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                       FontSize="{DynamicResource FontSize.Body.Medium}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="6,6,0,6"/>
+            <Button Grid.Column="2" Classes="note-more-button" Background="Transparent" BorderThickness="0" Padding="4,6"
+                    VerticalAlignment="Center" Cursor="Hand" ToolTip.Tip="More actions"
+                    Tag="{Binding}">
+                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
+                                  Width="16" Height="16"
+                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                <Button.Flyout>
+                    <MenuFlyout>
+                        <MenuItem Header="Delete" Tag="{Binding}" Click="OnDeleteClick"/>
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

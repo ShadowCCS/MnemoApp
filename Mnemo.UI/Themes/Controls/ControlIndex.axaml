@@ -58,6 +58,8 @@
                 <ResourceInclude Source="Window.axaml" />
                 <ResourceInclude Source="ComboBox.axaml" />
                 <ResourceInclude Source="ComboBoxItem.axaml" />
+                <ResourceInclude Source="TreeView.axaml" />
+                <ResourceInclude Source="TreeViewItem.axaml" />
                 <ResourceInclude Source="ContextMenu.axaml" />
                 <ResourceInclude Source="DataValidationErrors.axaml" />
                 <ResourceInclude Source="DateTimePickerShared.axaml" />

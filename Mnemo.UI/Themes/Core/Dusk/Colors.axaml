@@ -203,6 +203,32 @@
     <Color x:Key="ListBoxItemForegroundSelectedPointerOver">#FFFFFF</Color>
     <Color x:Key="ListBoxItemForegroundSelectedPressed">#FFFFFF</Color>
     <Color x:Key="ListBoxItemForegroundDisabled">#666666</Color>
+
+    <!-- TreeViewItem (mirrors ListBoxItem for consistent sidebar styling) -->
+    <Color x:Key="TreeViewItemBackgroundColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBackgroundPointerOverColor">#464549</Color>
+    <Color x:Key="TreeViewItemBackgroundPressedColor">#312e2d</Color>
+    <Color x:Key="TreeViewItemBackgroundDisabledColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBackgroundSelectedColor">#e95b45</Color>
+    <Color x:Key="TreeViewItemBackgroundSelectedPointerOverColor">#FF6B55</Color>
+    <Color x:Key="TreeViewItemBackgroundSelectedPressedColor">#D14F3B</Color>
+    <Color x:Key="TreeViewItemBackgroundSelectedDisabledColor">#464549</Color>
+    <Color x:Key="TreeViewItemForegroundColor">#CFCCCB</Color>
+    <Color x:Key="TreeViewItemForegroundPointerOverColor">#CFCCCB</Color>
+    <Color x:Key="TreeViewItemForegroundPressedColor">#CFCCCB</Color>
+    <Color x:Key="TreeViewItemForegroundDisabledColor">#666666</Color>
+    <Color x:Key="TreeViewItemForegroundSelectedColor">#FFFFFF</Color>
+    <Color x:Key="TreeViewItemForegroundSelectedPointerOverColor">#FFFFFF</Color>
+    <Color x:Key="TreeViewItemForegroundSelectedPressedColor">#FFFFFF</Color>
+    <Color x:Key="TreeViewItemForegroundSelectedDisabledColor">#666666</Color>
+    <Color x:Key="TreeViewItemBorderBrushColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBorderBrushPointerOverColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBorderBrushPressedColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBorderBrushDisabledColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBorderBrushSelectedColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBorderBrushSelectedPointerOverColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBorderBrushSelectedPressedColor">Transparent</Color>
+    <Color x:Key="TreeViewItemBorderBrushSelectedDisabledColor">Transparent</Color>
     
     <!-- ComboBox -->
     <Color x:Key="ComboBoxBackground">#464549</Color>

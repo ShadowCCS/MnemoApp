@@ -230,6 +230,34 @@
     <SolidColorBrush x:Key="ListBoxItemForegroundSelectedPointerOverBrush" Color="{DynamicResource ListBoxItemForegroundSelectedPointerOver}"/>
     <SolidColorBrush x:Key="ListBoxItemForegroundSelectedPressedBrush" Color="{DynamicResource ListBoxItemForegroundSelectedPressed}"/>
     <SolidColorBrush x:Key="ListBoxItemForegroundDisabledBrush" Color="{DynamicResource ListBoxItemForegroundDisabled}"/>
+
+    <!-- TreeViewItem Brushes (keys match TreeViewItem.axaml DynamicResource lookups) -->
+    <SolidColorBrush x:Key="TreeViewItemBackground" Color="{DynamicResource TreeViewItemBackgroundColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="{DynamicResource TreeViewItemBackgroundPointerOverColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBackgroundPressed" Color="{DynamicResource TreeViewItemBackgroundPressedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBackgroundDisabled" Color="{DynamicResource TreeViewItemBackgroundDisabledColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="{DynamicResource TreeViewItemBackgroundSelectedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPointerOver" Color="{DynamicResource TreeViewItemBackgroundSelectedPointerOverColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPressed" Color="{DynamicResource TreeViewItemBackgroundSelectedPressedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedDisabled" Color="{DynamicResource TreeViewItemBackgroundSelectedDisabledColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemForeground" Color="{DynamicResource TreeViewItemForegroundColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemForegroundPointerOver" Color="{DynamicResource TreeViewItemForegroundPointerOverColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemForegroundPressed" Color="{DynamicResource TreeViewItemForegroundPressedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemForegroundDisabled" Color="{DynamicResource TreeViewItemForegroundDisabledColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="{DynamicResource TreeViewItemForegroundSelectedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="{DynamicResource TreeViewItemForegroundSelectedPointerOverColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPressed" Color="{DynamicResource TreeViewItemForegroundSelectedPressedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemForegroundSelectedDisabled" Color="{DynamicResource TreeViewItemForegroundSelectedDisabledColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBorderBrush" Color="{DynamicResource TreeViewItemBorderBrushColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBorderBrushPointerOver" Color="{DynamicResource TreeViewItemBorderBrushPointerOverColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBorderBrushPressed" Color="{DynamicResource TreeViewItemBorderBrushPressedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBorderBrushDisabled" Color="{DynamicResource TreeViewItemBorderBrushDisabledColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBorderBrushSelected" Color="{DynamicResource TreeViewItemBorderBrushSelectedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBorderBrushSelectedPointerOver" Color="{DynamicResource TreeViewItemBorderBrushSelectedPointerOverColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBorderBrushSelectedPressed" Color="{DynamicResource TreeViewItemBorderBrushSelectedPressedColor}"/>
+    <SolidColorBrush x:Key="TreeViewItemBorderBrushSelectedDisabled" Color="{DynamicResource TreeViewItemBorderBrushSelectedDisabledColor}"/>
+    <Thickness x:Key="TreeViewItemBorderThemeThickness">0</Thickness>
+    <x:Double x:Key="TreeViewItemMinHeight">32</x:Double>
     
     <!-- ComboBox Brushes -->
     <SolidColorBrush x:Key="ComboBoxBackgroundBrush" Color="{DynamicResource ComboBoxBackground}"/>
@@ -305,6 +333,23 @@
     <x:Double x:Key="TooltipMaxWidth">320</x:Double>
     <x:Double x:Key="TooltipFontSize">13</x:Double>
     <x:Double x:Key="TooltipOpacity">1</x:Double>
+
+    <!-- Flyout / MenuFlyout (Mnemo overlay theming) -->
+    <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="{DynamicResource TooltipBackground}"/>
+    <SolidColorBrush x:Key="FlyoutBorderThemeBrush" Color="{DynamicResource TooltipBorder}"/>
+    <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="{DynamicResource TooltipBackground}"/>
+    <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="{DynamicResource TooltipBorder}"/>
+    <Thickness x:Key="MenuFlyoutPresenterBorderThemeThickness">1</Thickness>
+    <Thickness x:Key="MenuFlyoutPresenterThemePadding">4,2</Thickness>
+    <Thickness x:Key="FlyoutContentThemePadding">12,8</Thickness>
+    <Thickness x:Key="FlyoutBorderThemePadding">1</Thickness>
+    <CornerRadius x:Key="OverlayCornerRadius">6</CornerRadius>
+    <x:Double x:Key="FlyoutThemeMinWidth">100</x:Double>
+    <x:Double x:Key="FlyoutThemeMaxWidth">400</x:Double>
+    <x:Double x:Key="FlyoutThemeMinHeight">0</x:Double>
+    <x:Double x:Key="FlyoutThemeMaxHeight">400</x:Double>
+    <x:Double x:Key="MenuFlyoutThemeMinHeight">0</x:Double>
+    <x:Double x:Key="HorizontalMenuFlyoutThemeMinWidth">0</x:Double>
 
     <!-- Navigation Button -->
     <SolidColorBrush x:Key="NavigationButtonBackgroundBrush" Color="{DynamicResource NavigationButtonBackground}"/>
