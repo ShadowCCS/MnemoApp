@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Mnemo.UI.Controls;
 using Mnemo.UI.Modules.Notes.ViewModels;
 
 namespace Mnemo.UI.Modules.Notes.Views;
@@ -16,7 +17,7 @@ public partial class NoteTreeRow : UserControl
     private PointerPressedEventArgs? _pendingDragPress;
     private Point _pressPosition;
     private bool _dragStarted;
-    private TreeViewItem? _treeViewItem;
+    private MnemoTreeViewItem? _treeViewItem;
     private EventHandler<PointerPressedEventArgs>? _folderPointerPressedHandler;
 
     public NoteTreeRow()
@@ -38,7 +39,7 @@ public partial class NoteTreeRow : UserControl
         AddHandler(PointerReleasedEvent, OnPointerReleased, RoutingStrategies.Bubble);
         AddHandler(PointerCaptureLostEvent, OnPointerCaptureLost, RoutingStrategies.Bubble);
 
-        _treeViewItem = this.FindAncestorOfType<TreeViewItem>();
+        _treeViewItem = this.FindAncestorOfType<MnemoTreeViewItem>();
         if (_treeViewItem != null)
         {
             UpdateSelectedClass(_treeViewItem.IsSelected);
@@ -80,7 +81,7 @@ public partial class NoteTreeRow : UserControl
 
     private void OnTreeViewItemPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property == TreeViewItem.IsSelectedProperty && _treeViewItem != null)
+        if (e.Property == MnemoTreeViewItem.IsSelectedProperty && _treeViewItem != null)
             UpdateSelectedClass(_treeViewItem.IsSelected);
     }
 
@@ -105,9 +106,9 @@ public partial class NoteTreeRow : UserControl
     private void OnFolderTreeViewItemPointerPressedTunnel(object? sender, PointerPressedEventArgs e)
     {
         if (e.GetCurrentPoint(null).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed) return;
-        if (sender is not TreeViewItem tvi || tvi.DataContext is not NoteTreeItemViewModel item || !item.IsFolder) return;
-        // Only handle if the click was on this folder's header row. If the hit element is inside a child TreeViewItem, do not handle.
-        if (e.Source is Visual source && source.FindAncestorOfType<TreeViewItem>() is TreeViewItem hitTreeViewItem && hitTreeViewItem != tvi)
+        if (sender is not MnemoTreeViewItem tvi || tvi.DataContext is not NoteTreeItemViewModel item || !item.IsFolder) return;
+        // Only handle if the click was on this folder's header row. If the hit element is inside a child item, do not handle.
+        if (e.Source is Visual source && source.FindAncestorOfType<MnemoTreeViewItem>() is MnemoTreeViewItem hitTreeViewItem && hitTreeViewItem != tvi)
             return;
         e.Handled = true;
         item.IsExpanded = !item.IsExpanded;

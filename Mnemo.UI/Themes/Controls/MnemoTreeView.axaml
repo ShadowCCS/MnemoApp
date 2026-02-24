@@ -1,20 +1,21 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="using:Mnemo.UI.Controls"
                     x:ClassModifier="internal">
   <Design.PreviewWith>
     <Border Padding="20">
       <StackPanel Spacing="20">
-        <TreeView>
-          <TreeViewItem Header="Root" IsExpanded="True">
-            <TreeViewItem Header="Child1"/>
-            <TreeViewItem Header="Child2"/>
-          </TreeViewItem>
-        </TreeView>
+        <controls:MnemoTreeView>
+          <controls:MnemoTreeViewItem Header="Root" IsExpanded="True">
+            <controls:MnemoTreeViewItem Header="Child1"/>
+            <controls:MnemoTreeViewItem Header="Child2"/>
+          </controls:MnemoTreeViewItem>
+        </controls:MnemoTreeView>
       </StackPanel>
     </Border>
   </Design.PreviewWith>
 
-  <ControlTheme x:Key="{x:Type TreeView}" TargetType="TreeView">
+  <ControlTheme x:Key="{x:Type controls:MnemoTreeView}" TargetType="controls:MnemoTreeView">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />

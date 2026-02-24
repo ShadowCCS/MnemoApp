@@ -7,17 +7,17 @@
   <Design.PreviewWith>
     <Border Padding="20"
             MinWidth="300">
-      <TreeView>
-        <TreeViewItem Header="Level 1" IsExpanded="True">
-          <TreeViewItem Header="Level 2.1" IsSelected="True" IsExpanded="True">
-            <TreeViewItem Header="Level 3.1" />
-            <TreeViewItem Header="Level 3.2" IsSelected="True">
-              <TreeViewItem Header="Level 4" />
-            </TreeViewItem>
-          </TreeViewItem>
-          <TreeViewItem Header="Level 2.2" IsEnabled="False" />
-        </TreeViewItem>
-      </TreeView>
+      <controls:MnemoTreeView>
+        <controls:MnemoTreeViewItem Header="Level 1" IsExpanded="True">
+          <controls:MnemoTreeViewItem Header="Level 2.1" IsSelected="True" IsExpanded="True">
+            <controls:MnemoTreeViewItem Header="Level 3.1" />
+            <controls:MnemoTreeViewItem Header="Level 3.2" IsSelected="True">
+              <controls:MnemoTreeViewItem Header="Level 4" />
+            </controls:MnemoTreeViewItem>
+          </controls:MnemoTreeViewItem>
+          <controls:MnemoTreeViewItem Header="Level 2.2" IsEnabled="False" />
+        </controls:MnemoTreeViewItem>
+      </controls:MnemoTreeView>
     </Border>
   </Design.PreviewWith>
 
@@ -53,7 +53,7 @@
     </Style>
   </ControlTheme>
 
-  <ControlTheme x:Key="{x:Type TreeViewItem}" TargetType="TreeViewItem">
+  <ControlTheme x:Key="{x:Type controls:MnemoTreeViewItem}" TargetType="controls:MnemoTreeViewItem">
     <Setter Property="Padding" Value="0" />
     <Setter Property="Background" Value="{DynamicResource TreeViewItemBackground}" />
     <Setter Property="BorderBrush" Value="{DynamicResource TreeViewItemBorderBrush}" />

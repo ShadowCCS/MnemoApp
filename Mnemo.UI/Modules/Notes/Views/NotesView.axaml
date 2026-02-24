@@ -124,7 +124,7 @@
                                    FontSize="{DynamicResource FontSize.Body.Small}"
                                    FontFamily="{DynamicResource Font.SemiBold}"
                                    Foreground="{DynamicResource NotesSectionHeaderForegroundBrush}"/>
-                        <TreeView ItemsSource="{Binding FavouriteNotes}"
+                        <controls:MnemoTreeView ItemsSource="{Binding FavouriteNotes}"
                                   SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
                                   Margin="0,0,0,4" Background="Transparent"
                                   BorderThickness="0"/>
@@ -150,62 +150,62 @@
 
                         <!-- My Notes tree area (drop on tree or empty space below = move to root) -->
                         <Border x:Name="MyNotesTreeArea" Margin="0,0,0,12" Background="Transparent" MinHeight="80">
-                            <TreeView x:Name="MyNotesTreeView"
+                            <controls:MnemoTreeView x:Name="MyNotesTreeView"
                                       ItemsSource="{Binding RootTreeItems}"
                                       SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
                                       Background="Transparent"
                                       BorderThickness="0">
-                                <TreeView.Styles>
-                                    <Style Selector="TreeViewItem">
+                                <controls:MnemoTreeView.Styles>
+                                    <Style Selector="controls|MnemoTreeViewItem">
                                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                     </Style>
                                     <!-- Folders are not selectable: folder-item never shows selected appearance -->
-                                    <Style Selector="TreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot">
                                         <Setter Property="Background" Value="{DynamicResource TreeViewItemBackground}"/>
                                         <Setter Property="BorderBrush" Value="{DynamicResource TreeViewItemBorderBrush}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot > ContentPresenter#PART_HeaderPresenter">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot > ContentPresenter#PART_HeaderPresenter">
                                         <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForeground}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:selected /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:selected /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForeground}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:selected /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:selected /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
                                         <Setter Property="Color" Value="{DynamicResource TreeViewItemForeground}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot:pointerover">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot:pointerover">
                                         <Setter Property="Background" Value="{DynamicResource TreeViewItemBackgroundPointerOver}"/>
                                         <Setter Property="BorderBrush" Value="{DynamicResource TreeViewItemBorderBrushPointerOver}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot:pointerover > ContentPresenter#PART_HeaderPresenter">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:selected /template/ Border#PART_LayoutRoot:pointerover > ContentPresenter#PART_HeaderPresenter">
                                         <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundPointerOver}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:selected:pointerover /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:selected:pointerover /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundPointerOver}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:selected:pointerover /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:selected:pointerover /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
                                         <Setter Property="Color" Value="{DynamicResource TreeViewItemForegroundPointerOver}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:pressed:selected /template/ Border#PART_LayoutRoot">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:pressed:selected /template/ Border#PART_LayoutRoot">
                                         <Setter Property="Background" Value="{DynamicResource TreeViewItemBackgroundPressed}"/>
                                         <Setter Property="BorderBrush" Value="{DynamicResource TreeViewItemBorderBrushPressed}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:pressed:selected /template/ Border#PART_LayoutRoot > ContentPresenter#PART_HeaderPresenter">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:pressed:selected /template/ Border#PART_LayoutRoot > ContentPresenter#PART_HeaderPresenter">
                                         <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundPressed}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:pressed:selected /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:pressed:selected /template/ ContentPresenter#PART_HeaderPresenter TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource TreeViewItemForegroundPressed}"/>
                                     </Style>
-                                    <Style Selector="TreeViewItem.folder-item:pressed:selected /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
+                                    <Style Selector="controls|MnemoTreeViewItem.folder-item:pressed:selected /template/ ContentPresenter#PART_HeaderPresenter controls|SvgIcon">
                                         <Setter Property="Color" Value="{DynamicResource TreeViewItemForegroundPressed}"/>
                                     </Style>
-                                </TreeView.Styles>
-                                <TreeView.ItemTemplate>
+                                </controls:MnemoTreeView.Styles>
+                                <controls:MnemoTreeView.ItemTemplate>
                                     <TreeDataTemplate DataType="vm:NoteTreeItemViewModel" ItemsSource="{Binding Children}">
                                         <ContentPresenter Content="{Binding}"/>
                                     </TreeDataTemplate>
-                                </TreeView.ItemTemplate>
-                            </TreeView>
+                                </controls:MnemoTreeView.ItemTemplate>
+                            </controls:MnemoTreeView>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>

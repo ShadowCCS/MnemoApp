@@ -8,6 +8,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Mnemo.UI.Components.BlockEditor;
+using Mnemo.UI.Controls;
 using Mnemo.UI.Modules.Notes.ViewModels;
 
 namespace Mnemo.UI.Modules.Notes.Views;
@@ -88,7 +89,7 @@ public partial class NotesView : UserControl
     {
         var header = this.FindControl<Grid>("MyNotesHeader");
         var treeArea = this.FindControl<Border>("MyNotesTreeArea");
-        var tree = this.FindControl<TreeView>("MyNotesTreeView");
+        var tree = this.FindControl<MnemoTreeView>("MyNotesTreeView");
         if (header != null)
         {
             DragDrop.SetAllowDrop(header, true);
@@ -122,7 +123,7 @@ public partial class NotesView : UserControl
         if (e.Data.Get(NotesViewModel.NoteTreeItemDragKey) is not NoteTreeItemViewModel source) return;
 
         // When drop target is tree/treeArea, check if we're over a row: if so, perform drop-into-folder or reorder there
-        if (sender is Visual dropTarget && (dropTarget is TreeView || dropTarget is Border))
+        if (sender is Visual dropTarget && (dropTarget is MnemoTreeView || dropTarget is Border))
         {
             var (target, dropOnFolder, insertAfter) = GetDropTargetRowInfo(dropTarget, e);
             if (target != null)
@@ -192,7 +193,7 @@ public partial class NotesView : UserControl
 
         var header = this.FindControl<Grid>("MyNotesHeader");
         var treeArea = this.FindControl<Border>("MyNotesTreeArea");
-        var tree = this.FindControl<TreeView>("MyNotesTreeView");
+        var tree = this.FindControl<MnemoTreeView>("MyNotesTreeView");
         if (header != null)
         {
             header.RemoveHandler(DragDrop.DragOverEvent, OnMyNotesSectionDragOver);
