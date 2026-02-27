@@ -132,12 +132,13 @@ public partial class NoteTreeRow : UserControl
         }
 
         // Prepare drag from anywhere: capture here in tunnel so we get move/release even when press was on Button/icon/text.
-        var (collection, _) = vm != null ? FindContainingCollection(vm.RootTreeItems, item) : (null, -1);
+        var (collection, _) = vm != null ? FindContainingCollectionInAnyTree(vm, item) : (null, -1);
         if (collection == null) return;
 
         _pendingDragPress = e;
         _pressPosition = e.GetPosition(this);
         _dragStarted = false;
+        e.Handled = true; // Prevent TreeViewItem/PressedMixin from capturing pointer so we receive PointerMoved.
         e.Pointer.Capture(this);
     }
 
@@ -237,6 +238,16 @@ public partial class NoteTreeRow : UserControl
             current = current.GetVisualParent();
         }
         return null;
+    }
+
+    /// <summary>Finds the collection containing the item in either RootTreeItems or FavouriteNotes.</summary>
+    private static (ObservableCollection<NoteTreeItemViewModel>? collection, int index) FindContainingCollectionInAnyTree(
+        NotesViewModel vm,
+        NoteTreeItemViewModel item)
+    {
+        var (col, idx) = FindContainingCollection(vm.RootTreeItems, item);
+        if (col != null) return (col, idx);
+        return FindContainingCollection(vm.FavouriteNotes, item);
     }
 
     private static (ObservableCollection<NoteTreeItemViewModel>? collection, int index) FindContainingCollection(
