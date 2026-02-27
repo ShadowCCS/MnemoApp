@@ -50,10 +50,9 @@
                                    FontSize="{DynamicResource FontSize.Heading1}"
                                    FontFamily="{DynamicResource Font.Bold}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
-                        <TextBlock FontSize="{DynamicResource FontSize.Body.Medium}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}">
-                            <Run Text="{Binding GreetingName, StringFormat='Hello, {0}!'}"/>
-                        </TextBlock>
+                        <TextBlock Text="{Binding GreetingText}"
+                                   FontSize="{DynamicResource FontSize.Body.Medium}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
                     </StackPanel>
 
                     <!-- Edit / Add toolbar -->
@@ -176,8 +175,8 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Empty State -->
-                <StackPanel IsVisible="{Binding !Widgets.Count}"
+                <!-- Empty State (only after layout has loaded, to avoid flicker) -->
+                <StackPanel IsVisible="{Binding ShowEmptyState}"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Spacing="16"
@@ -202,6 +201,20 @@
                             Command="{Binding ToggleEditModeCommand}"
                             Classes="accent"
                             HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Loading state: on top until layout is loaded to avoid empty-state flicker -->
+                <StackPanel IsVisible="{Binding !IsLayoutLoaded}"
+                            ZIndex="20"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="12"
+                            Opacity="0.7"
+                            Background="Transparent">
+                    <TextBlock Text="Loading…"
+                               FontSize="{DynamicResource FontSize.Body.Medium}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"/>
                 </StackPanel>
                 </Grid>
             </StackPanel>

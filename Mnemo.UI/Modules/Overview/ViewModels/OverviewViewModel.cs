@@ -105,6 +105,28 @@ public partial class OverviewViewModel : ViewModelBase
     /// </summary>
     public string GreetingName => string.IsNullOrWhiteSpace(UserName) ? "there" : UserName.Trim();
 
+    /// <summary>
+    /// True after the dashboard layout (and widgets) have been loaded; used to avoid showing "empty" state while loading.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isLayoutLoaded;
+
+    /// <summary>
+    /// True after the user profile (name, picture) has been loaded; used to avoid greeting flicker.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isProfileLoaded;
+
+    /// <summary>
+    /// True when layout is loaded and there are no widgets; only then show the empty state.
+    /// </summary>
+    public bool ShowEmptyState => IsLayoutLoaded && Widgets.Count == 0;
+
+    /// <summary>
+    /// Greeting text: shows "Hello…" while profile is loading, then "Hello, {name}!".
+    /// </summary>
+    public string GreetingText => !IsProfileLoaded ? "Hello…" : $"Hello, {GreetingName}!";
+
     public OverviewViewModel(IWidgetRegistry widgetRegistry, IOverlayService overlayService, IStorageProvider storage, ISettingsService settingsService, ILoggerService logger)
     {
         _widgetRegistry = widgetRegistry;
@@ -114,6 +136,7 @@ public partial class OverviewViewModel : ViewModelBase
         _logger = logger;
 
         _settingsService.SettingChanged += OnSettingChanged;
+        Widgets.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowEmptyState));
         RunAndLogAsync(LoadLayoutAsync(), "load dashboard layout");
         RunAndLogAsync(LoadUserProfileAsync(), "load user profile");
     }
@@ -148,13 +171,22 @@ public partial class OverviewViewModel : ViewModelBase
         {
             UserName = name ?? string.Empty;
             ProfilePicturePath = pic ?? "avares://Mnemo.UI/Assets/demo-profile-pic.png";
+            IsProfileLoaded = true;
             OnPropertyChanged(nameof(GreetingName));
+            OnPropertyChanged(nameof(GreetingText));
         });
     }
 
     partial void OnUserNameChanged(string value)
     {
         OnPropertyChanged(nameof(GreetingName));
+        if (IsProfileLoaded)
+            OnPropertyChanged(nameof(GreetingText));
+    }
+
+    partial void OnIsLayoutLoadedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowEmptyState));
     }
 
     /// <summary>
@@ -176,6 +208,7 @@ public partial class OverviewViewModel : ViewModelBase
             {
                 await AddDefaultWidgetsAsync().ConfigureAwait(false);
             }
+            IsLayoutLoaded = true;
         }).ConfigureAwait(false);
     }
 
