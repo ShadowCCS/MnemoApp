@@ -81,6 +81,14 @@ public partial class NoteTreeItemViewModel : ObservableObject
         OnPropertyChanged(nameof(Name));
     }
 
+    /// <summary>
+    /// Notifies the view that the display name changed (e.g. note title edited). Name is computed from Note.Title or Folder.Name.
+    /// </summary>
+    public void NotifyNameChanged()
+    {
+        OnPropertyChanged(nameof(Name));
+    }
+
     private void OnChildrenChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         OnPropertyChanged(nameof(IsFolderEmpty));

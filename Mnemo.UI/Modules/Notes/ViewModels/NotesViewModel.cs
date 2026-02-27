@@ -288,6 +288,22 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         ModifiedText = FormatRelative(value.ModifiedAt, "Last modified");
     }
 
+    private void RefreshBreadcrumbText()
+    {
+        if (SelectedNote == null) return;
+        var value = SelectedNote;
+        if (!string.IsNullOrEmpty(value.FolderPath))
+            BreadcrumbText = value.FolderPath.TrimEnd('/').TrimEnd().Replace("/", " / ") + " / " + value.Title;
+        else if (value.FolderId != null && _foldersById.TryGetValue(value.FolderId, out var folder))
+        {
+            var path = GetFolderPath(folder);
+            BreadcrumbText = path.Count > 0 ? string.Join(" / ", path) + " / " + value.Title : value.Title;
+        }
+        else
+            BreadcrumbText = value.Title;
+        OnPropertyChanged(nameof(BreadcrumbText));
+    }
+
     private List<string> GetFolderPath(NoteFolder folder)
     {
         var path = new List<string> { folder.Name };
@@ -308,7 +324,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         if (SelectedNote == null) return;
 
         if (title != null)
+        {
             SelectedNote.Title = title;
+            NotifyTreeItemsForNoteTitleChanged(SelectedNote);
+            RefreshBreadcrumbText();
+        }
 
         if (blocks != null)
         {
@@ -318,6 +338,19 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
         await _noteService.SaveNoteAsync(SelectedNote);
         ModifiedText = FormatRelative(SelectedNote.ModifiedAt, "Last modified");
+    }
+
+    /// <summary>
+    /// Notifies all tree items that wrap the given note so the sidebar updates the displayed title.
+    /// </summary>
+    private void NotifyTreeItemsForNoteTitleChanged(Note note)
+    {
+        foreach (var item in FlattenedTreeItems.Where(i => i.Note == note))
+            item.NotifyNameChanged();
+        foreach (var item in FavouriteNotes.Where(i => i.Note == note))
+            item.NotifyNameChanged();
+        foreach (var item in AllNotesTreeItems.Where(i => i.Note == note))
+            item.NotifyNameChanged();
     }
 
     /// <summary>
