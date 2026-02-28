@@ -13,6 +13,7 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="{Binding AppIconPath, Converter={x:Static converters:PathToWindowIconConverter.Instance}}"
         Title="Mnemo"
+        WindowStartupLocation="CenterScreen"
         SystemDecorations="None"
         CanMinimize="True"
         CanResize="True"

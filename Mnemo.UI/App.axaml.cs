@@ -1,12 +1,15 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
-using System.Linq;
+using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Services;
+using Mnemo.UI.Modules.Onboarding.Views;
 using Mnemo.UI.ViewModels;
 using Mnemo.UI.Views;
 
@@ -87,7 +90,37 @@ public partial class App : Application
 
         navService.NavigateTo("overview");
 
+        _ = ShowOnboardingIfNeededAsync();
+
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private async Task ShowOnboardingIfNeededAsync()
+    {
+        if (Services == null) return;
+        var settingsService = Services.GetRequiredService<ISettingsService>();
+        var completed = await settingsService.GetAsync("Onboarding.Completed", false).ConfigureAwait(false);
+        if (completed) return;
+
+        var vm = Services.GetRequiredService<Mnemo.UI.Modules.Onboarding.ViewModels.OnboardingWizardViewModel>();
+        await vm.LoadUserNameAsync().ConfigureAwait(false);
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (Services == null) return;
+            var overlayService = Services.GetRequiredService<IOverlayService>();
+            var view = new OnboardingWizardView { DataContext = vm };
+            var options = new OverlayOptions
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                ShowBackdrop = true,
+                CloseOnOutsideClick = false,
+                CloseOnEscape = false
+            };
+            var id = overlayService.CreateOverlay(view, options, "OnboardingWizard");
+            vm.SetOverlayId(id);
+        });
     }
 
     private static void OnProcessExit(object? sender, EventArgs e)

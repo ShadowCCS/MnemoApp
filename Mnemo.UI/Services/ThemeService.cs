@@ -13,7 +13,7 @@ public class ThemeService : IThemeService
 {
     private readonly ISettingsService _settingsService;
     private const string ThemeSettingKey = "Appearance.Theme";
-    private const string DefaultTheme = "Dusk";
+    private const string DefaultTheme = "Dawn";
 
     public ThemeService(ISettingsService settingsService)
     {

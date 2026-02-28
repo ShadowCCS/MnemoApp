@@ -10,7 +10,7 @@ public partial class AppIconSettingViewModel : ViewModelBase
 {
     private readonly ISettingsService _settingsService;
     private const string SettingKey = "App.Icon";
-    private const string DefaultIcon = "avares://Mnemo.UI/Assets/AppIcons/AppIconDarkClassic.ico";
+    private const string DefaultIcon = "avares://Mnemo.UI/Assets/AppIcons/AppIconLightClassic.ico";
 
     [ObservableProperty] private string _title;
     [ObservableProperty] private string _description;

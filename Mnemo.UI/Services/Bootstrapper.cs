@@ -32,6 +32,7 @@ public static class Bootstrapper
         // AI Services
         services.AddSingleton<HardwareDetector>();
         services.AddSingleton<IAIModelRegistry, ModelRegistry>();
+        services.AddSingleton<IAIModelsSetupService, AIModelsSetupService>();
         services.AddSingleton<IResourceGovernor, ResourceGovernor>();
         services.AddSingleton<LlamaCppServerManager>();
         services.AddSingleton<IAIServerManager>(sp => sp.GetRequiredService<LlamaCppServerManager>());

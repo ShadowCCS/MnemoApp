@@ -3,6 +3,8 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <Version>0.1.0</Version>
+    <InformationalVersion>0.1.0-dev</InformationalVersion>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -11,9 +13,11 @@
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
+    <AvaloniaResource Include="Modules\Onboarding\Assets\**" />
     <AvaloniaResource Include="Themes\**" />
     <AvaloniaResource Include="Icons\Tabler\Used\**\*.svg" />
     <AvaloniaResource Include="Icons\Assets\*.svg" />
+    <AvaloniaResource Include="Assets\ProfilePictures\*.png" />
     <AvaloniaResource Include="Languages\**" />
 
   </ItemGroup>

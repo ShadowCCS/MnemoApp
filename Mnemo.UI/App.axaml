@@ -10,7 +10,7 @@
     </Application.DataTemplates>
   
     <Application.Styles>
-        <StyleInclude Source="avares://Mnemo.UI/Themes/Core/Dusk/theme.axaml" />
+        <StyleInclude Source="avares://Mnemo.UI/Themes/Core/Dawn/theme.axaml" />
     </Application.Styles>
 </Application>
 

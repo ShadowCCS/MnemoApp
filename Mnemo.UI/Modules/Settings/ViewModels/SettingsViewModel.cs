@@ -15,7 +15,7 @@ public partial class SettingsViewModel : ViewModelBase
     private string _userName = "John Doe";
 
     [ObservableProperty]
-    private string _profilePicturePath = "avares://Mnemo.UI/Assets/demo-profile-pic.png";
+    private string _profilePicturePath = "avares://Mnemo.UI/Assets/ProfilePictures/img2.png";
 
     [ObservableProperty]
     private SettingsCategoryViewModel? _selectedCategory;
@@ -53,7 +53,7 @@ public partial class SettingsViewModel : ViewModelBase
     private async Task LoadInitialSettingsAsync()
     {
         UserName = await _settingsService.GetAsync("User.DisplayName", "John Doe");
-        ProfilePicturePath = await _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/demo-profile-pic.png");
+        ProfilePicturePath = await _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/ProfilePictures/img2.png");
     }
 
     private void InitializeCategories()

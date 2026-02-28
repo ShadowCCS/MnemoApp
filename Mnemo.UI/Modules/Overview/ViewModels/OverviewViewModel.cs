@@ -98,7 +98,7 @@ public partial class OverviewViewModel : ViewModelBase
     /// Gets the user's profile picture path.
     /// </summary>
     [ObservableProperty]
-    private string _profilePicturePath = "avares://Mnemo.UI/Assets/demo-profile-pic.png";
+    private string _profilePicturePath = "avares://Mnemo.UI/Assets/ProfilePictures/img2.png";
 
     /// <summary>
     /// Gets the name to show in the greeting (user name or "there" when empty), trimmed.
@@ -165,12 +165,12 @@ public partial class OverviewViewModel : ViewModelBase
     private async Task LoadUserProfileAsync()
     {
         var name = await _settingsService.GetAsync(UserDisplayNameKey, string.Empty).ConfigureAwait(false);
-        var pic = await _settingsService.GetAsync(UserProfilePictureKey, "avares://Mnemo.UI/Assets/demo-profile-pic.png").ConfigureAwait(false);
+        var pic = await _settingsService.GetAsync(UserProfilePictureKey, "avares://Mnemo.UI/Assets/ProfilePictures/img2.png").ConfigureAwait(false);
         
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             UserName = name ?? string.Empty;
-            ProfilePicturePath = pic ?? "avares://Mnemo.UI/Assets/demo-profile-pic.png";
+            ProfilePicturePath = pic ?? "avares://Mnemo.UI/Assets/ProfilePictures/img2.png";
             IsProfileLoaded = true;
             OnPropertyChanged(nameof(GreetingName));
             OnPropertyChanged(nameof(GreetingText));

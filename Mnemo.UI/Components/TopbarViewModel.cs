@@ -22,7 +22,7 @@ public partial class TopbarViewModel : ViewModelBase
     private bool _isGamificationEnabled;
 
     [ObservableProperty]
-    private string _profilePicturePath = "avares://Mnemo.UI/Assets/demo-profile-pic.png";
+    private string _profilePicturePath = "avares://Mnemo.UI/Assets/ProfilePictures/img2.png";
 
     public TopbarViewModel(ISettingsService settingsService, IOverlayService overlayService)
     {
@@ -31,7 +31,7 @@ public partial class TopbarViewModel : ViewModelBase
         
         // Initial load
         _isGamificationEnabled = _settingsService.GetAsync("App.EnableGamification", true).GetAwaiter().GetResult();
-        _profilePicturePath = _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/demo-profile-pic.png").GetAwaiter().GetResult();
+        _profilePicturePath = _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/ProfilePictures/img2.png").GetAwaiter().GetResult();
 
         // Listen for changes
         _settingsService.SettingChanged += (s, key) =>
@@ -42,7 +42,7 @@ public partial class TopbarViewModel : ViewModelBase
             }
             else if (key == "User.ProfilePicture")
             {
-                ProfilePicturePath = _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/demo-profile-pic.png").GetAwaiter().GetResult();
+                ProfilePicturePath = _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/ProfilePictures/img2.png").GetAwaiter().GetResult();
             }
         };
     }

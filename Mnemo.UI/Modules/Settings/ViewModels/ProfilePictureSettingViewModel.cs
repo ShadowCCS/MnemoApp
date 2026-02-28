@@ -11,7 +11,7 @@ public partial class ProfilePictureSettingViewModel : ViewModelBase
 {
     private readonly ISettingsService _settingsService;
     private const string SettingKey = "User.ProfilePicture";
-    private const string DefaultPicture = "avares://Mnemo.UI/Assets/demo-profile-pic.png";
+    private const string DefaultPicture = "avares://Mnemo.UI/Assets/ProfilePictures/img2.png";
 
     [ObservableProperty] private string _title;
     [ObservableProperty] private string _description;

@@ -24,6 +24,8 @@ public class OverlayOptions
     public object? AnchorOffset { get; set; } 
     public object Margin { get; set; } = "0";
     public bool CloseOnOutsideClick { get; set; } = true;
+    /// <summary>When true, pressing Escape closes this overlay. Set to false for mandatory flows (e.g. onboarding).</summary>
+    public bool CloseOnEscape { get; set; } = true;
     public bool ShowBackdrop { get; set; } = true;
     public object HorizontalAlignment { get; set; } = "Center";
     public object VerticalAlignment { get; set; } = "Center";

@@ -164,7 +164,7 @@ namespace Mnemo.UI.Components
             if (e.Key == Key.Escape && OverlayService != null)
             {
                 var top = OverlayService.Overlays.OrderBy(o => o.ZIndex).LastOrDefault();
-                if (top != null)
+                if (top != null && top.Options.CloseOnEscape)
                 {
                     OverlayService.CloseOverlay(top.Id);
                     e.Handled = true;

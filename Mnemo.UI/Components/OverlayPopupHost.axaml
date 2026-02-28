@@ -26,9 +26,9 @@
         <DataTemplate x:DataType="services:OverlayInstance">
           <Grid IsHitTestVisible="True"
                 ZIndex="{Binding ZIndex}">
-            <!-- Backdrop -->
+            <!-- Backdrop: always block hit-test when visible so background cannot be clicked; close only if CloseOnOutsideClick -->
             <Border IsVisible="{Binding Options.ShowBackdrop}"
-                    IsHitTestVisible="{Binding Options.CloseOnOutsideClick}"
+                    IsHitTestVisible="{Binding Options.ShowBackdrop}"
                     PointerPressed="BackdropPressed">
               <Border.Background>
                 <MultiBinding Converter="{StaticResource OverlayBackdropConverter}">
