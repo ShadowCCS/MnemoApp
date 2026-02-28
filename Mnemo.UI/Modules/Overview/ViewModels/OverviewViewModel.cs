@@ -24,6 +24,7 @@ public partial class OverviewViewModel : ViewModelBase
     private readonly IOverlayService _overlayService;
     private readonly IStorageProvider _storage;
     private readonly ISettingsService _settingsService;
+    private readonly ILocalizationService _localizationService;
     private readonly ILoggerService _logger;
 
     /// <summary>
@@ -125,17 +126,21 @@ public partial class OverviewViewModel : ViewModelBase
     /// <summary>
     /// Greeting text: shows "Hello…" while profile is loading, then "Hello, {name}!".
     /// </summary>
-    public string GreetingText => !IsProfileLoaded ? "Hello…" : $"Hello, {GreetingName}!";
+    public string GreetingText => !IsProfileLoaded
+        ? _localizationService.T("HelloLoading", "Overview")
+        : string.Format(_localizationService.T("GreetingFormat", "Overview"), GreetingName);
 
-    public OverviewViewModel(IWidgetRegistry widgetRegistry, IOverlayService overlayService, IStorageProvider storage, ISettingsService settingsService, ILoggerService logger)
+    public OverviewViewModel(IWidgetRegistry widgetRegistry, IOverlayService overlayService, IStorageProvider storage, ISettingsService settingsService, ILocalizationService localizationService, ILoggerService logger)
     {
         _widgetRegistry = widgetRegistry;
         _overlayService = overlayService;
         _storage = storage;
         _settingsService = settingsService;
+        _localizationService = localizationService;
         _logger = logger;
 
         _settingsService.SettingChanged += OnSettingChanged;
+        _localizationService.LanguageChanged += (_, _) => OnPropertyChanged(nameof(GreetingText));
         Widgets.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowEmptyState));
         RunAndLogAsync(LoadLayoutAsync(), "load dashboard layout");
         RunAndLogAsync(LoadUserProfileAsync(), "load user profile");

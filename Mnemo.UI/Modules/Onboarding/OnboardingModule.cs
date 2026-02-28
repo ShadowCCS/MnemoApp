@@ -10,6 +10,11 @@ public class OnboardingModule : IModule
         services.AddTransient<OnboardingWizardViewModel>();
     }
 
+    public void RegisterTranslationSources(ITranslationSourceRegistry registry)
+    {
+        // No module translations yet; can add EmbeddedJsonTranslationSource for Translations/ later
+    }
+
     public void RegisterRoutes(INavigationRegistry registry)
     {
         // Onboarding is shown as overlay, not a route

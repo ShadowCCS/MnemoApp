@@ -6,6 +6,7 @@
              xmlns:controls="using:Mnemo.UI.Controls"
              xmlns:components="using:Mnemo.UI.Components"
              xmlns:converters="using:Mnemo.UI.Converters"
+             xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="Mnemo.UI.Modules.Chat.Views.ChatView"
              x:DataType="vm:ChatViewModel"
@@ -95,11 +96,11 @@
                                       Color="{DynamicResource AccentButtonIconBrush}"/>
                 </Border>
                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Text="Atlas"
+                    <TextBlock Text="{markup:T Ns=Chat, Key=Atlas}"
                                FontSize="{DynamicResource FontSize.Body.Large}"
                                FontFamily="{DynamicResource Font.SemiBold}"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    <TextBlock Text="Ask anything about your content"
+                    <TextBlock Text="{markup:T Ns=Chat, Key=AskAnything}"
                                FontSize="{DynamicResource FontSize.Body.Caption}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
@@ -112,7 +113,7 @@
                     CornerRadius="8"
                     Padding="12,6"
                     VerticalAlignment="Center">
-                <TextBlock Text="New Chat" FontWeight="Medium"/>
+                <TextBlock Text="{markup:T Ns=Chat, Key=NewChat}" FontWeight="Medium"/>
             </Button>
         </Grid>
 
@@ -134,7 +135,7 @@
                                                           Color="{DynamicResource AccentButtonIconBrush}"/>
                                     </Border>
                                     <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
-                                        <TextBlock Text="Atlas"
+                                        <TextBlock Text="{markup:T Ns=Chat, Key=Atlas}"
                                                    FontSize="{DynamicResource FontSize.Body.Small}"
                                                    FontFamily="{DynamicResource Font.SemiBold}"
                                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -145,7 +146,7 @@
                                                   BorderThickness="0"
                                                   Margin="-12,0,0,0">
                                             <Expander.Header>
-                                                <TextBlock Text="Thought process"
+                                                <TextBlock Text="{markup:T Ns=Chat, Key=ThoughtProcess}"
                                                            FontSize="{DynamicResource FontSize.Body.Caption}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                                            FontStyle="Italic"/>
@@ -242,7 +243,7 @@
                     Padding="0,8,0,0"
                     VerticalAlignment="Bottom"
                     HorizontalAlignment="Center">
-                <TextBlock Text="Scroll to bottom"
+                <TextBlock Text="{markup:T Ns=Chat, Key=ScrollToBottom}"
                            FontSize="{DynamicResource FontSize.Body.Caption}"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
             </Button>
@@ -257,7 +258,7 @@
                     <TextBox x:Name="InputBox"
                              Grid.Row="0"
                              Classes="TransparentBackground"
-                             Watermark="Ask something..."
+                             Watermark="{markup:T Ns=Chat, Key=AskPlaceholder}"
                              AcceptsReturn="True"
                              TextWrapping="Wrap"
                              MinHeight="40"

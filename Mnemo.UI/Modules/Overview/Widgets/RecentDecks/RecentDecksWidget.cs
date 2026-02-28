@@ -18,8 +18,8 @@ public class RecentDecksWidget : IWidget
             description: "View your recently practiced flashcard decks",
             category: WidgetCategory.Activity,
             icon: "avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg",
-            defaultSize: new WidgetSize(colSpan: 3, rowSpan: 2)
-        );
+            defaultSize: new WidgetSize(colSpan: 3, rowSpan: 2),
+            translationNamespace: "RecentDecks");
     }
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)

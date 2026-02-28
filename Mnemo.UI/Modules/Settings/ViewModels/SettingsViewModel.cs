@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Services;
@@ -10,6 +11,7 @@ public partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settingsService;
     private readonly IThemeService _themeService;
+    private readonly ILocalizationService _localizationService;
 
     [ObservableProperty]
     private string _userName = "John Doe";
@@ -30,10 +32,11 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedCategory.IsSelected = true;
     }
 
-    public SettingsViewModel(ISettingsService settingsService, IThemeService themeService)
+    public SettingsViewModel(ISettingsService settingsService, IThemeService themeService, ILocalizationService localizationService)
     {
         _settingsService = settingsService;
         _themeService = themeService;
+        _localizationService = localizationService;
         
         // Load settings asynchronously
         _ = LoadInitialSettingsAsync();
@@ -47,7 +50,17 @@ public partial class SettingsViewModel : ViewModelBase
             }
         };
 
+        _localizationService.LanguageChanged += OnLanguageChanged;
         InitializeCategories();
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        var selectedId = SelectedCategory?.CategoryId;
+        Categories.Clear();
+        InitializeCategories();
+        if (!string.IsNullOrEmpty(selectedId))
+            SelectedCategory = Categories.FirstOrDefault(c => c.CategoryId == selectedId) ?? Categories.FirstOrDefault();
     }
 
     private async Task LoadInitialSettingsAsync()
@@ -58,93 +71,95 @@ public partial class SettingsViewModel : ViewModelBase
 
     private void InitializeCategories()
     {
+        string T(string key) => _localizationService.T(key, "Settings");
+
         // Account Category
-        var account = new SettingsCategoryViewModel("Account", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/user.svg");
-        var profileGroup = new SettingsGroupViewModel("Profile");
-        profileGroup.Items.Add(new ProfilePictureSettingViewModel(_settingsService, "Profile Picture", "Your personal avatar shown in the app."));
-        profileGroup.Items.Add(new NameSettingViewModel(_settingsService, "Display Name", "Your name will be visible to other users when you share notes."));
+        var account = new SettingsCategoryViewModel(T("Account"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/user.svg", "Account");
+        var profileGroup = new SettingsGroupViewModel(T("Profile"));
+        profileGroup.Items.Add(new ProfilePictureSettingViewModel(_settingsService, T("ProfilePicture"), T("ProfilePictureDescription")));
+        profileGroup.Items.Add(new NameSettingViewModel(_settingsService, T("DisplayName"), T("DisplayNameDescription")));
         account.Groups.Add(profileGroup);
 
         // General Category
-        var general = new SettingsCategoryViewModel("General", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/settings.svg") { IsSelected = true };
-        
-        var appGroup = new SettingsGroupViewModel("Application");
-        appGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.LaunchAtStartup", "Launch at Startup", "Automatically start Mnemo when you log in."));
-        appGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "App.Language", "Language", "Choose your preferred language.", new[] { "English", "French", "German", "Spanish" }));
-        appGroup.Items.Add(new ActionSettingViewModel("Clear Cache", "Delete all temporary files to free up space.", "Clear Now"));
-        
-        var expGroup = new SettingsGroupViewModel("Experience");
-        expGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.EnableGamification", "Enable Gamification", "Track XP, streaks, and level up as you learn.", true));
-        
+        var general = new SettingsCategoryViewModel(T("General"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/settings.svg", "General") { IsSelected = true };
+
+        var appGroup = new SettingsGroupViewModel(T("Application"));
+        appGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.LaunchAtStartup", T("LaunchAtStartup"), T("LaunchAtStartupDescription")));
+        appGroup.Items.Add(new LanguageSettingViewModel(_localizationService, _settingsService));
+        appGroup.Items.Add(new ActionSettingViewModel(T("ClearCache"), T("ClearCacheDescription"), T("ClearNow")));
+
+        var expGroup = new SettingsGroupViewModel(T("Experience"));
+        expGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.EnableGamification", T("EnableGamification"), T("EnableGamificationDescription"), true));
+
         general.Groups.Add(appGroup);
         general.Groups.Add(expGroup);
 
         // Editor Category
-        var editor = new SettingsCategoryViewModel("Editor", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg");
-        
-        var editorGroup = new SettingsGroupViewModel("Writing Experience");
-        editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.AutoSave", "Auto-save", "Automatically save changes every few seconds.", true));
-        editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.SpellCheck", "Spell Check", "Highlight misspelled words in the editor.", true));
-        editorGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Editor.DefaultView", "Default View", "Choose the default view for new notes.", new[] { "Editor Only", "Preview Only", "Split View" }));
-        
-        var markdownGroup = new SettingsGroupViewModel("Markdown Rendering");
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.BlockSpacing", "Block Spacing", "Adjust the vertical space between paragraphs and sections.", new[] { "Normal", "Compact", "Relaxed" }));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LineHeight", "Line Spacing", "Adjust the height between lines of text within a paragraph.", new[] { "1.0", "1.2", "1.4", "1.45", "1.5", "1.6", "1.8", "2.0" }, "1.5"));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LetterSpacing", "Letter Spacing", "Adjust the space between characters.", new[] { "0", "0.2", "0.3", "0.4", "0.5", "0.8", "1.0", "1.5" }, "0.3"));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.FontSize", "Base Font Size", "Change the base font size for the rendered markdown.", new[] { "12px", "13px", "14px", "15px", "16px", "17px", "18px" }, "14px"));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.CodeFontSize", "Code Font Size", "Adjust the font size for code blocks.", new[] { "12px", "13px", "14px", "15px", "16px" }, "15px"));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.MathFontSize", "Math Font Size", "Adjust the font size for LaTeX formulas.", new[] { "14px", "16px", "18px", "20px" }, "14px"));
-        markdownGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Markdown.RenderMath", "Render LaTeX Math", "Enable or disable mathematical formula rendering.", true));
-        
+        var editor = new SettingsCategoryViewModel(T("Editor"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg", "Editor");
+
+        var editorGroup = new SettingsGroupViewModel(T("WritingExperience"));
+        editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.AutoSave", T("AutoSave"), T("AutoSaveDescription"), true));
+        editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.SpellCheck", T("SpellCheck"), T("SpellCheckDescription"), true));
+        editorGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Editor.DefaultView", T("DefaultView"), T("DefaultViewDescription"), new[] { T("EditorOnly"), T("PreviewOnly"), T("SplitView") }));
+
+        var markdownGroup = new SettingsGroupViewModel(T("MarkdownRendering"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.BlockSpacing", T("BlockSpacing"), T("BlockSpacingDescription"), new[] { T("Normal"), T("Compact"), T("Relaxed") }));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LineHeight", T("LineSpacing"), T("LineSpacingDescription"), new[] { "1.0", "1.2", "1.4", "1.45", "1.5", "1.6", "1.8", "2.0" }, "1.5"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LetterSpacing", T("LetterSpacing"), T("LetterSpacingDescription"), new[] { "0", "0.2", "0.3", "0.4", "0.5", "0.8", "1.0", "1.5" }, "0.3"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.FontSize", T("BaseFontSize"), T("BaseFontSizeDescription"), new[] { "12px", "13px", "14px", "15px", "16px", "17px", "18px" }, "14px"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.CodeFontSize", T("CodeFontSize"), T("CodeFontSizeDescription"), new[] { "12px", "13px", "14px", "15px", "16px" }, "15px"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.MathFontSize", T("MathFontSize"), T("MathFontSizeDescription"), new[] { "14px", "16px", "18px", "20px" }, "14px"));
+        markdownGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Markdown.RenderMath", T("RenderLatexMath"), T("RenderLatexMathDescription"), true));
+
         editor.Groups.Add(editorGroup);
         editor.Groups.Add(markdownGroup);
 
         // AI & Tools Category
-        var aiTools = new SettingsCategoryViewModel("AI & Tools", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg");
-        
-        var aiGroup = new SettingsGroupViewModel("Intelligence");
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", "Enable AI Assistant", "Use AI to help you write, summarize, and organize.", true));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartSwitch", "Smart Switch", "Automatically use the smarter (but slower) model for complex tasks."));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartUnitGeneration", "Smart Unit Generation", "Generate only the first unit on creation, then others on-demand."));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", "GPU Acceleration", "Use your graphics card to speed up AI inference. Requires NVIDIA GPU with CUDA."));
-        aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.UnloadTimeout", "Unload Timeout", "Free up memory when AI models are not in use.", new[] { "Never", "5 Minutes", "15 Minutes", "1 Hour" }));
-        
-        var ragGroup = new SettingsGroupViewModel("Local Knowledge");
-        ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", "Enable RAG", "RAG uses an embedding model to allow the processing of large documents. When off, your uploaded material will be limited.", true));
-        ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", "Embedding Model", "The model used to index your personal library.", new[] { "bge-small (Fast)"}));
-        
+        var aiTools = new SettingsCategoryViewModel(T("AITools"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg", "AITools");
+
+        var aiGroup = new SettingsGroupViewModel(T("Intelligence"));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", T("EnableAIAssistant"), T("EnableAIAssistantDescription"), true));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartSwitch", T("SmartSwitch"), T("SmartSwitchDescription")));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartUnitGeneration", T("SmartUnitGeneration"), T("SmartUnitGenerationDescription")));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", T("GpuAcceleration"), T("GpuAccelerationDescription")));
+        aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.UnloadTimeout", T("UnloadTimeout"), T("UnloadTimeoutDescription"), new[] { T("Never"), T("FiveMinutes"), T("FifteenMinutes"), T("OneHour") }));
+
+        var ragGroup = new SettingsGroupViewModel(T("LocalKnowledge"));
+        ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", T("EnableRAG"), T("EnableRAGDescription"), true));
+        ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", T("EmbeddingModel"), T("EmbeddingModelDescription"), new[] { T("BgeSmallFast") }));
+
         aiTools.Groups.Add(aiGroup);
         aiTools.Groups.Add(ragGroup);
 
         // Appearance Category
-        var appearance = new SettingsCategoryViewModel("Appearance", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg");
-        
-        var themeGroup = new SettingsGroupViewModel("Theme & Visuals");
-        themeGroup.Items.Add(new ThemeSettingViewModel(_themeService, "App Theme", "Select the visual style of the application."));
-        themeGroup.Items.Add(new AppIconSettingViewModel(_settingsService, "App Icon", "Customize the application icon in your taskbar."));
-        
+        var appearance = new SettingsCategoryViewModel(T("Appearance"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg", "Appearance");
+
+        var themeGroup = new SettingsGroupViewModel(T("ThemeVisuals"));
+        themeGroup.Items.Add(new ThemeSettingViewModel(_themeService, T("AppTheme"), T("AppThemeDescription")));
+        themeGroup.Items.Add(new AppIconSettingViewModel(_settingsService, T("AppIcon"), T("AppIconDescription")));
+
         appearance.Groups.Add(themeGroup);
 
         // Mindmap Category
-        var mindmap = new SettingsCategoryViewModel("Mindmap", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg");
-        
-        var gridGroup = new SettingsGroupViewModel("Grid & Background");
-        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridType", "Grid Type", "Choose the background grid style.", new[] { "None", "Dotted", "Lines" }, "Dotted"));
-        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridSize", "Grid Size", "Adjust the distance between grid points.", new[] { "20", "40", "60", "80", "100" }, "40"));
-        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridDotSize", "Grid Dot Size", "Adjust the size of the grid dots.", new[] { "0.5", "1.0", "1.5", "2.0", "2.5", "3.0" }, "1.5"));
-        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridOpacity", "Grid Opacity", "Adjust the transparency of the grid.", new[] { "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.8", "1.0" }, "0.2"));
-        
-        var behaviourGroup = new SettingsGroupViewModel("Interaction");
-        behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.ModifierBehaviour", "Shift Behaviour", "What Shift + drag does on empty canvas. Ctrl + box select adds to selection.", new[] { "Selecting", "Panning" }, "Selecting"));
-        
+        var mindmap = new SettingsCategoryViewModel(T("Mindmap"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Mindmap");
+
+        var gridGroup = new SettingsGroupViewModel(T("GridBackground"));
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridType", T("GridType"), T("GridTypeDescription"), new[] { "None", "Dotted", "Lines" }, "Dotted"));
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridSize", T("GridSize"), T("GridSizeDescription"), new[] { "20", "40", "60", "80", "100" }, "40"));
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridDotSize", T("GridDotSize"), T("GridDotSizeDescription"), new[] { "0.5", "1.0", "1.5", "2.0", "2.5", "3.0" }, "1.5"));
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridOpacity", T("GridOpacity"), T("GridOpacityDescription"), new[] { "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.8", "1.0" }, "0.2"));
+
+        var behaviourGroup = new SettingsGroupViewModel(T("Interaction"));
+        behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.ModifierBehaviour", T("ShiftBehaviour"), T("ShiftBehaviourDescription"), new[] { T("Selecting"), T("Panning") }, T("Selecting")));
+
         mindmap.Groups.Add(gridGroup);
         mindmap.Groups.Add(behaviourGroup);
 
         // Hotkeys Category
-        var hotkeys = new SettingsCategoryViewModel("Hotkeys", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg");
-        var hotkeysGroup = new SettingsGroupViewModel("Shortcuts");
-        hotkeysGroup.Items.Add(new ActionSettingViewModel("Global Quick Actions", "Press Alt+Shift+Q to open the quick action menu.", "Change Bind"));
-        hotkeysGroup.Items.Add(new ActionSettingViewModel("New Note", "Press Ctrl+N to create a new note.", "Change Bind"));
+        var hotkeys = new SettingsCategoryViewModel(T("Hotkeys"), "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg", "Hotkeys");
+        var hotkeysGroup = new SettingsGroupViewModel(T("Shortcuts"));
+        hotkeysGroup.Items.Add(new ActionSettingViewModel(T("GlobalQuickActions"), T("GlobalQuickActionsDescription"), T("ChangeBind")));
+        hotkeysGroup.Items.Add(new ActionSettingViewModel(T("NewNote"), T("NewNoteDescription"), T("ChangeBind")));
         hotkeys.Groups.Add(hotkeysGroup);
 
         Categories.Add(account);
@@ -154,7 +169,7 @@ public partial class SettingsViewModel : ViewModelBase
         Categories.Add(mindmap);
         Categories.Add(appearance);
         Categories.Add(hotkeys);
-        
+
         SelectedCategory = general;
     }
 }

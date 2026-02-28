@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Mnemo.UI.Components.Overlays"
+             xmlns:markup="using:Mnemo.UI.Markup"
              x:Class="Mnemo.UI.Components.Overlays.ExtensionPermissionPrompt"
              x:DataType="local:ExtensionPermissionPrompt"
              x:Name="Self">
@@ -14,7 +15,7 @@
     <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16">
       <!-- Header -->
       <StackPanel Grid.Row="0" Spacing="8">
-        <TextBlock Text="Extension Permission Request"
+        <TextBlock Text="{markup:T Ns=Permissions, Key=ExtensionPermissionRequest}"
                    FontSize="{DynamicResource FontSize.Heading3}" 
                    FontFamily="{DynamicResource Font.Bold}"
                    Foreground="{DynamicResource TextPrimaryBrush}"
@@ -36,7 +37,7 @@
 
       <!-- Permissions List -->
       <StackPanel Grid.Row="1" Spacing="12">
-        <TextBlock Text="Requested Permissions:"
+        <TextBlock Text="{markup:T Ns=Permissions, Key=RequestedPermissions}"
                    FontSize="{DynamicResource FontSize.Heading5}"
                    FontFamily="{DynamicResource Font.SemiBold}"
                    Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -73,11 +74,11 @@
                   Spacing="12" 
                   HorizontalAlignment="Center"
                   Margin="0,8,0,0">
-        <Button Content="Deny"
+        <Button Content="{markup:T Ns=Permissions, Key=Deny}"
                 Classes="Subtle"
                 Command="{Binding #Self.DenyCommand}"
                 MinWidth="100"/>
-        <Button Content="Approve"
+        <Button Content="{markup:T Ns=Permissions, Key=Approve}"
                 Command="{Binding #Self.ApproveCommand}"
                 MinWidth="100"/>
       </StackPanel>

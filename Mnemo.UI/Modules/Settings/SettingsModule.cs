@@ -10,6 +10,11 @@ public class SettingsModule : IModule
         services.AddTransient<SettingsViewModel>();
     }
 
+    public void RegisterTranslationSources(ITranslationSourceRegistry registry)
+    {
+        // No module translations yet
+    }
+
     public void RegisterRoutes(INavigationRegistry registry)
     {
         registry.RegisterRoute("settings", typeof(SettingsViewModel));
@@ -17,7 +22,7 @@ public class SettingsModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("Settings", "settings", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/settings.svg", "Ecosystem", 2);
+        sidebarService.RegisterItem("Settings", "settings", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/settings.svg", "Ecosystem", 2, int.MaxValue);
     }
 
     public void RegisterTools(IFunctionRegistry registry)

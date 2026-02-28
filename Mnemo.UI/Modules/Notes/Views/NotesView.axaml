@@ -9,6 +9,7 @@
              xmlns:blockEditor="using:Mnemo.UI.Components.BlockEditor"
              xmlns:converters="using:Mnemo.UI.Converters"
              xmlns:views="using:Mnemo.UI.Modules.Notes.Views"
+             xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
              x:Class="Mnemo.UI.Modules.Notes.Views.NotesView"
              x:DataType="vm:NotesViewModel"
@@ -49,11 +50,11 @@
                                     <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg"
                                                       Width="18" Height="18" Margin="0,0,12,0"
                                                       Color="{DynamicResource TextSecondaryBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="New Note" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="1" Text="{markup:T Ns=Notes, Key=NewNote}" VerticalAlignment="Center"
                                                FontSize="{DynamicResource FontSize.Body.Medium}"
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                Margin="0,0,12,0"/>
-                                    <TextBlock Grid.Column="2" Text="Ctrl+N" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="2" Text="{markup:T Ns=Notes, Key=ShortcutCtrlN}" VerticalAlignment="Center"
                                                FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </Grid>
@@ -68,11 +69,11 @@
                                     <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg"
                                                       Width="18" Height="18" Margin="0,0,12,0"
                                                       Color="{DynamicResource TextSecondaryBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="Search" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="1" Text="{markup:T Ns=Notes, Key=Search}" VerticalAlignment="Center"
                                                FontSize="{DynamicResource FontSize.Body.Medium}"
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                Margin="0,0,12,0"/>
-                                    <TextBlock Grid.Column="2" Text="Ctrl+S" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="2" Text="{markup:T Ns=Notes, Key=ShortcutCtrlS}" VerticalAlignment="Center"
                                                FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </Grid>
@@ -87,11 +88,11 @@
                                     <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/list-details.svg"
                                                       Width="18" Height="18" Margin="0,0,12,0"
                                                       Color="{DynamicResource TextSecondaryBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="Recent" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="1" Text="{markup:T Ns=Notes, Key=Recent}" VerticalAlignment="Center"
                                                FontSize="{DynamicResource FontSize.Body.Medium}"
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                Margin="0,0,12,0"/>
-                                    <TextBlock Grid.Column="2" Text="Ctrl+R" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="2" Text="{markup:T Ns=Notes, Key=ShortcutCtrlR}" VerticalAlignment="Center"
                                                FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 </Grid>
@@ -107,7 +108,7 @@
                                 <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/square-rounded-x.svg"
                                                   Width="18" Height="18" Margin="0,0,12,0"
                                                   Color="{DynamicResource TextSecondaryBrush}"/>
-                                <TextBlock Grid.Column="1" Text="Deleted" VerticalAlignment="Center"
+                                <TextBlock Grid.Column="1" Text="{markup:T Ns=Notes, Key=Deleted}" VerticalAlignment="Center"
                                            FontSize="{DynamicResource FontSize.Body.Medium}"
                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                            Margin="0,0,12,0"/>
@@ -120,7 +121,7 @@
                         <Rectangle Height="1" Fill="{DynamicResource NotesPaneDividerBrush}" Margin="0,4,0,8"/>
 
                         <!-- Favourites (flat list, same row template) -->
-                        <TextBlock Text="Favourites" Margin="10,4,10,6"
+                        <TextBlock Text="{markup:T Ns=Notes, Key=Favourites}" Margin="10,4,10,6"
                                    FontSize="{DynamicResource FontSize.Body.Small}"
                                    FontFamily="{DynamicResource Font.SemiBold}"
                                    Foreground="{DynamicResource NotesSectionHeaderForegroundBrush}"/>
@@ -134,7 +135,7 @@
                         <!-- My Notes header with New Folder (drop here = move to root) -->
                         <Grid x:Name="MyNotesHeader" Margin="10,4,10,6" ColumnDefinitions="*,Auto"
                               Background="Transparent">
-                            <TextBlock Grid.Column="0" Text="My Notes"
+                            <TextBlock Grid.Column="0" Text="{markup:T Ns=Notes, Key=MyNotes}"
                                        FontSize="{DynamicResource FontSize.Body.Small}"
                                        FontFamily="{DynamicResource Font.SemiBold}"
                                        Foreground="{DynamicResource NotesSectionHeaderForegroundBrush}"
@@ -232,7 +233,7 @@
                                  Background="Transparent"
                                  BorderThickness="0"
                                  Padding="0"
-                                 Watermark="Note title"
+                                 Watermark="{markup:T Ns=Notes, Key=NoteTitlePlaceholder}"
                                  x:Name="NoteTitleBox"/>
                         <Button Grid.Column="1" Command="{Binding ToggleFavoriteCommand}"
                                 Background="Transparent" BorderThickness="0" Padding="8,4"
@@ -274,7 +275,7 @@
                     <StackPanel.IsVisible>
                         <Binding Path="SelectedNote" Converter="{StaticResource NullToBoolInvertedConverter}"/>
                     </StackPanel.IsVisible>
-                    <TextBlock Text="Select a note or create a new one"
+                    <TextBlock Text="{markup:T Ns=Notes, Key=SelectOrCreateNote}"
                                FontSize="{DynamicResource FontSize.Body.Medium}"
                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                 </StackPanel>

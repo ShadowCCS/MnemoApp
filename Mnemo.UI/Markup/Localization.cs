@@ -5,14 +5,15 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.MarkupExtensions;
+using Avalonia.VisualTree;
 using Mnemo.Core;
 using Mnemo.Core.Services;
 
 namespace Mnemo.UI.Markup
 {
     /// <summary>
-    /// Usage: Text="{ui:T ns=Settings, key=Title}"
-    /// Or attachable: local:Localization.Namespace="Settings" local:Localization.TextKey="Title"
+    /// Markup extension for localized text. Usage: Text="{ui:T Ns=Settings, Key=Title}".
+    /// Resolves <see cref="ILocalizationService"/> from the application service provider (markup has no DI context).
     /// </summary>
     public class TExtension : MarkupExtension
     {
@@ -34,7 +35,7 @@ namespace Mnemo.UI.Markup
                 _loc.LanguageChanged += (_, __) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Value)));
             }
 
-            public string Value => _loc.T(Ns, Key);
+            public string Value => _loc.T(Key, Ns);
         }
 
         public override object ProvideValue(IServiceProvider serviceProvider)
@@ -73,8 +74,24 @@ namespace Mnemo.UI.Markup
 
         static Localization()
         {
-            NamespaceProperty.Changed.AddClassHandler<TextBlock>((tb, _) => Update(tb));
-            TextKeyProperty.Changed.AddClassHandler<TextBlock>((tb, _) => Update(tb));
+            NamespaceProperty.Changed.AddClassHandler<TextBlock>((tb, _) => OnAttached(tb));
+            TextKeyProperty.Changed.AddClassHandler<TextBlock>((tb, _) => OnAttached(tb));
+        }
+
+        private static void OnAttached(TextBlock? tb)
+        {
+            if (tb == null) return;
+            tb.DetachedFromVisualTree += OnDetachedFromVisualTree;
+            Update(tb);
+        }
+
+        private static void OnDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
+        {
+            if (sender is TextBlock tb)
+            {
+                tb.DetachedFromVisualTree -= OnDetachedFromVisualTree;
+                _registered.TryRemove(tb, out _);
+            }
         }
 
         private static void EnsureLanguageChangeHandler()
@@ -114,7 +131,7 @@ namespace Mnemo.UI.Markup
 
             var loc = ((App)Application.Current!).Services!.GetService(typeof(ILocalizationService)) as ILocalizationService;
             if (loc == null) return;
-            tb.Text = loc.T(ns!, key!);
+            tb.Text = loc.T(key!, ns!);
         }
     }
 }

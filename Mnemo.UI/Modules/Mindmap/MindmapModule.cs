@@ -13,6 +13,11 @@ public class MindmapModule : IModule
         services.AddTransient<MindmapOverviewViewModel>();
     }
 
+    public void RegisterTranslationSources(ITranslationSourceRegistry registry)
+    {
+        // No module translations yet
+    }
+
     public void RegisterRoutes(INavigationRegistry registry)
     {
         registry.RegisterRoute("mindmap", typeof(MindmapOverviewViewModel));
@@ -21,7 +26,7 @@ public class MindmapModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("Mindmap", "mindmap", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Library", 1);
+        sidebarService.RegisterItem("Mindmap", "mindmap", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Library", 1, int.MaxValue);
     }
 
     public void RegisterTools(IFunctionRegistry registry)

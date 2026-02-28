@@ -7,34 +7,38 @@ namespace Mnemo.Core.Models;
 
 public partial class SidebarItem : ObservableObject
 {
-    public string Label { get; }
+    [ObservableProperty]
+    private string _label;
+
     public string Route { get; }
     public string Icon { get; }
-    public string Title { get => Label; }
-    public string IconPath { get => Icon; }
+    public string Title => Label;
+    public string IconPath => Icon;
     public int Order { get; }
-    
+
     [ObservableProperty]
     private bool _isSelected;
 
     public SidebarItem(string label, string route, string icon, int order = int.MaxValue)
     {
-        Label = label;
+        _label = label;
         Route = route;
         Icon = icon;
         Order = order;
     }
 }
 
-public class SidebarCategory
+public partial class SidebarCategory : ObservableObject
 {
-    public string Name { get; }
+    [ObservableProperty]
+    private string _name;
+
     public int Order { get; }
     public ObservableCollection<SidebarItem> Items { get; } = new();
 
     public SidebarCategory(string name, int order = int.MaxValue)
     {
-        Name = name;
+        _name = name;
         Order = order;
     }
 }

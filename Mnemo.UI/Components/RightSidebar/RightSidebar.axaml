@@ -4,6 +4,7 @@
              xmlns:components="using:Mnemo.UI.Components"
              xmlns:converters="using:Mnemo.UI.Converters"
              xmlns:vm="using:Mnemo.UI.Components.RightSidebar"
+             xmlns:markup="using:Mnemo.UI.Markup"
              x:Class="Mnemo.UI.Components.RightSidebar.RightSidebar"
              x:DataType="vm:RightSidebarViewModel"
              x:Name="SidebarRoot">
@@ -88,11 +89,11 @@
                                               Color="{DynamicResource AccentButtonIconBrush}"/>
                         </Border>
                         <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Atlas"
+                            <TextBlock Text="{markup:T Ns=Chat, Key=Atlas}"
                                        FontSize="{DynamicResource FontSize.Body.Large}"
                                        FontFamily="{DynamicResource Font.SemiBold}"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="Ask anything about your content"
+                            <TextBlock Text="{markup:T Ns=Chat, Key=AskAnything}"
                                        FontSize="{DynamicResource FontSize.Body.Caption}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
@@ -101,14 +102,14 @@
                         <Button Classes="PromptActionButton"
                                 Command="{Binding NewChatCommand}"
                                 Padding="6"
-                                ToolTip.Tip="New chat">
+                                ToolTip.Tip="{markup:T Ns=Chat, Key=NewChat}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg"
                                               Width="18" Height="18"
                                               Color="{DynamicResource TextSecondaryBrush}"/>
                         </Button>
                         <Button Background="Transparent" BorderThickness="0"
                                 Command="{Binding ToggleCommand}"
-                                ToolTip.Tip="Close assistant"
+                                ToolTip.Tip="{markup:T Ns=Chat, Key=CloseAssistant}"
                                 Padding="6">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
                                               Width="20" Height="20"
@@ -139,7 +140,7 @@
                                     
                                     <!-- Content -->
                                     <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
-                                        <TextBlock Text="Atlas" 
+                                        <TextBlock Text="{markup:T Ns=Chat, Key=Atlas}" 
                                                    FontSize="{DynamicResource FontSize.Body.Small}"
                                                    FontFamily="{DynamicResource Font.SemiBold}"
                                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -151,7 +152,7 @@
                                                   BorderThickness="0"
                                                   Margin="-12,0,0,0">
                                             <Expander.Header>
-                                                <TextBlock Text="Thought process" 
+                                                <TextBlock Text="{markup:T Ns=Chat, Key=ThoughtProcess}" 
                                                            FontSize="{DynamicResource FontSize.Body.Caption}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                                            FontStyle="Italic"/>
@@ -254,7 +255,7 @@
                         <TextBox x:Name="InputBox"
                                  Grid.Row="0" 
                                  Classes="TransparentBackground"
-                                 Watermark="Ask something..."
+                                 Watermark="{markup:T Ns=Chat, Key=AskPlaceholder}"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  MinHeight="40"
@@ -268,7 +269,7 @@
 
                         <!-- Bottom Row: Attach, Mode, (space), Mic, Send -->
                         <Grid Grid.Row="1" ColumnDefinitions="Auto, Auto, *, Auto, Auto" MinWidth="0">
-                            <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="Add attachment">
+                            <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddAttachment}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/upload.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextSecondaryBrush}"/>
@@ -279,9 +280,9 @@
                                                       SelectedItem="{Binding SelectedAssistantMode}"
                                                       MinWidth="80"
                                                       Margin="0,0,6,0"
-                                                      ToolTip.Tip="Assistant mode"/>
+                                                      ToolTip.Tip="{markup:T Ns=Chat, Key=AssistantMode}"/>
                             <Border Grid.Column="2" MinWidth="0"/>
-                            <Button Grid.Column="3" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="Voice input">
+                            <Button Grid.Column="3" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextSecondaryBrush}"/>
@@ -295,7 +296,7 @@
                                     CornerRadius="10"
                                     BorderThickness="0"
                                     Width="32" Height="32"
-                                    ToolTip.Tip="Send (Enter)">
+                                    ToolTip.Tip="{markup:T Ns=Chat, Key=SendEnter}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource AccentButtonIconBrush}">
@@ -313,7 +314,7 @@
                                     CornerRadius="10"
                                     BorderThickness="0"
                                     Width="32" Height="32"
-                                    ToolTip.Tip="Stop">
+                                    ToolTip.Tip="{markup:T Ns=Chat, Key=Stop}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-pause.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource StopButtonForegroundBrush}"/>

@@ -8,11 +8,12 @@
         xmlns:components="using:Mnemo.UI.Components"
         xmlns:controls="using:Mnemo.UI.Controls"
         xmlns:converters="using:Mnemo.UI.Converters"
+        xmlns:markup="using:Mnemo.UI.Markup"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="Mnemo.UI.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="{Binding AppIconPath, Converter={x:Static converters:PathToWindowIconConverter.Instance}}"
-        Title="Mnemo"
+        Title="{markup:T Ns=App, Key=AppTitle}"
         WindowStartupLocation="CenterScreen"
         SystemDecorations="None"
         CanMinimize="True"
@@ -68,7 +69,7 @@
                 Foreground="{DynamicResource TopbarButtonForegroundBrush}"
                 Command="{Binding ToggleRightSidebarCommand}"
                 IsVisible="{Binding RightSidebarViewModel.IsCollapsed}"
-                ToolTip.Tip="Toggle Assistant">
+                ToolTip.Tip="{markup:T Ns=App, Key=ToggleAssistant}">
             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-sidebar.svg"
                               Color="{DynamicResource TopbarIconsBrush}"
                               Width="22"

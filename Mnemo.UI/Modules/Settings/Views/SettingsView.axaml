@@ -3,9 +3,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Mnemo.UI.Modules.Settings.ViewModels"
+             xmlns:model="using:Mnemo.Core.Models"
              xmlns:components="using:Mnemo.UI.Components"
              xmlns:controls="using:Mnemo.UI.Controls"
              xmlns:converters="using:Mnemo.UI.Converters"
+             xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
              x:Class="Mnemo.UI.Modules.Settings.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
@@ -51,6 +53,25 @@
                               Width="180"
                               Height="36"
                               VerticalContentAlignment="Center"/>
+                </components:SettingsCard.RightContent>
+            </components:SettingsCard>
+        </DataTemplate>
+
+        <!-- Language Setting Template -->
+        <DataTemplate x:Key="LanguageSettingTemplate" x:DataType="vm:LanguageSettingViewModel">
+            <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
+                <components:SettingsCard.RightContent>
+                    <controls:ModernComboBox ItemsSource="{Binding AvailableLanguages}"
+                              SelectedItem="{Binding SelectedLanguage}"
+                              Width="180"
+                              Height="36"
+                              VerticalContentAlignment="Center">
+                        <controls:ModernComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="model:LanguageManifest">
+                                <TextBlock Text="{Binding NativeName}" FontSize="14"/>
+                            </DataTemplate>
+                        </controls:ModernComboBox.ItemTemplate>
+                    </controls:ModernComboBox>
                 </components:SettingsCard.RightContent>
             </components:SettingsCard>
         </DataTemplate>
@@ -345,7 +366,7 @@
                 <!-- Sidebar Header/Profile -->
                 <Border Grid.Row="0" Padding="24,32,24,16">
                     <StackPanel Spacing="16">
-                        <TextBlock Text="Settings" 
+                        <TextBlock Text="{markup:T Ns=Settings, Key=Title}" 
                                    FontSize="24" 
                                    FontFamily="{DynamicResource Font.Bold}" 
                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -362,7 +383,7 @@
                                                FontSize="14" 
                                                FontFamily="{DynamicResource Font.SemiBold}"
                                                Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Welcome to Mnemo" 
+                                    <TextBlock Text="{markup:T Ns=Settings, Key=WelcomeToMnemo}" 
                                                FontSize="12" 
                                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </StackPanel>
@@ -373,7 +394,7 @@
 
                 <!-- Search Bar -->
                 <Border Grid.Row="1" Padding="24,0,24,24">
-                    <TextBox Watermark="Search settings..."
+                    <TextBox Watermark="{markup:T Ns=Settings, Key=SearchPlaceholder}"
                              Classes="SettingsSearch"
                              Height="38"
                              VerticalContentAlignment="Center">
@@ -428,7 +449,7 @@
                                        FontSize="32" 
                                        FontFamily="{DynamicResource Font.Bold}" 
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="Manage your preferences and application settings."
+                            <TextBlock Text="{markup:T Ns=Settings, Key=CategoryDescription}"
                                        FontSize="14"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
@@ -454,6 +475,7 @@
                                                         <ContentControl.DataTemplates>
                                                             <StaticResource ResourceKey="ToggleSettingTemplate"/>
                                                             <StaticResource ResourceKey="DropdownSettingTemplate"/>
+                                                            <StaticResource ResourceKey="LanguageSettingTemplate"/>
                                                             <StaticResource ResourceKey="ActionSettingTemplate"/>
                                                             <StaticResource ResourceKey="AppIconSettingTemplate"/>
                                                             <StaticResource ResourceKey="ThemeSettingTemplate"/>

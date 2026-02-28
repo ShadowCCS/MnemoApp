@@ -7,6 +7,7 @@
              xmlns:controls="using:Mnemo.UI.Controls"
              xmlns:converters="using:Mnemo.UI.Converters"
              xmlns:components="using:Mnemo.UI.Components"
+             xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="Mnemo.UI.Modules.Path.Views.PathDetailView"
              x:DataType="vm:PathDetailViewModel"
@@ -165,7 +166,7 @@
                                                     <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg" 
                                                                       Width="14" Height="14" 
                                                                       Color="{DynamicResource TextSecondaryBrush}"/>
-                                                    <TextBlock Text="Regenerate" 
+                                                    <TextBlock Text="{markup:T Ns=Path, Key=Regenerate}" 
                                                                FontSize="{DynamicResource FontSize.Body.Small}" 
                                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                                VerticalAlignment="Center"/>
@@ -193,11 +194,11 @@
                                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg" 
                                                               Width="48" Height="48" Color="{DynamicResource CardAccentBrush}"
                                                               Classes="Spinning"/>
-                                            <TextBlock Text="Generating content..." 
+                                            <TextBlock Text="{markup:T Ns=Path, Key=GeneratingContent}" 
                                                        FontSize="{DynamicResource FontSize.Heading5}" 
                                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                                        HorizontalAlignment="Center"/>
-                                            <Button Content="Regenerate Now" Command="{Binding #rootDetail.((vm:PathDetailViewModel)DataContext).GenerateUnitCommand}" CommandParameter="{Binding}" HorizontalAlignment="Center"/>
+                                            <Button Content="{markup:T Ns=Path, Key=RegenerateNow}" Command="{Binding #rootDetail.((vm:PathDetailViewModel)DataContext).GenerateUnitCommand}" CommandParameter="{Binding}" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Border>
 

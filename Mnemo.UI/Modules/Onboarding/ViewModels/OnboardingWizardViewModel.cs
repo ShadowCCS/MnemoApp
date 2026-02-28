@@ -18,6 +18,7 @@ public partial class OnboardingWizardViewModel : ViewModelBase
     private const string UserDisplayNameKey = "User.DisplayName";
 
     private readonly ISettingsService _settingsService;
+    private readonly ILocalizationService _localizationService;
     private readonly IOverlayService _overlayService;
     private readonly INavigationService _navigationService;
     private readonly IAIModelsSetupService _aiModelsSetupService;
@@ -27,6 +28,7 @@ public partial class OnboardingWizardViewModel : ViewModelBase
     private static readonly IReadOnlyList<OnboardingStepKind> Steps = new[]
     {
         OnboardingStepKind.Welcome,
+        OnboardingStepKind.Language,
         OnboardingStepKind.Personalization,
         OnboardingStepKind.AISetup,
     };
@@ -54,6 +56,7 @@ public partial class OnboardingWizardViewModel : ViewModelBase
 
     public string VersionText { get; } = global::Mnemo.UI.AppVersion.GetVersion();
 
+    public LanguageSettingViewModel LanguageSettingViewModel { get; }
     public ThemeSettingViewModel ThemeSettingViewModel { get; }
     public AppIconSettingViewModel AppIconSettingViewModel { get; }
     public ProfilePictureSettingViewModel ProfilePictureSettingViewModel { get; }
@@ -62,44 +65,70 @@ public partial class OnboardingWizardViewModel : ViewModelBase
     public OnboardingStepKind CurrentStep => Steps[CurrentStepIndex];
     public bool IsFirstStep => CurrentStepIndex == 0;
     public bool IsLastStep => CurrentStepIndex == Steps.Count - 1;
-    public string NextButtonText => IsLastStep ? "Finish" : "Next";
+    public string NextButtonText => IsLastStep ? _localizationService.T("Finish", "Common") : _localizationService.T("Next", "Common");
     public string StepProgressText => $"{CurrentStepIndex + 1} of {StepCount}";
     public bool ShowDownloadError => !string.IsNullOrEmpty(DownloadError);
     public bool IsWelcomeStep => CurrentStep == OnboardingStepKind.Welcome;
+    public bool IsLanguageStep => CurrentStep == OnboardingStepKind.Language;
     public bool IsPersonalizationStep => CurrentStep == OnboardingStepKind.Personalization;
     public bool IsAISetupStep => CurrentStep == OnboardingStepKind.AISetup;
 
     public string StepTitle => CurrentStep switch
     {
-        OnboardingStepKind.Welcome => "Welcome to Mnemo",
-        OnboardingStepKind.Personalization => "Personalize your experience",
-        OnboardingStepKind.AISetup => "Set up Atlas AI",
+        OnboardingStepKind.Welcome => _localizationService.T("WelcomeTitle", "Onboarding"),
+        OnboardingStepKind.Language => _localizationService.T("LanguageTitle", "Onboarding"),
+        OnboardingStepKind.Personalization => _localizationService.T("PersonalizeTitle", "Onboarding"),
+        OnboardingStepKind.AISetup => _localizationService.T("AISetupTitle", "Onboarding"),
         _ => string.Empty,
     };
 
     public string StepDescription => CurrentStep switch
     {
-        OnboardingStepKind.Welcome => "This application is under active development. Features may change and data formats are not yet final. Use at your own risk.",
-        OnboardingStepKind.Personalization => "Choose your display name, theme, app icon, and profile picture. You can change these later in Settings.",
-        OnboardingStepKind.AISetup => "Download the required AI model files (embedding, server, router, and fast) to enable local AI features. Already installed components are skipped; only missing ones are downloaded.",
+        OnboardingStepKind.Welcome => _localizationService.T("WelcomeDescription", "Onboarding"),
+        OnboardingStepKind.Language => _localizationService.T("LanguageDescription", "Onboarding"),
+        OnboardingStepKind.Personalization => _localizationService.T("PersonalizeDescription", "Onboarding"),
+        OnboardingStepKind.AISetup => _localizationService.T("AISetupDescription", "Onboarding"),
         _ => string.Empty,
     };
 
+    public string VersionLabel => string.Format(_localizationService.T("VersionFormat", "Onboarding"), VersionText);
+
     public OnboardingWizardViewModel(
         ISettingsService settingsService,
+        ILocalizationService localizationService,
         IThemeService themeService,
         IOverlayService overlayService,
         INavigationService navigationService,
         IAIModelsSetupService aiModelsSetupService)
     {
         _settingsService = settingsService;
+        _localizationService = localizationService;
         _overlayService = overlayService;
         _navigationService = navigationService;
         _aiModelsSetupService = aiModelsSetupService;
 
-        ThemeSettingViewModel = new ThemeSettingViewModel(themeService, "Theme", "Select the visual style.");
-        AppIconSettingViewModel = new AppIconSettingViewModel(settingsService, "App icon", "Icon shown in the taskbar.");
-        ProfilePictureSettingViewModel = new ProfilePictureSettingViewModel(settingsService, "Profile picture", "Your avatar in the app.");
+        string T(string key) => _localizationService.T(key, "Onboarding");
+        LanguageSettingViewModel = new LanguageSettingViewModel(localizationService, settingsService);
+        ThemeSettingViewModel = new ThemeSettingViewModel(themeService, T("Theme"), T("ThemeDescription"));
+        AppIconSettingViewModel = new AppIconSettingViewModel(settingsService, T("AppIconLabel"), T("AppIconDescription"));
+        ProfilePictureSettingViewModel = new ProfilePictureSettingViewModel(settingsService, T("ProfilePictureLabel"), T("ProfilePictureDescription"));
+
+        _localizationService.LanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(StepTitle));
+        OnPropertyChanged(nameof(StepDescription));
+        OnPropertyChanged(nameof(NextButtonText));
+        OnPropertyChanged(nameof(VersionLabel));
+        string T(string key) => _localizationService.T(key, "Onboarding");
+        ThemeSettingViewModel.Title = T("Theme");
+        ThemeSettingViewModel.Description = T("ThemeDescription");
+        AppIconSettingViewModel.Title = T("AppIconLabel");
+        AppIconSettingViewModel.Description = T("AppIconDescription");
+        ProfilePictureSettingViewModel.Title = T("ProfilePictureLabel");
+        ProfilePictureSettingViewModel.Description = T("ProfilePictureDescription");
     }
 
     public void SetOverlayId(string overlayId)
@@ -117,6 +146,7 @@ public partial class OnboardingWizardViewModel : ViewModelBase
         OnPropertyChanged(nameof(NextButtonText));
         OnPropertyChanged(nameof(StepProgressText));
         OnPropertyChanged(nameof(IsWelcomeStep));
+        OnPropertyChanged(nameof(IsLanguageStep));
         OnPropertyChanged(nameof(IsPersonalizationStep));
         OnPropertyChanged(nameof(IsAISetupStep));
         if (CurrentStep == OnboardingStepKind.AISetup)
@@ -160,7 +190,7 @@ public partial class OnboardingWizardViewModel : ViewModelBase
 
         IsDownloading = true;
         DownloadError = null;
-        DownloadStatusMessage = "Starting...";
+        DownloadStatusMessage = _localizationService.T("Starting", "Onboarding");
         _downloadCts = new CancellationTokenSource();
 
         var progress = new Progress<AIModelsSetupProgress>(p =>
@@ -176,17 +206,19 @@ public partial class OnboardingWizardViewModel : ViewModelBase
             if (result.IsSuccess)
             {
                 IsDownloadComplete = true;
-                DownloadStatusMessage = result.Value!.Installed.Count > 0 ? "Ready" : "All models already installed.";
+                DownloadStatusMessage = result.Value!.Installed.Count > 0
+                    ? _localizationService.T("Ready", "Onboarding")
+                    : _localizationService.T("AllModelsInstalled", "Onboarding");
             }
             else
             {
-                DownloadError = result.ErrorMessage ?? "Download failed.";
+                DownloadError = result.ErrorMessage ?? _localizationService.T("DownloadFailed", "Onboarding");
                 OnPropertyChanged(nameof(ShowDownloadError));
             }
         }
         catch (OperationCanceledException)
         {
-            DownloadStatusMessage = "Cancelled";
+            DownloadStatusMessage = _localizationService.T("Cancelled", "Onboarding");
         }
         catch (Exception ex)
         {
@@ -225,7 +257,7 @@ public partial class OnboardingWizardViewModel : ViewModelBase
             if (status.AllInstalled)
             {
                 IsDownloadComplete = true;
-                DownloadStatusMessage = "All models already installed.";
+                DownloadStatusMessage = _localizationService.T("AllModelsInstalled", "Onboarding");
             }
         }
         catch

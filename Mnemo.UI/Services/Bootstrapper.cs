@@ -63,9 +63,20 @@ public static class Bootstrapper
         services.AddSingleton<IFunctionRegistry, FunctionRegistry>();
         services.AddSingleton<IWidgetRegistry, WidgetRegistry>();
 
-        // 3. Discover and Configure Modules
-        // We scan for modules before building the final provider
+        // 3. Discover modules and register translation sources (before building provider)
         var modules = DiscoverModules();
+        var translationRegistry = new TranslationSourceRegistry();
+        translationRegistry.Add(new EmbeddedBuiltInTranslationSource());
+        foreach (var module in modules)
+        {
+            module.RegisterTranslationSources(translationRegistry);
+        }
+        services.AddSingleton<ILocalizationService>(sp => new LocalizationService(
+            translationRegistry.Sources,
+            sp.GetRequiredService<ILoggerService>(),
+            "en"));
+
+        // 4. Configure Modules
         var registrar = new ServiceRegistrar(services);
         foreach (var module in modules)
         {
@@ -74,7 +85,10 @@ public static class Bootstrapper
 
         var serviceProvider = services.BuildServiceProvider();
 
-        // 4. Initialize AI Model Registry and set default server path
+        // 5. Load saved or default language
+        _ = LoadSavedLanguageAsync(serviceProvider);
+
+        // 6. Initialize AI Model Registry and set default server path
         var settingsService = serviceProvider.GetRequiredService<ISettingsService>();
         _ = Task.Run(async () =>
         {
@@ -96,7 +110,7 @@ public static class Bootstrapper
         var modelRegistry = serviceProvider.GetRequiredService<IAIModelRegistry>();
         _ = modelRegistry.RefreshAsync();
 
-        // 5. Auto-start router model server
+        // 7. Auto-start router model server
         var serverManager = serviceProvider.GetRequiredService<LlamaCppServerManager>();
         var logger = serviceProvider.GetRequiredService<ILoggerService>();
         
@@ -127,7 +141,7 @@ public static class Bootstrapper
             }
         });
 
-        // 6. Register Routes, Sidebar Items, Tools and Widgets
+        // 8. Register Routes, Sidebar Items, Tools and Widgets
         var navRegistry = serviceProvider.GetRequiredService<INavigationRegistry>();
         var funcRegistry = serviceProvider.GetRequiredService<IFunctionRegistry>();
         var sidebarService = serviceProvider.GetRequiredService<ISidebarService>();
@@ -142,6 +156,15 @@ public static class Bootstrapper
         }
 
         return serviceProvider;
+    }
+
+    private static async Task LoadSavedLanguageAsync(IServiceProvider serviceProvider)
+    {
+        var settings = serviceProvider.GetRequiredService<ISettingsService>();
+        var loc = serviceProvider.GetRequiredService<ILocalizationService>();
+        var savedLanguage = await settings.GetAsync<string>("App.Language", "en").ConfigureAwait(false);
+        var languageToLoad = !string.IsNullOrWhiteSpace(savedLanguage) ? savedLanguage : "en";
+        await loc.SetLanguageAsync(languageToLoad).ConfigureAwait(false);
     }
 
     private static IEnumerable<IModule> DiscoverModules()

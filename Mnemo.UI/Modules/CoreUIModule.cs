@@ -16,6 +16,11 @@ public class CoreUIModule : IModule
         services.AddTransient<TopbarViewModel>();
     }
 
+    public void RegisterTranslationSources(ITranslationSourceRegistry registry)
+    {
+        // No translations for core UI
+    }
+
     public void RegisterRoutes(INavigationRegistry registry)
     {
         // Global routes could go here if any

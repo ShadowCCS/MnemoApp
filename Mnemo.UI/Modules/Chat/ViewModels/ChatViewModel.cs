@@ -21,6 +21,7 @@ public class ChatViewModel : ViewModelBase
 
     private readonly IAIOrchestrator _orchestrator;
     private readonly ILoggerService _logger;
+    private readonly ILocalizationService _localizationService;
 
     private string _inputText = string.Empty;
     public string InputText
@@ -85,10 +86,11 @@ public class ChatViewModel : ViewModelBase
     private CancellationTokenSource? _cts;
     private ChatMessageViewModel? _lastMessageSubscribed;
 
-    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger)
+    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService)
     {
         _orchestrator = orchestrator;
         _logger = logger;
+        _localizationService = localizationService;
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
@@ -98,12 +100,7 @@ public class ChatViewModel : ViewModelBase
 
         Messages.CollectionChanged += OnMessagesCollectionChanged;
 
-        Messages.Add(new ChatMessageViewModel
-        {
-            Content = "Hi, I'm your Mnemo assistant. Ask me to explain a concept, summarize a lesson, or help you practice.",
-            IsUser = false,
-            Suggestions = new List<string> { "Explain this page", "Quiz me", "Summarize" }
-        });
+        Messages.Add(CreateWelcomeMessage());
     }
 
     private void WarmUpSafe()
@@ -186,12 +183,22 @@ public class ChatViewModel : ViewModelBase
         }
         Messages.Clear();
         Messages.CollectionChanged += OnMessagesCollectionChanged;
-        Messages.Add(new ChatMessageViewModel
+        Messages.Add(CreateWelcomeMessage());
+    }
+
+    private ChatMessageViewModel CreateWelcomeMessage()
+    {
+        return new ChatMessageViewModel
         {
-            Content = "Hi, I'm your Mnemo assistant. Ask me to explain a concept, summarize a lesson, or help you practice.",
+            Content = _localizationService.T("WelcomeMessage", "Chat"),
             IsUser = false,
-            Suggestions = new List<string> { "Explain this page", "Quiz me", "Summarize" }
-        });
+            Suggestions = new List<string>
+            {
+                _localizationService.T("SuggestionExplain", "Chat"),
+                _localizationService.T("SuggestionQuiz", "Chat"),
+                _localizationService.T("SuggestionSummarize", "Chat")
+            }
+        };
     }
 
     private async Task SendMessageAsync()
@@ -246,7 +253,7 @@ public class ChatViewModel : ViewModelBase
             if (!foundResponse)
             {
                 await Dispatcher.UIThread.InvokeAsync(() =>
-                    aiMessage.Content = "I'm sorry, I couldn't generate a response.");
+                    aiMessage.Content = _localizationService.T("ErrorSorry", "Chat"));
             }
         }
         catch (OperationCanceledException)
@@ -254,7 +261,7 @@ public class ChatViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (string.IsNullOrEmpty(aiMessage.Content))
-                    aiMessage.Content = "Generation stopped.";
+                    aiMessage.Content = _localizationService.T("GenerationStopped", "Chat");
                 aiMessage.IsStreaming = false;
             });
         }
@@ -263,7 +270,7 @@ public class ChatViewModel : ViewModelBase
             _logger.Error("Chat", $"SendMessage failed: {ex}");
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                aiMessage.Content = "An unexpected error occurred. Please try again later.";
+                aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
                 aiMessage.IsStreaming = false;
             });
         }

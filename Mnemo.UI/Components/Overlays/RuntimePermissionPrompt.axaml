@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Mnemo.UI.Components.Overlays"
+             xmlns:markup="using:Mnemo.UI.Markup"
              x:Class="Mnemo.UI.Components.Overlays.RuntimePermissionPrompt"
              x:DataType="local:RuntimePermissionPrompt"
              x:Name="Self">
@@ -14,7 +15,7 @@
     <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="20">
       <!-- Header -->
       <StackPanel Grid.Row="0" Spacing="8">
-        <TextBlock Text="Additional Permission Required"
+        <TextBlock Text="{markup:T Ns=Permissions, Key=AdditionalPermissionRequired}"
                    FontSize="{DynamicResource FontSize.Heading4}" 
                    FontFamily="{DynamicResource Font.Bold}"
                    Foreground="{DynamicResource TextPrimaryBrush}"
@@ -52,11 +53,11 @@
                   Orientation="Horizontal" 
                   Spacing="12" 
                   HorizontalAlignment="Center">
-        <Button Content="Deny"
+        <Button Content="{markup:T Ns=Permissions, Key=Deny}"
                 Classes="Subtle"
                 Command="{Binding #Self.DenyCommand}"
                 MinWidth="100"/>
-        <Button Content="Allow"
+        <Button Content="{markup:T Ns=Permissions, Key=Allow}"
                 Command="{Binding #Self.AllowCommand}"
                 MinWidth="100"/>
       </StackPanel>

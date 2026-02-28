@@ -11,13 +11,17 @@ namespace Mnemo.UI.Services;
 public class SidebarService : ISidebarService, INotifyPropertyChanged
 {
     private bool _isCollapsed;
+    private readonly ILocalizationService _localizationService;
 
     private static readonly Dictionary<string, int> DefaultCategoryOrder = new(StringComparer.OrdinalIgnoreCase)
     {
-        { "Main hub", 0 },
+        { "MainHub", 0 },
         { "Library", 1 },
         { "Ecosystem", 2 }
     };
+
+    private readonly List<(SidebarCategory category, string nameKey, string ns)> _categoryKeys = new();
+    private readonly List<(SidebarItem item, string labelKey, string ns)> _itemKeys = new();
 
     public ObservableCollection<SidebarCategory> Categories { get; } = new();
 
@@ -34,16 +38,31 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
         }
     }
 
-    public void RegisterItem(string label, string route, string icon, string categoryName = "General", int? categoryOrder = null, int itemOrder = int.MaxValue)
+    public SidebarService(ILocalizationService localizationService)
     {
-        var category = Categories.FirstOrDefault(c => string.Equals(c.Name, categoryName, StringComparison.OrdinalIgnoreCase));
+        _localizationService = localizationService;
+        _localizationService.LanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        foreach (var (category, nameKey, ns) in _categoryKeys)
+            category.Name = _localizationService.T(nameKey, ns);
+        foreach (var (item, labelKey, ns) in _itemKeys)
+            item.Label = _localizationService.T(labelKey, ns);
+    }
+
+    public void RegisterItem(string labelKey, string route, string icon, string categoryKey = "General", int? categoryOrder = null, int itemOrder = int.MaxValue, string ns = "Sidebar")
+    {
+        var category = _categoryKeys.FirstOrDefault(t => string.Equals(t.nameKey, categoryKey, StringComparison.OrdinalIgnoreCase) && t.ns == ns).category;
         if (category == null)
         {
-            var order = categoryOrder ?? 
-                       (DefaultCategoryOrder.TryGetValue(categoryName, out var defaultOrder) ? defaultOrder : int.MaxValue);
-            category = new SidebarCategory(categoryName, order);
-            
-            // Insert at the correct position to maintain order
+            var order = categoryOrder ??
+                       (DefaultCategoryOrder.TryGetValue(categoryKey, out var defaultOrder) ? defaultOrder : int.MaxValue);
+            var resolvedCategoryName = _localizationService.T(categoryKey, ns);
+            category = new SidebarCategory(resolvedCategoryName, order);
+            _categoryKeys.Add((category, categoryKey, ns));
+
             var insertIndex = Categories.Count;
             for (int i = 0; i < Categories.Count; i++)
             {
@@ -55,10 +74,11 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
             }
             Categories.Insert(insertIndex, category);
         }
-        
-        var item = new SidebarItem(label, route, icon, itemOrder);
-        
-        // Insert at the correct position to maintain order
+
+        var resolvedLabel = _localizationService.T(labelKey, ns);
+        var item = new SidebarItem(resolvedLabel, route, icon, itemOrder);
+        _itemKeys.Add((item, labelKey, ns));
+
         var itemInsertIndex = category.Items.Count;
         for (int i = 0; i < category.Items.Count; i++)
         {

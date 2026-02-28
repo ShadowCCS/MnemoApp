@@ -3,6 +3,7 @@
              xmlns:vm="using:Mnemo.UI.Modules.Notes.ViewModels"
              xmlns:controls="using:Mnemo.UI.Controls"
              xmlns:converters="using:Mnemo.UI.Converters"
+             xmlns:markup="using:Mnemo.UI.Markup"
              x:Class="Mnemo.UI.Modules.Notes.Views.NoteTreeRow"
              x:DataType="vm:NoteTreeItemViewModel">
     <UserControl.Resources>
@@ -53,9 +54,9 @@
                                   Width="16" Height="16"/>
                 <Button.Flyout>
                     <MenuFlyout>
-                        <MenuItem Header="Rename" Tag="{Binding}" Click="OnRenameClick"
+                        <MenuItem Header="{markup:T Ns=Notes, Key=Rename}" Tag="{Binding}" Click="OnRenameClick"
                                   IsVisible="{Binding IsRenamableFolder}"/>
-                        <MenuItem Header="Delete" Tag="{Binding}" Click="OnDeleteClick"/>
+                        <MenuItem Header="{markup:T Ns=Notes, Key=Delete}" Tag="{Binding}" Click="OnDeleteClick"/>
                     </MenuFlyout>
                 </Button.Flyout>
             </Button>

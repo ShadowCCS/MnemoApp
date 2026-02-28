@@ -108,12 +108,12 @@ namespace Mnemo.UI.Components
 
             if (!string.IsNullOrWhiteSpace(TitleKey))
             {
-                Title = locService.T(Namespace!, TitleKey!);
+                Title = locService.T(TitleKey!, Namespace!);
             }
 
             if (!string.IsNullOrWhiteSpace(DescriptionKey))
             {
-                Description = locService.T(Namespace!, DescriptionKey!);
+                Description = locService.T(DescriptionKey!, Namespace!);
             }
         }
     }

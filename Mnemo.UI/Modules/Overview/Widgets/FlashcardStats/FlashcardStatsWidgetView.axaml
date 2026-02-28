@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Mnemo.UI.Modules.Overview.Widgets.FlashcardStats"
+             xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="240"
              x:Class="Mnemo.UI.Modules.Overview.Widgets.FlashcardStats.FlashcardStatsWidgetView"
              x:DataType="vm:FlashcardStatsWidgetViewModel">
@@ -19,7 +20,7 @@
                        FontFamily="{DynamicResource Font.Bold}"
                        Foreground="{DynamicResource TextPrimaryBrush}"
                        HorizontalAlignment="Center"/>
-            <TextBlock Text="Cards Practiced"
+            <TextBlock Text="{markup:T Ns=Overview, Key=CardsPracticed}"
                        FontSize="14"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        HorizontalAlignment="Center"/>
@@ -33,7 +34,7 @@
                            FontFamily="{DynamicResource Font.SemiBold}"
                            Foreground="{DynamicResource CardAccentBrush}"
                            HorizontalAlignment="Center"/>
-                <TextBlock Text="Today"
+                <TextBlock Text="{markup:T Ns=Overview, Key=Today}"
                            FontSize="11"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"/>
@@ -45,7 +46,7 @@
                            Foreground="{DynamicResource CardAccentBrush}"
                            HorizontalAlignment="Center"
                            Text="{Binding StudyStreak}"/>
-                <TextBlock Text="Day Streak"
+                <TextBlock Text="{markup:T Ns=Overview, Key=DayStreak}"
                            FontSize="11"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"/>

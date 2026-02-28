@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Mnemo.UI.Modules.Overview.Widgets.RecentDecks"
              xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="240"
              x:Class="Mnemo.UI.Modules.Overview.Widgets.RecentDecks.RecentDecksWidgetView"
              x:DataType="vm:RecentDecksWidgetViewModel">
@@ -56,7 +57,7 @@
                                         <Run Text="{Binding Subject}"/>
                                         <Run Text="•"/>
                                         <Run Text="{Binding CardCount}"/>
-                                        <Run Text="cards"/>
+                                        <Run Text="{markup:T Ns=Overview, Key=cards}"/>
                                     </TextBlock>
                                 </StackPanel>
 

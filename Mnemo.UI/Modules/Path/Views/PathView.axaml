@@ -6,6 +6,7 @@
              xmlns:controls="using:Mnemo.UI.Controls"
              xmlns:converters="using:Mnemo.UI.Converters"
              xmlns:components="using:Mnemo.UI.Components"
+             xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="Mnemo.UI.Modules.Path.Views.PathView"
              x:DataType="vm:PathViewModel"
@@ -118,11 +119,11 @@
             <!-- Header Section -->
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Learning Path" 
+                    <TextBlock Text="{markup:T Ns=Path, Key=Title}" 
                                FontSize="{DynamicResource FontSize.Heading1}" 
                                FontFamily="{DynamicResource Font.Bold}"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    <TextBlock Text="Organize your knowledge and track your progress" 
+                    <TextBlock Text="{markup:T Ns=Path, Key=Subtitle}" 
                                FontSize="{DynamicResource FontSize.Body.Medium}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
@@ -135,7 +136,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg" 
                                           Width="18" Height="18" Color="{DynamicResource CardAccentBrush}"/>
-                        <TextBlock Text="Generate New" 
+                        <TextBlock Text="{markup:T Ns=Path, Key=GenerateNew}" 
                                    FontFamily="{DynamicResource Font.SemiBold}" 
                                    Foreground="{DynamicResource CardAccentBrush}"/>
                     </StackPanel>
@@ -144,7 +145,7 @@
 
             <!-- Featured / Recently Active -->
             <StackPanel Spacing="20">
-                <TextBlock Text="Recently Active" 
+                <TextBlock Text="{markup:T Ns=Path, Key=RecentlyActive}" 
                            FontSize="{DynamicResource FontSize.Heading3}" 
                            FontFamily="{DynamicResource Font.SemiBold}"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -229,14 +230,14 @@
 
             <!-- Library / Continue Studying -->
             <StackPanel Spacing="25">
-                <TextBlock Text="Library" 
+                <TextBlock Text="{markup:T Ns=Path, Key=Library}" 
                            FontSize="{DynamicResource FontSize.Heading3}" 
                            FontFamily="{DynamicResource Font.SemiBold}"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
 
                 <!-- Modern Toolbar -->
                 <DockPanel LastChildFill="False">
-                    <TextBox Watermark="Search your library..." 
+                    <TextBox Watermark="{markup:T Ns=Path, Key=SearchLibrary}" 
                              Classes="SettingsSearch"
                              Width="320" 
                              Height="38"
@@ -338,22 +339,22 @@
                         <!-- Custom List Header -->
                         <Border Padding="12,8" Margin="0,0,0,5">
                             <Grid ColumnDefinitions="48,*,150,100,170,40">
-                                <TextBlock Grid.Column="1" Text="NAME" 
+                                <TextBlock Grid.Column="1" Text="{markup:T Ns=Path, Key=ColumnName}" 
                                            FontSize="{DynamicResource FontSize.Caption}" 
                                            FontFamily="{DynamicResource Font.Bold}" 
                                            Foreground="{DynamicResource TextTertiaryBrush}" 
                                            Margin="12,0,0,0"/>
-                                <TextBlock Grid.Column="2" Text="LAST MODIFIED" 
+                                <TextBlock Grid.Column="2" Text="{markup:T Ns=Path, Key=LastModified}" 
                                            FontSize="{DynamicResource FontSize.Caption}" 
                                            FontFamily="{DynamicResource Font.Bold}" 
                                            Foreground="{DynamicResource TextTertiaryBrush}" 
                                            HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="3" Text="SIZE" 
+                                <TextBlock Grid.Column="3" Text="{markup:T Ns=Path, Key=Size}" 
                                            FontSize="{DynamicResource FontSize.Caption}" 
                                            FontFamily="{DynamicResource Font.Bold}" 
                                            Foreground="{DynamicResource TextTertiaryBrush}" 
                                            HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="4" Text="PROGRESS" 
+                                <TextBlock Grid.Column="4" Text="{markup:T Ns=Path, Key=Progress}" 
                                            FontSize="{DynamicResource FontSize.Caption}" 
                                            FontFamily="{DynamicResource Font.Bold}" 
                                            Foreground="{DynamicResource TextTertiaryBrush}" 

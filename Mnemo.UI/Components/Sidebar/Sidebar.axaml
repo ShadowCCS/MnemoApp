@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:Mnemo.UI.Controls"
              xmlns:vm="using:Mnemo.UI.Components.Sidebar"
-             xmlns:i18n="clr-namespace:Mnemo.UI.Markup"
+             xmlns:markup="using:Mnemo.UI.Markup"
              x:Class="Mnemo.UI.Components.Sidebar.Sidebar"
              x:DataType="vm:SidebarViewModel">
     <Grid>
@@ -40,7 +40,7 @@
                         Background="Transparent" 
                         BorderThickness="0" 
                         Command="{Binding ToggleSidebarCommand}"
-                        ToolTip.Tip="Collapse sidebar"
+                        ToolTip.Tip="{markup:T Ns=Sidebar, Key=CollapseSidebar}"
                         VerticalAlignment="Center">
                     <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg" 
                                       Width="18" Height="18" 
@@ -101,7 +101,7 @@
                         BorderThickness="0" 
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
-                        ToolTip.Tip="Keyboard shortcuts"
+                        ToolTip.Tip="{markup:T Ns=Sidebar, Key=KeyboardShortcuts}"
                         Padding="12,8">
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="6" CornerRadius="6">
@@ -110,17 +110,17 @@
                                           Color="{DynamicResource CardIconColorBrush}"/>
                         </Border>
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Quick Actions"
+                            <TextBlock Text="{markup:T Ns=Sidebar, Key=QuickActions}"
                                        Foreground="{DynamicResource QuickActionsTextPrimaryBrush}"
                                        FontSize="{DynamicResource FontSize.Body.Small}"/>
-                            <TextBlock Text="alt + shift + Q" 
+                            <TextBlock Text="{markup:T Ns=Sidebar, Key=QuickActionsShortcut}" 
                                        FontSize="{DynamicResource FontSize.Caption}" 
                                        Foreground="{DynamicResource QuickActionsTextSecondaryBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </Button>
                 
-                <TextBlock Text="Development Build - Beta" 
+                <TextBlock Text="{markup:T Ns=Sidebar, Key=DevelopmentBuild}" 
                            FontSize="{DynamicResource FontSize.Body.Caption}" 
                            Foreground="{DynamicResource VersionTextBrush}"
                            HorizontalAlignment="Center"
@@ -157,7 +157,7 @@
                     <Button Background="Transparent" 
                             BorderThickness="0" 
                             Command="{Binding ToggleSidebarCommand}"
-                            ToolTip.Tip="Expand sidebar">
+                            ToolTip.Tip="{markup:T Ns=Sidebar, Key=ExpandSidebar}">
                         <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg" 
                                           Width="16" Height="16" 
                                           Color="{DynamicResource ChevronSidebarBrush}"/>

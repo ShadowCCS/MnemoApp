@@ -4,6 +4,7 @@
         xmlns:controls="using:Mnemo.UI.Controls"
         xmlns:converters="using:Mnemo.UI.Converters"
         xmlns:vm="using:Mnemo.UI.ViewModels"
+        xmlns:markup="using:Mnemo.UI.Markup"
         x:Class="Mnemo.UI.Components.Topbar"
         x:DataType="components:TopbarViewModel">
     <UserControl.Resources>
@@ -16,7 +17,7 @@
         <Grid ColumnDefinitions="Auto,*" Margin="10">
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg" Color="{DynamicResource TextSecondaryBrush}" Width="24" Height="24" />
-                <TextBlock Grid.Column="0" Text="Search for a lesson, mindmap, etc." FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="0" Text="{markup:T Ns=Topbar, Key=SearchPlaceholder}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
             </StackPanel>
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
@@ -38,11 +39,11 @@
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Assets/xp.svg" Width="18" Height="18" />
-                            <TextBlock Text="4,850 XP" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="{markup:T Ns=Topbar, Key=XpSample}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Assets/streak.svg" Width="18" Height="18" />
-                            <TextBlock Text="4 Days" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="{markup:T Ns=Topbar, Key=StreakDaysSample}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

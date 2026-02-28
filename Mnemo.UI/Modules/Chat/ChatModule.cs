@@ -10,6 +10,11 @@ public class ChatModule : IModule
         services.AddTransient<ChatViewModel>();
     }
 
+    public void RegisterTranslationSources(ITranslationSourceRegistry registry)
+    {
+        // No module translations yet
+    }
+
     public void RegisterRoutes(INavigationRegistry registry)
     {
         registry.RegisterRoute("chat", typeof(ChatViewModel));
@@ -17,7 +22,7 @@ public class ChatModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("AI Chat", "chat", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sparkles-2.svg", "Ecosystem", 3, 0);
+        sidebarService.RegisterItem("AIChat", "chat", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sparkles-2.svg", "Ecosystem", 3, 0);
     }
 
     public void RegisterTools(IFunctionRegistry registry)

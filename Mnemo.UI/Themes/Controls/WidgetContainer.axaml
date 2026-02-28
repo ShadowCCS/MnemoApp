@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:local="using:Mnemo.UI.Modules.Overview.Controls"
+                    xmlns:markup="using:Mnemo.UI.Markup"
                     x:ClassModifier="internal"
                     x:CompileBindings="False">
 
@@ -41,6 +42,8 @@
                         Stretch="Uniform"
                         Opacity="1.0"/>
                   <TextBlock Text="{Binding Widget.Metadata.Title, RelativeSource={RelativeSource TemplatedParent}}"
+                             markup:Localization.Namespace="{Binding Widget.Metadata.TranslationNamespace, RelativeSource={RelativeSource TemplatedParent}}"
+                             markup:Localization.TextKey="Title"
                              FontSize="14"
                              FontFamily="{DynamicResource Font.SemiBold}"
                              Foreground="{DynamicResource TextPrimaryBrush}"

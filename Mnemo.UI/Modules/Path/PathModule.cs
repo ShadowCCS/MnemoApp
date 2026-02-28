@@ -11,6 +11,11 @@ public class PathModule : IModule
         services.AddTransient<PathDetailViewModel>();
     }
 
+    public void RegisterTranslationSources(ITranslationSourceRegistry registry)
+    {
+        // No module translations yet
+    }
+
     public void RegisterRoutes(INavigationRegistry registry)
     {
         registry.RegisterRoute("path", typeof(PathViewModel));
@@ -19,7 +24,7 @@ public class PathModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("Learning Path", "path", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/route-square.svg", "Main hub", 0, 1);
+        sidebarService.RegisterItem("LearningPath", "path", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/route-square.svg", "MainHub", 0, 1);
     }
 
     public void RegisterTools(IFunctionRegistry registry)

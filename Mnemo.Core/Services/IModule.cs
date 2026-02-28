@@ -6,6 +6,10 @@ namespace Mnemo.Core.Services;
 public interface IModule
 {
     void ConfigureServices(IServiceRegistrar services);
+    /// <summary>
+    /// Registers translation sources for this module. Called before the service provider is built.
+    /// </summary>
+    void RegisterTranslationSources(ITranslationSourceRegistry registry);
     void RegisterRoutes(INavigationRegistry registry);
     void RegisterSidebarItems(ISidebarService sidebarService);
     void RegisterTools(IFunctionRegistry registry);

@@ -9,12 +9,15 @@ public partial class SettingsCategoryViewModel : ViewModelBase
     [ObservableProperty] private string _name;
     [ObservableProperty] private string _icon;
     [ObservableProperty] private bool _isSelected;
+    /// <summary>Stable id used when refreshing categories (e.g. on language change).</summary>
+    public string CategoryId { get; }
     public ObservableCollection<SettingsGroupViewModel> Groups { get; } = new();
 
-    public SettingsCategoryViewModel(string name, string icon)
+    public SettingsCategoryViewModel(string name, string icon, string? categoryId = null)
     {
         _name = name;
         _icon = icon;
+        CategoryId = categoryId ?? name;
     }
 }
 

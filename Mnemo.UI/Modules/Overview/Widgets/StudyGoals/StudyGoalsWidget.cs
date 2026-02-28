@@ -18,8 +18,8 @@ public class StudyGoalsWidget : IWidget
             description: "Track your daily study goals and progress",
             category: WidgetCategory.Activity,
             icon: "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg",
-            defaultSize: new WidgetSize(colSpan: 2, rowSpan: 2)
-        );
+            defaultSize: new WidgetSize(colSpan: 2, rowSpan: 2),
+            translationNamespace: "StudyGoals");
     }
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)

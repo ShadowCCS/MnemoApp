@@ -10,6 +10,11 @@ public class NotesModule : IModule
         services.AddTransient<NotesViewModel>();
     }
 
+    public void RegisterTranslationSources(ITranslationSourceRegistry registry)
+    {
+        // No module translations yet
+    }
+
     public void RegisterRoutes(INavigationRegistry registry)
     {
         registry.RegisterRoute("notes", typeof(NotesViewModel));
@@ -17,7 +22,7 @@ public class NotesModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("Notes", "notes", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg", "Library", 1);
+        sidebarService.RegisterItem("Notes", "notes", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg", "Library", 1, int.MaxValue);
     }
 
     public void RegisterTools(IFunctionRegistry registry)
