@@ -23,6 +23,7 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private readonly IAIOrchestrator _orchestrator;
     private readonly ILoggerService _logger;
+    private readonly ILocalizationService _localizationService;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveWidth))]
@@ -66,10 +67,11 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
 
-    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger)
+    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService)
     {
         _orchestrator = orchestrator;
         _logger = logger;
+        _localizationService = localizationService;
 
         ToggleCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
         SendCommand = new AsyncRelayCommand(SendAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy);
@@ -77,12 +79,22 @@ public partial class RightSidebarViewModel : ViewModelBase
         NewChatCommand = new RelayCommand(NewChat, () => !IsBusy);
         SuggestionSelectedCommand = new RelayCommand<string>(ApplySuggestion);
 
-        Messages.Add(new ChatMessage
+        Messages.Add(CreateWelcomeMessage());
+    }
+
+    private ChatMessage CreateWelcomeMessage()
+    {
+        return new ChatMessage
         {
             Role = MessageRole.Assistant,
-            Content = "Hi, I'm your Mnemo assistant. Ask me to explain a concept, summarize a lesson, or help you practice.",
-            Suggestions = new List<string> { "Explain this page", "Quiz me", "Summarize" }
-        });
+            Content = _localizationService.T("WelcomeMessage", "Chat"),
+            Suggestions = new List<string>
+            {
+                _localizationService.T("SuggestionExplain", "Chat"),
+                _localizationService.T("SuggestionQuiz", "Chat"),
+                _localizationService.T("SuggestionSummarize", "Chat")
+            }
+        };
     }
 
     partial void OnInputTextChanged(string value)
@@ -116,12 +128,7 @@ public partial class RightSidebarViewModel : ViewModelBase
     private void NewChat()
     {
         Messages.Clear();
-        Messages.Add(new ChatMessage
-        {
-            Role = MessageRole.Assistant,
-            Content = "Hi, I'm your Mnemo assistant. Ask me to explain a concept, summarize a lesson, or help you practice.",
-            Suggestions = new List<string> { "Explain this page", "Quiz me", "Summarize" }
-        });
+        Messages.Add(CreateWelcomeMessage());
     }
 
     private void ApplySuggestion(string? suggestion)
@@ -182,7 +189,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             if (!foundResponse)
             {
                 await Dispatcher.UIThread.InvokeAsync(() =>
-                    aiMessage.Content = "I'm sorry, I couldn't generate a response.");
+                    aiMessage.Content = _localizationService.T("ErrorSorry", "Chat"));
             }
         }
         catch (OperationCanceledException)
@@ -190,7 +197,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (string.IsNullOrEmpty(aiMessage.Content))
-                    aiMessage.Content = "Generation stopped.";
+                    aiMessage.Content = _localizationService.T("GenerationStopped", "Chat");
                 aiMessage.IsStreaming = false;
             });
         }
@@ -199,7 +206,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             _logger.Error("RightSidebar", $"Send failed: {ex}");
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                aiMessage.Content = "An unexpected error occurred. Please try again later.";
+                aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
                 aiMessage.IsStreaming = false;
             });
         }

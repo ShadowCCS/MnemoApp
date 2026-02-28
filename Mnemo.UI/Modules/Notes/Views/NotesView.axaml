@@ -142,7 +142,7 @@
                                        VerticalAlignment="Center"/>
                             <Button Grid.Column="1" Command="{Binding NewFolderCommand}"
                                     Background="Transparent" BorderThickness="0" Padding="6,4"
-                                    Cursor="Hand" ToolTip.Tip="New folder">
+                                    Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=NewFolder}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource NotesSectionHeaderForegroundBrush}"/>
@@ -237,7 +237,7 @@
                                  x:Name="NoteTitleBox"/>
                         <Button Grid.Column="1" Command="{Binding ToggleFavoriteCommand}"
                                 Background="Transparent" BorderThickness="0" Padding="8,4"
-                                Cursor="Hand" ToolTip.Tip="Toggle favorite">
+                                Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=ToggleFavorite}">
                             <Grid>
                                 <controls:SvgIcon x:Name="StarOutline" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/star.svg"
                                                   Width="22" Height="22" Color="{DynamicResource TextTertiaryBrush}"

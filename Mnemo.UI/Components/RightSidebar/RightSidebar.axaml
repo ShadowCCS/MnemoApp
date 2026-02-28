@@ -10,6 +10,7 @@
              x:Name="SidebarRoot">
     <UserControl.Resources>
         <converters:BoolToStreamingIntervalConverter x:Key="BoolToStreamingIntervalConverter"/>
+        <converters:AssistantModeToLabelConverter x:Key="AssistantModeToLabelConverter"/>
     </UserControl.Resources>
     <UserControl.Styles>
         <Style Selector="Button.SuggestionChip">
@@ -280,7 +281,16 @@
                                                       SelectedItem="{Binding SelectedAssistantMode}"
                                                       MinWidth="80"
                                                       Margin="0,0,6,0"
-                                                      ToolTip.Tip="{markup:T Ns=Chat, Key=AssistantMode}"/>
+                                                      ToolTip.Tip="{markup:T Ns=Chat, Key=AssistantMode}">
+                                <controls:ModernComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource AssistantModeToLabelConverter}}"
+                                                   FontSize="{DynamicResource FontSize.Body.Caption}"
+                                                   FontFamily="{DynamicResource Font.Medium}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </DataTemplate>
+                                </controls:ModernComboBox.ItemTemplate>
+                            </controls:ModernComboBox>
                             <Border Grid.Column="2" MinWidth="0"/>
                             <Button Grid.Column="3" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"

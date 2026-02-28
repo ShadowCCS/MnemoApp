@@ -48,7 +48,7 @@
                      Margin="4,4,0,4" VerticalAlignment="Center"
                      LostFocus="OnNameEditLostFocus" KeyDown="OnNameEditKeyDown"/>
             <Button x:Name="MoreButton" Grid.Column="2" Classes="note-more-button" Background="Transparent" BorderThickness="0" Padding="4,6"
-                    VerticalAlignment="Center" Cursor="Hand" ToolTip.Tip="More actions"
+                    VerticalAlignment="Center" Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=MoreActions}"
                     Tag="{Binding}">
                 <controls:SvgIcon Classes="note-row-icon" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
                                   Width="16" Height="16"/>

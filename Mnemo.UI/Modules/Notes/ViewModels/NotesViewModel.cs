@@ -18,6 +18,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     private readonly INoteService _noteService;
     private readonly INoteFolderService _folderService;
     private readonly ISettingsService _settingsService;
+    private readonly ILocalizationService _localizationService;
 
     [ObservableProperty]
     private Note? _selectedNote;
@@ -81,11 +82,12 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
     private Dictionary<string, NoteFolder> _foldersById = new();
 
-    public NotesViewModel(INoteService noteService, INoteFolderService folderService, ISettingsService settingsService)
+    public NotesViewModel(INoteService noteService, INoteFolderService folderService, ISettingsService settingsService, ILocalizationService localizationService)
     {
         _noteService = noteService;
         _folderService = folderService;
         _settingsService = settingsService;
+        _localizationService = localizationService;
     }
 
     [RelayCommand]
@@ -284,8 +286,8 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             BreadcrumbText = value.Title;
         }
 
-        CreatedText = FormatRelative(value.CreatedAt, "Created");
-        ModifiedText = FormatRelative(value.ModifiedAt, "Last modified");
+        CreatedText = FormatRelative(value.CreatedAt, "Created", "Notes");
+        ModifiedText = FormatRelative(value.ModifiedAt, "LastModified", "Notes");
     }
 
     private void RefreshBreadcrumbText()
@@ -337,7 +339,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         }
 
         await _noteService.SaveNoteAsync(SelectedNote);
-        ModifiedText = FormatRelative(SelectedNote.ModifiedAt, "Last modified");
+        ModifiedText = FormatRelative(SelectedNote.ModifiedAt, "LastModified", "Notes");
     }
 
     /// <summary>
@@ -763,17 +765,18 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         _ = LoadNotesCommand.ExecuteAsync(null);
     }
 
-    private static string FormatRelative(DateTime dateTime, string prefix)
+    private string FormatRelative(DateTime dateTime, string prefixKey, string ns)
     {
+        var prefix = _localizationService.T(prefixKey, ns);
         var utc = dateTime.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(dateTime, DateTimeKind.Utc) : dateTime.ToUniversalTime();
         var diff = DateTime.UtcNow - utc;
 
-        if (diff.TotalMinutes < 1) return $"{prefix} just now";
-        if (diff.TotalMinutes < 60) return $"{prefix} {(int)diff.TotalMinutes} minutes ago";
-        if (diff.TotalHours < 24) return $"{prefix} {(int)diff.TotalHours} hours ago";
-        if (diff.TotalDays < 7) return $"{prefix} {(int)diff.TotalDays} days ago";
-        if (diff.TotalDays < 30) return $"{prefix} {(int)(diff.TotalDays / 7)} weeks ago";
-        if (diff.TotalDays < 365) return $"{prefix} {(int)(diff.TotalDays / 30)} months ago";
-        return $"{prefix} {(int)(diff.TotalDays / 365)} years ago";
+        if (diff.TotalMinutes < 1) return $"{prefix} {_localizationService.T("JustNow", ns)}";
+        if (diff.TotalMinutes < 60) return $"{prefix} {string.Format(_localizationService.T("MinutesAgo", ns), (int)diff.TotalMinutes)}";
+        if (diff.TotalHours < 24) return $"{prefix} {string.Format(_localizationService.T("HoursAgo", ns), (int)diff.TotalHours)}";
+        if (diff.TotalDays < 7) return $"{prefix} {string.Format(_localizationService.T("DaysAgo", ns), (int)diff.TotalDays)}";
+        if (diff.TotalDays < 30) return $"{prefix} {string.Format(_localizationService.T("WeeksAgo", ns), (int)(diff.TotalDays / 7))}";
+        if (diff.TotalDays < 365) return $"{prefix} {string.Format(_localizationService.T("MonthsAgo", ns), (int)(diff.TotalDays / 30))}";
+        return $"{prefix} {string.Format(_localizationService.T("YearsAgo", ns), (int)(diff.TotalDays / 365))}";
     }
 }

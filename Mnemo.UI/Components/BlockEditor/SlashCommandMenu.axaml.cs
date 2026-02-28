@@ -4,6 +4,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Mnemo.Core.Models;
+using Mnemo.Core.Services;
+using Mnemo.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,18 +61,21 @@ public partial class SlashCommandMenu : UserControl
 
     private List<CommandItem> InitializeCommandItems()
     {
+        var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+        string T(string key, string ns = "NotesEditor") => loc?.T(key, ns) ?? key;
+
         return new List<CommandItem>
         {
-            new() { Icon = "T", Name = "Text", Description = "Plain text block", BlockType = BlockType.Text },
-            new() { Icon = "H1", Name = "Heading 1", Description = "Large section heading", BlockType = BlockType.Heading1 },
-            new() { Icon = "H2", Name = "Heading 2", Description = "Medium section heading", BlockType = BlockType.Heading2 },
-            new() { Icon = "H3", Name = "Heading 3", Description = "Small section heading", BlockType = BlockType.Heading3 },
-            new() { Icon = "•", Name = "Bullet List", Description = "Simple bulleted list", BlockType = BlockType.BulletList },
-            new() { Icon = "1.", Name = "Numbered List", Description = "Ordered numbered list", BlockType = BlockType.NumberedList },
-            new() { Icon = "☑", Name = "Checklist", Description = "Interactive to-do item", BlockType = BlockType.Checklist },
-            new() { Icon = "Q", Name = "Quote", Description = "Quoted text block", BlockType = BlockType.Quote },
-            new() { Icon = "</>", Name = "Code", Description = "Code block with syntax highlighting", BlockType = BlockType.Code },
-            new() { Icon = "—", Name = "Divider", Description = "Horizontal divider line", BlockType = BlockType.Divider }
+            new() { Icon = "T", Name = T("Text"), Description = T("TextDescription"), BlockType = BlockType.Text },
+            new() { Icon = "H1", Name = T("Heading1"), Description = T("Heading1Description"), BlockType = BlockType.Heading1 },
+            new() { Icon = "H2", Name = T("Heading2"), Description = T("Heading2Description"), BlockType = BlockType.Heading2 },
+            new() { Icon = "H3", Name = T("Heading3"), Description = T("Heading3Description"), BlockType = BlockType.Heading3 },
+            new() { Icon = "•", Name = T("BulletList"), Description = T("BulletListDescription"), BlockType = BlockType.BulletList },
+            new() { Icon = "1.", Name = T("NumberedList"), Description = T("NumberedListDescription"), BlockType = BlockType.NumberedList },
+            new() { Icon = "☑", Name = T("Checklist"), Description = T("ChecklistDescription"), BlockType = BlockType.Checklist },
+            new() { Icon = "Q", Name = T("Quote"), Description = T("QuoteDescription"), BlockType = BlockType.Quote },
+            new() { Icon = "</>", Name = T("Code"), Description = T("CodeDescription"), BlockType = BlockType.Code },
+            new() { Icon = "—", Name = T("Divider"), Description = T("DividerDescription"), BlockType = BlockType.Divider }
         };
     }
 

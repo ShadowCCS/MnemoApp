@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Avalonia;
 using Mnemo.Core.Models;
+using Mnemo.Core.Services;
+using Mnemo.UI;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
@@ -16,7 +19,6 @@ public class BlockViewModel : INotifyPropertyChanged
     private int _listNumberIndex = 1;
     private bool _isFocused;
     private bool _isSelected;
-    private string? _cachedWatermark;
 
     public string Id
     {
@@ -33,7 +35,6 @@ public class BlockViewModel : INotifyPropertyChanged
             {
                 _type = value; 
                 EnsureMetaKeys();
-                _cachedWatermark = null; // Invalidate watermark cache
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Watermark));
             }
@@ -48,7 +49,6 @@ public class BlockViewModel : INotifyPropertyChanged
             if (_content != value)
             {
                 _content = value; 
-                _cachedWatermark = null; // Invalidate watermark cache
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Watermark));
             }
@@ -101,7 +101,6 @@ public class BlockViewModel : INotifyPropertyChanged
             if (_isFocused != value)
             {
                 _isFocused = value; 
-                _cachedWatermark = null; // Invalidate watermark cache
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Watermark));
             }
@@ -128,31 +127,26 @@ public class BlockViewModel : INotifyPropertyChanged
     {
         get
         {
-            // Use cached value if available
-            if (_cachedWatermark != null)
-                return _cachedWatermark;
+            var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+            string T(string key, string ns = "NotesEditor") => loc?.T(key, ns) ?? key;
 
             // Only show the slash command hint for empty, focused Text blocks
             if (Type == BlockType.Text && IsFocused && string.IsNullOrEmpty(Content))
-            {
-                _cachedWatermark = "Type '/' for commands...";
-                return _cachedWatermark;
-            }
-            
-            _cachedWatermark = Type switch
+                return T("TypeSlashForCommands");
+
+            return Type switch
             {
                 BlockType.Text => string.Empty,
-                BlockType.Heading1 => "Heading 1",
-                BlockType.Heading2 => "Heading 2",
-                BlockType.Heading3 => "Heading 3",
-                BlockType.Quote => "Quote",
-                BlockType.Code => "Code",
-                BlockType.BulletList => "List item",
-                BlockType.NumberedList => "List item",
-                BlockType.Checklist => "To-do",
+                BlockType.Heading1 => T("Heading1"),
+                BlockType.Heading2 => T("Heading2"),
+                BlockType.Heading3 => T("Heading3"),
+                BlockType.Quote => T("Quote"),
+                BlockType.Code => T("Code"),
+                BlockType.BulletList => T("ListItem"),
+                BlockType.NumberedList => T("ListItem"),
+                BlockType.Checklist => T("Todo"),
                 _ => string.Empty
             };
-            return _cachedWatermark;
         }
     }
 

@@ -14,6 +14,7 @@
 
     <UserControl.Resources>
         <converters:BoolToStreamingIntervalConverter x:Key="BoolToStreamingIntervalConverter"/>
+        <converters:AssistantModeToLabelConverter x:Key="AssistantModeToLabelConverter"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -271,7 +272,7 @@
                              Margin="0,0,0,8"/>
 
                     <Grid Grid.Row="1" ColumnDefinitions="Auto, Auto, *, Auto, Auto" MinWidth="0">
-                        <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="Add attachment">
+                        <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddAttachment}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/upload.svg"
                                               Width="16" Height="16"
                                               Color="{DynamicResource TextSecondaryBrush}"/>
@@ -282,9 +283,18 @@
                                                   SelectedItem="{Binding SelectedAssistantMode}"
                                                   MinWidth="80"
                                                   Margin="0,0,6,0"
-                                                  ToolTip.Tip="Assistant mode"/>
+                                                  ToolTip.Tip="{markup:T Ns=Chat, Key=AssistantMode}">
+                            <controls:ModernComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource AssistantModeToLabelConverter}}"
+                                               FontSize="{DynamicResource FontSize.Body.Caption}"
+                                               FontFamily="{DynamicResource Font.Medium}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                </DataTemplate>
+                            </controls:ModernComboBox.ItemTemplate>
+                        </controls:ModernComboBox>
                         <Border Grid.Column="2" MinWidth="0"/>
-                        <Button Grid.Column="3" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="Voice input">
+                        <Button Grid.Column="3" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"
                                               Width="16" Height="16"
                                               Color="{DynamicResource TextSecondaryBrush}"/>
@@ -298,7 +308,7 @@
                                 CornerRadius="10"
                                 BorderThickness="0"
                                 Width="32" Height="32"
-                                ToolTip.Tip="Send (Enter)">
+                                ToolTip.Tip="{markup:T Ns=Chat, Key=SendEnter}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
                                               Width="16" Height="16"
                                               Color="{DynamicResource AccentButtonIconBrush}">
@@ -316,7 +326,7 @@
                                 CornerRadius="10"
                                 BorderThickness="0"
                                 Width="32" Height="32"
-                                ToolTip.Tip="Stop">
+                                ToolTip.Tip="{markup:T Ns=Chat, Key=Stop}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-pause.svg"
                                               Width="16" Height="16"
                                               Color="{DynamicResource StopButtonForegroundBrush}"/>
