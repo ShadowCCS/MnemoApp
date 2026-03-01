@@ -248,6 +248,7 @@
     "Code": "Code",
     "ListItem": "List item",
     "Todo": "To-do",
+    "ChecklistItem": "Add checklist item",
     "Text": "Text",
     "BulletList": "Bullet List",
     "NumberedList": "Numbered List",

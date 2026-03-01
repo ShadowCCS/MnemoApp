@@ -248,6 +248,7 @@
     "Code": "Código",
     "ListItem": "Elemento de lista",
     "Todo": "Lista de tareas",
+    "ChecklistItem": "Añadir elemento a la lista",
     "Text": "Texto",
     "BulletList": "Lista con viñetas",
     "NumberedList": "Lista numerada",

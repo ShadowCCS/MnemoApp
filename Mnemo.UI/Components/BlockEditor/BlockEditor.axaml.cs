@@ -464,6 +464,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
              source.GetVisualAncestors().OfType<Border>().Any(b => b.Tag is "DragHandle"));
         if (hitIsDragHandle) return;
 
+        // Let native CheckBox handling run (checklist toggles) instead of capturing in editor tunnel.
+        bool hitIsCheckBox = source is CheckBox || (source != null && source.GetVisualAncestors().Any(a => a is CheckBox));
+        if (hitIsCheckBox) return;
+
         var pos = e.GetPosition(this);
 
         if (IsPointInsideAnyBlock(pos))

@@ -248,6 +248,7 @@
       "Code": "コードブロック",
       "ListItem": "リスト項目",
       "Todo": "タスクリスト",
+      "ChecklistItem": "チェックリスト項目を追加",
       "Text": "テキスト",
       "BulletList": "マーカー付きリスト",
       "NumberedList": "番号付きリスト",

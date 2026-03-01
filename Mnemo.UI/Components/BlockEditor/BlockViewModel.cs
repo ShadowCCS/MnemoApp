@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Avalonia;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
@@ -127,9 +128,17 @@ public class BlockViewModel : INotifyPropertyChanged
 
     public bool IsChecked
     {
-        get => _meta.TryGetValue("checked", out var value) && value is bool boolValue && boolValue;
-        set 
-        { 
+        get
+        {
+            if (!_meta.TryGetValue("checked", out var value)) return false;
+            if (value is bool b) return b;
+            // After JSON deserialization, Meta values can be JsonElement
+            if (value is JsonElement je && je.ValueKind == JsonValueKind.True) return true;
+            if (value is JsonElement je2 && je2.ValueKind == JsonValueKind.False) return false;
+            return false;
+        }
+        set
+        {
             _meta["checked"] = value;
             OnPropertyChanged();
         }
@@ -156,7 +165,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 BlockType.Code => T("Code"),
                 BlockType.BulletList => T("ListItem"),
                 BlockType.NumberedList => T("ListItem"),
-                BlockType.Checklist => T("Todo"),
+                BlockType.Checklist => T("ChecklistItem"),
                 _ => string.Empty
             };
         }

@@ -6,9 +6,12 @@
     <Grid ColumnDefinitions="Auto,*">
         <CheckBox
             Grid.Column="0"
-            Margin="0,0,8,0"
-            IsChecked="{Binding IsChecked}"
-            VerticalAlignment="Top" />
+            Margin="0,2,8,0"
+            IsChecked="{Binding IsChecked, Mode=TwoWay}"
+            IsThreeState="False"
+            MinHeight="20"
+            VerticalAlignment="Top"
+            Cursor="Hand" />
         <TextBox
             x:Name="InputTextBox"
             Grid.Column="1"
@@ -17,6 +20,7 @@
             BorderThickness="0"
             FontSize="14"
             Padding="0"
+            VerticalAlignment="Top"
             Text="{Binding Content, Mode=TwoWay}"
             TextWrapping="Wrap"
             Watermark="{Binding Watermark}" />

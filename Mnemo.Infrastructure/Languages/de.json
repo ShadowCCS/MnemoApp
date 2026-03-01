@@ -248,6 +248,7 @@
     "Code": "Code",
     "ListItem": "Listelement",
     "Todo": "Aufgabe",
+    "ChecklistItem": "Checklistenpunkt hinzufügen",
     "Text": "Text",
     "BulletList": "Bulleted Liste",
     "NumberedList": "Nummerierte Liste",
