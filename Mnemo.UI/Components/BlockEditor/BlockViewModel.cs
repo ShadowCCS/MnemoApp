@@ -113,6 +113,18 @@ public class BlockViewModel : INotifyPropertyChanged
         set { _isSelected = value; OnPropertyChanged(); }
     }
 
+    private int? _pendingCaretIndex;
+
+    /// <summary>
+    /// When set, EditableBlock should move the caret to this index after the next focus.
+    /// The consumer is responsible for clearing this value after use.
+    /// </summary>
+    public int? PendingCaretIndex
+    {
+        get => _pendingCaretIndex;
+        set { _pendingCaretIndex = value; OnPropertyChanged(); }
+    }
+
     public bool IsChecked
     {
         get => _meta.TryGetValue("checked", out var value) && value is bool boolValue && boolValue;
@@ -152,11 +164,12 @@ public class BlockViewModel : INotifyPropertyChanged
 
     public event Action<BlockViewModel>? ContentChanged;
     public event Action<BlockViewModel>? DeleteRequested;
-    public event Action<BlockViewModel>? NewBlockRequested;
+    public event Action<BlockViewModel, string?>? NewBlockRequested;
     public event Action<BlockViewModel, BlockType>? NewBlockOfTypeRequested;
     public event Action<BlockViewModel>? DeleteAndFocusAboveRequested;
     public event Action<BlockViewModel>? FocusPreviousRequested;
     public event Action<BlockViewModel>? FocusNextRequested;
+    public event Action<BlockViewModel>? MergeWithPreviousRequested;
 
     public BlockViewModel(BlockType type, string content = "", int order = 0)
     {
@@ -233,9 +246,9 @@ public class BlockViewModel : INotifyPropertyChanged
         DeleteRequested?.Invoke(this);
     }
 
-    public void RequestNewBlock()
+    public void RequestNewBlock(string? initialContentForNewBlock = null)
     {
-        NewBlockRequested?.Invoke(this);
+        NewBlockRequested?.Invoke(this, initialContentForNewBlock);
     }
 
     public void RequestNewBlockOfType(BlockType type)
@@ -256,6 +269,11 @@ public class BlockViewModel : INotifyPropertyChanged
     public void RequestFocusNext()
     {
         FocusNextRequested?.Invoke(this);
+    }
+
+    public void RequestMergeWithPrevious()
+    {
+        MergeWithPreviousRequested?.Invoke(this);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -64,7 +64,9 @@ public partial class EditableBlock : UserControl
         _keyboardHandler.EnterPressed += HandleEnterPressed;
         _keyboardHandler.RequestNewBlockOfType += HandleRequestNewBlockOfType;
         _keyboardHandler.ConvertToBlockType += ConvertToBlockType;
+        _keyboardHandler.ConvertToTextPreservingContent += HandleConvertToTextPreservingContent;
         _keyboardHandler.EscapePressed += OnEscapePressed;
+        _keyboardHandler.MergeWithPrevious += HandleMergeWithPrevious;
 
         // Wire up markdown detector
         _markdownDetector.ShortcutDetected += OnMarkdownShortcutDetected;
@@ -72,7 +74,25 @@ public partial class EditableBlock : UserControl
 
     private void HandleRequestFocusPrevious() => _viewModel?.RequestFocusPrevious();
     private void HandleRequestFocusNext() => _viewModel?.RequestFocusNext();
-    private void HandleEnterPressed() => _viewModel?.RequestNewBlock();
+    private void HandleMergeWithPrevious() => _viewModel?.RequestMergeWithPrevious();
+    private void HandleEnterPressed()
+    {
+        if (_viewModel == null) return;
+        var input = _currentBlockComponent?.GetInputControl();
+        if (input is TextBox textBox)
+        {
+            var text = textBox.Text ?? string.Empty;
+            var caretIndex = Math.Clamp(textBox.CaretIndex, 0, text.Length);
+            var textBefore = text.Substring(0, caretIndex);
+            var textAfter = text.Substring(caretIndex);
+            _viewModel.Content = textBefore;
+            _viewModel.RequestNewBlock(textAfter);
+        }
+        else
+        {
+            _viewModel.RequestNewBlock();
+        }
+    }
     private void HandleRequestNewBlockOfType(BlockType type) => _viewModel?.RequestNewBlockOfType(type);
     private void OnMarkdownShortcutDetected(BlockType type, System.Collections.Generic.Dictionary<string, object>? meta) => SetBlockType(type, meta);
 
@@ -113,9 +133,11 @@ public partial class EditableBlock : UserControl
             _keyboardHandler.RequestFocusPrevious -= HandleRequestFocusPrevious;
             _keyboardHandler.RequestFocusNext -= HandleRequestFocusNext;
             _keyboardHandler.EnterPressed -= HandleEnterPressed;
-        _keyboardHandler.RequestNewBlockOfType -= HandleRequestNewBlockOfType;
-        _keyboardHandler.ConvertToBlockType -= ConvertToBlockType;
-        _keyboardHandler.EscapePressed -= OnEscapePressed;
+            _keyboardHandler.RequestNewBlockOfType -= HandleRequestNewBlockOfType;
+            _keyboardHandler.ConvertToBlockType -= ConvertToBlockType;
+            _keyboardHandler.ConvertToTextPreservingContent -= HandleConvertToTextPreservingContent;
+            _keyboardHandler.EscapePressed -= OnEscapePressed;
+            _keyboardHandler.MergeWithPrevious -= HandleMergeWithPrevious;
         }
         
         if (_markdownDetector != null)
@@ -197,12 +219,34 @@ public partial class EditableBlock : UserControl
         var text = textBox.Text ?? string.Empty;
         var caretIndex = textBox.CaretIndex;
         var selectionLength = Math.Abs(textBox.SelectionEnd - textBox.SelectionStart);
-        var isEmpty = string.IsNullOrWhiteSpace(text);
-        var isContentEmpty = string.IsNullOrWhiteSpace(_viewModel.Content);
-        if (caretIndex != 0 || selectionLength != 0 || (!isEmpty && !isContentEmpty))
+
+        // Only intercept when caret is at position 0 with no selection
+        if (caretIndex != 0 || selectionLength != 0)
             return;
-        e.Handled = true;
-        HandleBackspaceOnEmptyBlock();
+
+        // Use the live TextBox text — _viewModel.Content may not have synced yet at KeyDown time
+        var isEmpty = string.IsNullOrWhiteSpace(text);
+
+        if (isEmpty)
+        {
+            // Empty block: delete/convert
+            e.Handled = true;
+            HandleBackspaceOnEmptyBlock();
+        }
+        else if (_viewModel.Type != BlockType.Text)
+        {
+            // Non-text block with content at position 0: convert to Text, preserving content
+            e.Handled = true;
+            HandleConvertToTextPreservingContent();
+        }
+        else
+        {
+            // Text block with content at position 0: merge with the block above.
+            // Sync TextBox content to ViewModel first — TextChanged hasn't fired yet at KeyDown time.
+            _viewModel.Content = text;
+            e.Handled = true;
+            _viewModel.RequestMergeWithPrevious();
+        }
     }
     
     private void HandleBlockComponentGotFocus(object? sender, TextBox textBox)
@@ -306,8 +350,23 @@ public partial class EditableBlock : UserControl
             case nameof(BlockViewModel.IsFocused):
                 if (_viewModel.IsFocused)
                 {
-                    _focusManager?.ClearCache(); // Clear cache when focus changes
-                    _focusManager?.FocusTextBox();
+                    _focusManager?.ClearCache();
+
+                    // Only programmatically focus+move caret when the TextBox isn't already focused.
+                    // If the user clicked the TextBox directly, it already has focus and the correct
+                    // caret position — calling FocusTextBox() would snap the caret to the end.
+                    var alreadyFocused = _focusManager?.GetFocusedTextBox() != null;
+
+                    if (_viewModel.PendingCaretIndex.HasValue)
+                    {
+                        var caretIndex = _viewModel.PendingCaretIndex.Value;
+                        _viewModel.PendingCaretIndex = null;
+                        _focusManager?.FocusTextBox(caretIndex);
+                    }
+                    else if (!alreadyFocused)
+                    {
+                        _focusManager?.FocusTextBox();
+                    }
                 }
                 else
                 {
@@ -468,26 +527,6 @@ public partial class EditableBlock : UserControl
             }, DispatcherPriority.Input);
         }
 
-        // Handle backspace on empty block BEFORE delegating to keyboard handler
-        // This ensures we catch it before TextBox processes it
-        if (e.Key == Key.Back && _viewModel != null && !e.Handled)
-        {
-            var text = textBox.Text ?? string.Empty;
-            var caretIndex = textBox.CaretIndex;
-            var selectionLength = Math.Abs(textBox.SelectionEnd - textBox.SelectionStart);
-            
-            System.Diagnostics.Debug.WriteLine($"[EditableBlock] Backspace detected - Text: '{text}', CaretIndex: {caretIndex}, SelectionLength: {selectionLength}, IsEmpty: {string.IsNullOrWhiteSpace(text)}, BlockType: {_viewModel.Type}");
-            
-            // If at start of block with no selection and block is empty
-            if (caretIndex == 0 && selectionLength == 0 && string.IsNullOrWhiteSpace(text))
-            {
-                System.Diagnostics.Debug.WriteLine($"[EditableBlock] Handling backspace on empty block - Type: {_viewModel.Type}");
-                e.Handled = true;
-                HandleBackspaceOnEmptyBlock();
-                return;
-            }
-        }
-
         // Delegate to keyboard handler
         _keyboardHandler.HandleKeyDown(e, textBox, _viewModel);
     }
@@ -550,6 +589,36 @@ public partial class EditableBlock : UserControl
     private void ConvertToBlockType(BlockType blockType)
     {
         SetBlockType(blockType);
+    }
+
+    private void HandleConvertToTextPreservingContent()
+    {
+        if (_viewModel == null || _stateManager == null) return;
+
+        // Read content from the live TextBox before the component is swapped out
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox;
+        var content = textBox?.Text ?? _viewModel.Content;
+
+        // Change type — this causes the ContentControl to swap to a new TextBlockComponent.
+        // We use BeginUpdate so TextChanged on the new component doesn't misfire.
+        _stateManager.SetUpdatingFromViewModel();
+        _viewModel.Type = BlockType.Text;
+
+        // After the new TextBlockComponent is wired up (WireUpBlockComponent posts at Loaded),
+        // restore the content and focus. Post at a lower priority than Loaded to ensure
+        // WireUpBlockComponent has already run.
+        Dispatcher.UIThread.Post(() =>
+        {
+            _stateManager.PreviousText = content;
+            _viewModel.Content = content;
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                _stateManager.SetNormal();
+                _focusManager?.ClearCache();
+                _focusManager?.FocusTextBox(0);
+            }, DispatcherPriority.Input);
+        }, DispatcherPriority.Loaded);
     }
 
     private void SetBlockType(BlockType blockType, System.Collections.Generic.Dictionary<string, object>? meta = null)

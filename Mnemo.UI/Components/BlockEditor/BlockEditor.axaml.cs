@@ -116,10 +116,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return Blocks.Select(b => b.ToBlock()).ToArray();
     }
 
-    public void AddBlock(BlockType type, int? position = null)
+    public void AddBlock(BlockType type, int? position = null, string? initialContent = null)
     {
         var order = position ?? Blocks.Count;
         var block = BlockFactory.CreateBlock(type, order);
+        if (initialContent != null)
+            block.Content = initialContent;
         SubscribeToBlock(block);
 
         if (position.HasValue && position.Value < Blocks.Count)
@@ -142,6 +144,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.DeleteAndFocusAboveRequested += OnDeleteAndFocusAboveRequested;
         block.FocusPreviousRequested += OnFocusPreviousRequested;
         block.FocusNextRequested += OnFocusNextRequested;
+        block.MergeWithPreviousRequested += OnMergeWithPreviousRequested;
     }
 
     private void UnsubscribeFromBlock(BlockViewModel block)
@@ -153,6 +156,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.DeleteAndFocusAboveRequested -= OnDeleteAndFocusAboveRequested;
         block.FocusPreviousRequested -= OnFocusPreviousRequested;
         block.FocusNextRequested -= OnFocusNextRequested;
+        block.MergeWithPreviousRequested -= OnMergeWithPreviousRequested;
     }
 
     private void OnBlockContentChanged(BlockViewModel block)
@@ -171,6 +175,32 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private void OnDeleteAndFocusAboveRequested(BlockViewModel block)
     {
         DeleteBlock(block);
+    }
+
+    private void OnMergeWithPreviousRequested(BlockViewModel block)
+    {
+        var index = Blocks.IndexOf(block);
+        if (index <= 0) return; // No previous block to merge into
+
+        var previousBlock = Blocks[index - 1];
+        var insertionPoint = previousBlock.Content?.Length ?? 0;
+        previousBlock.Content = (previousBlock.Content ?? string.Empty) + (block.Content ?? string.Empty);
+
+        UnsubscribeFromBlock(block);
+        Blocks.Remove(block);
+
+        ReorderBlocks();
+        BlocksChanged?.Invoke();
+
+        // Set PendingCaretIndex before IsFocused so the IsFocused handler can read it
+        var caretTarget = insertionPoint;
+        Avalonia.Threading.Dispatcher.UIThread.Post(
+            () =>
+            {
+                previousBlock.PendingCaretIndex = caretTarget;
+                previousBlock.IsFocused = true;
+            },
+            Avalonia.Threading.DispatcherPriority.Input);
     }
 
     private void DeleteBlock(BlockViewModel block)
@@ -204,10 +234,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         BlocksChanged?.Invoke();
     }
 
-    private void OnNewBlockRequested(BlockViewModel block)
+    private void OnNewBlockRequested(BlockViewModel block, string? initialContent)
     {
         var index = Blocks.IndexOf(block);
-        AddBlock(BlockType.Text, index + 1);
+        AddBlock(BlockType.Text, index + 1, initialContent);
 
         // Focus new block after UI has updated
         var newBlockIndex = index + 1;

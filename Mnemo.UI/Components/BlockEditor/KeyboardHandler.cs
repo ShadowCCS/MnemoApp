@@ -36,8 +36,10 @@ public class KeyboardHandler
     #pragma warning restore CS0067
     public event Action<BlockType>? RequestNewBlockOfType;
     public event Action<BlockType>? ConvertToBlockType;
+    public event Action? ConvertToTextPreservingContent;
     public event Action? EscapePressed;
     public event Action? EnterPressed;
+    public event Action? MergeWithPrevious;
 
     public void HandleKeyDown(KeyEventArgs e, TextBox textBox, BlockViewModel? viewModel)
     {
@@ -113,21 +115,32 @@ public class KeyboardHandler
             return;
         }
 
-        // When caret is at position 0 with no selection, backspace can't delete anything before it
-        // So we check if the block is already empty/whitespace
         if (caretIndex == 0)
         {
+            // Use the live TextBox text — viewModel.Content may not have synced yet at KeyDown time
             var isEmpty = string.IsNullOrWhiteSpace(text);
-            // Also check ViewModel content in case TextBox hasn't synced yet
-            var isContentEmpty = string.IsNullOrWhiteSpace(viewModel.Content);
-            
-            System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] At caret 0 - IsEmpty: {isEmpty}, IsContentEmpty: {isContentEmpty}");
-            
-            if (isEmpty || isContentEmpty)
+
+            System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] At caret 0 - IsEmpty: {isEmpty}, BlockType: {viewModel.Type}");
+
+            if (isEmpty)
             {
                 System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Triggering BackspaceOnEmpty event");
                 e.Handled = true;
                 BackspaceOnEmpty?.Invoke();
+            }
+            else if (viewModel.Type != BlockType.Text)
+            {
+                // Non-text block with content at position 0 → convert to Text, preserving content
+                System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Non-text block with content at position 0 - converting to Text (preserving content)");
+                e.Handled = true;
+                ConvertToTextPreservingContent?.Invoke();
+            }
+            else
+            {
+                // Text block with content at position 0 → merge with the block above
+                System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Text block with content at position 0 - merging with previous");
+                e.Handled = true;
+                MergeWithPrevious?.Invoke();
             }
         }
         else
@@ -143,13 +156,13 @@ public class KeyboardHandler
 
         if (viewModel.Type == BlockType.Text)
         {
-            // If it's already a text block and empty, delete it and focus above
+            // Empty text block → delete it and focus above
             System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Text block - requesting delete and focus above");
             viewModel.RequestDeleteAndFocusAbove();
         }
         else
         {
-            // For any special block (non-text), convert to text block first
+            // Empty non-text block → convert to text block
             System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Non-text block - converting to Text");
             ConvertToBlockType?.Invoke(BlockType.Text);
         }
