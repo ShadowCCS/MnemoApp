@@ -4,6 +4,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
+using Avalonia.Media;
+using Avalonia.Media.TextFormatting;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
@@ -351,6 +353,11 @@ public partial class EditableBlock : UserControl
                 if (_viewModel.IsFocused)
                 {
                     _focusManager?.ClearCache();
+
+                    // During a cross-block selection drag the editor owns focus — calling FocusTextBox()
+                    // here would steal focus away from the anchor block and cause flicker/thrashing.
+                    var parentEditor = FindParentBlockEditor();
+                    if (parentEditor?.IsCrossBlockSelectingActive == true) break;
 
                     // Only programmatically focus+move caret when the TextBox isn't already focused.
                     // If the user clicked the TextBox directly, it already has focus and the correct
@@ -878,26 +885,58 @@ public partial class EditableBlock : UserControl
         var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
         if (textBox == null) return;
         var len = textBox.Text?.Length ?? 0;
-        start = Math.Clamp(start, 0, len);
-        end = Math.Clamp(end, 0, len);
-        textBox.SelectionStart = Math.Min(start, end);
-        textBox.SelectionEnd = Math.Max(start, end);
-        textBox.CaretIndex = Math.Max(start, end);
+        int selStart = Math.Clamp(Math.Min(start, end), 0, len);
+        int selEnd = Math.Clamp(Math.Max(start, end), 0, len);
+
+        // When clearing selection (selStart == selEnd == 0), skip the assignment in two cases:
+        // 1) This TextBox is currently focused — we're in the middle of a focus transfer to another
+        //    block; setting SelectionStart/End = 0 here snaps the caret to 0 for one frame (flicker).
+        // 2) This TextBox is unfocused and already has no selection — no-op.
+        bool isClear = selStart == 0 && selEnd == 0;
+        bool alreadyClear = textBox.SelectionStart == 0 && textBox.SelectionEnd == 0;
+        if (isClear && (textBox.IsFocused || alreadyClear)) return;
+
+        textBox.SelectionStart = selStart;
+        textBox.SelectionEnd = selEnd;
+        // Do NOT set CaretIndex here — doing so on an unfocused TextBox causes it to steal
+        // keyboard focus, which creates a focus-thrashing loop during cross-block drag selection.
+        // SelectionStart/End alone are sufficient to render the highlight.
     }
 
     /// <summary>
     /// Gets the character index in this block's TextBox closest to the given point (in this control's coordinates).
-    /// Returns 0 or text length if the point is in the top or bottom half of the block.
+    /// Uses the TextPresenter's already-rendered TextLayout for a side-effect-free, pixel-accurate hit-test.
     /// </summary>
     public int GetCharacterIndexFromPoint(Point pointInBlock)
     {
         var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
         if (textBox == null) return 0;
-        var ptInTextBox = this.TranslatePoint(pointInBlock, textBox);
-        if (!ptInTextBox.HasValue) return 0;
-        var h = textBox.Bounds.Height;
-        if (double.IsNaN(h) || h <= 0) return 0;
-        return ptInTextBox.Value.Y < h / 2 ? 0 : (textBox.Text?.Length ?? 0);
+
+        var presenter = textBox.GetVisualDescendants()
+            .OfType<Avalonia.Controls.Presenters.TextPresenter>()
+            .FirstOrDefault();
+        if (presenter == null) return 0;
+
+        // Translate into the TextPresenter's coordinate space — this accounts for all TextBox
+        // padding so the hit-test uses the exact same origin the rendered glyphs use.
+        var ptInPresenter = this.TranslatePoint(pointInBlock, presenter);
+        if (!ptInPresenter.HasValue) return 0;
+
+        var len = textBox.Text?.Length ?? 0;
+        if (len == 0) return 0;
+
+        try
+        {
+            var result = presenter.TextLayout.HitTestPoint(ptInPresenter.Value);
+            var pos = result.TextPosition;
+            if (result.IsTrailing && pos < len)
+                pos++;
+            return Math.Clamp(pos, 0, len);
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     private BlockEditor? FindParentBlockEditor()

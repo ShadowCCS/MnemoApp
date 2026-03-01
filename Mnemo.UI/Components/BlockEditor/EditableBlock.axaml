@@ -31,12 +31,14 @@
         <Grid ColumnDefinitions="24,*">
             <!--  Drag Handle  -->
             <Border
+                x:Name="DragHandleBorder"
                 Grid.Column="0"
                 Margin="0,0,8,0"
                 VerticalAlignment="Top"
                 Background="Transparent"
                 Cursor="Hand"
                 Opacity="0"
+                Tag="DragHandle"
                 PointerEntered="DragHandle_PointerEntered"
                 PointerExited="DragHandle_PointerExited"
                 PointerPressed="DragHandle_PointerPressed">

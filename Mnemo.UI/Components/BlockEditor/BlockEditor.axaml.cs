@@ -29,9 +29,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     // Cross-block text selection (Mode 1)
     private bool _isCrossBlockSelecting;
     private bool _crossBlockArmed;  // true after pointer-down inside TextBox, waiting for first move outside
+    /// <summary>True while a cross-block text selection drag is actively in progress. Used by EditableBlock to suppress focus side-effects during the drag.</summary>
+    public bool IsCrossBlockSelectingActive => _isCrossBlockSelecting;
     private BlockViewModel? _crossBlockAnchorBlock;
     private int _crossBlockAnchorCharIndex;
     private Point _crossBlockStartPoint;
+    /// <summary>Hysteresis: last endpoint block index to avoid boundary flicker when dragging across blocks.</summary>
+    private int _lastCrossBlockCurrentIndex = -1;
 
     public ObservableCollection<BlockViewModel> Blocks
     {
@@ -56,6 +60,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         AddHandler(DragDrop.DragLeaveEvent, Editor_DragLeave, RoutingStrategies.Bubble);
         AddHandler(PointerPressedEvent, Editor_PointerPressedTunnel, RoutingStrategies.Tunnel);
         AddHandler(PointerPressedEvent, Editor_PointerPressedBubble, RoutingStrategies.Bubble);
+        // When we capture the pointer (cross-block or box-select), we receive moves/releases on this control
+        AddHandler(PointerMovedEvent, Editor_PointerMoved, RoutingStrategies.Tunnel);
+        AddHandler(PointerReleasedEvent, Editor_PointerReleased, RoutingStrategies.Tunnel);
         // Tunnel so we get keys before the focused TextBox (for block-selection Backspace/Copy/Paste)
         AddHandler(KeyDownEvent, Editor_KeyDown, RoutingStrategies.Tunnel);
         Loaded += Editor_Loaded;
@@ -232,7 +239,17 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (e.PropertyName != nameof(BlockViewModel.IsFocused)) return;
         if (sender is BlockViewModel block && block.IsFocused)
+        {
+            // During cross-block text selection the editor controls which blocks have text
+            // selection. Clearing it here (triggered by IsFocused changes on each block we
+            // update) would fight with UpdateCrossBlockSelection and cause flicker.
+            if (_isCrossBlockSelecting || _crossBlockArmed) return;
+
             ClearBlockSelection();
+            var idx = Blocks.IndexOf(block);
+            if (idx >= 0)
+                ClearTextSelectionInAllBlocksExcept(idx);
+        }
     }
 
     private void OnBlockContentChanged(BlockViewModel block)
@@ -429,15 +446,57 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Tunnel: arm box-select when press is on empty space (outside any EditableBlock).
-    /// We do NOT capture or mark handled yet — we wait for a movement threshold in PointerMoved.
+    /// Tunnel: when press is inside a block, capture immediately for cross-block text selection so we receive
+    /// PointerMoved (TextBox would otherwise capture and we would never see moves). When press is on empty
+    /// space, arm box-select and capture in PointerMoved once threshold is exceeded.
     /// </summary>
     private void Editor_PointerPressedTunnel(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
+        // Double/triple clicks must reach the TextBox for word/line selection — don't intercept them.
+        if (e.ClickCount > 1) return;
+
+        // If the press originated on the drag handle, let it propagate so DoDragDrop can run.
+        var source = e.Source as Visual;
+        bool hitIsDragHandle = source != null &&
+            (source is Border { Tag: "DragHandle" } ||
+             source.GetVisualAncestors().OfType<Border>().Any(b => b.Tag is "DragHandle"));
+        if (hitIsDragHandle) return;
+
         var pos = e.GetPosition(this);
-        if (IsPointInsideAnyBlock(pos)) return;
+
+        if (IsPointInsideAnyBlock(pos))
+        {
+            // Press inside a block: arm cross-block selection and capture so we get PointerMoved
+            var blockIndex = GetBlockIndexAtPoint(pos);
+            if (blockIndex < 0 || blockIndex >= Blocks.Count) return;
+
+            var editableBlock = GetEditableBlockAt(blockIndex);
+            if (editableBlock == null) return;
+
+            var pointInBlock = this.TranslatePoint(pos, editableBlock);
+            if (!pointInBlock.HasValue) return;
+
+            var vm = Blocks[blockIndex];
+            var charIndex = editableBlock.GetCharacterIndexFromPoint(pointInBlock.Value);
+
+            ClearBlockSelection();
+            _crossBlockAnchorBlock = vm;
+            _crossBlockAnchorCharIndex = Math.Clamp(charIndex, 0, vm.Content?.Length ?? 0);
+            _crossBlockArmed = true;
+            _isCrossBlockSelecting = false;
+
+            editableBlock.ApplyTextSelection(_crossBlockAnchorCharIndex, _crossBlockAnchorCharIndex);
+            ClearTextSelectionInAllBlocksExcept(blockIndex);
+            // Set PendingCaretIndex before IsFocused so FocusTextBox lands at the click position
+            // directly — without this it would snap to the end first, causing a visible flicker.
+            vm.PendingCaretIndex = _crossBlockAnchorCharIndex;
+            vm.IsFocused = true;
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
 
         // Arm box-select — actual capture happens in PointerMoved once threshold is exceeded
         _boxSelectStart = pos;
@@ -445,6 +504,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _isBoxSelecting = false;
 
         ClearBlockSelection();
+        ClearTextSelectionInAllBlocksExcept(-1);
     }
 
     /// <summary>
@@ -466,14 +526,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     /// <summary>
     /// Bubble: clear selection; arm cross-block text selection when press is inside a TextBox.
-    /// We do NOT capture or mark handled — the TextBox handles its own initial click normally.
+    /// Skipped when we already armed and captured in Tunnel (cross-block).
     /// </summary>
     private void Editor_PointerPressedBubble(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
-        // If box-select was already armed, don't also arm cross-block select
         if (_boxSelectArmed) return;
+        // Already armed and captured in Tunnel for cross-block selection
+        if (_crossBlockArmed) return;
 
         ClearBlockSelection();
 
@@ -532,21 +593,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        // Cross-block text selection: activate once pointer moves into a different block.
-        // Since this handler is registered on the TopLevel in tunnel phase, it fires even when
-        // the TextBox has captured the pointer for its own single-block text selection.
+        // Cross-block text selection: on first move we enter selecting mode (we already have capture from Tunnel).
         if (_crossBlockArmed && _crossBlockAnchorBlock != null)
         {
-            var anchorIndex = Blocks.IndexOf(_crossBlockAnchorBlock);
-            var currentIndex = GetBlockIndexAtPoint(current);
-
-            if (currentIndex >= 0 && currentIndex != anchorIndex)
-            {
-                _crossBlockArmed = false;
-                _isCrossBlockSelecting = true;
-                // Steal pointer capture from the TextBox so further moves come to us
-                e.Pointer.Capture(this);
-            }
+            _crossBlockArmed = false;
+            _isCrossBlockSelecting = true;
         }
 
         if (_isCrossBlockSelecting && _crossBlockAnchorBlock != null)
@@ -562,12 +613,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         var wasBoxSelecting = _isBoxSelecting;
         var wasCrossBlockSelecting = _isCrossBlockSelecting;
+        var wasArmedButNotDragged = _crossBlockArmed && !_isCrossBlockSelecting && _crossBlockAnchorBlock != null;
+        var clickAnchorBlock = _crossBlockAnchorBlock;
+        var clickAnchorChar = _crossBlockAnchorCharIndex;
 
         _boxSelectArmed = false;
         _crossBlockArmed = false;
         _isBoxSelecting = false;
         _isCrossBlockSelecting = false;
         _crossBlockAnchorBlock = null;
+        _lastCrossBlockCurrentIndex = -1;
 
         if (wasBoxSelecting)
         {
@@ -577,6 +632,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         else if (wasCrossBlockSelecting)
         {
+            e.Pointer.Capture(null);
+        }
+        else if (wasArmedButNotDragged && clickAnchorBlock != null)
+        {
+            // Plain click: focus+caret were already set at press time via PendingCaretIndex.
+            // Just release the pointer capture that the tunnel handler acquired.
             e.Pointer.Capture(null);
         }
     }
@@ -836,66 +897,102 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return -1;
     }
 
+    /// <summary>
+    /// Clears text selection (SelectionStart/SelectionEnd) in every block except the one at exceptBlockIndex.
+    /// Pass -1 to clear all blocks. Used so a new press or click on empty space clears previous cross-block selection.
+    /// </summary>
+    private void ClearTextSelectionInAllBlocksExcept(int exceptBlockIndex)
+    {
+        var containers = GetBlockContainersInOrder();
+        if (containers == null) return;
+        for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+        {
+            if (exceptBlockIndex >= 0 && i == exceptBlockIndex) continue;
+            var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+            editableBlock?.ApplyTextSelection(0, 0);
+        }
+    }
+
     private void UpdateCrossBlockSelection(Point currentPoint)
     {
         int anchorIndex = _crossBlockAnchorBlock != null ? Blocks.IndexOf(_crossBlockAnchorBlock) : -1;
         if (anchorIndex < 0) return;
 
-        int currentIndex = GetBlockIndexAtPoint(currentPoint);
-        if (currentIndex < 0) return;
-        currentIndex = Math.Clamp(currentIndex, 0, Blocks.Count - 1);
+        int rawIndex = GetBlockIndexAtPoint(currentPoint);
+        if (rawIndex < 0) return;
+        rawIndex = Math.Clamp(rawIndex, 0, Blocks.Count - 1);
+
+        // Hysteresis: keep last endpoint block until pointer has clearly left its bounds to avoid boundary flicker
+        int currentIndex = rawIndex;
+        var bounds = GetBlockBoundsInEditorOrder();
+        if (bounds.Count > 0 && _lastCrossBlockCurrentIndex >= 0 && _lastCrossBlockCurrentIndex < bounds.Count)
+        {
+            var (top, bottom) = bounds[_lastCrossBlockCurrentIndex];
+            if (currentPoint.Y >= top && currentPoint.Y < bottom)
+                currentIndex = _lastCrossBlockCurrentIndex;
+        }
+        _lastCrossBlockCurrentIndex = currentIndex;
 
         int anchorChar = _crossBlockAnchorCharIndex;
         bool forward = currentIndex >= anchorIndex;
         int startIdx = Math.Min(anchorIndex, currentIndex);
         int endIdx = Math.Max(anchorIndex, currentIndex);
 
-        // Clear selection highlight on blocks outside the selection range
+        // Text selection only: never use block selection (IsSelected). Clear it on all blocks.
         for (int i = 0; i < Blocks.Count; i++)
-        {
-            if (i < startIdx || i > endIdx)
-                Blocks[i].IsSelected = false;
-        }
+            Blocks[i].IsSelected = false;
 
         var containers = GetBlockContainersInOrder();
         if (containers == null) return;
 
-        for (int i = startIdx; i <= endIdx && i < containers.Count && i < Blocks.Count; i++)
+        for (int i = 0; i < containers.Count && i < Blocks.Count; i++)
         {
             var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
             if (editableBlock == null) continue;
+
+            // Blocks outside the selection range must be explicitly cleared so that shrinking
+            // the selection (e.g. dragging back toward the anchor) removes highlights correctly.
+            if (i < startIdx || i > endIdx)
+            {
+                editableBlock.ApplyTextSelection(0, 0);
+                continue;
+            }
 
             var block = Blocks[i];
             int len = block.Content?.Length ?? 0;
 
             if (anchorIndex == currentIndex)
             {
-                // Single-block selection: use TextBox text selection only (the block stays focused)
+                // Single block: select text from anchor to current point
                 var ptInBlock = this.TranslatePoint(currentPoint, editableBlock);
                 int curChar = ptInBlock.HasValue ? editableBlock.GetCharacterIndexFromPoint(ptInBlock.Value) : anchorChar;
                 int selStart = Math.Min(anchorChar, curChar);
                 int selEnd = Math.Max(anchorChar, curChar);
                 editableBlock.ApplyTextSelection(selStart, selEnd);
-                block.IsSelected = false;
             }
             else if (i == anchorIndex)
             {
-                // Anchor block: use TextBox text selection (it still has focus)
+                // Anchor block: text from anchor to end (forward) or start to anchor (backward)
                 if (forward)
                     editableBlock.ApplyTextSelection(anchorChar, len);
                 else
                     editableBlock.ApplyTextSelection(0, anchorChar);
-                block.IsSelected = false;
             }
             else if (i == currentIndex)
             {
-                // Current (endpoint) block: highlight the whole block visually
-                block.IsSelected = true;
+                // Endpoint block: text from start to current point (forward) or current point to end (backward)
+                var ptInBlock = this.TranslatePoint(currentPoint, editableBlock);
+                int curChar = ptInBlock.HasValue ? editableBlock.GetCharacterIndexFromPoint(ptInBlock.Value) : 0;
+                curChar = Math.Clamp(curChar, 0, len);
+                if (forward)
+                    editableBlock.ApplyTextSelection(0, curChar);
+                else
+                    editableBlock.ApplyTextSelection(curChar, len);
             }
             else
             {
-                // Intermediate blocks: highlight the whole block visually
-                block.IsSelected = true;
+                // Intermediate blocks: select all text in the block
+                editableBlock.ApplyTextSelection(0, len);
             }
         }
     }

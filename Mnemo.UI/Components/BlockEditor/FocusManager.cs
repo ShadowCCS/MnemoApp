@@ -18,24 +18,37 @@ public class FocusManager
 
     public void FocusTextBox(int? caretPosition = null)
     {
+        // Use Input priority so focus transfers before Avalonia renders the focus-loss
+        // state on the previously focused TextBox. Loaded priority would let a frame render
+        // with the old block's caret snapped to 0, causing a visible flicker.
+        // If the TextBox isn't in the tree yet (e.g. newly created block), fall back to Loaded.
         Dispatcher.UIThread.Post(() =>
         {
             var textBox = FindFocusableTextBox();
-            if (textBox == null) return;
+            if (textBox == null)
+            {
+                // TextBox not yet rendered — retry at Loaded priority
+                Dispatcher.UIThread.Post(() =>
+                {
+                    var tb = FindFocusableTextBox();
+                    if (tb == null) return;
+                    ApplyFocus(tb, caretPosition);
+                }, DispatcherPriority.Loaded);
+                return;
+            }
 
-            textBox.Focus();
-            
-            if (caretPosition.HasValue)
-            {
-                textBox.CaretIndex = caretPosition.Value;
-            }
-            else
-            {
-                textBox.CaretIndex = textBox.Text?.Length ?? 0;
-            }
-            
-            _cachedTextBox = textBox;
-        }, DispatcherPriority.Loaded);
+            ApplyFocus(textBox, caretPosition);
+        }, DispatcherPriority.Input);
+    }
+
+    private void ApplyFocus(TextBox textBox, int? caretPosition)
+    {
+        // Set CaretIndex before Focus() so the caret is already at the correct position
+        // when the TextBox first renders its focused state — prevents a snap flicker.
+        var targetCaret = caretPosition ?? (textBox.Text?.Length ?? 0);
+        textBox.CaretIndex = targetCaret;
+        textBox.Focus();
+        _cachedTextBox = textBox;
     }
 
     public void FocusTextBoxAtStart()
