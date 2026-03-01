@@ -15,6 +15,7 @@
         <components:BlockTypeToComponentConverter x:Key="BlockTypeConverter" />
     </UserControl.Resources>
     <Grid>
+        <!-- Block content (fills cell) -->
         <Border
             x:Name="BlockContainer"
             Padding="8"
@@ -50,6 +51,17 @@
                 DataContext="{Binding}" />
         </Grid>
     </Border>
+        <!-- Drop indicator line: overlays top of block, does not affect layout -->
+        <Border
+            x:Name="DropIndicatorLine"
+            Height="3"
+            VerticalAlignment="Top"
+            HorizontalAlignment="Stretch"
+            Background="{DynamicResource CardAccentBrush}"
+            CornerRadius="1"
+            IsHitTestVisible="False"
+            IsVisible="False"
+            Opacity="1" />
     </Grid>
 </UserControl>
 

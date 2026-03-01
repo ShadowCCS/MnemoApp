@@ -8,8 +8,9 @@
     x:CompileBindings="False"
     d:DesignHeight="450"
     d:DesignWidth="800"
-    mc:Ignorable="d">
-    <ItemsControl ItemsSource="{Binding Blocks}">
+    mc:Ignorable="d"
+    DragDrop.AllowDrop="True">
+    <ItemsControl x:Name="BlocksItemsControl" ItemsSource="{Binding Blocks}">
         <ItemsControl.ItemTemplate>
             <DataTemplate>
                 <local:EditableBlock />

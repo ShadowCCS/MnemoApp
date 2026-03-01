@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -246,6 +247,7 @@ public partial class EditableBlock : UserControl
         DragDrop.SetAllowDrop(BlockContainer, true);
         BlockContainer.AddHandler(DragDrop.DragOverEvent, Block_DragOver);
         BlockContainer.AddHandler(DragDrop.DropEvent, Block_Drop);
+        BlockContainer.AddHandler(DragDrop.DragLeaveEvent, Block_DragLeave);
     }
 
     private void SetupKeyboardHandling()
@@ -569,10 +571,41 @@ public partial class EditableBlock : UserControl
                 }
             }
         }
-        // Keep focus on this block after conversion (explicit Post needed when IsFocused was already true)
-        _viewModel.IsFocused = true;
-        Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
+
+        // When converting to a non-editable block (e.g. Divider), ensure there is an editable block below so the user can keep typing
+        var addedBlockBelow = blockType == BlockType.Divider && EnsureEditableBlockBelowIfNeeded();
+
+        if (!addedBlockBelow)
+        {
+            // Keep focus on this block after conversion (explicit Post needed when IsFocused was already true)
+            _viewModel.IsFocused = true;
+            Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
+        }
     }
+
+    /// <summary>
+    /// If the current block is non-editable and there is no editable block below, inserts a new Text block below and requests focus on it.
+    /// Returns true if a block was added (caller should not focus the current block).
+    /// </summary>
+    private bool EnsureEditableBlockBelowIfNeeded()
+    {
+        if (_viewModel == null) return false;
+
+        var editor = FindParentBlockEditor();
+        if (editor == null) return false;
+
+        var index = editor.Blocks.IndexOf(_viewModel);
+        if (index < 0) return false;
+
+        var nextIndex = index + 1;
+        var hasEditableBelow = nextIndex < editor.Blocks.Count && IsEditableBlockType(editor.Blocks[nextIndex].Type);
+        if (hasEditableBelow) return false;
+
+        _viewModel.RequestNewBlockOfType(BlockType.Text);
+        return true;
+    }
+
+    private static bool IsEditableBlockType(BlockType type) => type != BlockType.Divider;
 
     #endregion
 
@@ -625,9 +658,15 @@ public partial class EditableBlock : UserControl
         _stateManager.PreviousText = string.Empty;
         _stateManager.SetNormal();
         _focusManager?.ClearCache();
-        // Keep focus on this block after conversion
-        _viewModel.IsFocused = true;
-        Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
+
+        // When converting to Divider, ensure there is an editable block below so the user can keep typing
+        var addedBlockBelow = blockType == BlockType.Divider && EnsureEditableBlockBelowIfNeeded();
+
+        if (!addedBlockBelow)
+        {
+            _viewModel.IsFocused = true;
+            Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
+        }
     }
 
     #endregion
@@ -662,9 +701,50 @@ public partial class EditableBlock : UserControl
 
     private void Block_DragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.Data.Contains("BlockViewModel") 
-            ? DragDropEffects.Move 
-            : DragDropEffects.None;
+        if (!e.Data.Contains("BlockViewModel"))
+        {
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+        if (e.Data.Get("BlockViewModel") is not BlockViewModel draggedBlock || draggedBlock == _viewModel)
+        {
+            e.DragEffects = DragDropEffects.Move;
+            return;
+        }
+        e.DragEffects = DragDropEffects.Move;
+
+        var parent = FindParentBlockEditor();
+        if (parent == null) return;
+
+        var cursorInEditor = e.GetPosition(parent);
+        parent.HandleBlockDragOver(cursorInEditor, draggedBlock);
+    }
+
+    public void ShowDropLineAtTop()
+    {
+        if (DropIndicatorLine == null) return;
+        DropIndicatorLine.VerticalAlignment = VerticalAlignment.Top;
+        DropIndicatorLine.IsVisible = true;
+    }
+
+    public void ShowDropLineAtBottom()
+    {
+        if (DropIndicatorLine == null) return;
+        DropIndicatorLine.VerticalAlignment = VerticalAlignment.Bottom;
+        DropIndicatorLine.IsVisible = true;
+    }
+
+    public void HideDropLine()
+    {
+        if (DropIndicatorLine != null)
+            DropIndicatorLine.IsVisible = false;
+    }
+
+    private void Block_DragLeave(object? sender, DragEventArgs e)
+    {
+        // Do not clear the drop indicator here: the pointer may have moved from this block's
+        // Border to its inner content (e.g. TextBox), which would cause flicker. The editor
+        // clears the indicator when the pointer leaves the editor (Editor_DragLeave).
     }
 
     private void Block_Drop(object? sender, DragEventArgs e)
@@ -677,24 +757,16 @@ public partial class EditableBlock : UserControl
 
         try
         {
-            var draggedIndex = parent.Blocks.IndexOf(draggedBlock);
-            var targetIndex = parent.Blocks.IndexOf(_viewModel);
-
-            if (draggedIndex != -1 && targetIndex != -1 && draggedIndex != targetIndex)
-            {
-                parent.Blocks.Move(draggedIndex, targetIndex);
-                
-                for (int i = 0; i < parent.Blocks.Count; i++)
-                {
-                    parent.Blocks[i].Order = i;
-                }
-                
-                parent.NotifyBlocksChanged();
-            }
+            if (!parent.TryPerformDrop(draggedBlock))
+                BlockEditorLogger.LogError("Drop failed: invalid insert index or block", null);
         }
         catch (Exception ex)
         {
             BlockEditorLogger.LogError("Error during drop operation", ex);
+        }
+        finally
+        {
+            parent.ClearDropIndicator();
         }
     }
 

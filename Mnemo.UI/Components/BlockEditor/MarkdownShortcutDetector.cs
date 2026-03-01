@@ -17,6 +17,7 @@ public class MarkdownShortcutDetector
         ["[]"] = (BlockType.Checklist, null),
         ["[ ]"] = (BlockType.Checklist, null),
         [">"] = (BlockType.Quote, null),
+        ["---"] = (BlockType.Divider, null),
         ["```"] = (BlockType.Code, new Dictionary<string, object> { ["language"] = "csharp" }),
         ["1."] = (BlockType.NumberedList, null)
     };
