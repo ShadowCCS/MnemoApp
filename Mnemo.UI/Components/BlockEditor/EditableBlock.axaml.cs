@@ -762,6 +762,9 @@ public partial class EditableBlock : UserControl
     {
         if (_viewModel == null) return;
 
+        // Clear block selection when user starts dragging to reorder
+        FindParentBlockEditor()?.ClearBlockSelection();
+
         var data = new DataObject();
         data.Set("BlockViewModel", _viewModel);
 
@@ -837,6 +840,64 @@ public partial class EditableBlock : UserControl
         {
             parent.ClearDropIndicator();
         }
+    }
+
+    /// <summary>
+    /// Gets the currently selected text from this block's TextBox, or null if no selection or no TextBox.
+    /// </summary>
+    public string? GetSelectedText()
+    {
+        var range = GetSelectionRange();
+        if (range == null || _viewModel == null) return null;
+        var content = _viewModel.Content ?? string.Empty;
+        int start = Math.Clamp(range.Value.start, 0, content.Length);
+        int end = Math.Clamp(range.Value.end, 0, content.Length);
+        if (start >= end) return null;
+        return content.Substring(start, end - start);
+    }
+
+    /// <summary>
+    /// Gets the (SelectionStart, SelectionEnd) from this block's TextBox, or null if no TextBox.
+    /// </summary>
+    public (int start, int end)? GetSelectionRange()
+    {
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox?.Text == null) return null;
+        int start = Math.Min(textBox.SelectionStart, textBox.SelectionEnd);
+        int end = Math.Max(textBox.SelectionStart, textBox.SelectionEnd);
+        if (start >= end) return null;
+        return (start, end);
+    }
+
+    /// <summary>
+    /// Applies a text selection range to this block's TextBox (for cross-block selection).
+    /// No-op if the block has no TextBox (e.g. Divider).
+    /// </summary>
+    public void ApplyTextSelection(int start, int end)
+    {
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox == null) return;
+        var len = textBox.Text?.Length ?? 0;
+        start = Math.Clamp(start, 0, len);
+        end = Math.Clamp(end, 0, len);
+        textBox.SelectionStart = Math.Min(start, end);
+        textBox.SelectionEnd = Math.Max(start, end);
+        textBox.CaretIndex = Math.Max(start, end);
+    }
+
+    /// <summary>
+    /// Gets the character index in this block's TextBox closest to the given point (in this control's coordinates).
+    /// Returns 0 or text length if the point is in the top or bottom half of the block.
+    /// </summary>
+    public int GetCharacterIndexFromPoint(Point pointInBlock)
+    {
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox == null) return 0;
+        var ptInTextBox = this.TranslatePoint(pointInBlock, textBox);
+        if (!ptInTextBox.HasValue) return 0;
+        var h = textBox.Bounds.Height;
+        if (double.IsNaN(h) || h <= 0) return 0;
+        return ptInTextBox.Value.Y < h / 2 ? 0 : (textBox.Text?.Length ?? 0);
     }
 
     private BlockEditor? FindParentBlockEditor()

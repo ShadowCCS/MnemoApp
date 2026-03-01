@@ -446,6 +446,7 @@
     <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource Border}"/>
     <SolidColorBrush x:Key="QuoteLineBrush" Color="{DynamicResource QuoteLine}"/>
     <SolidColorBrush x:Key="AccentPrimaryBrush" Color="{DynamicResource AccentPrimary}"/>
+    <SolidColorBrush x:Key="BlockSelectionBrush" Color="{DynamicResource BlockSelectionBackground}"/>
     <!-- Mindmap -->
     <SolidColorBrush x:Key="MindmapNodeBorderBrush" Color="{DynamicResource MindmapNodeBorder}"/>
     <SolidColorBrush x:Key="MindmapNodeBorderHoverBrush" Color="{DynamicResource MindmapNodeBorderHover}"/>

@@ -13,15 +13,21 @@
     mc:Ignorable="d">
     <UserControl.Resources>
         <components:BlockTypeToComponentConverter x:Key="BlockTypeConverter" />
+        <local:BoolToSelectionBrushConverter x:Key="BoolToSelectionBrushConverter" />
     </UserControl.Resources>
-    <Grid>
+    <Grid Margin="0,0,0,4">
         <!-- Block content (fills cell) -->
         <Border
             x:Name="BlockContainer"
             Padding="8"
-            Background="Transparent"
             CornerRadius="4"
             DragDrop.AllowDrop="True">
+            <Border.Background>
+                <MultiBinding Converter="{StaticResource BoolToSelectionBrushConverter}">
+                    <Binding Path="IsSelected" />
+                    <Binding RelativeSource="{RelativeSource Self}" Path="." />
+                </MultiBinding>
+            </Border.Background>
         <Grid ColumnDefinitions="24,*">
             <!--  Drag Handle  -->
             <Border

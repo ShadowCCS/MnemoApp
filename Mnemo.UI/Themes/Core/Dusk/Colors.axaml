@@ -170,8 +170,8 @@
     
     <!-- TextBox -->
     <Color x:Key="TextControlBackground">#312e2d</Color>
-    <Color x:Key="TextControlBackgroundPointerOver">#464549</Color>
-    <Color x:Key="TextControlBackgroundFocused">#312e2d</Color>
+    <Color x:Key="TextControlBackgroundPointerOver">Transparent</Color>
+    <Color x:Key="TextControlBackgroundFocused">Transparent</Color>
     <Color x:Key="TextControlBackgroundDisabled">#1f1f1e</Color>
     <Color x:Key="TextControlForeground">#CFCCCB</Color>
     <Color x:Key="TextControlForegroundPointerOver">#CFCCCB</Color>
@@ -389,6 +389,7 @@
     <Color x:Key="MindmapGridColor">#40FFFFFF</Color>
 
     <!-- Notes module (pane, section headers, editor) -->
+    <Color x:Key="BlockSelectionBackground">#4A2520</Color>
     <Color x:Key="NotesPaneBackground">#1C1B1A</Color>
     <Color x:Key="NotesSectionHeaderForeground">#9A9694</Color>
     <Color x:Key="NotesPaneDivider">#2E2D2C</Color>

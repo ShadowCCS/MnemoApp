@@ -263,8 +263,8 @@
                                Fill="{DynamicResource NotesEditorSeparatorBrush}"
                                Margin="0,0,0,24"/>
 
-                    <!-- Editable block content -->
-                    <blockEditor:BlockEditor x:Name="NoteBlockEditor"/>
+                    <!-- Editable block content: negative margin so editor receives pointer events in page margins (drag-box start) -->
+                    <blockEditor:BlockEditor x:Name="NoteBlockEditor" Margin="-32,0,-32,0"/>
                 </StackPanel>
 
                 <!-- Empty state when no note selected -->
