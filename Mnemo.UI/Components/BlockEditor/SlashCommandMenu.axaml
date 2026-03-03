@@ -3,81 +3,107 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Mnemo.UI.Components.BlockEditor"
+    xmlns:controls="using:Mnemo.UI.Controls"
     x:CompileBindings="True"
-    MinWidth="280"
-    MaxHeight="400">
+    MinWidth="300"
+    MaxHeight="420">
     <Border
-        Background="{DynamicResource CardBackgroundPrimaryBrush}"
+        Background="{DynamicResource WorkspaceBackgroundBrush}"
         BorderBrush="{DynamicResource ButtonBorderBrush}"
         BorderThickness="1"
         BoxShadow="0 8 24 0 #20000000, 0 2 8 0 #10000000"
         CornerRadius="12"
-        Padding="6">
-        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="CommandItems">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Spacing="2" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="local:CommandItem">
-                        <Border
-                            x:Name="ItemBorder"
-                            Background="Transparent"
-                            CornerRadius="8"
-                            Cursor="Hand"
-                            Padding="10,10"
-                            PointerPressed="CommandItem_PointerPressed">
-                            <Border.Transitions>
-                                <Transitions>
-                                    <BrushTransition Property="Background" Duration="0:0:0.15" />
-                                </Transitions>
-                            </Border.Transitions>
-                            <Border.Styles>
-                                <Style Selector="Border:pointerover">
-                                    <Setter Property="Background" Value="{DynamicResource ListBoxItemBackgroundPointerOverBrush}" />
-                                </Style>
-                            </Border.Styles>
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <!-- Icon Container -->
-                                <Border
-                                    Width="36"
-                                    Height="36"
-                                    Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                                    CornerRadius="8"
-                                    VerticalAlignment="Center">
+        Padding="0">
+        <StackPanel>
+            <!-- Command list with keyboard-selectable items -->
+            <ScrollViewer
+                MaxHeight="320"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled">
+                <ListBox
+                    x:Name="CommandListBox"
+                    Classes="SlashCommandListBox"
+                    Focusable="False"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="6,4"
+                    SelectionMode="Single">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="0" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="local:CommandItem">
+                            <Border
+                                x:Name="ItemBorder"
+                                Background="Transparent"
+                                CornerRadius="6"
+                                Cursor="Hand"
+                                Padding="8,5"
+                                PointerPressed="CommandItem_PointerPressed">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <!-- Icon -->
+                                    <Border
+                                        Width="32"
+                                        Height="32"
+                                        Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                        CornerRadius="6"
+                                        VerticalAlignment="Center">
+                                        <controls:SvgIcon
+                                            Width="18"
+                                            Height="18"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            SvgPath="{Binding IconPath}"
+                                            Color="{DynamicResource TextPrimaryBrush}" />
+                                    </Border>
+                                    <!-- Name (single line, ref image style) -->
                                     <TextBlock
-                                        HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
-                                        FontSize="16"
-                                        FontWeight="SemiBold"
-                                        Foreground="{DynamicResource TextPrimaryBrush}"
-                                        Text="{Binding Icon}" />
-                                </Border>
-                                <!-- Text Content -->
-                                <StackPanel VerticalAlignment="Center" Spacing="2">
-                                    <TextBlock
                                         FontSize="14"
-                                        FontWeight="SemiBold"
                                         Foreground="{DynamicResource TextPrimaryBrush}"
-                                        Text="{Binding Name}" />
+                                        Text="{Binding Name}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <!-- Spacer -->
+                                    <Panel HorizontalAlignment="Stretch" IsHitTestVisible="False" />
+                                    <!-- Shortcut hint on the right -->
                                     <TextBlock
+                                        VerticalAlignment="Center"
                                         FontSize="12"
                                         Foreground="{DynamicResource TextSecondaryBrush}"
-                                        Text="{Binding Description}" />
+                                        Text="{Binding Shortcut}" />
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </ScrollViewer>
+            <!-- Separator -->
+            <Border
+                Height="1"
+                Margin="12,0"
+                Background="{DynamicResource ButtonBorderBrush}"
+                Opacity="0.5" />
+            <!-- Close menu hint -->
+            <Border
+                Padding="12,8"
+                Cursor="Arrow"
+                Background="Transparent">
+                <StackPanel Orientation="Horizontal" Spacing="0">
+                    <TextBlock
+                        x:Name="CloseMenuTextBlock"
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <Panel HorizontalAlignment="Stretch" IsHitTestVisible="False" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Foreground="{DynamicResource TextTertiaryBrush}"
+                        Text="esc" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
     </Border>
 </UserControl>
-
-
-
-
-
-

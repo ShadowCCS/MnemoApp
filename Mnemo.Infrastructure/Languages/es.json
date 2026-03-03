@@ -263,7 +263,9 @@
     "ChecklistDescription": "Elemento interactivo de lista de tareas",
     "QuoteDescription": "Bloque de texto citado",
     "CodeDescription": "Bloque de código con resaltado sintáctico",
-    "DividerDescription": "Línea divisora horizontal"
+    "DividerDescription": "Línea divisora horizontal",
+    "CloseMenu": "Cerrar menú",
+    "SlashMenuSearchPlaceholder": "Escribe para buscar"
   },
   "Mindmap": {
     "Title": "Mapas Mentales",

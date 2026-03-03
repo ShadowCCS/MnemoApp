@@ -198,7 +198,25 @@ namespace Mnemo.UI.Components
                 var calculatedMargin = CalculateAnchorMargin(overlay, topLevel);
                 if (calculatedMargin.HasValue)
                 {
-                    border.Margin = calculatedMargin.Value;
+                    var margin = calculatedMargin.Value;
+                    // For TopLeft: position so overlay BOTTOM is just above the anchor (no overlap)
+                    if (overlay.Options.AnchorPosition == AnchorPosition.TopLeft &&
+                        overlay.Options.AnchorControl is Control anchor &&
+                        anchor.TranslatePoint(new Point(0, 0), topLevel) is { } anchorPt)
+                    {
+                        if (border.Bounds.Height > 0)
+                        {
+                            var offset = overlay.Options.AnchorOffset as Thickness? ?? new Thickness(0);
+                            double gap = offset.Top <= 0 ? -offset.Top : 4;
+                            margin = new Thickness(margin.Left, anchorPt.Y - border.Bounds.Height - gap, margin.Right, margin.Bottom);
+                        }
+                        else
+                        {
+                            // Height not yet available; re-run after layout so we can position correctly
+                            Dispatcher.UIThread.Post(() => UpdateOverlayPosition(border, overlay), DispatcherPriority.Loaded);
+                        }
+                    }
+                    border.Margin = margin;
                     border.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
                     border.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
                 }

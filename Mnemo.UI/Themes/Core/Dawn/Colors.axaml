@@ -204,23 +204,28 @@
     <Color x:Key="ListBoxItemForegroundSelectedPressed">#FFFFFF</Color>
     <Color x:Key="ListBoxItemForegroundDisabled">#CCCCCC</Color>
 
+    <!-- SlashCommandMenu list items: gray selection (no accent) -->
+    <Color x:Key="SlashCommandItemBackgroundSelected">#EBEBEB</Color>
+    <Color x:Key="SlashCommandItemBackgroundSelectedPointerOver">#E0E0E0</Color>
+    <Color x:Key="SlashCommandItemBackgroundSelectedPressed">#E5E5E5</Color>
+
     <!-- TreeViewItem (mirrors ListBoxItem for consistent sidebar styling) -->
     <Color x:Key="TreeViewItemBackgroundColor">Transparent</Color>
     <Color x:Key="TreeViewItemBackgroundPointerOverColor">#F5F5F5</Color>
     <Color x:Key="TreeViewItemBackgroundPressedColor">#E5E5E5</Color>
     <Color x:Key="TreeViewItemBackgroundDisabledColor">Transparent</Color>
-    <Color x:Key="TreeViewItemBackgroundSelectedColor">#e95b45</Color>
-    <Color x:Key="TreeViewItemBackgroundSelectedPointerOverColor">#FF6B55</Color>
-    <Color x:Key="TreeViewItemBackgroundSelectedPressedColor">#D14F3B</Color>
+    <Color x:Key="TreeViewItemBackgroundSelectedColor">#EBEBEB</Color>
+    <Color x:Key="TreeViewItemBackgroundSelectedPointerOverColor">#E0E0E0</Color>
+    <Color x:Key="TreeViewItemBackgroundSelectedPressedColor">#E5E5E5</Color>
     <Color x:Key="TreeViewItemBackgroundSelectedDisabledColor">#E5E5E5</Color>
     <Color x:Key="TreeViewItemForegroundColor">#1A1A1A</Color>
     <Color x:Key="TreeViewItemForegroundPointerOverColor">#1A1A1A</Color>
     <Color x:Key="TreeViewItemForegroundPressedColor">#1A1A1A</Color>
     <Color x:Key="TreeViewItemForegroundDisabledColor">#CCCCCC</Color>
-    <!-- Selected row: white text and icons on orange background -->
-    <Color x:Key="TreeViewItemForegroundSelectedColor">#FFFFFF</Color>
-    <Color x:Key="TreeViewItemForegroundSelectedPointerOverColor">#FFFFFF</Color>
-    <Color x:Key="TreeViewItemForegroundSelectedPressedColor">#FFFFFF</Color>
+    <!-- Selected row: dark text on gray background -->
+    <Color x:Key="TreeViewItemForegroundSelectedColor">#1A1A1A</Color>
+    <Color x:Key="TreeViewItemForegroundSelectedPointerOverColor">#1A1A1A</Color>
+    <Color x:Key="TreeViewItemForegroundSelectedPressedColor">#1A1A1A</Color>
     <Color x:Key="TreeViewItemForegroundSelectedDisabledColor">#CCCCCC</Color>
     <Color x:Key="TreeViewItemBorderBrushColor">Transparent</Color>
     <Color x:Key="TreeViewItemBorderBrushPointerOverColor">Transparent</Color>
@@ -286,6 +291,9 @@
     <Color x:Key="ScrollBarThumbBackground">#CCCCCC</Color>
     <Color x:Key="ScrollBarThumbBackgroundPointerOver">#BBBBBB</Color>
     <Color x:Key="ScrollBarThumbBackgroundPressed">#AAAAAA</Color>
+    <Color x:Key="ScrollBarThumbBackgroundDisabled">#E0E0E0</Color>
+    <Color x:Key="ScrollBarTrackFill">#00000000</Color>
+    <Color x:Key="ScrollBarTrackStroke">#00000000</Color>
     <Color x:Key="ScrollBarButtonBackground">#F5F5F5</Color>
     <Color x:Key="ScrollBarButtonBackgroundPointerOver">#EBEBEB</Color>
     <Color x:Key="ScrollBarButtonBackgroundPressed">#E5E5E5</Color>

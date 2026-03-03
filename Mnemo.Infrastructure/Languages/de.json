@@ -263,7 +263,9 @@
     "ChecklistDescription": "Interaktive To-do-Aufgabe",
     "QuoteDescription": "Block aus zitiertem Text",
     "CodeDescription": "Codeblock mit Syntax-Hervorhebung",
-    "DividerDescription": "Horizontale Trennlinie"
+    "DividerDescription": "Horizontale Trennlinie",
+    "CloseMenu": "Menü schließen",
+    "SlashMenuSearchPlaceholder": "Tippen zum Suchen"
   },
   "Mindmap": {
     "Title": "Mindmaps",

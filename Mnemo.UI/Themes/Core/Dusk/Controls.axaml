@@ -231,6 +231,11 @@
     <SolidColorBrush x:Key="ListBoxItemForegroundSelectedPressedBrush" Color="{DynamicResource ListBoxItemForegroundSelectedPressed}"/>
     <SolidColorBrush x:Key="ListBoxItemForegroundDisabledBrush" Color="{DynamicResource ListBoxItemForegroundDisabled}"/>
 
+    <!-- SlashCommandMenu list item brushes (gray selection) -->
+    <SolidColorBrush x:Key="SlashCommandItemBackgroundSelectedBrush" Color="{DynamicResource SlashCommandItemBackgroundSelected}"/>
+    <SolidColorBrush x:Key="SlashCommandItemBackgroundSelectedPointerOverBrush" Color="{DynamicResource SlashCommandItemBackgroundSelectedPointerOver}"/>
+    <SolidColorBrush x:Key="SlashCommandItemBackgroundSelectedPressedBrush" Color="{DynamicResource SlashCommandItemBackgroundSelectedPressed}"/>
+
     <!-- TreeViewItem Brushes (keys match TreeViewItem.axaml DynamicResource lookups) -->
     <SolidColorBrush x:Key="TreeViewItemBackground" Color="{DynamicResource TreeViewItemBackgroundColor}"/>
     <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="{DynamicResource TreeViewItemBackgroundPointerOverColor}"/>
@@ -309,11 +314,21 @@
     <SolidColorBrush x:Key="CheckBoxForegroundPressedBrush" Color="{DynamicResource CheckBoxForegroundPressed}"/>
     <SolidColorBrush x:Key="CheckBoxForegroundDisabledBrush" Color="{DynamicResource CheckBoxForegroundDisabled}"/>
     
-    <!-- ScrollBar Brushes -->
+    <!-- ScrollBar -->
+    <x:Double x:Key="ScrollBarSize">8</x:Double>
+    <x:Double x:Key="ScrollBarTrackBorderThemeThickness">0</x:Double>
     <SolidColorBrush x:Key="ScrollBarBackgroundBrush" Color="{DynamicResource ScrollBarBackground}"/>
+    <SolidColorBrush x:Key="ScrollBarForegroundBrush" Color="{DynamicResource ScrollBarThumbBackground}"/>
+    <SolidColorBrush x:Key="ScrollBarBorderBrush" Color="{DynamicResource ScrollBarBackground}"/>
+    <SolidColorBrush x:Key="ScrollBarBackgroundPointerOverBrush" Color="{DynamicResource ScrollBarBackground}"/>
     <SolidColorBrush x:Key="ScrollBarThumbBackgroundBrush" Color="{DynamicResource ScrollBarThumbBackground}"/>
     <SolidColorBrush x:Key="ScrollBarThumbBackgroundPointerOverBrush" Color="{DynamicResource ScrollBarThumbBackgroundPointerOver}"/>
     <SolidColorBrush x:Key="ScrollBarThumbBackgroundPressedBrush" Color="{DynamicResource ScrollBarThumbBackgroundPressed}"/>
+    <SolidColorBrush x:Key="ScrollBarThumbBackgroundDisabledBrush" Color="{DynamicResource ScrollBarThumbBackgroundDisabled}"/>
+    <SolidColorBrush x:Key="ScrollBarTrackFillBrush" Color="{DynamicResource ScrollBarTrackFill}"/>
+    <SolidColorBrush x:Key="ScrollBarTrackStrokeBrush" Color="{DynamicResource ScrollBarTrackStroke}"/>
+    <SolidColorBrush x:Key="ScrollBarTrackFillPointerOverBrush" Color="{DynamicResource ScrollBarTrackFill}"/>
+    <SolidColorBrush x:Key="ScrollBarTrackStrokePointerOverBrush" Color="{DynamicResource ScrollBarTrackStroke}"/>
     <SolidColorBrush x:Key="ScrollBarButtonBackgroundBrush" Color="{DynamicResource ScrollBarButtonBackground}"/>
     <SolidColorBrush x:Key="ScrollBarButtonBackgroundPointerOverBrush" Color="{DynamicResource ScrollBarButtonBackgroundPointerOver}"/>
     <SolidColorBrush x:Key="ScrollBarButtonBackgroundPressedBrush" Color="{DynamicResource ScrollBarButtonBackgroundPressed}"/>

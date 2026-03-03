@@ -263,7 +263,9 @@
       "ChecklistDescription": "インタラクティブなタスク項目",
       "QuoteDescription": "引用されたテキストブロック",
       "CodeDescription": "シントックスハイライトのコードブロック",
-      "DividerDescription": "水平分割線"
+      "DividerDescription": "水平分割線",
+      "CloseMenu": "メニューを閉じる",
+      "SlashMenuSearchPlaceholder": "検索するには入力"
     },
     "Mindmap": {
       "Title": "マインドマップ",

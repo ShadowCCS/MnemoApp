@@ -687,10 +687,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         var hasBlockSelection = Blocks.Any(b => b.IsSelected);
 
-        // 1. Backspace: delete all selected blocks
+        // 1. Backspace: delete all selected blocks, or delete text selection (including cross-block)
         if (e.Key == Key.Back && hasBlockSelection)
         {
             DeleteSelectedBlocks();
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Back && !hasBlockSelection && HasCrossBlockTextSelection())
+        {
+            TryDeleteTextSelection();
             e.Handled = true;
             return;
         }
@@ -752,6 +758,85 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             int focusIndex = Math.Min(firstIndex, Blocks.Count - 1);
             if (focusIndex < 0) focusIndex = 0;
             var target = Blocks[focusIndex];
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => target.IsFocused = true,
+                Avalonia.Threading.DispatcherPriority.Input);
+        }
+
+        ReorderBlocks();
+        ClearBlockSelection();
+        BlocksChanged?.Invoke();
+    }
+
+    private bool HasCrossBlockTextSelection()
+    {
+        var containers = GetBlockContainersInOrder();
+        if (containers == null) return false;
+        for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+        {
+            var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+            if (editableBlock?.GetSelectionRange() != null) return true;
+        }
+        return false;
+    }
+
+    private void TryDeleteTextSelection()
+    {
+        var containers = GetBlockContainersInOrder();
+        if (containers == null) return;
+
+        int? firstAffectedIndex = null;
+        for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+        {
+            var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+            if (editableBlock?.GetSelectionRange() != null)
+            {
+                if (firstAffectedIndex == null) firstAffectedIndex = i;
+                editableBlock.DeleteSelection();
+            }
+        }
+
+        RemoveEmptyBlocksAfterTextDelete(firstAffectedIndex ?? 0);
+    }
+
+    /// <summary>
+    /// Removes empty blocks after a text-delete operation, but keeps the first block that had
+    /// selection (even if empty) and focuses it. Other empty blocks are removed.
+    /// </summary>
+    private void RemoveEmptyBlocksAfterTextDelete(int firstBlockInDeletion)
+    {
+        var emptyIndices = new List<int>();
+        for (int i = 0; i < Blocks.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(Blocks[i].Content ?? string.Empty))
+                emptyIndices.Add(i);
+        }
+        // Never remove the first block that had selection — it stays (empty) and gets focus
+        var toRemove = emptyIndices.Where(i => i != firstBlockInDeletion).ToList();
+
+        foreach (int i in toRemove.OrderByDescending(x => x))
+        {
+            var block = Blocks[i];
+            UnsubscribeFromBlock(block);
+            Blocks.RemoveAt(i);
+        }
+
+        // After removals, the block that was at firstBlockInDeletion may have a new index
+        int newFocusIndex = firstBlockInDeletion - toRemove.Count(i => i < firstBlockInDeletion);
+        newFocusIndex = Math.Clamp(newFocusIndex, 0, Math.Max(0, Blocks.Count - 1));
+
+        if (Blocks.Count == 0)
+        {
+            var defaultBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
+            SubscribeToBlock(defaultBlock);
+            Blocks.Add(defaultBlock);
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => defaultBlock.IsFocused = true,
+                Avalonia.Threading.DispatcherPriority.Input);
+        }
+        else
+        {
+            var target = Blocks[newFocusIndex];
             Avalonia.Threading.Dispatcher.UIThread.Post(
                 () => target.IsFocused = true,
                 Avalonia.Threading.DispatcherPriority.Input);

@@ -14,9 +14,12 @@ namespace Mnemo.UI.Components.BlockEditor;
 
 public class CommandItem
 {
-    public string Icon { get; set; } = string.Empty;
+    /// <summary>Full avares path to the SVG icon (e.g. avares://Mnemo.UI/Icons/SlashCommand/letter-t.svg).</summary>
+    public string IconPath { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    /// <summary>Optional shortcut hint shown on the right (e.g. "#", "1.", "-").</summary>
+    public string? Shortcut { get; set; }
     public BlockType BlockType { get; set; }
 }
 
@@ -25,6 +28,8 @@ public partial class SlashCommandMenu : UserControl
     private readonly List<CommandItem> _allCommandItems;
     private List<CommandItem> _filteredCommandItems;
     private string _filterText = string.Empty;
+    private int _selectedIndex;
+    private ListBox? _commandListBox;
 
     public event Action<BlockType>? CommandSelected;
 
@@ -38,19 +43,39 @@ public partial class SlashCommandMenu : UserControl
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
+        _commandListBox = this.FindControl<ListBox>("CommandListBox");
+        var closeMenuText = this.FindControl<TextBlock>("CloseMenuTextBlock");
+        if (closeMenuText != null)
+        {
+            var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+            string T(string key, string ns = "NotesEditor") => loc?.T(key, ns) ?? key;
+            closeMenuText.Text = T("CloseMenu");
+        }
         EnsureItemsSourceSet();
+        SyncSelectedIndex();
         Loaded -= OnLoaded;
     }
 
     private void EnsureItemsSourceSet()
     {
-        var itemsControl = this.FindControl<ItemsControl>("CommandItems");
-        if (itemsControl != null)
+        if (_commandListBox == null) return;
+        if (_commandListBox.ItemsSource != _filteredCommandItems)
         {
-            if (itemsControl.ItemsSource != _filteredCommandItems)
-            {
-                itemsControl.ItemsSource = _filteredCommandItems;
-            }
+            _commandListBox.ItemsSource = _filteredCommandItems;
+        }
+    }
+
+    private void SyncSelectedIndex()
+    {
+        if (_commandListBox == null) return;
+        _selectedIndex = Math.Clamp(_selectedIndex, 0, Math.Max(0, _filteredCommandItems.Count - 1));
+        if (_commandListBox.SelectedIndex != _selectedIndex)
+        {
+            _commandListBox.SelectedIndex = _selectedIndex;
+        }
+        if (_selectedIndex >= 0 && _commandListBox.ContainerFromIndex(_selectedIndex) is Control container)
+        {
+            container.BringIntoView();
         }
     }
 
@@ -64,18 +89,19 @@ public partial class SlashCommandMenu : UserControl
         var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
         string T(string key, string ns = "NotesEditor") => loc?.T(key, ns) ?? key;
 
+        const string iconBase = "avares://Mnemo.UI/Icons/SlashCommand/";
         return new List<CommandItem>
         {
-            new() { Icon = "T", Name = T("Text"), Description = T("TextDescription"), BlockType = BlockType.Text },
-            new() { Icon = "H1", Name = T("Heading1"), Description = T("Heading1Description"), BlockType = BlockType.Heading1 },
-            new() { Icon = "H2", Name = T("Heading2"), Description = T("Heading2Description"), BlockType = BlockType.Heading2 },
-            new() { Icon = "H3", Name = T("Heading3"), Description = T("Heading3Description"), BlockType = BlockType.Heading3 },
-            new() { Icon = "•", Name = T("BulletList"), Description = T("BulletListDescription"), BlockType = BlockType.BulletList },
-            new() { Icon = "1.", Name = T("NumberedList"), Description = T("NumberedListDescription"), BlockType = BlockType.NumberedList },
-            new() { Icon = "☑", Name = T("Checklist"), Description = T("ChecklistDescription"), BlockType = BlockType.Checklist },
-            new() { Icon = "Q", Name = T("Quote"), Description = T("QuoteDescription"), BlockType = BlockType.Quote },
-            new() { Icon = "</>", Name = T("Code"), Description = T("CodeDescription"), BlockType = BlockType.Code },
-            new() { Icon = "—", Name = T("Divider"), Description = T("DividerDescription"), BlockType = BlockType.Divider }
+            new() { IconPath = iconBase + "letter-t.svg", Name = T("Text"), Description = T("TextDescription"), Shortcut = null, BlockType = BlockType.Text },
+            new() { IconPath = iconBase + "h-1.svg", Name = T("Heading1"), Description = T("Heading1Description"), Shortcut = "#", BlockType = BlockType.Heading1 },
+            new() { IconPath = iconBase + "h-2.svg", Name = T("Heading2"), Description = T("Heading2Description"), Shortcut = "##", BlockType = BlockType.Heading2 },
+            new() { IconPath = iconBase + "h-3.svg", Name = T("Heading3"), Description = T("Heading3Description"), Shortcut = "###", BlockType = BlockType.Heading3 },
+            new() { IconPath = iconBase + "list.svg", Name = T("BulletList"), Description = T("BulletListDescription"), Shortcut = "-", BlockType = BlockType.BulletList },
+            new() { IconPath = iconBase + "list-numbers.svg", Name = T("NumberedList"), Description = T("NumberedListDescription"), Shortcut = "1.", BlockType = BlockType.NumberedList },
+            new() { IconPath = iconBase + "list-check.svg", Name = T("Checklist"), Description = T("ChecklistDescription"), Shortcut = "[]", BlockType = BlockType.Checklist },
+            new() { IconPath = iconBase + "quote.svg", Name = T("Quote"), Description = T("QuoteDescription"), Shortcut = "\"", BlockType = BlockType.Quote },
+            new() { IconPath = iconBase + "math-function.svg", Name = T("Code"), Description = T("CodeDescription"), Shortcut = null, BlockType = BlockType.Code },
+            new() { IconPath = iconBase + "separator.svg", Name = T("Divider"), Description = T("DividerDescription"), Shortcut = "---", BlockType = BlockType.Divider }
         };
     }
 
@@ -85,7 +111,9 @@ public partial class SlashCommandMenu : UserControl
         
         _filterText = filterText;
         FilterItems(filterText);
+        _selectedIndex = 0;
         EnsureItemsSourceSet();
+        SyncSelectedIndex();
     }
 
     private void FilterItems(string filterText)
@@ -107,7 +135,22 @@ public partial class SlashCommandMenu : UserControl
     public void HandleEnter()
     {
         if (_filteredCommandItems.Count == 0) return;
-        CommandSelected?.Invoke(_filteredCommandItems[0].BlockType);
+        _selectedIndex = Math.Clamp(_selectedIndex, 0, _filteredCommandItems.Count - 1);
+        CommandSelected?.Invoke(_filteredCommandItems[_selectedIndex].BlockType);
+    }
+
+    public void HandleUp()
+    {
+        if (_filteredCommandItems.Count == 0) return;
+        _selectedIndex = Math.Max(0, _selectedIndex - 1);
+        SyncSelectedIndex();
+    }
+
+    public void HandleDown()
+    {
+        if (_filteredCommandItems.Count == 0) return;
+        _selectedIndex = Math.Min(_filteredCommandItems.Count - 1, _selectedIndex + 1);
+        SyncSelectedIndex();
     }
 
     public void HandleItemClick(CommandItem command)

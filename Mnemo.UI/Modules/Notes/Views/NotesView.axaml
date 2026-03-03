@@ -243,7 +243,7 @@
                                                   Width="22" Height="22" Color="{DynamicResource TextTertiaryBrush}"
                                                   IsVisible="{Binding IsFavorite, Converter={StaticResource BoolNegationConverter}}"/>
                                 <controls:SvgIcon x:Name="StarFilled" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/star.svg"
-                                                  Width="22" Height="22" Color="{DynamicResource SystemAccentColor}"
+                                                  Width="22" Height="22" Color="{DynamicResource AccentPrimary}"
                                                   IsVisible="{Binding IsFavorite}"/>
                             </Grid>
                         </Button>

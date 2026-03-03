@@ -519,6 +519,23 @@ public partial class EditableBlock : UserControl
             return;
         }
 
+        // Handle Up/Down when slash menu is visible for keyboard navigation
+        if (_slashMenuOverlayId != null && _currentSlashMenu != null)
+        {
+            if (e.Key == Key.Up)
+            {
+                _currentSlashMenu.HandleUp();
+                e.Handled = true;
+                return;
+            }
+            if (e.Key == Key.Down)
+            {
+                _currentSlashMenu.HandleDown();
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Fallback: Hide menu if visible and any non-slash key is pressed (covers cases where TextChanged doesn't fire)
         // This ensures menu state is always correct regardless of event timing
         if (_slashMenuOverlayId != null && !isSlashKey && e.Key != Key.Escape && e.Key != Key.Enter && e.Key != Key.Up && e.Key != Key.Down)
@@ -687,6 +704,54 @@ public partial class EditableBlock : UserControl
 
     #region Slash Menu Handling
 
+    /// <summary>Estimated height of the slash menu for viewport space checks.</summary>
+    private const double SlashMenuHeightEstimate = 320;
+
+    /// <summary>Returns true to show menu above the textbox, false to show below. Default when both fit is below.</summary>
+    private static bool ShouldShowSlashMenuAbove(TextBox textBox)
+    {
+        if (textBox == null || !textBox.IsVisible) return false;
+
+        var scrollViewer = textBox.FindAncestorOfType<ScrollViewer>();
+        double visibleTop;
+        double visibleBottom;
+        double anchorTop;
+        double anchorBottom;
+
+        if (scrollViewer != null && scrollViewer.Content is Visual scrollContent)
+        {
+            var ptInContent = textBox.TranslatePoint(new Point(0, 0), scrollContent);
+            if (!ptInContent.HasValue) return false;
+            visibleTop = scrollViewer.Offset.Y;
+            visibleBottom = scrollViewer.Offset.Y + scrollViewer.Viewport.Height;
+            anchorTop = ptInContent.Value.Y;
+            anchorBottom = ptInContent.Value.Y + textBox.Bounds.Height;
+        }
+        else
+        {
+            var topLevel = textBox.FindAncestorOfType<TopLevel>();
+            if (topLevel == null) return false;
+            var ptInWindow = textBox.TranslatePoint(new Point(0, 0), topLevel);
+            if (!ptInWindow.HasValue) return false;
+            visibleTop = 0;
+            visibleBottom = topLevel.Bounds.Height;
+            anchorTop = ptInWindow.Value.Y;
+            anchorBottom = ptInWindow.Value.Y + textBox.Bounds.Height;
+        }
+
+        double spaceAbove = anchorTop - visibleTop;
+        double spaceBelow = visibleBottom - anchorBottom;
+
+        // If not enough space below but enough above → show above
+        if (spaceBelow < SlashMenuHeightEstimate && spaceAbove >= spaceBelow)
+            return true;
+        // If not enough space above but enough below → show below
+        if (spaceAbove < SlashMenuHeightEstimate && spaceBelow >= spaceAbove)
+            return false;
+        // Default: show below when both fit or when both are tight
+        return false;
+    }
+
     private void ShowSlashMenu(TextBox textBox, string filterText = "")
     {
         if (_overlayService == null || textBox == null || !textBox.IsVisible) return;
@@ -699,13 +764,14 @@ public partial class EditableBlock : UserControl
         menu.UpdateFilter(filterText);
         _currentSlashMenu = menu;
 
+        bool showAbove = ShouldShowSlashMenuAbove(textBox);
         var options = new OverlayOptions
         {
             ShowBackdrop = false,
             CloseOnOutsideClick = true,
             AnchorControl = textBox,
-            AnchorPosition = AnchorPosition.BottomLeft,
-            AnchorOffset = new Thickness(0, 4, 0, 0), // 4px offset below textbox
+            AnchorPosition = showAbove ? AnchorPosition.TopLeft : AnchorPosition.BottomLeft,
+            AnchorOffset = showAbove ? new Thickness(0, -4, 0, 0) : new Thickness(0, 4, 0, 0),
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
         };
@@ -874,6 +940,30 @@ public partial class EditableBlock : UserControl
         int end = Math.Max(textBox.SelectionStart, textBox.SelectionEnd);
         if (start >= end) return null;
         return (start, end);
+    }
+
+    /// <summary>
+    /// Deletes the currently selected text in this block's TextBox and syncs to the view model.
+    /// No-op if there is no selection or no TextBox. Used for Backspace/Delete with text selection (including cross-block).
+    /// </summary>
+    public bool DeleteSelection()
+    {
+        var range = GetSelectionRange();
+        if (range == null || _viewModel == null) return false;
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox?.Text == null) return false;
+        string text = textBox.Text;
+        int start = range.Value.start;
+        int len = range.Value.end - start;
+        if (len <= 0 || start < 0 || start + len > text.Length) return false;
+        string newText = text.Remove(start, len);
+        textBox.Text = newText;
+        textBox.CaretIndex = start;
+        textBox.SelectionStart = start;
+        textBox.SelectionEnd = start;
+        _viewModel.Content = newText;
+        _viewModel.NotifyContentChanged();
+        return true;
     }
 
     /// <summary>

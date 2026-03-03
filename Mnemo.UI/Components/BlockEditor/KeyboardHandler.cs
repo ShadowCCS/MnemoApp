@@ -107,11 +107,22 @@ public class KeyboardHandler
     private void HandleBackspace(KeyEventArgs e, TextBox textBox, string text, int caretIndex, int selectionLength, BlockViewModel viewModel)
     {
         System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] HandleBackspace - Text: '{text}', CaretIndex: {caretIndex}, SelectionLength: {selectionLength}, BlockType: {viewModel.Type}");
-        
-        // If there's a selection, backspace will delete it - let TextBox handle that normally
-        if (selectionLength > 0)
+
+        // If there's a selection, explicitly delete it (Avalonia TextBox may not handle Backspace-for-selection reliably when custom handlers are present)
+        if (selectionLength != 0)
         {
-            System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Selection detected, letting TextBox handle");
+            int start = Math.Min(textBox.SelectionStart, textBox.SelectionEnd);
+            int len = Math.Abs(textBox.SelectionEnd - textBox.SelectionStart);
+            if (len > 0 && start >= 0 && start + len <= text.Length)
+            {
+                string newText = text.Remove(start, len);
+                textBox.Text = newText;
+                textBox.CaretIndex = start;
+                textBox.SelectionStart = start;
+                textBox.SelectionEnd = start;
+                viewModel.Content = newText;
+                e.Handled = true;
+            }
             return;
         }
 

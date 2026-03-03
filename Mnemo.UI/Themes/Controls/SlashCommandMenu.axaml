@@ -1,0 +1,23 @@
+<Styles
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:ClassModifier="internal">
+
+    <!-- ListBox with class SlashCommandListBox: item layout and gray hover/selection -->
+    <Style Selector="ListBox.SlashCommandListBox ListBoxItem">
+        <Setter Property="Padding" Value="0,1" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="ListBox.SlashCommandListBox ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ListBoxItemBackgroundPointerOverBrush}" />
+    </Style>
+    <Style Selector="ListBox.SlashCommandListBox ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SlashCommandItemBackgroundSelectedBrush}" />
+    </Style>
+    <Style Selector="ListBox.SlashCommandListBox ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SlashCommandItemBackgroundSelectedPointerOverBrush}" />
+    </Style>
+    <Style Selector="ListBox.SlashCommandListBox ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SlashCommandItemBackgroundSelectedPressedBrush}" />
+    </Style>
+</Styles>

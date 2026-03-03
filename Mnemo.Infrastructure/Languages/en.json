@@ -263,7 +263,9 @@
     "ChecklistDescription": "Interactive to-do item",
     "QuoteDescription": "Quoted text block",
     "CodeDescription": "Code block with syntax highlighting",
-    "DividerDescription": "Horizontal divider line"
+    "DividerDescription": "Horizontal divider line",
+    "CloseMenu": "Close menu",
+    "SlashMenuSearchPlaceholder": "Type to search"
   },
   "Mindmap": {
     "Title": "Mindmaps",
