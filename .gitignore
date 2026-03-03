@@ -87,6 +87,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+publish/
 
 ## Files built by Visual Studio
 *_i.c

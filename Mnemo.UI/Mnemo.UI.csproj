@@ -4,10 +4,19 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <Version>0.1.0</Version>
-    <InformationalVersion>0.1.0-dev</InformationalVersion>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcons/AppIconLightClassic.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+    <AssemblyTitle>Mnemo</AssemblyTitle>
+    <AssemblyDescription>Local-first AI-powered learning environment.</AssemblyDescription>
+    <AssemblyCompany>Mnemo</AssemblyCompany>
+    <AssemblyProduct>Mnemo</AssemblyProduct>
+    <AssemblyCopyright>Copyright © Mnemo 2026</AssemblyCopyright>
+    <AssemblyVersion>0.1.0</AssemblyVersion>
+    <AssemblyFileVersion>0.1.0</AssemblyFileVersion>
+    <AssemblyInformationalVersion>0.1.0-dev</AssemblyInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
