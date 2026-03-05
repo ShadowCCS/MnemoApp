@@ -1,14 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.UI.Components.Overlays;
 using Mnemo.UI.Services;
 using Mnemo.UI.ViewModels;
 
@@ -19,9 +24,17 @@ public class ChatViewModel : ViewModelBase
     /// <summary>Distance from bottom (px) below which we consider "at bottom" for scroll-to-bottom button.</summary>
     public const double ScrollToBottomThreshold = 20;
 
+    private static readonly ICommand NoOpAttachmentCommand = new RelayCommand<ChatAttachmentViewModel>(_ => { });
+
+    private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"
+    };
+
     private readonly IAIOrchestrator _orchestrator;
     private readonly ILoggerService _logger;
     private readonly ILocalizationService _localizationService;
+    private readonly IOverlayService _overlayService;
 
     private string _inputText = string.Empty;
     public string InputText
@@ -62,6 +75,9 @@ public class ChatViewModel : ViewModelBase
         set => SetProperty(ref _showScrollToBottomButton, value);
     }
 
+    /// <summary>When true, new content (e.g. streaming) will auto-scroll to bottom. Becomes false when user scrolls up; restored when user clicks "Scroll to bottom".</summary>
+    private bool _isAutoScrollAttached = true;
+
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
     /// <summary>Available assistant modes for the mode dropdown.</summary>
@@ -74,11 +90,15 @@ public class ChatViewModel : ViewModelBase
         set => SetProperty(ref _selectedAssistantMode, value);
     }
 
+    public ObservableCollection<ChatAttachmentViewModel> PendingAttachments { get; } = new();
+
     public ICommand SendMessageCommand { get; }
     public ICommand StopCommand { get; }
     public ICommand NewChatCommand { get; }
     public ICommand SuggestionSelectedCommand { get; }
     public ICommand ScrollToBottomCommand { get; }
+    public ICommand RemoveAttachmentCommand { get; }
+    public ICommand OpenImagePreviewCommand { get; }
 
     /// <summary>Raised when the view should scroll to the end (e.g. after new message or user clicked "Scroll to bottom").</summary>
     public event EventHandler? RequestScrollToBottom;
@@ -86,17 +106,24 @@ public class ChatViewModel : ViewModelBase
     private CancellationTokenSource? _cts;
     private ChatMessageViewModel? _lastMessageSubscribed;
 
-    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService)
+    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService)
     {
         _orchestrator = orchestrator;
         _logger = logger;
         _localizationService = localizationService;
+        _overlayService = overlayService;
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
         NewChatCommand = new RelayCommand(NewChat, () => !IsBusy);
         SuggestionSelectedCommand = new RelayCommand<string>(ApplySuggestion);
         ScrollToBottomCommand = new RelayCommand(OnScrollToBottom);
+        RemoveAttachmentCommand = new RelayCommand<ChatAttachmentViewModel>(a =>
+        {
+            if (a != null)
+                PendingAttachments.Remove(a);
+        });
+        OpenImagePreviewCommand = new RelayCommand<string>(OpenImagePreview);
 
         Messages.CollectionChanged += OnMessagesCollectionChanged;
 
@@ -120,18 +147,25 @@ public class ChatViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Called by the view when scroll position changes; updates <see cref="ShowScrollToBottomButton"/>.</summary>
+    /// <summary>Called by the view when scroll position changes; updates <see cref="ShowScrollToBottomButton"/> and auto-scroll attachment.</summary>
     public void NotifyScrollPosition(double offsetY, double extentHeight, double viewportHeight)
     {
         var atBottom = extentHeight - viewportHeight - offsetY <= ScrollToBottomThreshold;
         if (!atBottom)
+        {
             ShowScrollToBottomButton = true;
+            _isAutoScrollAttached = false;
+        }
         else
+        {
             ShowScrollToBottomButton = false;
+            _isAutoScrollAttached = true;
+        }
     }
 
     private void OnScrollToBottom()
     {
+        _isAutoScrollAttached = true;
         ShowScrollToBottomButton = false;
         RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
     }
@@ -140,7 +174,8 @@ public class ChatViewModel : ViewModelBase
     {
         if (e.Action != NotifyCollectionChangedAction.Add) return;
         SubscribeToLastMessage();
-        RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
+        if (_isAutoScrollAttached)
+            RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
     }
 
     private void SubscribeToLastMessage()
@@ -158,7 +193,7 @@ public class ChatViewModel : ViewModelBase
 
     private void OnLastMessageContentChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ChatMessageViewModel.Content))
+        if (e.PropertyName == nameof(ChatMessageViewModel.Content) && _isAutoScrollAttached)
             RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
     }
 
@@ -173,6 +208,40 @@ public class ChatViewModel : ViewModelBase
         _cts?.Cancel();
     }
 
+    /// <summary>Adds an attachment (file or image path). Call from view after file picker or screenshot capture.</summary>
+    public void AddPendingAttachment(string path, ChatAttachmentKind kind, string? displayName = null)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return;
+        var item = new ChatAttachmentViewModel(path, kind, displayName, RemoveAttachmentCommand);
+        PendingAttachments.Add(item);
+    }
+
+    /// <summary>Determines if a file path should be treated as an image for the vision model.</summary>
+    public static bool IsImagePath(string path)
+    {
+        var ext = System.IO.Path.GetExtension(path);
+        return !string.IsNullOrEmpty(ext) && ImageExtensions.Contains(ext);
+    }
+
+    /// <summary>Opens an overlay preview for the given image path. No-op if path is invalid or file missing.</summary>
+    private void OpenImagePreview(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return;
+        var overlay = new ImagePreviewOverlay { ImagePath = path };
+        var options = new OverlayOptions
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true,
+            CloseOnEscape = true
+        };
+        var id = _overlayService.CreateOverlay(overlay, options, "ImagePreview");
+        overlay.CloseRequested += () => _overlayService.CloseOverlay(id);
+    }
+
     private void NewChat()
     {
         Messages.CollectionChanged -= OnMessagesCollectionChanged;
@@ -182,6 +251,7 @@ public class ChatViewModel : ViewModelBase
             _lastMessageSubscribed = null;
         }
         Messages.Clear();
+        PendingAttachments.Clear();
         Messages.CollectionChanged += OnMessagesCollectionChanged;
         Messages.Add(CreateWelcomeMessage());
     }
@@ -208,10 +278,24 @@ public class ChatViewModel : ViewModelBase
         var userMessage = InputText;
         InputText = string.Empty;
 
+        var imagePaths = new List<string>();
+        var pendingList = PendingAttachments.ToList();
+        foreach (var a in pendingList)
+        {
+            if (a.Kind == ChatAttachmentKind.Image)
+                imagePaths.Add(a.Path);
+        }
+
+        var messageAttachments = pendingList
+            .Select(a => new ChatAttachmentViewModel(a.Path, a.Kind, a.DisplayName, NoOpAttachmentCommand))
+            .ToList();
+        PendingAttachments.Clear();
+
         Messages.Add(new ChatMessageViewModel
         {
             Content = userMessage,
-            IsUser = true
+            IsUser = true,
+            Attachments = messageAttachments.Count > 0 ? messageAttachments : null
         });
 
         IsBusy = true;
@@ -225,6 +309,31 @@ public class ChatViewModel : ViewModelBase
         Messages.Add(aiMessage);
 
         _cts = new CancellationTokenSource();
+
+        List<string>? imageBase64 = null;
+        if (imagePaths.Count > 0)
+        {
+            try
+            {
+                imageBase64 = new List<string>(imagePaths.Count);
+                foreach (var p in imagePaths)
+                {
+                    var bytes = await File.ReadAllBytesAsync(p, _cts.Token).ConfigureAwait(false);
+                    imageBase64.Add(Convert.ToBase64String(bytes));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("Chat", $"Failed to read image(s) for upload: {ex}");
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
+                    aiMessage.IsStreaming = false;
+                });
+                IsBusy = false;
+                return;
+            }
+        }
 
         try
         {
@@ -242,7 +351,8 @@ public class ChatViewModel : ViewModelBase
                 ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
                 fullPrompt,
                 _cts.Token,
-                UpdateContent);
+                UpdateContent,
+                imageBase64);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {

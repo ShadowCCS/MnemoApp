@@ -80,13 +80,15 @@ When answering:
     /// Runs the streaming prompt loop off the UI thread and reports content via callbacks.
     /// Callbacks may be invoked from a background thread; caller must marshal to UI for updates.
     /// </summary>
+    /// <param name="imageBase64Contents">Optional. For vision: list of image base64 strings to send with the prompt.</param>
     /// <returns>True if at least one token was received; false if empty response.</returns>
     public static async Task<(bool FoundResponse, string FinalContent)> RunStreamingAsync(
         IAIOrchestrator orchestrator,
         string systemPrompt,
         string fullPrompt,
         CancellationToken cancellationToken,
-        Action<string> onContentUpdate)
+        Action<string> onContentUpdate,
+        IReadOnlyList<string>? imageBase64Contents = null)
     {
         var buffer = new StringBuilder();
         var lastUiUpdate = DateTime.UtcNow;
@@ -94,7 +96,7 @@ When answering:
 
         await Task.Run(async () =>
         {
-            await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken))
+            await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents))
             {
                 buffer.Append(token);
                 foundResponse = true;

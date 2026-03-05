@@ -157,10 +157,12 @@ public class AIOrchestrator : IAIOrchestrator
         }
     }
 
-    public async IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default, IReadOnlyList<string>? imageBase64Contents = null)
     {
-        // Chat does not use RAG; use prompts as-is.
-        var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
+        // When images are present, use fast model (vision-capable, e.g. ministral 3-3b).
+        var targetModel = (imageBase64Contents != null && imageBase64Contents.Count > 0)
+            ? await SelectVisionModelAsync(ct).ConfigureAwait(false)
+            : await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
         if (targetModel == null) yield break;
 
         var finalSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
@@ -172,7 +174,7 @@ public class AIOrchestrator : IAIOrchestrator
         await _governor.AcquireModelAsync(targetModel, ct).ConfigureAwait(false);
         try
         {
-            await foreach (var token in _textService.GenerateStreamingAsync(targetModel, formattedPrompt, ct).ConfigureAwait(false))
+            await foreach (var token in _textService.GenerateStreamingAsync(targetModel, formattedPrompt, ct, imageBase64Contents).ConfigureAwait(false))
             {
                 yield return token;
             }
@@ -181,6 +183,14 @@ public class AIOrchestrator : IAIOrchestrator
         {
             _governor.ReleaseModel(targetModel);
         }
+    }
+
+    /// <summary>Selects the fast (vision-capable) model for image prompts.</summary>
+    private async Task<AIModelManifest?> SelectVisionModelAsync(CancellationToken ct)
+    {
+        var modelsEnumerable = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
+        var fastModel = modelsEnumerable.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == "fast");
+        return fastModel ?? modelsEnumerable.FirstOrDefault(m => m.Type == AIModelType.Text);
     }
 
     private async Task<AIModelManifest?> SelectModelAsync(string userPrompt, CancellationToken ct)

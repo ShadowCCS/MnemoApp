@@ -429,6 +429,7 @@ public class MarkdownRenderer : IMarkdownRenderer
                 {
                     Text = code.Content,
                     FontFamily = new FontFamily("Consolas,monospace"),
+                    Foreground = foreground ?? (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!,
                     Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!
                 });
                 break;

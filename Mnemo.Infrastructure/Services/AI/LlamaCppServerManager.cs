@@ -81,12 +81,13 @@ public class LlamaCppServerManager : IAIServerManager
         }
 
         var modelFile = ResolveModelPath(manifest);
+        var mmprojFile = ResolveMmprojPath(manifest);
         var uri = new Uri(manifest.Endpoint);
         var port = uri.Port;
         var useGpuSetting = await _settings.GetAsync<bool?>("AI.GpuAcceleration").ConfigureAwait(false);
         var hardwareInfo = _hardware.Detect();
         var useGpu = useGpuSetting ?? hardwareInfo.HasNvidiaGpu;
-        var serverKey = ComputeServerKey(manifest, modelFile, port, useGpu);
+        var serverKey = ComputeServerKey(manifest, modelFile, port, useGpu, mmprojFile);
 
         _lastUsed[manifest.Id] = DateTime.UtcNow;
 
@@ -116,7 +117,7 @@ public class LlamaCppServerManager : IAIServerManager
                 }
             }
 
-            await StartServerAsync(manifest, modelFile, port, useGpu, serverKey, ct).ConfigureAwait(false);
+            await StartServerAsync(manifest, modelFile, mmprojFile, port, useGpu, serverKey, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -177,7 +178,7 @@ public class LlamaCppServerManager : IAIServerManager
         }
     }
 
-    private static string ComputeServerKey(AIModelManifest manifest, string modelPath, int port, bool useGpu)
+    private static string ComputeServerKey(AIModelManifest manifest, string modelPath, int port, bool useGpu, string? mmprojPath)
     {
         var contextSize = 8192;
         if (manifest.Metadata.TryGetValue("ContextSize", out var csStr) && int.TryParse(csStr, out var cs))
@@ -196,7 +197,7 @@ public class LlamaCppServerManager : IAIServerManager
         }
 
         var flashAttn = useGpu && manifest.Metadata.TryGetValue("FlashAttn", out var flashStr) && bool.TryParse(flashStr, out var flash) && flash;
-        var payload = $"{modelPath}|{port}|{contextSize}|{gpuLayers}|{flashAttn}";
+        var payload = $"{modelPath}|{port}|{contextSize}|{gpuLayers}|{flashAttn}|{mmprojPath ?? ""}";
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
         return hash;
     }
@@ -398,7 +399,7 @@ public class LlamaCppServerManager : IAIServerManager
         PersistRegistry();
     }
 
-    private async Task StartServerAsync(AIModelManifest manifest, string modelFile, int port, bool useGpu, string serverKey, CancellationToken ct)
+    private async Task StartServerAsync(AIModelManifest manifest, string modelFile, string? mmprojFile, int port, bool useGpu, string serverKey, CancellationToken ct)
     {
         var serverPath = await _settings.GetAsync<string>("AI.LlamaCpp.ServerPath").ConfigureAwait(false);
 
@@ -408,7 +409,7 @@ public class LlamaCppServerManager : IAIServerManager
                 $"llama.cpp server executable not found. Please set AI.LlamaCpp.ServerPath in settings. Current path: {serverPath}");
         }
 
-        var args = BuildServerArgs(manifest, modelFile, port, useGpu);
+        var args = BuildServerArgs(manifest, modelFile, mmprojFile, port, useGpu);
 
         _logger.Info("LlamaCppServerManager", $"Starting llama.cpp server for {manifest.DisplayName} on port {port}");
         _logger.Info("LlamaCppServerManager", $"Command: {serverPath} {args}");
@@ -471,7 +472,7 @@ public class LlamaCppServerManager : IAIServerManager
         _logger.Info("LlamaCppServerManager", $"Server for {manifest.DisplayName} is ready!");
     }
 
-    private string BuildServerArgs(AIModelManifest manifest, string modelPath, int port, bool useGpu)
+    private string BuildServerArgs(AIModelManifest manifest, string modelPath, string? mmprojPath, int port, bool useGpu)
     {
         var contextSize = 8192;
         if (manifest.Metadata.TryGetValue("ContextSize", out var csStr) && int.TryParse(csStr, out var cs))
@@ -498,6 +499,11 @@ public class LlamaCppServerManager : IAIServerManager
                    $"--cont-batching " +
                    $"--metrics " +
                    $"--mlock";
+
+        if (!string.IsNullOrEmpty(mmprojPath))
+        {
+            args += $" --mmproj \"{mmprojPath}\"";
+        }
 
         if (useGpu && manifest.Metadata.TryGetValue("FlashAttn", out var flashStr) && bool.TryParse(flashStr, out var flash) && flash)
         {
@@ -531,6 +537,21 @@ public class LlamaCppServerManager : IAIServerManager
         }
 
         throw new FileNotFoundException($"Model file not found at: {modelPath}");
+    }
+
+    /// <summary>
+    /// Resolves the multimodal projector (mmproj) path if the manifest specifies one.
+    /// Add "MmprojFileName" to the model's manifest.json Metadata to enable vision (e.g. for Ministral 3 3B).
+    /// </summary>
+    private static string? ResolveMmprojPath(AIModelManifest manifest)
+    {
+        if (!manifest.Metadata.TryGetValue("MmprojFileName", out var fileName) || string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        var path = Path.Combine(manifest.LocalPath, fileName.Trim());
+        return File.Exists(path) ? path : null;
     }
 
     private async Task WaitForHealthAsync(string endpoint, CancellationToken ct)

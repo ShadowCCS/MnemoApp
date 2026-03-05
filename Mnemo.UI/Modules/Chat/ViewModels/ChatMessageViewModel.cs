@@ -48,6 +48,21 @@ public class ChatMessageViewModel : ViewModelBase
         set => SetProperty(ref _suggestions, value);
     }
 
+    private List<ChatAttachmentViewModel>? _attachments;
+    /// <summary>Attachments sent with this message (e.g. images). Shown in the bubble for user messages.</summary>
+    public List<ChatAttachmentViewModel>? Attachments
+    {
+        get => _attachments;
+        set
+        {
+            if (SetProperty(ref _attachments, value))
+                OnPropertyChanged(nameof(HasAttachments));
+        }
+    }
+
+    /// <summary>True when this message has attachments to display.</summary>
+    public bool HasAttachments => _attachments is { Count: > 0 };
+
     public bool IsThinking => !string.IsNullOrEmpty(Thoughts);
 
     private bool _isStreaming;

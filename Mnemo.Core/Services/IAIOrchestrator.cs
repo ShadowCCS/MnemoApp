@@ -8,7 +8,8 @@ namespace Mnemo.Core.Services;
 public interface IAIOrchestrator
 {
     Task<Result<string>> PromptAsync(string systemPrompt, string userPrompt, CancellationToken ct = default);
-    IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, CancellationToken ct = default);
+    /// <param name="imageBase64Contents">Optional. For vision (e.g. fast model): images to send with the user prompt.</param>
+    IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, CancellationToken ct = default, IReadOnlyList<string>? imageBase64Contents = null);
     /// <param name="responseJsonSchema">Optional. When set, forwarded to text service so the server forces JSON output (same as router); use e.g. LearningPathJsonSchema.GetSchema().</param>
     Task<Result<string>> PromptWithModelAsync(string modelId, string prompt, CancellationToken ct = default, object? responseJsonSchema = null);
 

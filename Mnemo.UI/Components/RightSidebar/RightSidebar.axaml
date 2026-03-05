@@ -171,6 +171,7 @@
                                         
                                         <!-- Markdown content (throttled when streaming, like Chat module) -->
                                         <components:MarkdownView Source="{Binding Content}"
+                                                                 Foreground="{DynamicResource TextPrimaryBrush}"
                                                                  StreamingUpdateIntervalMs="{Binding IsStreaming, Converter={StaticResource BoolToStreamingIntervalConverter}}"/>
                                         
                                         <!-- Sources -->

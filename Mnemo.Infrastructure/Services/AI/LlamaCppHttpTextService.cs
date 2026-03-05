@@ -84,9 +84,10 @@ public class LlamaCppHttpTextService : ITextGenerationService
     }
 
     public async IAsyncEnumerable<string> GenerateStreamingAsync(
-        AIModelManifest manifest, 
-        string prompt, 
-        [EnumeratorCancellation] CancellationToken ct)
+        AIModelManifest manifest,
+        string prompt,
+        [EnumeratorCancellation] CancellationToken ct,
+        IReadOnlyList<string>? imageBase64Contents = null)
     {
         if (string.IsNullOrEmpty(manifest.Endpoint))
         {
@@ -106,7 +107,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
 
         using (_serverManager.BeginRequest(manifest.Id))
         {
-            await foreach (var chunk in GetStreamingChunksAsync(manifest, prompt, ct))
+            await foreach (var chunk in GetStreamingChunksAsync(manifest, prompt, imageBase64Contents, ct))
             {
                 yield return chunk;
             }
@@ -116,11 +117,12 @@ public class LlamaCppHttpTextService : ITextGenerationService
     private async IAsyncEnumerable<string> GetStreamingChunksAsync(
         AIModelManifest manifest,
         string prompt,
+        IReadOnlyList<string>? imageBase64Contents,
         [EnumeratorCancellation] CancellationToken ct)
     {
         var endpoint = $"{manifest.Endpoint!.TrimEnd('/')}/v1/chat/completions";
         var (temperature, maxTokens) = GetGenerationParams(manifest);
-        var requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: true, manifest, responseJsonSchema: null);
+        var requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: true, manifest, responseJsonSchema: null, imageBase64Contents);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Content = new StringContent(
@@ -218,10 +220,26 @@ public class LlamaCppHttpTextService : ITextGenerationService
         _httpClient.Dispose();
     }
 
-    /// <summary>Build request body for chat completions. When responseJsonSchema is set or manifest is a router, adds response_format so the Llama server forces JSON output (same mechanism as routing).</summary>
-    private static object BuildChatRequest(string prompt, double temperature, int maxTokens, bool stream, AIModelManifest manifest, object? responseJsonSchema = null)
+    /// <summary>Build request body for chat completions. When responseJsonSchema is set or manifest is a router, adds response_format so the Llama server forces JSON output (same mechanism as routing). When imageBase64Contents is set, builds multimodal user content (OpenAI vision format).</summary>
+    private static object BuildChatRequest(string prompt, double temperature, int maxTokens, bool stream, AIModelManifest manifest, object? responseJsonSchema = null, IReadOnlyList<string>? imageBase64Contents = null)
     {
-        var messages = new[] { new { role = "user", content = prompt } };
+        object content;
+        if (imageBase64Contents != null && imageBase64Contents.Count > 0)
+        {
+            var parts = new List<object> { new { type = "text", text = prompt } };
+            foreach (var base64 in imageBase64Contents)
+            {
+                var url = string.IsNullOrEmpty(base64) ? "data:image/png;base64," : $"data:image/png;base64,{base64.Trim()}";
+                parts.Add(new { type = "image_url", image_url = new { url } });
+            }
+            content = parts;
+        }
+        else
+        {
+            content = prompt;
+        }
+
+        var messages = new[] { new { role = "user", content } };
         object? responseFormat = null;
 
         if (responseJsonSchema != null)
