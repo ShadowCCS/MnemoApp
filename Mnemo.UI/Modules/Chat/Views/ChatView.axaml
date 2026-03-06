@@ -121,185 +121,297 @@
         </Grid>
 
         <!-- Messages (same layout as RightSidebar) -->
-        <ScrollViewer x:Name="ChatScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
-            <Border HorizontalAlignment="Stretch" MinWidth="0" Padding="0,0,16,0">
-                <ItemsControl ItemsSource="{Binding Messages}" HorizontalAlignment="Stretch">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="vm:ChatMessageViewModel">
-                            <Panel Margin="0,0,0,24" MinWidth="0">
-                                <!-- Assistant Message -->
-                                <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding !IsUser}" MinWidth="0">
-                                    <Border Grid.Column="0" Width="28" Height="28" CornerRadius="14"
-                                            Background="{DynamicResource CardAccentBrush}"
-                                            Margin="0,2,12,0" VerticalAlignment="Top"
-                                            BoxShadow="0 2 6 0 #15000000">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg"
-                                                          Width="14" Height="14"
-                                                          Color="{DynamicResource AccentButtonIconBrush}"/>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
-                                        <TextBlock Text="{markup:T Ns=Chat, Key=Atlas}"
-                                                   FontSize="{DynamicResource FontSize.Body.Small}"
-                                                   FontFamily="{DynamicResource Font.SemiBold}"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+        <Grid Grid.Row="1">
+            <ScrollViewer x:Name="ChatScrollViewer" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                <Border HorizontalAlignment="Stretch" MinWidth="0" Padding="0,0,16,0">
+                    <ItemsControl ItemsSource="{Binding Messages}" HorizontalAlignment="Stretch">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:ChatMessageViewModel">
+                                <Panel Margin="0,0,0,24" MinWidth="0">
+                                    <!-- Assistant Message -->
+                                    <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding !IsUser}" MinWidth="0">
+                                        <Border Grid.Column="0" Width="28" Height="28" CornerRadius="14"
+                                                Background="{DynamicResource CardAccentBrush}"
+                                                Margin="0,2,12,0" VerticalAlignment="Top"
+                                                BoxShadow="0 2 6 0 #15000000">
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg"
+                                                              Width="14" Height="14"
+                                                              Color="{DynamicResource AccentButtonIconBrush}"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="2" MinWidth="0">
+                                            <TextBlock Text="{markup:T Ns=Chat, Key=Atlas}"
+                                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
 
-                                        <Expander IsVisible="{Binding IsThinking}"
-                                                  Padding="0" MinHeight="0"
-                                                  Background="Transparent"
-                                                  BorderThickness="0"
-                                                  Margin="-12,0,0,0">
-                                            <Expander.Header>
-                                                <TextBlock Text="{markup:T Ns=Chat, Key=ThoughtProcess}"
-                                                           FontSize="{DynamicResource FontSize.Body.Caption}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                                           FontStyle="Italic"/>
-                                            </Expander.Header>
-                                            <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                                                    CornerRadius="8" Padding="12" Margin="12,0,0,0"
-                                                    BorderBrush="{DynamicResource SidebarBorderBrush}"
-                                                    BorderThickness="1">
-                                                <TextBlock Text="{Binding Thoughts}"
-                                                           FontSize="{DynamicResource FontSize.Body.Caption}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                                           TextWrapping="Wrap"/>
-                                            </Border>
-                                        </Expander>
+                                            <Expander IsVisible="{Binding IsThinking}"
+                                                      Padding="0" MinHeight="0"
+                                                      Background="Transparent"
+                                                      BorderThickness="0"
+                                                      Margin="-12,0,0,0">
+                                                <Expander.Header>
+                                                    <TextBlock Text="{markup:T Ns=Chat, Key=ThoughtProcess}"
+                                                               FontSize="{DynamicResource FontSize.Body.Caption}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               FontStyle="Italic"/>
+                                                </Expander.Header>
+                                                <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                                        CornerRadius="8" Padding="12" Margin="12,0,0,0"
+                                                        BorderBrush="{DynamicResource SidebarBorderBrush}"
+                                                        BorderThickness="1">
+                                                    <TextBlock Text="{Binding Thoughts}"
+                                                               FontSize="{DynamicResource FontSize.Body.Caption}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               TextWrapping="Wrap"/>
+                                                </Border>
+                                            </Expander>
 
-                                        <!-- Single MarkdownView: throttled live re-renders while streaming, immediate when done -->
-                                        <components:MarkdownView Source="{Binding Content}"
-                                                                 Foreground="{DynamicResource TextPrimaryBrush}"
-                                                                 StreamingUpdateIntervalMs="{Binding IsStreaming, Converter={StaticResource BoolToStreamingIntervalConverter}}"/>
+                                            <!-- Single MarkdownView: throttled live re-renders while streaming, immediate when done -->
+                                            <components:MarkdownView Source="{Binding Content}"
+                                                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                     StreamingUpdateIntervalMs="{Binding IsStreaming, Converter={StaticResource BoolToStreamingIntervalConverter}}"/>
 
-                                        <ItemsControl ItemsSource="{Binding Sources}" Margin="0,8,0,0">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel Orientation="Horizontal" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                                                            BorderBrush="{DynamicResource SidebarBorderBrush}"
-                                                            BorderThickness="1"
-                                                            CornerRadius="6"
-                                                            Padding="8,4"
-                                                            Margin="0,0,6,6">
-                                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
-                                                                              Width="12" Height="12"
-                                                                              Color="{DynamicResource TextSecondaryBrush}"/>
-                                                            <TextBlock Text="{Binding}"
-                                                                       FontSize="11"
-                                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-
-                                        <ItemsControl ItemsSource="{Binding Suggestions}" Margin="0,12,0,0" HorizontalAlignment="Stretch">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel Orientation="Horizontal" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Button Content="{Binding}"
-                                                            Classes="SuggestionChip" Margin="0,0,8,8"
-                                                            Command="{Binding #ChatRoot.DataContext.SuggestionSelectedCommand}"
-                                                            CommandParameter="{Binding}"/>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Grid>
-
-                                <!-- User Message -->
-                                <Grid IsVisible="{Binding IsUser}" HorizontalAlignment="Right" MaxWidth="400">
-                                    <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                                            BorderBrush="{DynamicResource SidebarBorderBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="18,18,4,18"
-                                            Padding="14,10"
-                                            BoxShadow="0 1 4 0 #05000000">
-                                        <StackPanel Spacing="8">
-                                            <ItemsControl ItemsSource="{Binding Attachments}"
-                                                         IsVisible="{Binding HasAttachments}">
+                                            <ItemsControl ItemsSource="{Binding Sources}" Margin="0,8,0,0">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
-                                                        <WrapPanel Orientation="Horizontal"/>
+                                                        <WrapPanel Orientation="Horizontal" />
                                                     </ItemsPanelTemplate>
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
-                                                    <DataTemplate DataType="vm:ChatAttachmentViewModel">
-                                                        <Panel Margin="0,0,8,8">
-                                                            <!-- Image Attachment (clickable to open overlay preview) -->
-                                                            <Button Command="{Binding #ChatRoot.DataContext.OpenImagePreviewCommand}"
-                                                                    CommandParameter="{Binding Path}"
-                                                                    Background="Transparent"
-                                                                    BorderThickness="0"
-                                                                    Padding="0"
-                                                                    CornerRadius="12"
-                                                                    ClipToBounds="True"
-                                                                    Cursor="Hand"
-                                                                    IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=Image}">
-                                                                <Border CornerRadius="12"
-                                                                        ClipToBounds="True"
-                                                                        BorderBrush="{DynamicResource SidebarBorderBrush}"
-                                                                        BorderThickness="1"
-                                                                        Background="{DynamicResource CardBackgroundPrimaryBrush}">
-                                                                    <Image Source="{Binding Path, Converter={StaticResource LocalPathToBitmapConverter}}"
-                                                                           Stretch="Uniform"
-                                                                           MaxWidth="128"
-                                                                           MaxHeight="128"
-                                                                           MinWidth="32"
-                                                                           MinHeight="32"/>
-                                                                </Border>
-                                                            </Button>
-
-                                                            <!-- File Attachment -->
-                                                            <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
-                                                                    BorderBrush="{DynamicResource SidebarBorderBrush}"
-                                                                    BorderThickness="1"
-                                                                    CornerRadius="8"
-                                                                    Padding="10,8"
-                                                                    IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=File}">
-                                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                                    <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                                                                            CornerRadius="6"
-                                                                            Padding="6">
-                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
-                                                                                          Width="16" Height="16"
-                                                                                          Color="{DynamicResource TextPrimaryBrush}"/>
-                                                                    </Border>
-                                                                    <TextBlock Text="{Binding DisplayName}"
-                                                                               FontSize="{DynamicResource FontSize.Body.Small}"
-                                                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                                                               FontFamily="{DynamicResource Font.Medium}"
-                                                                               TextTrimming="CharacterEllipsis"
-                                                                               MaxWidth="200"
-                                                                               VerticalAlignment="Center"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </Panel>
+                                                    <DataTemplate>
+                                                        <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                                                BorderBrush="{DynamicResource SidebarBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="6"
+                                                                Padding="8,4"
+                                                                Margin="0,0,6,6">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
+                                                                                  Width="12" Height="12"
+                                                                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                                                                <TextBlock Text="{Binding}"
+                                                                           FontSize="11"
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                            </StackPanel>
+                                                        </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
-                                            <TextBlock Text="{Binding Content}"
-                                                       FontSize="{DynamicResource FontSize.Body.Small}"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       TextWrapping="Wrap"
-                                                       LineHeight="20"/>
+
+                                            <ItemsControl ItemsSource="{Binding Suggestions}" Margin="0,12,0,0" HorizontalAlignment="Stretch">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="{Binding}"
+                                                                Classes="SuggestionChip" Margin="0,0,8,8"
+                                                                Command="{Binding #ChatRoot.DataContext.SuggestionSelectedCommand}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </StackPanel>
-                                    </Border>
-                                </Grid>
-                            </Panel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                                    </Grid>
+
+                                    <!-- User Message -->
+                                    <Grid IsVisible="{Binding IsUser}" HorizontalAlignment="Right" MaxWidth="400">
+                                        <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                                BorderBrush="{DynamicResource SidebarBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="18,18,4,18"
+                                                Padding="14,10"
+                                                BoxShadow="0 1 4 0 #05000000">
+                                            <StackPanel Spacing="8">
+                                                <ItemsControl ItemsSource="{Binding Attachments}"
+                                                             IsVisible="{Binding HasAttachments}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel Orientation="Horizontal"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="vm:ChatAttachmentViewModel">
+                                                            <Panel Margin="0,0,8,8">
+                                                                <!-- Image Attachment (clickable to open overlay preview) -->
+                                                                <Button Command="{Binding #ChatRoot.DataContext.OpenImagePreviewCommand}"
+                                                                        CommandParameter="{Binding Path}"
+                                                                        Background="Transparent"
+                                                                        BorderThickness="0"
+                                                                        Padding="0"
+                                                                        CornerRadius="12"
+                                                                        ClipToBounds="True"
+                                                                        Cursor="Hand"
+                                                                        IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=Image}">
+                                                                    <Border CornerRadius="12"
+                                                                            ClipToBounds="True"
+                                                                            BorderBrush="{DynamicResource SidebarBorderBrush}"
+                                                                            BorderThickness="1"
+                                                                            Background="{DynamicResource CardBackgroundPrimaryBrush}">
+                                                                        <Image Source="{Binding Path, Converter={StaticResource LocalPathToBitmapConverter}}"
+                                                                               Stretch="Uniform"
+                                                                               MaxWidth="128"
+                                                                               MaxHeight="128"
+                                                                               MinWidth="32"
+                                                                               MinHeight="32"/>
+                                                                    </Border>
+                                                                </Button>
+
+                                                                <!-- File Attachment -->
+                                                                <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+                                                                        BorderBrush="{DynamicResource SidebarBorderBrush}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="8"
+                                                                        Padding="10,8"
+                                                                        IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=File}">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                                        <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                                                                CornerRadius="6"
+                                                                                Padding="6">
+                                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
+                                                                                              Width="16" Height="16"
+                                                                                              Color="{DynamicResource TextPrimaryBrush}"/>
+                                                                        </Border>
+                                                                        <TextBlock Text="{Binding DisplayName}"
+                                                                                   FontSize="{DynamicResource FontSize.Body.Small}"
+                                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                                   FontFamily="{DynamicResource Font.Medium}"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   MaxWidth="200"
+                                                                                   VerticalAlignment="Center"/>
+                                                                    </StackPanel>
+                                                                </Border>
+
+                                                                <!-- Voice Attachment -->
+                                                                 <Border Background="{DynamicResource CardBackgroundPrimaryBrush}"
+                                                                        BorderBrush="{DynamicResource SidebarBorderBrush}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="16"
+                                                                        Padding="12,8"
+                                                                        IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=Voice}">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                                                        <Button Background="{DynamicResource CardAccentBrush}"
+                                                                                CornerRadius="10"
+                                                                                Width="24" Height="24"
+                                                                                Padding="4"
+                                                                                Cursor="Hand"
+                                                                                BorderThickness="0">
+                                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-play.svg"
+                                                                                              Width="14" Height="14"
+                                                                                              Color="{DynamicResource AccentButtonIconBrush}"/>
+                                                                        </Button>
+                                                                         <!-- Waveform visualization (static for now) -->
+                                                                        <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" Height="16" Opacity="0.8">
+                                                                             <Border Width="2" Height="8" CornerRadius="1" Background="{DynamicResource TextPrimaryBrush}" Opacity="0.6"/>
+                                                                             <Border Width="2" Height="12" CornerRadius="1" Background="{DynamicResource TextPrimaryBrush}" Opacity="0.8"/>
+                                                                             <Border Width="2" Height="6" CornerRadius="1" Background="{DynamicResource TextPrimaryBrush}" Opacity="0.5"/>
+                                                                             <Border Width="2" Height="14" CornerRadius="1" Background="{DynamicResource TextPrimaryBrush}" Opacity="0.9"/>
+                                                                             <Border Width="2" Height="10" CornerRadius="1" Background="{DynamicResource TextPrimaryBrush}" Opacity="0.7"/>
+                                                                             <Border Width="2" Height="12" CornerRadius="1" Background="{DynamicResource TextPrimaryBrush}" Opacity="0.8"/>
+                                                                             <Border Width="2" Height="8" CornerRadius="1" Background="{DynamicResource TextPrimaryBrush}" Opacity="0.6"/>
+                                                                             <Border Width="2" Height="4" CornerRadius="1" Background="{DynamicResource TextPrimaryBrush}" Opacity="0.4"/>
+                                                                        </StackPanel>
+                                                                        
+                                                                        <TextBlock Text="{Binding DisplayName}"
+                                                                                   FontSize="{DynamicResource FontSize.Body.Caption}"
+                                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                                   FontFamily="{DynamicResource Font.Medium}"
+                                                                                   VerticalAlignment="Center"
+                                                                                   Margin="4,0,0,0"/>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </Panel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <TextBlock Text="{Binding Content}"
+                                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           LineHeight="20"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </Panel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </ScrollViewer>
+
+            <!-- Floating Recording UI -->
+            <Border IsVisible="{Binding IsRecording}"
+                    VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                    Margin="0,0,0,12"
+                    Background="{DynamicResource CardBackgroundPrimaryBrush}"
+                    CornerRadius="24"
+                    BorderBrush="{DynamicResource SidebarBorderBrush}"
+                    BorderThickness="1"
+                    Padding="16,8"
+                    BoxShadow="0 4 16 0 #20000000">
+                <Grid ColumnDefinitions="Auto, *, Auto, Auto" VerticalAlignment="Center">
+                    <!-- Status & Timer -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <Border Width="10" Height="10" CornerRadius="5" Background="#FFEF4444">
+                            <Border.Styles>
+                                <Style Selector="Border">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:1.5" IterationCount="Infinite">
+                                            <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1.0"/></KeyFrame>
+                                            <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.4"/></KeyFrame>
+                                            <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1.0"/></KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </Border.Styles>
+                        </Border>
+                        <TextBlock Text="{Binding RecordingDurationText}" 
+                                   FontSize="{DynamicResource FontSize.Body.Default}"
+                                   FontFamily="{DynamicResource Font.Monospace}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <!-- Visual Waveform Placeholder -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="3" Height="20" VerticalAlignment="Center" Margin="0,0,24,0">
+                        <Border Width="3" Height="10" CornerRadius="1.5" Background="{DynamicResource TextSecondaryBrush}" Opacity="0.5"/>
+                        <Border Width="3" Height="16" CornerRadius="1.5" Background="{DynamicResource TextSecondaryBrush}" Opacity="0.7"/>
+                        <Border Width="3" Height="12" CornerRadius="1.5" Background="{DynamicResource TextSecondaryBrush}" Opacity="0.6"/>
+                        <Border Width="3" Height="20" CornerRadius="1.5" Background="{DynamicResource TextSecondaryBrush}" Opacity="0.9"/>
+                        <Border Width="3" Height="14" CornerRadius="1.5" Background="{DynamicResource TextSecondaryBrush}" Opacity="0.8"/>
+                        <Border Width="3" Height="18" CornerRadius="1.5" Background="{DynamicResource TextSecondaryBrush}" Opacity="1.0"/>
+                        <Border Width="3" Height="12" CornerRadius="1.5" Background="{DynamicResource TextSecondaryBrush}" Opacity="0.7"/>
+                        <Border Width="3" Height="16" CornerRadius="1.5" Background="{DynamicResource TextSecondaryBrush}" Opacity="0.9"/>
+                    </StackPanel>
+
+                    <!-- Actions -->
+                     <Button Grid.Column="2" 
+                            Command="{Binding CancelRecordingCommand}" 
+                            Classes="PromptActionButton" 
+                            ToolTip.Tip="{markup:T Ns=Common, Key=Cancel}" 
+                            Margin="0,0,8,0">
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" 
+                                          Width="20" Height="20" 
+                                          Color="{DynamicResource TextSecondaryBrush}"/>
+                    </Button>
+
+                    <Button Grid.Column="3" 
+                            Command="{Binding StopRecordingCommand}" 
+                            Background="{DynamicResource CardAccentBrush}" 
+                            CornerRadius="12" 
+                            Width="36" Height="36" 
+                            Padding="8" 
+                            BorderThickness="0"
+                            ToolTip.Tip="{markup:T Ns=Chat, Key=Stop}">
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-pause.svg" 
+                                          Width="16" Height="16" 
+                                          Color="{DynamicResource AccentButtonIconBrush}"/>
+                    </Button>
+                </Grid>
             </Border>
-        </ScrollViewer>
+        </Grid>
 
         <!-- Scroll to bottom hint (visible when user has scrolled up) + Input area -->
         <Grid Grid.Row="2" RowDefinitions="Auto, Auto">
@@ -343,16 +455,29 @@
                                                 ClipToBounds="True"
                                                 Background="{DynamicResource CardBackgroundPrimaryBrush}">
                                             <Grid>
+                                                <!-- Image -->
                                                 <Image Width="36" Height="36"
                                                        Source="{Binding Path, Converter={StaticResource LocalPathToBitmapConverter}}"
                                                        Stretch="UniformToFill"
                                                        IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=Image}"/>
+                                                
+                                                <!-- File Icon -->
                                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
                                                                   Width="16" Height="16"
                                                                   HorizontalAlignment="Center"
                                                                   VerticalAlignment="Center"
                                                                   Color="{DynamicResource TextSecondaryBrush}"
                                                                   IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=File}"/>
+                                                
+                                                <!-- Voice Icon -->
+                                                <Border Background="{DynamicResource CardAccentBrush}"
+                                                        IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=Voice}">
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-play.svg"
+                                                                      Width="14" Height="14"
+                                                                      HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"
+                                                                      Color="{DynamicResource AccentButtonIconBrush}"/>
+                                                </Border>
                                             </Grid>
                                         </Border>
                                         <TextBlock Text="{Binding DisplayName}"
@@ -375,91 +500,97 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBox x:Name="InputBox"
-                             Grid.Row="1"
-                             Classes="TransparentBackground"
-                             Watermark="{markup:T Ns=Chat, Key=AskPlaceholder}"
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"
-                             MinHeight="40"
-                             MaxHeight="120"
-                             BorderThickness="0"
-                             Background="{DynamicResource TextControlTransparentBackgroundBrush}"
-                             Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
-                             KeyDown="InputBox_KeyDown"
-                             Padding="4"
-                             Margin="0,0,0,8"/>
 
-                    <Grid Grid.Row="2" ColumnDefinitions="Auto, Auto, Auto, Auto, *, Auto, Auto" MinWidth="0">
-                        <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddAttachment}" Click="AddAttachment_Click">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/upload.svg"
-                                              Width="16" Height="16"
-                                              Color="{DynamicResource TextSecondaryBrush}"/>
-                        </Button>
-                        <Button Grid.Column="1" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddImage}" Click="AddImage_Click">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/polaroid.svg"
-                                              Width="16" Height="16"
-                                              Color="{DynamicResource TextSecondaryBrush}"/>
-                        </Button>
-                        <Button Grid.Column="2" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddScreenshot}" Click="AddScreenshot_Click">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/screenshot.svg"
-                                              Width="16" Height="16"
-                                              Color="{DynamicResource TextSecondaryBrush}"/>
-                        </Button>
-                        <controls:ModernComboBox Grid.Column="3"
-                                                  Classes="PromptPill"
-                                                  ItemsSource="{Binding AssistantModes}"
-                                                  SelectedItem="{Binding SelectedAssistantMode}"
-                                                  MinWidth="80"
-                                                  Margin="0,0,6,0"
-                                                  ToolTip.Tip="{markup:T Ns=Chat, Key=AssistantMode}">
-                            <controls:ModernComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Converter={StaticResource AssistantModeToLabelConverter}}"
-                                               FontSize="{DynamicResource FontSize.Body.Caption}"
-                                               FontFamily="{DynamicResource Font.Medium}"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                </DataTemplate>
-                            </controls:ModernComboBox.ItemTemplate>
-                        </controls:ModernComboBox>
-                        <Border Grid.Column="4" MinWidth="0"/>
-                        <Button Grid.Column="5" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"
-                                              Width="16" Height="16"
-                                              Color="{DynamicResource TextSecondaryBrush}"/>
-                        </Button>
-                        <Button Grid.Column="6"
-                                Command="{Binding SendMessageCommand}"
-                                IsVisible="{Binding !IsBusy}"
-                                Background="{DynamicResource CardAccentBrush}"
-                                Foreground="{DynamicResource AccentButtonIconBrush}"
-                                Padding="8"
-                                CornerRadius="10"
-                                BorderThickness="0"
-                                Width="32" Height="32"
-                                ToolTip.Tip="{markup:T Ns=Chat, Key=SendEnter}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
-                                              Width="16" Height="16"
-                                              Color="{DynamicResource AccentButtonIconBrush}">
-                                <controls:SvgIcon.RenderTransform>
-                                    <RotateTransform Angle="-90"/>
-                                </controls:SvgIcon.RenderTransform>
-                            </controls:SvgIcon>
-                        </Button>
-                        <Button Grid.Column="5"
-                                Command="{Binding StopCommand}"
-                                IsVisible="{Binding IsBusy}"
-                                Background="{DynamicResource StopButtonBackgroundBrush}"
-                                Foreground="{DynamicResource StopButtonForegroundBrush}"
-                                Padding="8"
-                                CornerRadius="10"
-                                BorderThickness="0"
-                                Width="32" Height="32"
-                                ToolTip.Tip="{markup:T Ns=Chat, Key=Stop}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-pause.svg"
-                                              Width="16" Height="16"
-                                              Color="{DynamicResource StopButtonForegroundBrush}"/>
-                        </Button>
+                    <!-- Normal Input Area -->
+                    <Grid Grid.Row="1" Grid.RowSpan="2" RowDefinitions="Auto, Auto">
+                        <TextBox x:Name="InputBox"
+                                 Grid.Row="0"
+                                 Classes="TransparentBackground"
+                                 Watermark="{Binding WatermarkText}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="40"
+                                 MaxHeight="120"
+                                 BorderThickness="0"
+                                 Background="{DynamicResource TextControlTransparentBackgroundBrush}"
+                                 Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="{Binding IsRecording}"
+                                 KeyDown="InputBox_KeyDown"
+                                 Padding="4"
+                                 Margin="0,0,0,8"/>
+
+                        <Grid Grid.Row="1" ColumnDefinitions="Auto, Auto, Auto, Auto, *, Auto, Auto" MinWidth="0" IsEnabled="{Binding !IsRecording}">
+                            <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddAttachment}" Click="AddAttachment_Click">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/upload.svg"
+                                                  Width="16" Height="16"
+                                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                            </Button>
+                            <Button Grid.Column="1" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddImage}" Click="AddImage_Click">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/polaroid.svg"
+                                                  Width="16" Height="16"
+                                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                            </Button>
+                            <Button Grid.Column="2" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddScreenshot}" Click="AddScreenshot_Click">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/screenshot.svg"
+                                                  Width="16" Height="16"
+                                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                            </Button>
+                            <controls:ModernComboBox Grid.Column="3"
+                                                      Classes="PromptPill"
+                                                      ItemsSource="{Binding AssistantModes}"
+                                                      SelectedItem="{Binding SelectedAssistantMode}"
+                                                      MinWidth="80"
+                                                      Margin="0,0,6,0"
+                                                      ToolTip.Tip="{markup:T Ns=Chat, Key=AssistantMode}">
+                                <controls:ModernComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource AssistantModeToLabelConverter}}"
+                                                   FontSize="{DynamicResource FontSize.Body.Caption}"
+                                                   FontFamily="{DynamicResource Font.Medium}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </DataTemplate>
+                                </controls:ModernComboBox.ItemTemplate>
+                            </controls:ModernComboBox>
+                            <Border Grid.Column="4" MinWidth="0"/>
+                            <Button Grid.Column="5" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}"
+                                    Command="{Binding StartRecordingCommand}">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"
+                                                  Width="16" Height="16"
+                                                  Color="{DynamicResource TextSecondaryBrush}"/>
+                            </Button>
+                            <Button Grid.Column="6"
+                                    Command="{Binding SendMessageCommand}"
+                                    IsVisible="{Binding !IsBusy}"
+                                    Background="{DynamicResource CardAccentBrush}"
+                                    Foreground="{DynamicResource AccentButtonIconBrush}"
+                                    Padding="8"
+                                    CornerRadius="10"
+                                    BorderThickness="0"
+                                    Width="32" Height="32"
+                                    ToolTip.Tip="{markup:T Ns=Chat, Key=SendEnter}">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                  Width="16" Height="16"
+                                                  Color="{DynamicResource AccentButtonIconBrush}">
+                                    <controls:SvgIcon.RenderTransform>
+                                        <RotateTransform Angle="-90"/>
+                                    </controls:SvgIcon.RenderTransform>
+                                </controls:SvgIcon>
+                            </Button>
+                            <Button Grid.Column="5"
+                                    Command="{Binding StopCommand}"
+                                    IsVisible="{Binding IsBusy}"
+                                    Background="{DynamicResource StopButtonBackgroundBrush}"
+                                    Foreground="{DynamicResource StopButtonForegroundBrush}"
+                                    Padding="8"
+                                    CornerRadius="10"
+                                    BorderThickness="0"
+                                    Width="32" Height="32"
+                                    ToolTip.Tip="{markup:T Ns=Chat, Key=Stop}">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-pause.svg"
+                                                  Width="16" Height="16"
+                                                  Color="{DynamicResource StopButtonForegroundBrush}"/>
+                            </Button>
+                        </Grid>
                     </Grid>
                 </Grid>
             </Border>

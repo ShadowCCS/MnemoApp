@@ -17,9 +17,17 @@ public class ChatAttachmentKindToBoolConverter : IValueConverter
         if (value is not ChatAttachmentKind kind)
             return false;
         var param = parameter?.ToString() ?? "Image";
-        return param.Equals("Image", StringComparison.OrdinalIgnoreCase)
-            ? kind == ChatAttachmentKind.Image
-            : kind == ChatAttachmentKind.File;
+        
+        if (param.Equals("Image", StringComparison.OrdinalIgnoreCase))
+            return kind == ChatAttachmentKind.Image;
+            
+        if (param.Equals("File", StringComparison.OrdinalIgnoreCase))
+            return kind == ChatAttachmentKind.File;
+            
+        if (param.Equals("Voice", StringComparison.OrdinalIgnoreCase))
+            return kind == ChatAttachmentKind.Voice;
+
+        return false;
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

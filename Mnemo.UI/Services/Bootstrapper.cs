@@ -12,6 +12,7 @@ using Mnemo.Infrastructure.Services;
 
 using Mnemo.Infrastructure.Services.AI;
 using Mnemo.Infrastructure.Services.Knowledge;
+using Mnemo.Infrastructure.Services.Speech;
 
 namespace Mnemo.UI.Services;
 
@@ -47,7 +48,8 @@ public static class Bootstrapper
         services.AddSingleton<ILearningPathService, LearningPathService>();
         services.AddSingleton<INoteService, NoteService>();
         services.AddSingleton<INoteFolderService, NoteFolderService>();
-        
+        services.AddSingleton<ISpeechRecognitionService, WhisperSpeechRecognitionService>();
+
         // 2. Register UI-specific Services
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IOverlayService, OverlayService>();

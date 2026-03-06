@@ -35,6 +35,12 @@ public class ChatViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly ILocalizationService _localizationService;
     private readonly IOverlayService _overlayService;
+    private readonly ISpeechRecognitionService _speechService;
+    private readonly ISettingsService _settingsService;
+
+    /// <summary>When recording started, if append mode: content that was in the input before dictation.</summary>
+    private string _inputTextBeforeRecording = string.Empty;
+    private bool _wipeInputForDictation;
 
     private string _inputText = string.Empty;
     public string InputText
@@ -99,23 +105,53 @@ public class ChatViewModel : ViewModelBase
     public ICommand ScrollToBottomCommand { get; }
     public ICommand RemoveAttachmentCommand { get; }
     public ICommand OpenImagePreviewCommand { get; }
+    public ICommand StartRecordingCommand { get; }
+    public ICommand StopRecordingCommand { get; }
+    public ICommand CancelRecordingCommand { get; }
 
     /// <summary>Raised when the view should scroll to the end (e.g. after new message or user clicked "Scroll to bottom").</summary>
     public event EventHandler? RequestScrollToBottom;
 
     private CancellationTokenSource? _cts;
     private ChatMessageViewModel? _lastMessageSubscribed;
+    private CancellationTokenSource? _recordingDurationCts;
 
-    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService)
+    private bool _isRecording;
+    public bool IsRecording
+    {
+        get => _isRecording;
+        set
+        {
+            if (SetProperty(ref _isRecording, value))
+            {
+                OnPropertyChanged(nameof(WatermarkText));
+                ((AsyncRelayCommand)StartRecordingCommand).NotifyCanExecuteChanged();
+                ((AsyncRelayCommand)StopRecordingCommand).NotifyCanExecuteChanged();
+                ((AsyncRelayCommand)CancelRecordingCommand).NotifyCanExecuteChanged();
+                ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string WatermarkText => IsRecording 
+        ? _localizationService.T("Listening", "Chat") 
+        : _localizationService.T("AskPlaceholder", "Chat");
+
+    private TimeSpan _recordingDuration;
+    public string RecordingDurationText => _recordingDuration.ToString(@"mm\:ss");
+
+    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService, ISpeechRecognitionService speechService, ISettingsService settingsService)
     {
         _orchestrator = orchestrator;
         _logger = logger;
         _localizationService = localizationService;
         _overlayService = overlayService;
+        _speechService = speechService;
+        _settingsService = settingsService;
 
-        SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy);
+        SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
-        NewChatCommand = new RelayCommand(NewChat, () => !IsBusy);
+        NewChatCommand = new RelayCommand(NewChat, () => !IsBusy && !IsRecording);
         SuggestionSelectedCommand = new RelayCommand<string>(ApplySuggestion);
         ScrollToBottomCommand = new RelayCommand(OnScrollToBottom);
         RemoveAttachmentCommand = new RelayCommand<ChatAttachmentViewModel>(a =>
@@ -125,9 +161,123 @@ public class ChatViewModel : ViewModelBase
         });
         OpenImagePreviewCommand = new RelayCommand<string>(OpenImagePreview);
 
+        StartRecordingCommand = new AsyncRelayCommand(StartRecordingAsync, () => !IsBusy && !IsRecording);
+        StopRecordingCommand = new AsyncRelayCommand(StopRecordingAsync, () => IsRecording);
+        CancelRecordingCommand = new AsyncRelayCommand(CancelRecordingAsync, () => IsRecording);
+
         Messages.CollectionChanged += OnMessagesCollectionChanged;
 
         Messages.Add(CreateWelcomeMessage());
+        OnPropertyChanged(nameof(WatermarkText));
+    }
+
+    private void OnPartialTranscript(string text)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            InputText = _wipeInputForDictation
+                ? text
+                : string.IsNullOrWhiteSpace(_inputTextBeforeRecording)
+                    ? text
+                    : _inputTextBeforeRecording + (string.IsNullOrWhiteSpace(text) ? "" : " " + text);
+        });
+    }
+
+    private async Task StartRecordingAsync()
+    {
+        if (IsRecording) return;
+        _wipeInputForDictation = await _settingsService.GetAsync("Chat.WipeInputForDictation", false).ConfigureAwait(false);
+        _inputTextBeforeRecording = _wipeInputForDictation ? string.Empty : InputText;
+        try
+        {
+            await _speechService.StartRecordingAsync(CancellationToken.None, OnPartialTranscript).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsRecording = true;
+                _recordingDuration = TimeSpan.Zero;
+                OnPropertyChanged(nameof(RecordingDurationText));
+
+                _recordingDurationCts = new CancellationTokenSource();
+                var ct = _recordingDurationCts.Token;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        while (!ct.IsCancellationRequested)
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);
+                            if (ct.IsCancellationRequested) break;
+                            Dispatcher.UIThread.Post(() =>
+                            {
+                                _recordingDuration = _recordingDuration.Add(TimeSpan.FromSeconds(1));
+                                OnPropertyChanged(nameof(RecordingDurationText));
+                            });
+                        }
+                    }
+                    catch (OperationCanceledException) { }
+                }, CancellationToken.None);
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Chat", $"Failed to start recording: {ex}");
+        }
+    }
+
+    private async Task StopRecordingAsync()
+    {
+        if (!IsRecording) return;
+
+        _recordingDurationCts?.Cancel();
+        _recordingDurationCts?.Dispose();
+        _recordingDurationCts = null;
+        IsRecording = false;
+
+        IsBusy = true;
+        try
+        {
+            var result = await _speechService.StopAndTranscribeAsync(CancellationToken.None).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (result.IsSuccess && !string.IsNullOrWhiteSpace(result.Value))
+                {
+                    InputText = _wipeInputForDictation
+                        ? result.Value
+                        : string.IsNullOrWhiteSpace(_inputTextBeforeRecording)
+                            ? result.Value
+                            : _inputTextBeforeRecording + " " + result.Value;
+                }
+                else if (!result.IsSuccess)
+                    _logger.Error("Chat", result.ErrorMessage ?? "Speech recognition failed.");
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Chat", $"Speech recognition failed: {ex}");
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => IsBusy = false);
+        }
+    }
+
+    private async Task CancelRecordingAsync()
+    {
+        if (!IsRecording) return;
+
+        _recordingDurationCts?.Cancel();
+        _recordingDurationCts?.Dispose();
+        _recordingDurationCts = null;
+
+        await _speechService.CancelRecordingAsync(CancellationToken.None).ConfigureAwait(false);
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            IsRecording = false;
+            _recordingDuration = TimeSpan.Zero;
+            OnPropertyChanged(nameof(RecordingDurationText));
+            InputText = _inputTextBeforeRecording;
+        });
     }
 
     private void WarmUpSafe()

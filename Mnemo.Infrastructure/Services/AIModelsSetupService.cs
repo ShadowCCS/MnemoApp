@@ -22,6 +22,7 @@ public class AIModelsSetupService : IAIModelsSetupService
         ("server", "server.zip", "llamaServer"),
         ("router", "router.zip", Path.Combine("text", "router")),
         ("fast", "fast.zip", Path.Combine("text", "fast")),
+        ("stt", "stt.zip", Path.Combine("audio", "STT")),
     };
 
     private readonly string _modelsPath;
@@ -59,7 +60,8 @@ public class AIModelsSetupService : IAIModelsSetupService
     }
 
     /// <summary>
-    /// Server is installed if llama-server.exe exists; other components if the directory exists and has files.
+    /// Server is installed if llama-server.exe exists; STT if ggml-tiny.bin exists;
+    /// other components if the directory exists and has files.
     /// </summary>
     private static bool IsComponentInstalled(string name, string targetDir)
     {
@@ -70,6 +72,12 @@ public class AIModelsSetupService : IAIModelsSetupService
         {
             var exePath = Path.Combine(targetDir, "llama-server.exe");
             return File.Exists(exePath);
+        }
+
+        if (string.Equals(name, "stt", StringComparison.OrdinalIgnoreCase))
+        {
+            var modelPath = Path.Combine(targetDir, "ggml-tiny.bin");
+            return File.Exists(modelPath);
         }
 
         return Directory.EnumerateFileSystemEntries(targetDir, "*", SearchOption.AllDirectories).Any();
