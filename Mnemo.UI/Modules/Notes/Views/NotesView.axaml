@@ -226,7 +226,7 @@
                 <StackPanel IsVisible="{Binding SelectedNote, Converter={StaticResource NullToBoolConverter}}" Spacing="0">
                     <!-- Title row with favorite star -->
                     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                        <TextBox Grid.Column="0" Text="{Binding SelectedNote.Title, Mode=TwoWay}"
+                        <TextBox Grid.Column="0" Text="{Binding SelectedNote.Title, Mode=TwoWay, FallbackValue=''}"
                                  FontSize="{DynamicResource FontSize.Heading1}"
                                  FontFamily="{DynamicResource Font.Bold}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"

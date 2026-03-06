@@ -413,13 +413,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void ReorderBlocks()
     {
+        bool hasNumberedLists = false;
         for (int i = 0; i < Blocks.Count; i++)
         {
             Blocks[i].Order = i;
+            if (Blocks[i].Type == BlockType.NumberedList)
+                hasNumberedLists = true;
         }
         
-        // Update list numbers for numbered list blocks
-        UpdateListNumbers();
+        if (hasNumberedLists)
+            UpdateListNumbers();
     }
 
     private void UpdateListNumbers()

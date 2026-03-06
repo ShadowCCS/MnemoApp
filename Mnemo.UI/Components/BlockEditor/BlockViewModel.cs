@@ -70,14 +70,7 @@ public class BlockViewModel : INotifyPropertyChanged
     public int Order
     {
         get => _order;
-        set
-        {
-            if (_order != value)
-            {
-                _order = value;
-                OnPropertyChanged();
-            }
-        }
+        set => _order = value;
     }
 
     public int ListNumberIndex

@@ -28,6 +28,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     /// </summary>
     private NoteTreeItemViewModel? _lastSelectedNoteTreeItem;
 
+    /// <summary>
+    /// Guard flag: suppresses SelectedNote changes caused by collection rebuilds (e.g. RefreshFavouriteNotes).
+    /// </summary>
+    private bool _isRefreshingCollections;
+
     [ObservableProperty]
     private NoteTreeItemViewModel? _selectedTreeItem;
 
@@ -150,9 +155,17 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
     private void RefreshFavouriteNotes()
     {
-        FavouriteNotes.Clear();
-        foreach (var note in Notes.Where(n => n.IsFavorite).OrderByDescending(n => n.ModifiedAt))
-            FavouriteNotes.Add(new NoteTreeItemViewModel(note));
+        _isRefreshingCollections = true;
+        try
+        {
+            FavouriteNotes.Clear();
+            foreach (var note in Notes.Where(n => n.IsFavorite).OrderByDescending(n => n.ModifiedAt))
+                FavouriteNotes.Add(new NoteTreeItemViewModel(note));
+        }
+        finally
+        {
+            _isRefreshingCollections = false;
+        }
     }
 
     private void BuildTree(List<NoteFolder> folders, List<Note> notes)
@@ -240,6 +253,10 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             SelectedTreeItem = _lastSelectedNoteTreeItem;
             return;
         }
+
+        // Ignore null changes caused by collection rebuilds (e.g. RefreshFavouriteNotes clearing TreeView)
+        if (value == null && _isRefreshingCollections)
+            return;
 
         if (value == null)
         {
