@@ -47,9 +47,9 @@ We’ve built Mnemo to be:
 <tr>
 <td width="50%">
 
-**Settings**
+**Notes Editor**
 
-![Settings](https://i.postimg.cc/8cpdDsWJ/settings.png)
+![NotesEditor](https://i.postimg.cc/5t9rRytC/notes-editor.png)
 
 </td>
 <td width="50%">
