@@ -8,10 +8,7 @@ public partial class CodeBlockComponent : BlockComponentBase
     public CodeBlockComponent()
     {
         InitializeComponent();
-        InputTextBox.GotFocus += OnTextBoxGotFocus;
-        InputTextBox.LostFocus += OnTextBoxLostFocus;
-        InputTextBox.TextChanged += OnTextBoxTextChanged;
-        InputTextBox.KeyDown += OnTextBoxKeyDown;
+        WireInputControl(InputTextBox);
     }
 
     public override Control? GetInputControl() => InputTextBox;

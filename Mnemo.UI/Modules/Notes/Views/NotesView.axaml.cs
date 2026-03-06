@@ -16,6 +16,8 @@ namespace Mnemo.UI.Modules.Notes.Views;
 public partial class NotesView : UserControl
 {
     private bool _blocksChangedSubscribed;
+    private DispatcherTimer? _saveDebounceTimer;
+    private const int SaveDebounceMs = 500;
 
     public NotesView()
     {
@@ -41,7 +43,18 @@ public partial class NotesView : UserControl
         if (e.PropertyName != nameof(NotesViewModel.SelectedNote))
             return;
 
+        FlushPendingSave();
         Dispatcher.UIThread.Post(() => LoadBlocksForCurrentNote(), DispatcherPriority.Loaded);
+    }
+
+    private void FlushPendingSave()
+    {
+        if (_saveDebounceTimer != null)
+        {
+            _saveDebounceTimer.Stop();
+            _saveDebounceTimer.Tick -= OnSaveDebounceTimerTick;
+            OnSaveDebounceTimerTick(null, EventArgs.Empty);
+        }
     }
 
     private void LoadBlocksForCurrentNote()
@@ -62,8 +75,30 @@ public partial class NotesView : UserControl
         }
     }
 
-    private async void OnBlockEditorBlocksChanged()
+    private void OnBlockEditorBlocksChanged()
     {
+        if (DataContext is not NotesViewModel vm || vm.SelectedNote == null)
+            return;
+
+        _saveDebounceTimer?.Stop();
+        _saveDebounceTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(SaveDebounceMs)
+        };
+        _saveDebounceTimer.Tick += OnSaveDebounceTimerTick;
+        _saveDebounceTimer.Start();
+    }
+
+    private async void OnSaveDebounceTimerTick(object? sender, EventArgs e)
+    {
+        var timer = _saveDebounceTimer;
+        _saveDebounceTimer = null;
+        if (timer != null)
+        {
+            timer.Stop();
+            timer.Tick -= OnSaveDebounceTimerTick;
+        }
+
         if (DataContext is not NotesViewModel vm || vm.SelectedNote == null)
             return;
 
@@ -187,6 +222,8 @@ public partial class NotesView : UserControl
 
     protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
+        FlushPendingSave();
+
         var titleBox = this.FindControl<TextBox>("NoteTitleBox");
         if (titleBox != null)
             titleBox.LostFocus -= OnTitleBoxLostFocus;

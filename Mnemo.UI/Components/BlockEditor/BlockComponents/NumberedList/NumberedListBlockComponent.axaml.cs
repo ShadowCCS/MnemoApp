@@ -8,10 +8,7 @@ public partial class NumberedListBlockComponent : BlockComponentBase
     public NumberedListBlockComponent()
     {
         InitializeComponent();
-        InputTextBox.GotFocus += OnTextBoxGotFocus;
-        InputTextBox.LostFocus += OnTextBoxLostFocus;
-        InputTextBox.TextChanged += OnTextBoxTextChanged;
-        InputTextBox.KeyDown += OnTextBoxKeyDown;
+        WireInputControl(InputTextBox);
     }
 
     public override Control? GetInputControl() => InputTextBox;

@@ -106,8 +106,6 @@ public class KeyboardHandler
 
     private void HandleBackspace(KeyEventArgs e, TextBox textBox, string text, int caretIndex, int selectionLength, BlockViewModel viewModel)
     {
-        System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] HandleBackspace - Text: '{text}', CaretIndex: {caretIndex}, SelectionLength: {selectionLength}, BlockType: {viewModel.Type}");
-
         // If there's a selection, explicitly delete it (Avalonia TextBox may not handle Backspace-for-selection reliably when custom handlers are present)
         if (selectionLength != 0)
         {
@@ -128,53 +126,36 @@ public class KeyboardHandler
 
         if (caretIndex == 0)
         {
-            // Use the live TextBox text — viewModel.Content may not have synced yet at KeyDown time
             var isEmpty = string.IsNullOrWhiteSpace(text);
-
-            System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] At caret 0 - IsEmpty: {isEmpty}, BlockType: {viewModel.Type}");
 
             if (isEmpty)
             {
-                System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Triggering BackspaceOnEmpty event");
                 e.Handled = true;
                 BackspaceOnEmpty?.Invoke();
             }
             else if (viewModel.Type != BlockType.Text)
             {
-                // Non-text block with content at position 0 → convert to Text, preserving content
-                System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Non-text block with content at position 0 - converting to Text (preserving content)");
                 e.Handled = true;
                 ConvertToTextPreservingContent?.Invoke();
             }
             else
             {
-                // Text block with content at position 0 → merge with the block above
-                System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Text block with content at position 0 - merging with previous");
                 e.Handled = true;
                 MergeWithPrevious?.Invoke();
             }
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Caret not at 0, letting TextBox handle");
         }
     }
 
     public void HandleBackspaceOnEmptyBlock(BlockViewModel viewModel)
     {
-        System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] HandleBackspaceOnEmptyBlock - BlockType: {viewModel?.Type}");
         if (viewModel == null) return;
 
         if (viewModel.Type == BlockType.Text)
         {
-            // Empty text block → delete it and focus above
-            System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Text block - requesting delete and focus above");
             viewModel.RequestDeleteAndFocusAbove();
         }
         else
         {
-            // Empty non-text block → convert to text block
-            System.Diagnostics.Debug.WriteLine($"[KeyboardHandler] Non-text block - converting to Text");
             ConvertToBlockType?.Invoke(BlockType.Text);
         }
     }

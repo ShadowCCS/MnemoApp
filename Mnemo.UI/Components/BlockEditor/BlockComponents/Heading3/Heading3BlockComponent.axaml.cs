@@ -8,10 +8,7 @@ public partial class Heading3BlockComponent : BlockComponentBase
     public Heading3BlockComponent()
     {
         InitializeComponent();
-        InputTextBox.GotFocus += OnTextBoxGotFocus;
-        InputTextBox.LostFocus += OnTextBoxLostFocus;
-        InputTextBox.TextChanged += OnTextBoxTextChanged;
-        InputTextBox.KeyDown += OnTextBoxKeyDown;
+        WireInputControl(InputTextBox);
     }
 
     public override Control? GetInputControl() => InputTextBox;

@@ -9,6 +9,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using Mnemo.Core.Models;
 
 namespace Mnemo.UI.Components.BlockEditor;
@@ -16,6 +17,9 @@ namespace Mnemo.UI.Components.BlockEditor;
 public partial class BlockEditor : UserControl, INotifyPropertyChanged
 {
     private ObservableCollection<BlockViewModel> _blocks = new();
+
+    /// <summary>Index of the currently focused block, or -1. Kept in sync by <see cref="OnBlockPropertyChanged"/>.</summary>
+    private int _focusedBlockIndex = -1;
 
     // Drag-box block selection (Mode 2)
     private bool _isBoxSelecting;
@@ -32,6 +36,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// <summary>True while a cross-block text selection drag is actively in progress. Used by EditableBlock to suppress focus side-effects during the drag.</summary>
     public bool IsCrossBlockSelectingActive => _isCrossBlockSelecting;
     private BlockViewModel? _crossBlockAnchorBlock;
+    private int _crossBlockAnchorBlockIndex = -1;
     private int _crossBlockAnchorCharIndex;
     private Point _crossBlockStartPoint;
     /// <summary>Hysteresis: last endpoint block index to avoid boundary flicker when dragging across blocks.</summary>
@@ -165,6 +170,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         
         // Replace entire collection to trigger UI update
+        _focusedBlockIndex = -1;
         Blocks = newBlocks;
         
         // Update list numbers after loading
@@ -237,18 +243,32 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnBlockPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(BlockViewModel.IsFocused)) return;
-        if (sender is BlockViewModel block && block.IsFocused)
+        if (e.PropertyName == nameof(BlockViewModel.Type))
         {
+            UpdateListNumbers();
+            return;
+        }
+
+        if (e.PropertyName != nameof(BlockViewModel.IsFocused)) return;
+        if (sender is not BlockViewModel block) return;
+
+        if (block.IsFocused)
+        {
+            var idx = Blocks.IndexOf(block);
+            _focusedBlockIndex = idx;
+
             // During cross-block text selection the editor controls which blocks have text
             // selection. Clearing it here (triggered by IsFocused changes on each block we
             // update) would fight with UpdateCrossBlockSelection and cause flicker.
             if (_isCrossBlockSelecting || _crossBlockArmed) return;
 
             ClearBlockSelection();
-            var idx = Blocks.IndexOf(block);
             if (idx >= 0)
                 ClearTextSelectionInAllBlocksExcept(idx);
+        }
+        else if (_focusedBlockIndex >= 0 && _focusedBlockIndex < Blocks.Count && ReferenceEquals(Blocks[_focusedBlockIndex], block))
+        {
+            _focusedBlockIndex = -1;
         }
     }
 
@@ -256,8 +276,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         // Clear block selection when user edits text (typing, paste, etc.)
         ClearBlockSelection();
-        // Update list numbers in case block type changed
-        UpdateListNumbers();
         // Trigger save in parent
         BlocksChanged?.Invoke();
     }
@@ -367,26 +385,28 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnFocusPreviousRequested(BlockViewModel block)
     {
-        var index = Blocks.IndexOf(block);
+        var index = GetFocusedBlockIndex();
+        if (index < 0) index = Blocks.IndexOf(block);
         if (index > 0)
         {
             block.IsFocused = false;
             var previousIndex = index - 1;
             Avalonia.Threading.Dispatcher.UIThread.Post(
-                () => Blocks[previousIndex].IsFocused = true, 
+                () => Blocks[previousIndex].IsFocused = true,
                 Avalonia.Threading.DispatcherPriority.Input);
         }
     }
 
     private void OnFocusNextRequested(BlockViewModel block)
     {
-        var index = Blocks.IndexOf(block);
+        var index = GetFocusedBlockIndex();
+        if (index < 0) index = Blocks.IndexOf(block);
         var nextIndex = index + 1;
         if (nextIndex < Blocks.Count)
         {
             block.IsFocused = false;
             Avalonia.Threading.Dispatcher.UIThread.Post(
-                () => Blocks[nextIndex].IsFocused = true, 
+                () => Blocks[nextIndex].IsFocused = true,
                 Avalonia.Threading.DispatcherPriority.Input);
         }
     }
@@ -487,6 +507,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
             ClearBlockSelection();
             _crossBlockAnchorBlock = vm;
+            _crossBlockAnchorBlockIndex = blockIndex;
             _crossBlockAnchorCharIndex = Math.Clamp(charIndex, 0, vm.Content?.Length ?? 0);
             _crossBlockArmed = true;
             _isCrossBlockSelecting = false;
@@ -553,6 +574,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         // Arm cross-block select — capture happens in PointerMoved once drag leaves the source block
         _crossBlockAnchorBlock = vm;
+        _crossBlockAnchorBlockIndex = Blocks.IndexOf(vm);
         _crossBlockAnchorCharIndex = Math.Clamp(textBox.CaretIndex, 0, textBox.Text?.Length ?? 0);
         _crossBlockStartPoint = e.GetPosition(this);
         _crossBlockArmed = true;
@@ -626,6 +648,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _isBoxSelecting = false;
         _isCrossBlockSelecting = false;
         _crossBlockAnchorBlock = null;
+        _crossBlockAnchorBlockIndex = -1;
         _lastCrossBlockCurrentIndex = -1;
 
         if (wasBoxSelecting)
@@ -705,8 +728,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         bool ctrlC = e.Key == Key.C && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
         if (ctrlC)
         {
-            if (TryCopySelectionToClipboard())
-                e.Handled = true;
+            _ = TryCopySelectionToClipboardAsync();
+            e.Handled = true;
             return;
         }
 
@@ -714,8 +737,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         bool ctrlV = e.Key == Key.V && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
         if (ctrlV)
         {
-            if (TryPasteFromClipboard(hasBlockSelection))
-                e.Handled = true;
+            _ = TryPasteFromClipboardAsync(hasBlockSelection);
+            e.Handled = true;
         }
     }
 
@@ -847,19 +870,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         BlocksChanged?.Invoke();
     }
 
-    private bool TryCopySelectionToClipboard()
+    private async Task TryCopySelectionToClipboardAsync()
     {
         // Mode 2: block selection (drag-box)
         var selectedBlocks = Blocks.Where(b => b.IsSelected).ToList();
         if (selectedBlocks.Count > 0)
         {
             var markdown = BlockMarkdownSerializer.Serialize(selectedBlocks);
-            return SetClipboardText(markdown, this);
+            await SetClipboardTextAsync(markdown);
+            return;
         }
 
         // Mode 1: cross-block text selection (gather blocks that have text selection)
         var containers = GetBlockContainersInOrder();
-        if (containers == null) return false;
+        if (containers == null) return;
 
         var toCopy = new List<BlockViewModel>();
         for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
@@ -875,38 +899,36 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 vm.IsChecked = block.IsChecked;
             toCopy.Add(vm);
         }
-        if (toCopy.Count == 0) return false;
+        if (toCopy.Count == 0) return;
         var md = BlockMarkdownSerializer.Serialize(toCopy);
-        return SetClipboardText(md, this);
+        await SetClipboardTextAsync(md);
     }
 
-    private static bool SetClipboardText(string text, Visual? relativeTo)
-    {
-        try
-        {
-            var topLevel = relativeTo != null ? TopLevel.GetTopLevel(relativeTo) : null;
-            if (topLevel?.Clipboard != null)
-            {
-                topLevel.Clipboard.SetTextAsync(text).GetAwaiter().GetResult();
-                return true;
-            }
-        }
-        catch { /* clipboard can fail */ }
-        return false;
-    }
-
-    private bool TryPasteFromClipboard(bool replaceBlockSelection)
+    private async Task SetClipboardTextAsync(string text)
     {
         try
         {
             var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel?.Clipboard == null) return false;
+            if (topLevel?.Clipboard != null)
+            {
+                await topLevel.Clipboard.SetTextAsync(text);
+            }
+        }
+        catch { /* clipboard can fail */ }
+    }
 
-            var text = topLevel.Clipboard.GetTextAsync().GetAwaiter().GetResult();
-            if (string.IsNullOrWhiteSpace(text)) return false;
+    private async Task TryPasteFromClipboardAsync(bool replaceBlockSelection)
+    {
+        try
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel?.Clipboard == null) return;
+
+            var text = await topLevel.Clipboard.GetTextAsync();
+            if (string.IsNullOrWhiteSpace(text)) return;
 
             var pasted = BlockMarkdownSerializer.Deserialize(text);
-            if (pasted.Length == 0) return false;
+            if (pasted.Length == 0) return;
 
             int insertIndex;
             if (replaceBlockSelection)
@@ -953,17 +975,25 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     () => firstPasted.IsFocused = true,
                     Avalonia.Threading.DispatcherPriority.Input);
             }
-            return true;
         }
-        catch { return false; }
+        catch { /* paste can fail */ }
     }
 
     private int GetFocusedBlockIndex()
     {
+        // Use the maintained index; fall back to a linear scan only when stale.
+        if (_focusedBlockIndex >= 0 && _focusedBlockIndex < Blocks.Count && Blocks[_focusedBlockIndex].IsFocused)
+            return _focusedBlockIndex;
+
         for (int i = 0; i < Blocks.Count; i++)
         {
-            if (Blocks[i].IsFocused) return i;
+            if (Blocks[i].IsFocused)
+            {
+                _focusedBlockIndex = i;
+                return i;
+            }
         }
+        _focusedBlockIndex = -1;
         return -1;
     }
 
@@ -1004,8 +1034,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void UpdateCrossBlockSelection(Point currentPoint)
     {
-        int anchorIndex = _crossBlockAnchorBlock != null ? Blocks.IndexOf(_crossBlockAnchorBlock) : -1;
-        if (anchorIndex < 0) return;
+        int anchorIndex = _crossBlockAnchorBlockIndex;
+        if (anchorIndex < 0 || _crossBlockAnchorBlock == null) return;
 
         int rawIndex = GetBlockIndexAtPoint(currentPoint);
         if (rawIndex < 0) return;

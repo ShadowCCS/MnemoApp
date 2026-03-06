@@ -271,18 +271,9 @@ public partial class EditableBlock : UserControl
     
     private void HandleBlockComponentKeyDown(object? sender, KeyEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine($"[EditableBlock] HandleBlockComponentKeyDown called - Key: {e.Key}, Sender: {sender?.GetType().Name}");
         if (sender is BlockComponentBase component && component.GetInputControl() is TextBox textBox)
         {
-            System.Diagnostics.Debug.WriteLine($"[EditableBlock] Routing to TextBox_KeyDown");
             TextBox_KeyDown(textBox, e);
-        }
-        else
-        {
-            var isComponent = sender is BlockComponentBase;
-            var component2 = sender as BlockComponentBase;
-            var hasTextBox = component2?.GetInputControl() is TextBox;
-            System.Diagnostics.Debug.WriteLine($"[EditableBlock] Failed to get TextBox - IsComponent: {isComponent}, HasTextBox: {hasTextBox}");
         }
     }
 
@@ -479,13 +470,8 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine($"[EditableBlock] TextBox_KeyDown called - Key: {e.Key}, Handled: {e.Handled}, Sender: {sender?.GetType().Name}");
-        
         if (_viewModel == null || sender is not TextBox textBox || _keyboardHandler == null)
-        {
-            System.Diagnostics.Debug.WriteLine($"[EditableBlock] Early return - ViewModel: {_viewModel != null}, TextBox: {sender is TextBox}, Handler: {_keyboardHandler != null}");
             return;
-        }
 
         // Handle markdown shortcuts on space
         if (e.Key == Key.Space)
@@ -561,9 +547,7 @@ public partial class EditableBlock : UserControl
 
     private void HandleBackspaceOnEmptyBlock()
     {
-        System.Diagnostics.Debug.WriteLine($"[EditableBlock] HandleBackspaceOnEmptyBlock called - ViewModel: {_viewModel != null}, Handler: {_keyboardHandler != null}");
         if (_keyboardHandler == null || _viewModel == null) return;
-        System.Diagnostics.Debug.WriteLine($"[EditableBlock] Calling keyboard handler - BlockType: {_viewModel.Type}");
         _keyboardHandler.HandleBackspaceOnEmptyBlock(_viewModel);
     }
 
@@ -629,20 +613,16 @@ public partial class EditableBlock : UserControl
         _viewModel.Type = BlockType.Text;
 
         // After the new TextBlockComponent is wired up (WireUpBlockComponent posts at Loaded),
-        // restore the content and focus. Post at a lower priority than Loaded to ensure
-        // WireUpBlockComponent has already run.
+        // restore content and focus in a single post at Render priority so layout has settled
+        // but we are still before normal Input processing.
         Dispatcher.UIThread.Post(() =>
         {
             _stateManager.PreviousText = content;
             _viewModel.Content = content;
-
-            Dispatcher.UIThread.Post(() =>
-            {
-                _stateManager.SetNormal();
-                _focusManager?.ClearCache();
-                _focusManager?.FocusTextBox(0);
-            }, DispatcherPriority.Input);
-        }, DispatcherPriority.Loaded);
+            _stateManager.SetNormal();
+            _focusManager?.ClearCache();
+            _focusManager?.FocusTextBox(0);
+        }, DispatcherPriority.Render);
     }
 
     private void SetBlockType(BlockType blockType, System.Collections.Generic.Dictionary<string, object>? meta = null)

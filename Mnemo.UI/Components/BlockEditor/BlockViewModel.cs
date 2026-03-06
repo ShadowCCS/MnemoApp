@@ -70,11 +70,13 @@ public class BlockViewModel : INotifyPropertyChanged
     public int Order
     {
         get => _order;
-        set 
-        { 
-            _order = value; 
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(ListNumber)); // Update list number when order changes
+        set
+        {
+            if (_order != value)
+            {
+                _order = value;
+                OnPropertyChanged();
+            }
         }
     }
 
@@ -111,7 +113,14 @@ public class BlockViewModel : INotifyPropertyChanged
     public bool IsSelected
     {
         get => _isSelected;
-        set { _isSelected = value; OnPropertyChanged(); }
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
     }
 
     private int? _pendingCaretIndex;
