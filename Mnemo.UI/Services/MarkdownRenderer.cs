@@ -60,16 +60,16 @@ public class MarkdownRenderer : IMarkdownRenderer
 
     private async Task<double> GetBaseFontSizeAsync()
     {
-        var val = await _settingsService.GetAsync("Markdown.FontSize", "14px");
+        var val = await _settingsService.GetAsync("Markdown.FontSize", "16px");
         if (double.TryParse(val.Replace("px", ""), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var result)) return result;
-        return 14.0;
+        return 16.0;
     }
 
     private async Task<double> GetCodeFontSizeAsync()
     {
-        var val = await _settingsService.GetAsync("Markdown.CodeFontSize", "14px");
+        var val = await _settingsService.GetAsync("Markdown.CodeFontSize", "16px");
         if (double.TryParse(val.Replace("px", ""), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var result)) return result;
-        return 14.0;
+        return 16.0;
     }
 
     private async Task<double> GetMathFontSizeAsync(bool isDisplay)

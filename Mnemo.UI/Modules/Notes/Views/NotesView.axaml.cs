@@ -7,6 +7,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Mnemo.Core.Models;
 using Mnemo.UI.Components.BlockEditor;
 using Mnemo.UI.Controls;
 using Mnemo.UI.Modules.Notes.ViewModels;
@@ -17,6 +18,8 @@ public partial class NotesView : UserControl
 {
     private bool _blocksChangedSubscribed;
     private DispatcherTimer? _saveDebounceTimer;
+    /// <summary>Note we have pending unsaved block changes for. When flushing on note switch, SelectedNote is already the new note; we must save this one with editor content.</summary>
+    private Note? _pendingSaveNote;
     private const int SaveDebounceMs = 500;
 
     public NotesView()
@@ -80,6 +83,7 @@ public partial class NotesView : UserControl
         if (DataContext is not NotesViewModel vm || vm.SelectedNote == null)
             return;
 
+        _pendingSaveNote = vm.SelectedNote;
         _saveDebounceTimer?.Stop();
         _saveDebounceTimer = new DispatcherTimer
         {
@@ -99,14 +103,20 @@ public partial class NotesView : UserControl
             timer.Tick -= OnSaveDebounceTimerTick;
         }
 
-        if (DataContext is not NotesViewModel vm || vm.SelectedNote == null)
+        var noteToSave = _pendingSaveNote;
+        _pendingSaveNote = null;
+
+        if (DataContext is not NotesViewModel vm)
             return;
 
         var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
         if (editor == null)
             return;
 
-        await vm.SaveCurrentNoteAsync(editor.GetBlocks(), null);
+        if (noteToSave != null)
+            await vm.SaveNoteWithContentAsync(noteToSave, editor.GetBlocks(), null);
+        else if (vm.SelectedNote != null)
+            await vm.SaveCurrentNoteAsync(editor.GetBlocks(), null);
     }
 
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
@@ -118,6 +128,34 @@ public partial class NotesView : UserControl
             titleBox.LostFocus += OnTitleBoxLostFocus;
 
         SetupMyNotesDropTargets();
+        SetupGutterBoxSelect();
+    }
+
+    private void SetupGutterBoxSelect()
+    {
+        var scrollViewer = this.FindControl<ScrollViewer>("EditorScrollViewer");
+        if (scrollViewer == null) return;
+        scrollViewer.AddHandler(PointerPressedEvent, OnGutterPointerPressed, RoutingStrategies.Tunnel);
+    }
+
+    private void OnGutterPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (e.ClickCount > 1) return;
+
+        var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
+        if (editor == null) return;
+
+        // Check if press is in the gutter (outside the editor's own bounds)
+        var posInEditor = e.GetPosition(editor);
+        var editorBounds = new Rect(0, 0, editor.Bounds.Width, editor.Bounds.Height);
+        if (editorBounds.Contains(posInEditor)) return; // inside editor — let it handle
+
+        // Only arm if press is vertically within the editor's vertical extent
+        if (posInEditor.Y < 0 || posInEditor.Y > editor.Bounds.Height) return;
+
+        editor.ArmExternalBoxSelect(posInEditor, e.Pointer);
+        // Don't mark handled — let ScrollViewer defocus etc. still run
     }
 
     private void SetupMyNotesDropTargets()
@@ -227,6 +265,9 @@ public partial class NotesView : UserControl
         var titleBox = this.FindControl<TextBox>("NoteTitleBox");
         if (titleBox != null)
             titleBox.LostFocus -= OnTitleBoxLostFocus;
+
+        var scrollViewer = this.FindControl<ScrollViewer>("EditorScrollViewer");
+        scrollViewer?.RemoveHandler(PointerPressedEvent, OnGutterPointerPressed);
 
         var header = this.FindControl<Grid>("MyNotesHeader");
         var treeArea = this.FindControl<Border>("MyNotesTreeArea");

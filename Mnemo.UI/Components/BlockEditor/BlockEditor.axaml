@@ -13,33 +13,33 @@
     Background="Transparent"
     VerticalAlignment="Stretch"
     ClipToBounds="False">
-    <Border Background="Transparent" ClipToBounds="False" Padding="32,0,32,0">
-        <Grid x:Name="EditorRoot" RowDefinitions="Auto,*" Background="Transparent" ClipToBounds="False">
-        <!-- Blocks list -->
-        <ItemsControl x:Name="BlocksItemsControl" Grid.Row="0" ItemsSource="{Binding Blocks}" Background="Transparent">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <local:EditableBlock />
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <!-- Transparent fill area below blocks: receives pointer events for drag-box selection -->
-        <Border x:Name="BelowBlocksArea" Grid.Row="1" MinHeight="120" Background="Transparent" />
-        <!-- Selection box overlay (drag-box block selection); drawn on top, no hit-test -->
-        <Border
-            x:Name="SelectionBoxBorder"
-            Grid.Row="0"
-            Grid.RowSpan="2"
-            Background="{DynamicResource AccentPrimaryBrush}"
-            Opacity="0.15"
-            BorderBrush="{DynamicResource AccentPrimaryBrush}"
-            BorderThickness="1"
-            IsVisible="False"
-            IsHitTestVisible="False"
-            HorizontalAlignment="Left"
-            VerticalAlignment="Top" />
-        </Grid>
-    </Border>
+    <Grid Background="Transparent">
+        <Border Background="Transparent" ClipToBounds="False" Padding="32,0,32,0">
+            <Grid Background="Transparent">
+                <Grid x:Name="EditorRoot" RowDefinitions="Auto,*" Background="Transparent" ClipToBounds="False">
+                    <ItemsControl x:Name="BlocksItemsControl" Grid.Row="0" ItemsSource="{Binding Blocks}" Background="Transparent">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <local:EditableBlock />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border x:Name="BelowBlocksArea" Grid.Row="1" MinHeight="120" Background="Transparent" />
+                </Grid>
+                <!-- Overlay inside padded Border so (0,0) = content area; selection box coords match GetPosition(overlay). -->
+                <local:LayoutOverlayPanel x:Name="SelectionBoxOverlay" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <Border
+                        x:Name="SelectionBoxBorder"
+                        Background="{DynamicResource AccentPrimaryBrush}"
+                        Opacity="0.15"
+                        BorderBrush="{DynamicResource AccentPrimaryBrush}"
+                        BorderThickness="1"
+                        IsVisible="False"
+                        IsHitTestVisible="False" />
+                </local:LayoutOverlayPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>
 
 

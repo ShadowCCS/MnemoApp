@@ -100,6 +100,16 @@ public partial class NoteTreeRow : UserControl
             RowBorder.Classes.Remove("selected");
     }
 
+    /// <summary>True only when the pointer is within this row's MoreButton bounds (avoids wrong Button in ancestor chain / hit-test).</summary>
+    private bool IsPointerOnMoreButton(PointerEventArgs e)
+    {
+        if (MoreButton == null) return false;
+        var pt = e.GetPosition(MoreButton);
+        var w = MoreButton.Bounds.Width;
+        var h = MoreButton.Bounds.Height;
+        return pt.X >= 0 && pt.Y >= 0 && pt.X <= w && pt.Y <= h;
+    }
+
     /// <summary>
     /// Called on the TreeViewItem (Tunnel) for folder rows only. Only toggle when the click is on the folder header, not on a child item.
     /// </summary>
@@ -110,6 +120,8 @@ public partial class NoteTreeRow : UserControl
         // Only handle if the click was on this folder's header row. If the hit element is inside a child item, do not handle.
         if (e.Source is Visual source && source.FindAncestorOfType<MnemoTreeViewItem>() is MnemoTreeViewItem hitTreeViewItem && hitTreeViewItem != tvi)
             return;
+        // Let the MoreButton handle its own click.
+        if (IsPointerOnMoreButton(e)) return;
         e.Handled = true;
         item.IsExpanded = !item.IsExpanded;
     }
@@ -121,6 +133,8 @@ public partial class NoteTreeRow : UserControl
     {
         if (DataContext is not NoteTreeItemViewModel item) return;
         if (e.GetCurrentPoint(this).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed) return;
+        // Let the MoreButton receive the click normally — don't capture or mark handled.
+        if (IsPointerOnMoreButton(e)) return;
 
         var vm = FindNotesViewModel();
 
@@ -161,13 +175,6 @@ public partial class NoteTreeRow : UserControl
 
     private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (_pendingDragPress != null && !_dragStarted && MoreButton != null)
-        {
-            var pt = e.GetPosition(MoreButton);
-            if (pt.X >= 0 && pt.Y >= 0 && pt.X <= MoreButton.Bounds.Width && pt.Y <= MoreButton.Bounds.Height)
-                MoreButton.Flyout?.ShowAt(MoreButton);
-        }
-
         e.Pointer.Capture(null);
         ClearPendingDrag();
     }

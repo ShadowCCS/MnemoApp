@@ -24,7 +24,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     // Drag-box block selection (Mode 2)
     private bool _isBoxSelecting;
     private bool _boxSelectArmed;   // true after pointer-down outside blocks, waiting for threshold
-    private Point _boxSelectStart;
+    private Point _boxSelectStart;   // editor space (for hit-test)
+    private Point _boxSelectStartInOverlay; // overlay space (for drawing); set when arming
     private Border? _selectionBoxBorder;
     private const double BoxSelectThreshold = 6.0; // pixels to move before box appears
     /// <summary>Horizontal padding on EditorRoot; selection box Margin is relative to the padded content area.</summary>
@@ -469,6 +470,26 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     }
 
     /// <summary>
+    /// Arms box-select from an external control (e.g. the ScrollViewer gutter outside the editor column).
+    /// <paramref name="pressPointInEditor"/> must already be in editor coordinates.
+    /// Returns true if armed (caller should capture the pointer on its own control and forward
+    /// subsequent PointerMoved/Released via <see cref="HandleExternalPointerMoved"/> and
+    /// <see cref="HandleExternalPointerReleased"/>).
+    /// </summary>
+    public bool ArmExternalBoxSelect(Point pressPointInEditor, IPointer pointer)
+    {
+        _boxSelectStart = pressPointInEditor;
+        var overlay = _selectionBoxBorder?.GetVisualParent() as Visual;
+        _boxSelectStartInOverlay = overlay != null && this.TranslatePoint(pressPointInEditor, overlay) is { } ov ? ov : pressPointInEditor;
+        _boxSelectArmed = true;
+        _isBoxSelecting = false;
+        ClearBlockSelection();
+        ClearTextSelectionInAllBlocksExcept(-1);
+        pointer.Capture(this);
+        return true;
+    }
+
+    /// <summary>
     /// Tunnel: when press is inside a block, capture immediately for cross-block text selection so we receive
     /// PointerMoved (TextBox would otherwise capture and we would never see moves). When press is on empty
     /// space, arm box-select and capture in PointerMoved once threshold is exceeded.
@@ -526,13 +547,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        // Arm box-select — actual capture happens in PointerMoved once threshold is exceeded
+        // Arm box-select — capture immediately to prevent ScrollViewer from stealing the gesture
         _boxSelectStart = pos;
+        var overlay = _selectionBoxBorder?.GetVisualParent() as Visual;
+        _boxSelectStartInOverlay = overlay != null ? e.GetPosition(overlay) : pos;
         _boxSelectArmed = true;
         _isBoxSelecting = false;
 
         ClearBlockSelection();
         ClearTextSelectionInAllBlocksExcept(-1);
+        e.Pointer.Capture(this);
     }
 
     /// <summary>
@@ -607,16 +631,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 if (_selectionBoxBorder != null)
                 {
                     _selectionBoxBorder.IsVisible = true;
-                    _selectionBoxBorder.Margin = new Thickness(_boxSelectStart.X - EditorContentPaddingX, _boxSelectStart.Y, 0, 0);
+                    Canvas.SetLeft(_selectionBoxBorder, _boxSelectStartInOverlay.X);
+                    Canvas.SetTop(_selectionBoxBorder, _boxSelectStartInOverlay.Y);
                     _selectionBoxBorder.Width = 0;
                     _selectionBoxBorder.Height = 0;
+                    (_selectionBoxBorder.GetVisualParent() as LayoutOverlayPanel)?.InvalidateArrange();
                 }
             }
         }
 
         if (_isBoxSelecting)
         {
-            UpdateSelectionBoxVisual(_boxSelectStart, current);
+            var overlay = _selectionBoxBorder?.GetVisualParent() as Visual;
+            Point endInOverlay = overlay != null ? e.GetPosition(overlay) : current;
+            UpdateSelectionBoxVisual(_boxSelectStartInOverlay, endInOverlay);
             UpdateBoxSelection(_boxSelectStart, current);
             e.Handled = true;
             return;
@@ -641,6 +669,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (e.GetCurrentPoint(this).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonReleased) return;
 
         var wasBoxSelecting = _isBoxSelecting;
+        var wasBoxArmed = _boxSelectArmed;
         var wasCrossBlockSelecting = _isCrossBlockSelecting;
         var wasArmedButNotDragged = _crossBlockArmed && !_isCrossBlockSelecting && _crossBlockAnchorBlock != null;
         var clickAnchorBlock = _crossBlockAnchorBlock;
@@ -660,6 +689,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (_selectionBoxBorder != null)
                 _selectionBoxBorder.IsVisible = false;
         }
+        else if (wasBoxArmed)
+        {
+            // Plain click on empty space (no drag threshold reached): release capture
+            e.Pointer.Capture(null);
+        }
         else if (wasCrossBlockSelecting)
         {
             e.Pointer.Capture(null);
@@ -672,16 +706,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
     }
 
+    /// <param name="start">Start point in selection overlay coordinate space.</param>
+    /// <param name="end">End point in selection overlay coordinate space.</param>
     private void UpdateSelectionBoxVisual(Point start, Point end)
     {
         if (_selectionBoxBorder == null) return;
-        double x = Math.Min(start.X, end.X) - EditorContentPaddingX;
+        double x = Math.Min(start.X, end.X);
         double y = Math.Min(start.Y, end.Y);
         double width = Math.Abs(end.X - start.X);
         double height = Math.Abs(end.Y - start.Y);
-        _selectionBoxBorder.Margin = new Thickness(x, y, 0, 0);
+        Canvas.SetLeft(_selectionBoxBorder, x);
+        Canvas.SetTop(_selectionBoxBorder, y);
         _selectionBoxBorder.Width = width;
         _selectionBoxBorder.Height = height;
+        (_selectionBoxBorder.GetVisualParent() as LayoutOverlayPanel)?.InvalidateArrange();
     }
 
     private void UpdateBoxSelection(Point start, Point end)

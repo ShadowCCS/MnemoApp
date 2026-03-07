@@ -403,4 +403,31 @@
     <Color x:Key="NotesSectionHeaderForeground">#5C5B5A</Color>
     <Color x:Key="NotesPaneDivider">#EBEAE9</Color>
     <Color x:Key="NotesEditorSeparator">#EBEAE9</Color>
+
+    <!-- Slider -->
+    <Color x:Key="SliderTrackFill">#E5E5E5</Color>
+    <Color x:Key="SliderTrackValueFill">#e95b45</Color>
+    <Color x:Key="SliderThumbBackground">#FFFFFF</Color>
+    <Color x:Key="SliderThumbBorder">#E5E5E5</Color>
+    <Color x:Key="SliderTickBarFill">#CCCCCC</Color>
+    <Color x:Key="SliderContainerBackground">Transparent</Color>
+    
+    <!-- Slider PointerOver -->
+    <Color x:Key="SliderTrackFillPointerOver">#D5D5D5</Color>
+    <Color x:Key="SliderTrackValueFillPointerOver">#FF6B55</Color>
+    <Color x:Key="SliderThumbBackgroundPointerOver">#F5F5F5</Color>
+    <Color x:Key="SliderContainerBackgroundPointerOver">Transparent</Color>
+    
+    <!-- Slider Pressed -->
+    <Color x:Key="SliderTrackFillPressed">#BBBBBB</Color>
+    <Color x:Key="SliderTrackValueFillPressed">#D14F3B</Color>
+    <Color x:Key="SliderThumbBackgroundPressed">#E5E5E5</Color>
+    <Color x:Key="SliderContainerBackgroundPressed">Transparent</Color>
+    
+    <!-- Slider Disabled -->
+    <Color x:Key="SliderTrackFillDisabled">#F5F5F5</Color>
+    <Color x:Key="SliderTrackValueFillDisabled">#CCCCCC</Color>
+    <Color x:Key="SliderThumbBackgroundDisabled">#F5F5F5</Color>
+    <Color x:Key="SliderTickBarFillDisabled">#E5E5E5</Color>
+    <Color x:Key="SliderContainerBackgroundDisabled">Transparent</Color>
 </ResourceDictionary>

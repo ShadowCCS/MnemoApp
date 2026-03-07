@@ -14,6 +14,7 @@ namespace Mnemo.UI.Modules.Notes.ViewModels;
 public partial class NotesViewModel : ViewModelBase, INavigationAware
 {
     private const string LastOpenNoteIdKey = "Notes.LastOpenNoteId";
+    private const string NotesSidebarOpenKey = "Notes.SidebarOpen";
 
     private readonly INoteService _noteService;
     private readonly INoteFolderService _folderService;
@@ -93,6 +94,16 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         _folderService = folderService;
         _settingsService = settingsService;
         _localizationService = localizationService;
+
+        _settingsService.SettingChanged += OnSettingChanged;
+    }
+
+    private void OnSettingChanged(object? sender, string key)
+    {
+        if (key == "Editor.Width")
+        {
+            _ = UpdateEditorWidthAsync();
+        }
     }
 
     [RelayCommand]
@@ -101,6 +112,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         IsLoading = true;
         try
         {
+            await UpdateEditorWidthAsync();
             var folders = (await _folderService.GetAllFoldersAsync()).ToList();
             var notes = (await _noteService.GetAllNotesAsync()).ToList();
 
@@ -124,6 +136,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
                 if (matchingItem != null)
                     SelectedTreeItem = matchingItem;
             }
+
+            var sidebarOpen = await _settingsService.GetAsync(NotesSidebarOpenKey, true);
+            _sidebarStateLoaded = false;
+            IsSidebarOpen = sidebarOpen;
+            _sidebarStateLoaded = true;
         }
         finally
         {
@@ -341,22 +358,33 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     public async Task SaveCurrentNoteAsync(Block[]? blocks, string? title = null)
     {
         if (SelectedNote == null) return;
+        await SaveNoteWithContentAsync(SelectedNote, blocks, title);
+    }
+
+    /// <summary>
+    /// Persists a specific note's blocks/title. Used when flushing pending save after note switch (editor still has previous note's content).
+    /// </summary>
+    public async Task SaveNoteWithContentAsync(Note note, Block[]? blocks, string? title = null)
+    {
+        if (note == null) return;
 
         if (title != null)
         {
-            SelectedNote.Title = title;
-            NotifyTreeItemsForNoteTitleChanged(SelectedNote);
-            RefreshBreadcrumbText();
+            note.Title = title;
+            NotifyTreeItemsForNoteTitleChanged(note);
+            if (SelectedNote == note)
+                RefreshBreadcrumbText();
         }
 
         if (blocks != null)
         {
-            SelectedNote.Blocks = blocks.Length > 0 ? blocks.ToList() : new List<Block>();
-            SelectedNote.Content = ""; // Prefer blocks; optional: generate markdown from blocks later
+            note.Blocks = blocks.Length > 0 ? blocks.ToList() : new List<Block>();
+            note.Content = "";
         }
 
-        await _noteService.SaveNoteAsync(SelectedNote);
-        ModifiedText = FormatRelative(SelectedNote.ModifiedAt, "LastModified", "Notes");
+        await _noteService.SaveNoteAsync(note);
+        if (SelectedNote == note)
+            ModifiedText = FormatRelative(note.ModifiedAt, "LastModified", "Notes");
     }
 
     /// <summary>
@@ -399,6 +427,23 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         };
     }
 
+    private bool _sidebarStateLoaded = false;
+
+    [ObservableProperty]
+    private bool _isSidebarOpen = false;
+
+    partial void OnIsSidebarOpenChanged(bool value)
+    {
+        if (_sidebarStateLoaded)
+            _ = _settingsService.SetAsync(NotesSidebarOpenKey, value);
+    }
+
+    [RelayCommand]
+    private void ToggleSidebar()
+    {
+        IsSidebarOpen = !IsSidebarOpen;
+    }
+
     [RelayCommand]
     private async Task NewNoteAsync()
     {
@@ -418,17 +463,8 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         _ = await _noteService.SaveNoteAsync(note);
     }
 
-    [RelayCommand]
-    private void Search()
-    {
-        // Placeholder: open search overlay when implemented.
-    }
+    // Search and Recent commands removed as per request
 
-    [RelayCommand]
-    private void Recent()
-    {
-        // Placeholder: show recent notes filter when implemented.
-    }
 
     [RelayCommand]
     private void SelectFavourite(NoteTreeItemViewModel? item)
@@ -777,9 +813,35 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         }
     }
 
+    [ObservableProperty]
+    private double _editorMaxWidth = 1000;
+
     public void OnNavigatedTo(object? parameter)
     {
         _ = LoadNotesCommand.ExecuteAsync(null);
+    }
+
+    private async Task UpdateEditorWidthAsync()
+    {
+        var widthStr = await _settingsService.GetAsync("Editor.Width", _localizationService.T("Wide", "Settings"));
+        if (string.IsNullOrWhiteSpace(widthStr))
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => EditorMaxWidth = 1000);
+            return;
+        }
+        var superCompact = _localizationService.T("SuperCompact", "Settings");
+        var compact = _localizationService.T("Compact", "Settings");
+        var wide = _localizationService.T("Wide", "Settings");
+        var superWide = _localizationService.T("SuperWide", "Settings");
+
+        double width = 1000;
+        if (widthStr == superCompact) width = 600;
+        else if (widthStr == compact) width = 800;
+        else if (widthStr == wide) width = 1000;
+        else if (widthStr == superWide) width = 1600;
+
+        var w = width;
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => EditorMaxWidth = w);
     }
 
     private string FormatRelative(DateTime dateTime, string prefixKey, string ns)

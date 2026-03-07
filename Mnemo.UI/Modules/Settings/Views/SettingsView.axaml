@@ -354,6 +354,39 @@
             </components:SettingsCard>
         </DataTemplate>
 
+        <!-- Step Slider Setting Template -->
+        <DataTemplate x:Key="StepSliderSettingTemplate" x:DataType="vm:StepSliderSettingViewModel">
+            <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
+                <components:SettingsCard.RightContent>
+                    <StackPanel Width="300" Spacing="4">
+                        <Slider Minimum="0" 
+                                Maximum="{Binding MaxIndex}" 
+                                Value="{Binding SelectedIndex}" 
+                                TickFrequency="1" 
+                                IsSnapToTickEnabled="True"
+                                MinHeight="30"
+                                Margin="0,0,0,4"/>
+                        <ItemsControl ItemsSource="{Binding Options}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" 
+                                               FontSize="10" 
+                                               Foreground="{DynamicResource TextTertiaryBrush}" 
+                                               HorizontalAlignment="Center" 
+                                               TextAlignment="Center"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </components:SettingsCard.RightContent>
+            </components:SettingsCard>
+        </DataTemplate>
+
     </UserControl.Resources>
 
     <Grid ColumnDefinitions="300,*">
@@ -482,6 +515,7 @@
                                                             <StaticResource ResourceKey="ProfilePictureSettingTemplate"/>
                                                             <StaticResource ResourceKey="NameSettingTemplate"/>
                                                             <StaticResource ResourceKey="TextSettingTemplate"/>
+                                                            <StaticResource ResourceKey="StepSliderSettingTemplate"/>
                                                         </ContentControl.DataTemplates>
                                                     </ContentControl>
                                                 </DataTemplate>
