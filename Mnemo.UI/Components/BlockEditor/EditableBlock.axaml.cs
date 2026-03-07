@@ -923,6 +923,31 @@ public partial class EditableBlock : UserControl
     }
 
     /// <summary>
+    /// Gets the selection range or (caret, caret) from this block's TextBox. Used for paste-to-current-block.
+    /// </summary>
+    public (int start, int end)? GetSelectionOrCaretRange()
+    {
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox?.Text == null) return null;
+        int start = Math.Min(textBox.SelectionStart, textBox.SelectionEnd);
+        int end = Math.Max(textBox.SelectionStart, textBox.SelectionEnd);
+        return (start, end);
+    }
+
+    /// <summary>
+    /// Sets the TextBox caret to the given index. No-op if no TextBox. Used after programmatic content change (e.g. paste).
+    /// </summary>
+    public void SetCaretIndex(int index)
+    {
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox?.Text == null) return;
+        int c = Math.Clamp(index, 0, textBox.Text.Length);
+        textBox.CaretIndex = c;
+        textBox.SelectionStart = c;
+        textBox.SelectionEnd = c;
+    }
+
+    /// <summary>
     /// Deletes the currently selected text in this block's TextBox and syncs to the view model.
     /// No-op if there is no selection or no TextBox. Used for Backspace/Delete with text selection (including cross-block).
     /// </summary>
@@ -941,6 +966,30 @@ public partial class EditableBlock : UserControl
         textBox.CaretIndex = start;
         textBox.SelectionStart = start;
         textBox.SelectionEnd = start;
+        _viewModel.Content = newText;
+        _viewModel.NotifyContentChanged();
+        return true;
+    }
+
+    /// <summary>
+    /// Inserts the given text at the current caret (or replaces the current selection) and syncs to the view model.
+    /// Returns true if the block has a TextBox and the insert was performed. Used for inline paste.
+    /// </summary>
+    public bool InsertTextAtCursor(string text)
+    {
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox?.Text == null || _viewModel == null) return false;
+        int start = Math.Min(textBox.SelectionStart, textBox.SelectionEnd);
+        int end = Math.Max(textBox.SelectionStart, textBox.SelectionEnd);
+        int len = textBox.Text.Length;
+        start = Math.Clamp(start, 0, len);
+        end = Math.Clamp(end, 0, len);
+        string newText = textBox.Text.Remove(start, end - start).Insert(start, text);
+        textBox.Text = newText;
+        int newCaret = start + text.Length;
+        textBox.CaretIndex = newCaret;
+        textBox.SelectionStart = newCaret;
+        textBox.SelectionEnd = newCaret;
         _viewModel.Content = newText;
         _viewModel.NotifyContentChanged();
         return true;

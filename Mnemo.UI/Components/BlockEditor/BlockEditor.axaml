@@ -13,7 +13,7 @@
     Background="Transparent"
     VerticalAlignment="Stretch"
     ClipToBounds="False">
-    <Grid Background="Transparent">
+    <Grid Background="Transparent" Cursor="IBeam">
         <Border Background="Transparent" ClipToBounds="False" Padding="32,0,32,0">
             <Grid Background="Transparent">
                 <Grid x:Name="EditorRoot" RowDefinitions="Auto,*" Background="Transparent" ClipToBounds="False">

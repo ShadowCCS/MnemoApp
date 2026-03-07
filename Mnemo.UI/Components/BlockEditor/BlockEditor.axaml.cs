@@ -691,7 +691,32 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         else if (wasBoxArmed)
         {
-            // Plain click on empty space (no drag threshold reached): release capture
+            // Plain click on empty space: if below blocks, add new block and focus it
+            var belowArea = this.FindControl<Border>("BelowBlocksArea");
+            if (belowArea != null)
+            {
+                var topLeft = belowArea.TranslatePoint(new Point(0, 0), this);
+                if (topLeft.HasValue)
+                {
+                    var rect = new Rect(topLeft.Value.X, topLeft.Value.Y, belowArea.Bounds.Width, belowArea.Bounds.Height);
+                    if (rect.Contains(_boxSelectStart))
+                    {
+                        // Don't add a new block if the block above (last block) is empty
+                        var lastIsEmpty = Blocks.Count > 0 && string.IsNullOrWhiteSpace(Blocks[Blocks.Count - 1].Content);
+                        if (!lastIsEmpty)
+                        {
+                            AddBlock(BlockType.Text, Blocks.Count);
+                            if (Blocks.Count > 0)
+                            {
+                                var newBlock = Blocks[Blocks.Count - 1];
+                                Avalonia.Threading.Dispatcher.UIThread.Post(
+                                    () => newBlock.IsFocused = true,
+                                    Avalonia.Threading.DispatcherPriority.Render);
+                            }
+                        }
+                    }
+                }
+            }
             e.Pointer.Capture(null);
         }
         else if (wasCrossBlockSelecting)
@@ -970,6 +995,65 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
             var pasted = BlockMarkdownSerializer.Deserialize(text);
             if (pasted.Length == 0) return;
+
+            // When not replacing a block selection: paste first block into current block at caret/selection; remaining pasted blocks become new blocks; tail of current block goes to last pasted block.
+            if (!replaceBlockSelection && pasted.Length >= 1)
+            {
+                int focusedIndex = GetFocusedBlockIndex();
+                if (focusedIndex >= 0 && focusedIndex < Blocks.Count)
+                {
+                    var focusedVm = Blocks[focusedIndex];
+                    if (focusedVm.Type != BlockType.Divider)
+                    {
+                        var editableBlock = GetEditableBlockAt(focusedIndex);
+                        var range = editableBlock?.GetSelectionOrCaretRange();
+                        if (range.HasValue)
+                        {
+                            var content = focusedVm.Content ?? string.Empty;
+                            int start = Math.Clamp(range.Value.start, 0, content.Length);
+                            int end = Math.Clamp(range.Value.end, 0, content.Length);
+                            string textBefore = content[0..start];
+                            string textAfter = content[end..];
+                            string firstContent = pasted[0].Content ?? string.Empty;
+
+                            focusedVm.Content = textBefore + firstContent;
+                            editableBlock!.SetCaretIndex(textBefore.Length + firstContent.Length);
+
+                            if (pasted.Length == 1)
+                            {
+                                if (textAfter.Length > 0)
+                                {
+                                    var tailBlock = BlockFactory.CreateBlock(BlockType.Text, focusedIndex + 1);
+                                    tailBlock.Content = textAfter;
+                                    SubscribeToBlock(tailBlock);
+                                    Blocks.Insert(focusedIndex + 1, tailBlock);
+                                    ReorderBlocks();
+                                }
+                                ClearBlockSelection();
+                                BlocksChanged?.Invoke();
+                                return;
+                            }
+
+                            // Multiple pasted blocks: insert pasted[1] .. pasted[n-1]; last one gets pasted[last].Content + textAfter
+                            int insertAt = focusedIndex + 1;
+                            for (int i = 1; i < pasted.Length; i++)
+                            {
+                                var block = pasted[i];
+                                string blockContent = (block.Content ?? string.Empty) + (i == pasted.Length - 1 ? textAfter : string.Empty);
+                                block.Content = blockContent;
+                                SubscribeToBlock(block);
+                                Blocks.Insert(insertAt, block);
+                                block.Order = insertAt;
+                                insertAt++;
+                            }
+                            ReorderBlocks();
+                            ClearBlockSelection();
+                            BlocksChanged?.Invoke();
+                            return;
+                        }
+                    }
+                }
+            }
 
             int insertIndex;
             if (replaceBlockSelection)
