@@ -1,0 +1,26 @@
+<UserControl
+    x:Class="Mnemo.UI.Components.BlockEditor.FormattingToolbar.ColorSwatchPopup"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:CompileBindings="False"
+    Focusable="False"
+    Width="200">
+    <Border
+        Background="{DynamicResource WorkspaceBackgroundBrush}"
+        BorderBrush="{DynamicResource ButtonBorderBrush}"
+        BorderThickness="1"
+        BoxShadow="0 4 16 0 #18000000, 0 1 4 0 #10000000"
+        CornerRadius="10"
+        Padding="12,10">
+        <StackPanel Spacing="8">
+            <TextBlock
+                x:Name="HeaderLabel"
+                Text="TEXT COLOR"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource TextSecondaryBrush}"
+                LetterSpacing="0.5" />
+            <WrapPanel x:Name="SwatchPanel" Orientation="Horizontal" />
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -12,7 +12,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core;
 using Mnemo.Core.Services;
 using Mnemo.Core.Models;
+using Mnemo.Core.Formatting;
 using Mnemo.UI.Components.BlockEditor.BlockComponents;
+using Mnemo.UI.Components.BlockEditor.FormattingToolbar;
 using System;
 using System.Linq;
 
@@ -39,6 +41,9 @@ public partial class EditableBlock : UserControl
     private bool _backspaceHandledInTunnel;
     private string? _slashMenuOverlayId;
     private SlashCommandMenu? _currentSlashMenu;
+    private string? _formattingToolbarOverlayId;
+    private InlineFormattingToolbar? _currentFormattingToolbar;
+    private TopLevel? _toolbarPointerTopLevel;
 
     public EditableBlock()
     {
@@ -150,8 +155,9 @@ public partial class EditableBlock : UserControl
             _markdownDetector.ShortcutDetected -= OnMarkdownShortcutDetected;
         }
         
-        // Close any open slash menu overlay
+        // Close any open overlays
         CloseSlashMenu();
+        CloseFormattingToolbar();
     }
 
     private void OnControlLoaded(object? sender, RoutedEventArgs e)
@@ -194,6 +200,9 @@ public partial class EditableBlock : UserControl
                 _backspaceTunnelHandler = OnBackspaceTunnelKeyDown;
                 textBox.AddHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler, Avalonia.Interactivity.RoutingStrategies.Tunnel);
                 _currentTunnelTextBox = textBox;
+
+                textBox.PointerReleased += OnTextBoxPointerReleasedForToolbar;
+                textBox.KeyUp += OnTextBoxKeyUpForToolbar;
             }
             else
             {
@@ -209,9 +218,12 @@ public partial class EditableBlock : UserControl
     
     private void RemoveBackspaceTunnelHandler()
     {
-        if (_currentTunnelTextBox != null && _backspaceTunnelHandler != null)
+        if (_currentTunnelTextBox != null)
         {
-            _currentTunnelTextBox.RemoveHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler);
+            if (_backspaceTunnelHandler != null)
+                _currentTunnelTextBox.RemoveHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler);
+            _currentTunnelTextBox.PointerReleased -= OnTextBoxPointerReleasedForToolbar;
+            _currentTunnelTextBox.KeyUp -= OnTextBoxKeyUpForToolbar;
             _currentTunnelTextBox = null;
             _backspaceTunnelHandler = null;
         }
@@ -373,8 +385,17 @@ public partial class EditableBlock : UserControl
                 }
                 else
                 {
-                    // Hide slash menu when block loses focus
                     CloseSlashMenu();
+                    // Delay toolbar close — if focus moved to a non-focusable toolbar button,
+                    // the TextBox will regain focus on the same tick and we should keep the toolbar open.
+                    if (_formattingToolbarOverlayId != null)
+                    {
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            if (_viewModel != null && !_viewModel.IsFocused)
+                                CloseFormattingToolbar();
+                        }, DispatcherPriority.Input);
+                    }
                 }
                 break;
                 
@@ -429,11 +450,31 @@ public partial class EditableBlock : UserControl
     {
         if (_viewModel != null && _stateManager != null)
         {
-            _viewModel.IsFocused = false;
-            var parentEditor = FindParentBlockEditor();
-            parentEditor?.FlushTypingBatch();
-            parentEditor?.NotifyBlocksChanged();
+            // When the formatting toolbar is open, clicking its buttons may briefly steal focus
+            // from the TextBox. Defer the focus-loss handling so the toolbar action can execute
+            // and refocus the TextBox before we tear anything down.
+            if (_formattingToolbarOverlayId != null)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+                    if (textBox != null && textBox.IsFocused) return;
+                    if (_currentFormattingToolbar?.IsInteractingWithToolbar == true) return;
+                    CompleteLostFocus();
+                }, DispatcherPriority.Input);
+                return;
+            }
+            CompleteLostFocus();
         }
+    }
+
+    private void CompleteLostFocus()
+    {
+        if (_viewModel == null || _stateManager == null) return;
+        _viewModel.IsFocused = false;
+        var parentEditor = FindParentBlockEditor();
+        parentEditor?.FlushTypingBatch();
+        parentEditor?.NotifyBlocksChanged();
     }
 
     private void TextBox_TextChanged(object? sender, TextChangedEventArgs e)
@@ -799,6 +840,203 @@ public partial class EditableBlock : UserControl
             _viewModel.IsFocused = true;
             Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
         }
+    }
+
+    #endregion
+
+    #region Formatting Toolbar
+
+    private const double FormattingToolbarHeightEstimate = 48;
+
+    private void OnTextBoxPointerReleasedForToolbar(object? sender, PointerReleasedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
+    }
+
+    private void OnTextBoxKeyUpForToolbar(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ||
+            e.Key == Key.Left || e.Key == Key.Right || e.Key == Key.Up || e.Key == Key.Down ||
+            e.Key == Key.Home || e.Key == Key.End)
+        {
+            Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
+        }
+    }
+
+    private void CheckSelectionAndToggleToolbar()
+    {
+        var range = GetSelectionRange();
+        if (range != null && range.Value.end > range.Value.start)
+        {
+            _cachedSelectionRange = range;
+            if (_formattingToolbarOverlayId == null)
+                ShowFormattingToolbar();
+        }
+        else
+        {
+            _cachedSelectionRange = null;
+            CloseFormattingToolbar();
+        }
+    }
+
+    private void ShowFormattingToolbar()
+    {
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (_overlayService == null || textBox == null || !textBox.IsVisible) return;
+
+        CloseFormattingToolbar();
+
+        var toolbar = new InlineFormattingToolbar();
+        toolbar.FormatRequested += OnFormatRequested;
+        toolbar.BackgroundColorRequested += OnBackgroundColorRequested;
+        _currentFormattingToolbar = toolbar;
+
+        bool showAbove = ShouldShowToolbarAbove(textBox);
+        var options = new OverlayOptions
+        {
+            ShowBackdrop = false,
+            CloseOnOutsideClick = true,
+            AnchorControl = textBox,
+            AnchorPosition = showAbove ? AnchorPosition.TopLeft : AnchorPosition.BottomLeft,
+            AnchorOffset = showAbove ? new Thickness(0, -8, 0, 0) : new Thickness(0, 4, 0, 0),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+        };
+
+        _formattingToolbarOverlayId = _overlayService.CreateOverlay(toolbar, options, "InlineFormattingToolbar");
+        AttachToolbarOutsideClickHandler(textBox);
+    }
+
+    private void CloseFormattingToolbar()
+    {
+        if (!string.IsNullOrEmpty(_formattingToolbarOverlayId) && _overlayService != null)
+        {
+            _overlayService.CloseOverlay(_formattingToolbarOverlayId);
+            _formattingToolbarOverlayId = null;
+            _cachedSelectionRange = null;
+            DetachToolbarOutsideClickHandler();
+
+            if (_currentFormattingToolbar != null)
+            {
+                _currentFormattingToolbar.FormatRequested -= OnFormatRequested;
+                _currentFormattingToolbar.BackgroundColorRequested -= OnBackgroundColorRequested;
+                _currentFormattingToolbar = null;
+            }
+        }
+    }
+
+    private static bool ShouldShowToolbarAbove(TextBox textBox)
+    {
+        if (textBox == null || !textBox.IsVisible) return true;
+
+        var scrollViewer = textBox.FindAncestorOfType<ScrollViewer>();
+        double anchorTop;
+
+        if (scrollViewer != null && scrollViewer.Content is Visual scrollContent)
+        {
+            var ptInContent = textBox.TranslatePoint(new Point(0, 0), scrollContent);
+            if (!ptInContent.HasValue) return true;
+            double visibleTop = scrollViewer.Offset.Y;
+            anchorTop = ptInContent.Value.Y;
+            return (anchorTop - visibleTop) >= FormattingToolbarHeightEstimate;
+        }
+
+        var topLevel = textBox.FindAncestorOfType<TopLevel>();
+        if (topLevel == null) return true;
+        var ptInWindow = textBox.TranslatePoint(new Point(0, 0), topLevel);
+        if (!ptInWindow.HasValue) return true;
+        return ptInWindow.Value.Y >= FormattingToolbarHeightEstimate;
+    }
+
+    private void OnFormatRequested(InlineFormatKind kind)
+    {
+        ApplyInlineFormat(kind);
+    }
+
+    private void OnBackgroundColorRequested(string hex)
+    {
+        ApplyInlineFormat(InlineFormatKind.BackgroundColor, hex);
+    }
+
+    private (int start, int end)? _cachedSelectionRange;
+
+    private void ApplyInlineFormat(InlineFormatKind kind, string? color = null)
+    {
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox?.Text == null || _viewModel == null) return;
+
+        // Use cached selection if the live one is gone (focus was stolen by overlay)
+        var range = GetSelectionRange() ?? _cachedSelectionRange;
+        if (range == null) return;
+
+        string content = textBox.Text;
+        string previousText = content;
+
+        var (newContent, newSelStart, newSelEnd) = InlineFormatApplier.Apply(
+            content, range.Value.start, range.Value.end, kind, color);
+
+        if (newContent == content) return;
+
+        textBox.Text = newContent;
+        textBox.SelectionStart = newSelStart;
+        textBox.SelectionEnd = newSelEnd;
+        _viewModel.PreviousContent = previousText;
+        _viewModel.Content = newContent;
+
+        if (_stateManager != null)
+            _stateManager.PreviousText = newContent;
+
+        _cachedSelectionRange = (newSelStart, newSelEnd);
+
+        var parentEditor = FindParentBlockEditor();
+        parentEditor?.TrackTypingEdit(_viewModel, previousText);
+
+        // Refocus TextBox so selection stays visible and user can continue editing
+        textBox.Focus();
+    }
+
+    private void AttachToolbarOutsideClickHandler(TextBox anchorTextBox)
+    {
+        DetachToolbarOutsideClickHandler();
+        _toolbarPointerTopLevel = TopLevel.GetTopLevel(anchorTextBox);
+        _toolbarPointerTopLevel?.AddHandler(InputElement.PointerPressedEvent, OnTopLevelPointerPressedForFormattingToolbar, RoutingStrategies.Tunnel);
+    }
+
+    private void DetachToolbarOutsideClickHandler()
+    {
+        if (_toolbarPointerTopLevel != null)
+        {
+            _toolbarPointerTopLevel.RemoveHandler(InputElement.PointerPressedEvent, OnTopLevelPointerPressedForFormattingToolbar);
+            _toolbarPointerTopLevel = null;
+        }
+    }
+
+    private void OnTopLevelPointerPressedForFormattingToolbar(object? sender, PointerPressedEventArgs e)
+    {
+        if (_formattingToolbarOverlayId == null || _currentFormattingToolbar == null)
+            return;
+
+        if (_currentFormattingToolbar.IsEventFromToolbarOverlay(e.Source))
+            return;
+
+        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        if (textBox != null && e.Source is Visual sourceVisual && IsDescendantOf(sourceVisual, textBox))
+            return;
+
+        CloseFormattingToolbar();
+    }
+
+    private static bool IsDescendantOf(Visual source, Visual ancestor)
+    {
+        Visual? current = source;
+        while (current != null)
+        {
+            if (ReferenceEquals(current, ancestor))
+                return true;
+            current = current.GetVisualParent();
+        }
+
+        return false;
     }
 
     #endregion

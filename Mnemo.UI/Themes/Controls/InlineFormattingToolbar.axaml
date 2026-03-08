@@ -1,0 +1,33 @@
+<Styles
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:ClassModifier="internal">
+
+    <Style Selector="Button.FormattingToolbarButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="6,4" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Focusable" Value="False" />
+    </Style>
+
+    <Style Selector="Button.FormattingToolbarButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ListBoxItemBackgroundPointerOverBrush}" />
+    </Style>
+
+    <Style Selector="Button.FormattingToolbarButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SlashCommandItemBackgroundSelectedBrush}" />
+    </Style>
+
+    <Style Selector="Button.FormattingToolbarButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Opacity" Value="0.4" />
+    </Style>
+
+    <Style Selector="Button.FormattingToolbarIcon">
+        <Setter Property="Padding" Value="5,4" />
+    </Style>
+</Styles>
