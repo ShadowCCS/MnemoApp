@@ -9,7 +9,7 @@ namespace Mnemo.UI.Components.BlockEditor;
 public class FocusManager
 {
     private readonly Control _parentControl;
-    private TextBox? _cachedTextBox;
+    private RichTextEditor? _cachedEditor;
 
     public FocusManager(Control parentControl)
     {
@@ -18,87 +18,64 @@ public class FocusManager
 
     public void FocusTextBox(int? caretPosition = null)
     {
-        // Use Input priority so focus transfers before Avalonia renders the focus-loss
-        // state on the previously focused TextBox. Loaded priority would let a frame render
-        // with the old block's caret snapped to 0, causing a visible flicker.
-        // If the TextBox isn't in the tree yet (e.g. newly created block), fall back to Loaded.
         Dispatcher.UIThread.Post(() =>
         {
-            var textBox = FindFocusableTextBox();
-            if (textBox == null)
+            var editor = FindFocusableEditor();
+            if (editor == null)
             {
-                // TextBox not yet rendered — retry at Loaded priority
                 Dispatcher.UIThread.Post(() =>
                 {
-                    var tb = FindFocusableTextBox();
-                    if (tb == null) return;
-                    ApplyFocus(tb, caretPosition);
+                    var e2 = FindFocusableEditor();
+                    if (e2 == null) return;
+                    ApplyFocus(e2, caretPosition);
                 }, DispatcherPriority.Loaded);
                 return;
             }
-
-            ApplyFocus(textBox, caretPosition);
+            ApplyFocus(editor, caretPosition);
         }, DispatcherPriority.Input);
     }
 
-    private void ApplyFocus(TextBox textBox, int? caretPosition)
+    private void ApplyFocus(RichTextEditor editor, int? caretPosition)
     {
-        // Set CaretIndex before Focus() so the caret is already at the correct position
-        // when the TextBox first renders its focused state — prevents a snap flicker.
-        var targetCaret = caretPosition ?? (textBox.Text?.Length ?? 0);
-        textBox.CaretIndex = targetCaret;
-        textBox.Focus();
-        _cachedTextBox = textBox;
+        var targetCaret = caretPosition ?? editor.TextLength;
+        editor.CaretIndex = targetCaret;
+        editor.SelectionStart = targetCaret;
+        editor.SelectionEnd = targetCaret;
+        editor.Focus();
+        _cachedEditor = editor;
     }
 
-    public void FocusTextBoxAtStart()
-    {
-        FocusTextBox(0);
-    }
+    public void FocusTextBoxAtStart() => FocusTextBox(0);
+    public void FocusTextBoxAtEnd() => FocusTextBox(null);
 
-    public void FocusTextBoxAtEnd()
-    {
-        FocusTextBox(null);
-    }
-
-    public TextBox? GetFocusedTextBox()
+    /// <summary>Returns the currently focused <see cref="RichTextEditor"/>, or null.</summary>
+    public RichTextEditor? GetFocusedTextBox()
     {
         return _parentControl.GetVisualDescendants()
-            .OfType<TextBox>()
-            .FirstOrDefault(tb => tb.IsFocused);
+            .OfType<RichTextEditor>()
+            .FirstOrDefault(e => e.IsFocused);
     }
 
-    public TextBox? GetCurrentTextBox()
+    /// <summary>Returns the cached or discovered <see cref="RichTextEditor"/>.</summary>
+    public RichTextEditor? GetCurrentTextBox()
     {
-        // Try cached first - verify it's still valid
-        if (_cachedTextBox != null 
-            && _cachedTextBox.IsVisible 
-            && _cachedTextBox.IsEffectivelyVisible 
-            && _cachedTextBox.GetVisualRoot() != null)
-        {
-            return _cachedTextBox;
-        }
+        if (_cachedEditor != null
+            && _cachedEditor.IsVisible
+            && _cachedEditor.IsEffectivelyVisible
+            && _cachedEditor.GetVisualRoot() != null)
+            return _cachedEditor;
 
-        // Find visible textbox and update cache
-        var textBox = FindFocusableTextBox();
-        _cachedTextBox = textBox;
-        return textBox;
+        var editor = FindFocusableEditor();
+        _cachedEditor = editor;
+        return editor;
     }
 
-    public void ClearCache()
-    {
-        _cachedTextBox = null;
-    }
+    public void ClearCache() => _cachedEditor = null;
 
-    private TextBox? FindFocusableTextBox()
+    private RichTextEditor? FindFocusableEditor()
     {
-        var textBoxes = _parentControl.GetVisualDescendants()
-            .OfType<TextBox>()
-            .Where(tb => tb.IsVisible && tb.IsEffectivelyVisible)
-            .ToList();
-
-        return textBoxes.FirstOrDefault();
+        return _parentControl.GetVisualDescendants()
+            .OfType<RichTextEditor>()
+            .FirstOrDefault(e => e.IsVisible && e.IsEffectivelyVisible);
     }
 }
-
-

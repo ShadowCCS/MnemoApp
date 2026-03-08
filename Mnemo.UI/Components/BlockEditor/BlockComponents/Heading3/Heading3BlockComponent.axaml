@@ -2,22 +2,16 @@
     x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Heading3.Heading3BlockComponent"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:editor="using:Mnemo.UI.Components.BlockEditor"
     x:CompileBindings="False">
-    <TextBox
-        x:Name="InputTextBox"
-        AcceptsReturn="False"
-        Background="Transparent"
-        BorderThickness="0"
+    <editor:RichTextEditor
+        x:Name="Editor"
+        MinWidth="200"
+        HorizontalAlignment="Stretch"
         FontSize="18"
         FontWeight="Medium"
-        Padding="0"
-        Text="{Binding Content, Mode=TwoWay}"
-        TextWrapping="Wrap"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        CaretBrush="{DynamicResource TextPrimaryBrush}"
+        SelectionBrush="{DynamicResource SystemAccentColor}"
         Watermark="{Binding Watermark}" />
 </UserControl>
-
-
-
-
-
-

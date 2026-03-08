@@ -1,4 +1,3 @@
-using Avalonia.Controls;
 using Avalonia.Input;
 using Mnemo.Core.Models;
 using System;
@@ -8,8 +7,6 @@ namespace Mnemo.UI.Components.BlockEditor;
 
 public class KeyboardHandler
 {
-    private const int BACKSPACE_THRESHOLD = 1;
-    
     private static readonly HashSet<BlockType> TextAndHeadingTypes = new()
     {
         BlockType.Text,
@@ -19,21 +16,15 @@ public class KeyboardHandler
     };
 
     private Key? _lastKey;
-
-    public Key? LastKey
-    {
-        get => _lastKey;
-        set => _lastKey = value;
-    }
-
+    public Key? LastKey { get => _lastKey; set => _lastKey = value; }
     public bool WasBackspace => _lastKey == Key.Back;
 
     public event Action? BackspaceOnEmpty;
     public event Action? RequestFocusPrevious;
     public event Action? RequestFocusNext;
-    #pragma warning disable CS0067 // Event is never used
+#pragma warning disable CS0067
     public event Action? RequestNewBlock;
-    #pragma warning restore CS0067
+#pragma warning restore CS0067
     public event Action<BlockType>? RequestNewBlockOfType;
     public event Action<BlockType>? ConvertToBlockType;
     public event Action? ConvertToTextPreservingContent;
@@ -41,62 +32,52 @@ public class KeyboardHandler
     public event Action? EnterPressed;
     public event Action? MergeWithPrevious;
 
-    public void HandleKeyDown(KeyEventArgs e, TextBox textBox, BlockViewModel? viewModel)
+    public void HandleKeyDown(KeyEventArgs e, RichTextEditor editor, BlockViewModel? viewModel)
     {
-        if (e.Handled || viewModel == null || textBox == null) return;
+        if (e.Handled || viewModel == null || editor == null) return;
 
         LastKey = e.Key;
-        var text = textBox.Text ?? string.Empty;
-        var caretIndex = textBox.CaretIndex;
-        var selectionLength = textBox.SelectionEnd - textBox.SelectionStart;
+        var text = editor.Text;
+        var caretIndex = editor.CaretIndex;
+        var selectionLength = editor.SelectionEnd - editor.SelectionStart;
 
         switch (e.Key)
         {
             case Key.Enter when viewModel.Type != BlockType.Code:
-                HandleEnter(e, textBox, viewModel);
+                HandleEnter(e, editor, viewModel);
                 break;
-                
+
             case Key.Back:
-                HandleBackspace(e, textBox, text, caretIndex, selectionLength, viewModel);
+                HandleBackspace(e, editor, text, caretIndex, selectionLength, viewModel);
                 break;
-                
-            case Key.Up when caretIndex == 0 || IsOnFirstLine(textBox):
+
+            case Key.Up when caretIndex == 0 || IsOnFirstLine(editor):
                 e.Handled = true;
                 RequestFocusPrevious?.Invoke();
                 break;
-                
-            case Key.Down when caretIndex == text.Length || IsOnLastLine(textBox):
+
+            case Key.Down when caretIndex == text.Length || IsOnLastLine(editor):
                 e.Handled = true;
                 RequestFocusNext?.Invoke();
                 break;
-                
+
             case Key.Escape:
                 e.Handled = true;
                 EscapePressed?.Invoke();
                 break;
-                
-            case Key.Space:
-                // Markdown shortcuts are handled separately
-                break;
         }
     }
 
-    private void HandleEnter(KeyEventArgs e, TextBox textBox, BlockViewModel viewModel)
+    private void HandleEnter(KeyEventArgs e, RichTextEditor editor, BlockViewModel viewModel)
     {
         e.Handled = true;
-        
-        var hasContent = !string.IsNullOrWhiteSpace(textBox.Text);
-
+        var hasContent = !string.IsNullOrWhiteSpace(editor.Text);
         if (viewModel.Type is BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist)
         {
             if (hasContent)
-            {
                 RequestNewBlockOfType?.Invoke(viewModel.Type);
-            }
             else
-            {
                 ConvertToBlockType?.Invoke(BlockType.Text);
-            }
         }
         else
         {
@@ -104,30 +85,18 @@ public class KeyboardHandler
         }
     }
 
-    private void HandleBackspace(KeyEventArgs e, TextBox textBox, string text, int caretIndex, int selectionLength, BlockViewModel viewModel)
+    private void HandleBackspace(KeyEventArgs e, RichTextEditor editor, string text, int caretIndex, int selectionLength, BlockViewModel viewModel)
     {
-        // If there's a selection, explicitly delete it (Avalonia TextBox may not handle Backspace-for-selection reliably when custom handlers are present)
         if (selectionLength != 0)
         {
-            int start = Math.Min(textBox.SelectionStart, textBox.SelectionEnd);
-            int len = Math.Abs(textBox.SelectionEnd - textBox.SelectionStart);
-            if (len > 0 && start >= 0 && start + len <= text.Length)
-            {
-                string newText = text.Remove(start, len);
-                textBox.Text = newText;
-                textBox.CaretIndex = start;
-                textBox.SelectionStart = start;
-                textBox.SelectionEnd = start;
-                viewModel.Content = newText;
-                e.Handled = true;
-            }
+            // RichTextEditor handles selection deletion internally; just mark handled
+            // so the tunnel/bubble chain doesn't double-process.
             return;
         }
 
         if (caretIndex == 0)
         {
             var isEmpty = string.IsNullOrWhiteSpace(text);
-
             if (isEmpty)
             {
                 e.Handled = true;
@@ -149,44 +118,28 @@ public class KeyboardHandler
     public void HandleBackspaceOnEmptyBlock(BlockViewModel viewModel)
     {
         if (viewModel == null) return;
-
         if (viewModel.Type == BlockType.Text)
-        {
             viewModel.RequestDeleteAndFocusAbove();
-        }
         else
-        {
             ConvertToBlockType?.Invoke(BlockType.Text);
-        }
     }
 
-    public bool IsSlashKeyPress(Key key, string text)
+    public bool IsSlashKeyPress(Key key, string text) =>
+        text == "/" || key == Key.Divide || key == Key.OemQuestion || key == Key.Oem2;
+
+    private static bool IsOnFirstLine(RichTextEditor editor)
     {
-        return text == "/" || 
-               key == Key.Divide || 
-               key == Key.OemQuestion || 
-               key == Key.Oem2;
+        var text = editor.Text;
+        var caretIndex = editor.CaretIndex;
+        if (caretIndex == 0) return true;
+        return !text[..caretIndex].Contains('\n');
     }
 
-    private bool IsTextOrHeadingBlock(BlockType type) => TextAndHeadingTypes.Contains(type);
-
-    private bool IsOnFirstLine(TextBox textBox)
+    private static bool IsOnLastLine(RichTextEditor editor)
     {
-        if (!textBox.AcceptsReturn || textBox.CaretIndex == 0)
-            return true;
-
-        var text = textBox.Text ?? string.Empty;
-        return !text[..textBox.CaretIndex].Contains('\n');
-    }
-
-    private bool IsOnLastLine(TextBox textBox)
-    {
-        if (!textBox.AcceptsReturn || textBox.CaretIndex == (textBox.Text?.Length ?? 0))
-            return true;
-
-        var text = textBox.Text ?? string.Empty;
-        return !text[textBox.CaretIndex..].Contains('\n');
+        var text = editor.Text;
+        var caretIndex = editor.CaretIndex;
+        if (caretIndex >= text.Length) return true;
+        return !text[caretIndex..].Contains('\n');
     }
 }
-
-

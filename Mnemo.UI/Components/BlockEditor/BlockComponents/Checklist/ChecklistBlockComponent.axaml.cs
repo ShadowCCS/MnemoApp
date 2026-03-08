@@ -1,5 +1,4 @@
-using Avalonia.Controls;
-using Mnemo.UI.Components.BlockEditor;
+﻿using Avalonia.Controls;
 
 namespace Mnemo.UI.Components.BlockEditor.BlockComponents.Checklist;
 
@@ -8,10 +7,8 @@ public partial class ChecklistBlockComponent : BlockComponentBase
     public ChecklistBlockComponent()
     {
         InitializeComponent();
-        WireInputControl(InputTextBox);
+        WireRichTextEditor(Editor);
     }
 
-    public override Control? GetInputControl() => InputTextBox;
+    public override Control? GetInputControl() => Editor;
 }
-
-

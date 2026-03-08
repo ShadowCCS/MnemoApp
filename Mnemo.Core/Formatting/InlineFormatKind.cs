@@ -8,6 +8,7 @@ public enum InlineFormatKind
     Strikethrough,
     Highlight,
     BackgroundColor,
+    Code,
     Subscript,
     Superscript
 }

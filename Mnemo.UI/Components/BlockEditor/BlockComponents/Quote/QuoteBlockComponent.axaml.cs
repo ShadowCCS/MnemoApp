@@ -1,5 +1,4 @@
-using Avalonia.Controls;
-using Mnemo.UI.Components.BlockEditor;
+﻿using Avalonia.Controls;
 
 namespace Mnemo.UI.Components.BlockEditor.BlockComponents.Quote;
 
@@ -8,10 +7,8 @@ public partial class QuoteBlockComponent : BlockComponentBase
     public QuoteBlockComponent()
     {
         InitializeComponent();
-        WireInputControl(InputTextBox);
+        WireRichTextEditor(Editor);
     }
 
-    public override Control? GetInputControl() => InputTextBox;
+    public override Control? GetInputControl() => Editor;
 }
-
-

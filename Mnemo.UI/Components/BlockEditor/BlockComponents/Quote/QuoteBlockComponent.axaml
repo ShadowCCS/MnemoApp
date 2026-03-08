@@ -2,38 +2,29 @@
     x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Quote.QuoteBlockComponent"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:editor="using:Mnemo.UI.Components.BlockEditor"
     x:CompileBindings="False">
     <Grid ColumnDefinitions="3,*">
-        <!-- Vertical quote line (full height, always visible) -->
         <Border
             Grid.Column="0"
             Width="3"
             Margin="0,4,0,4"
             VerticalAlignment="Stretch"
             Background="{DynamicResource QuoteLineBrush}" />
-        <!-- Text content -->
         <Border
             Grid.Column="1"
             Padding="12,4,0,4"
             Background="Transparent">
-            <TextBox
-                x:Name="InputTextBox"
-                AcceptsReturn="False"
-                Background="Transparent"
-                BorderThickness="0"
+            <editor:RichTextEditor
+                x:Name="Editor"
+                MinWidth="200"
+                HorizontalAlignment="Stretch"
                 FontSize="14"
-                FontStyle="Italic"
+                Foreground="{DynamicResource TextPrimaryBrush}"
+                CaretBrush="{DynamicResource TextPrimaryBrush}"
+                SelectionBrush="{DynamicResource SystemAccentColor}"
                 Opacity="0.8"
-                Padding="0"
-                Text="{Binding Content, Mode=TwoWay}"
-                TextWrapping="Wrap"
                 Watermark="{Binding Watermark}" />
         </Border>
     </Grid>
 </UserControl>
-
-
-
-
-
-

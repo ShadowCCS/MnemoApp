@@ -15,7 +15,6 @@ using Mnemo.Core.Models;
 using Mnemo.Core.Formatting;
 using Mnemo.UI.Components.BlockEditor.BlockComponents;
 using Mnemo.UI.Components.BlockEditor.FormattingToolbar;
-using System;
 using System.Linq;
 
 namespace Mnemo.UI.Components.BlockEditor;
@@ -36,7 +35,7 @@ public partial class EditableBlock : UserControl
     private BlockViewModel? _viewModel;
     private BlockEditor? _cachedParentEditor;
     private BlockComponentBase? _currentBlockComponent;
-    private TextBox? _currentTunnelTextBox;
+    private RichTextEditor? _currentEditor;
     private EventHandler<KeyEventArgs>? _backspaceTunnelHandler;
     private bool _backspaceHandledInTunnel;
     private string? _slashMenuOverlayId;
@@ -86,11 +85,11 @@ public partial class EditableBlock : UserControl
     private void HandleEnterPressed()
     {
         if (_viewModel == null) return;
-        var input = _currentBlockComponent?.GetInputControl();
-        if (input is TextBox textBox)
+        var editor = _currentBlockComponent?.GetRichTextEditor();
+        if (editor != null)
         {
-            var text = textBox.Text ?? string.Empty;
-            var caretIndex = Math.Clamp(textBox.CaretIndex, 0, text.Length);
+            var text = editor.Text;
+            var caretIndex = Math.Clamp(editor.CaretIndex, 0, text.Length);
             var textBefore = text.Substring(0, caretIndex);
             var textAfter = text.Substring(caretIndex);
             _viewModel.NotifyStructuralChangeStarting();
@@ -162,8 +161,10 @@ public partial class EditableBlock : UserControl
 
     private void OnControlLoaded(object? sender, RoutedEventArgs e)
     {
-        // Wire up block component events
         WireUpBlockComponent();
+        Dispatcher.UIThread.Post(() => WireUpBlockComponent(), DispatcherPriority.Render);
+        // Content binding can apply after first layout; run again after a short delay so Runs are synced.
+        Dispatcher.UIThread.Post(() => WireUpBlockComponent(), DispatcherPriority.ApplicationIdle);
     }
     
     private void WireUpBlockComponent()
@@ -182,56 +183,59 @@ public partial class EditableBlock : UserControl
         if (BlockContentControl?.Content is BlockComponentBase component)
         {
             _currentBlockComponent = component;
-            
-            // Ensure DataContext is set on the component
-            if (component.DataContext == null && _viewModel != null)
+
+            // Always set DataContext so the component has the VM (converter-created content may not inherit it).
+            if (_viewModel != null)
             {
                 component.DataContext = _viewModel;
+                // Explicitly sync runs so text is visible even if DataContextChanged/SyncFromViewModel ran before DC was set.
+                if (component.GetRichTextEditor() is { } rte)
+                    rte.Runs = _viewModel.Runs;
             }
-            
+
             component.TextBoxGotFocus += HandleBlockComponentGotFocus;
             component.TextBoxLostFocus += HandleBlockComponentLostFocus;
             component.TextBoxTextChanged += HandleBlockComponentTextChanged;
             component.TextBoxKeyDown += HandleBlockComponentKeyDown;
             
-            // Handle backspace on empty in tunnel phase so we run before TextBox consumes the key
-            if (component.GetInputControl() is TextBox textBox)
+            var editor = component.GetRichTextEditor();
+            if (editor != null)
             {
+                _currentEditor = editor;
                 _backspaceTunnelHandler = OnBackspaceTunnelKeyDown;
-                textBox.AddHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-                _currentTunnelTextBox = textBox;
+                editor.AddHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler, Avalonia.Interactivity.RoutingStrategies.Tunnel);
 
-                textBox.PointerReleased += OnTextBoxPointerReleasedForToolbar;
-                textBox.KeyUp += OnTextBoxKeyUpForToolbar;
+                editor.PointerReleased += OnTextBoxPointerReleasedForToolbar;
+                editor.KeyUp += OnTextBoxKeyUpForToolbar;
             }
             else
             {
-                _currentTunnelTextBox = null;
+                _currentEditor = null;
             }
         }
         else
         {
             _currentBlockComponent = null;
-            _currentTunnelTextBox = null;
+            _currentEditor = null;
         }
     }
     
     private void RemoveBackspaceTunnelHandler()
     {
-        if (_currentTunnelTextBox != null)
+        if (_currentEditor != null)
         {
             if (_backspaceTunnelHandler != null)
-                _currentTunnelTextBox.RemoveHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler);
-            _currentTunnelTextBox.PointerReleased -= OnTextBoxPointerReleasedForToolbar;
-            _currentTunnelTextBox.KeyUp -= OnTextBoxKeyUpForToolbar;
-            _currentTunnelTextBox = null;
+                _currentEditor.RemoveHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler);
+            _currentEditor.PointerReleased -= OnTextBoxPointerReleasedForToolbar;
+            _currentEditor.KeyUp -= OnTextBoxKeyUpForToolbar;
+            _currentEditor = null;
             _backspaceTunnelHandler = null;
         }
     }
     
     private void OnBackspaceTunnelKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Back || e.Handled || _viewModel == null || sender is not TextBox textBox)
+        if (e.Key != Key.Back || e.Handled || _viewModel == null || sender is not RichTextEditor textBox)
             return;
         var text = textBox.Text ?? string.Empty;
         var caretIndex = textBox.CaretIndex;
@@ -268,9 +272,9 @@ public partial class EditableBlock : UserControl
         }
     }
     
-    private void HandleBlockComponentGotFocus(object? sender, TextBox textBox)
+    private void HandleBlockComponentGotFocus(object? sender, RichTextEditor editor)
     {
-        TextBox_GotFocus(textBox, new RoutedEventArgs());
+        TextBox_GotFocus(editor, new RoutedEventArgs());
     }
     
     private void HandleBlockComponentLostFocus(object? sender, RoutedEventArgs e)
@@ -280,17 +284,17 @@ public partial class EditableBlock : UserControl
     
     private void HandleBlockComponentTextChanged(object? sender, TextChangedEventArgs e)
     {
-        if (sender is BlockComponentBase component && component.GetInputControl() is TextBox textBox)
+        if (sender is BlockComponentBase component && component.GetRichTextEditor() is RichTextEditor editor)
         {
-            TextBox_TextChanged(textBox, e);
+            TextBox_TextChanged(editor, e);
         }
     }
     
     private void HandleBlockComponentKeyDown(object? sender, KeyEventArgs e)
     {
-        if (sender is BlockComponentBase component && component.GetInputControl() is TextBox textBox)
+        if (sender is BlockComponentBase component && component.GetRichTextEditor() is RichTextEditor editor)
         {
-            TextBox_KeyDown(textBox, e);
+            TextBox_KeyDown(editor, e);
         }
     }
 
@@ -322,8 +326,8 @@ public partial class EditableBlock : UserControl
         
         SubscribeToViewModel();
         
-        // Wire up block component after data context changes
-        Dispatcher.UIThread.Post(() => WireUpBlockComponent(), DispatcherPriority.Loaded);
+        // Wire up block component after data context changes; use Render so ContentControl.Content binding has run
+        Dispatcher.UIThread.Post(() => WireUpBlockComponent(), DispatcherPriority.Render);
         
         if (_viewModel != null && _stateManager != null)
         {
@@ -403,23 +407,15 @@ public partial class EditableBlock : UserControl
                 if (_stateManager != null)
                 {
                     var currentText = _viewModel.Content ?? string.Empty;
+                    var currentEditor = _focusManager?.GetCurrentTextBox();
+                    var editorText = currentEditor?.Text ?? string.Empty;
                     
-                    // Check if TextBox text already matches the new Content value
-                    // If so, this PropertyChanged was triggered by TextChanged handler updating Content,
-                    // so we should NOT set the updating flag (to avoid blocking the next keystroke)
-                    var textBox = _focusManager?.GetCurrentTextBox();
-                    var textBoxText = textBox?.Text ?? string.Empty;
-                    
-                    if (textBoxText == currentText)
+                    if (editorText == currentText)
                     {
-                        // TextBox text matches Content - this is from TextChanged handler
-                        // Don't set the updating flag, just sync PreviousText
-                        // TextChanged handler will update PreviousText, but sync here too for safety
                         _stateManager.PreviousText = currentText;
                         return;
                     }
                     
-                    // This is a programmatic update from outside (e.g., loading), set the flag
                     _stateManager.SetUpdatingFromViewModel();
                     _stateManager.PreviousText = currentText;
                     _focusManager?.ClearCache();
@@ -440,9 +436,9 @@ public partial class EditableBlock : UserControl
 
         _viewModel.IsFocused = true;
         
-        if (sender is TextBox textBox)
+        if (sender is RichTextEditor editor)
         {
-            _stateManager.PreviousText = textBox.Text ?? string.Empty;
+            _stateManager.PreviousText = editor.Text;
         }
     }
 
@@ -450,15 +446,12 @@ public partial class EditableBlock : UserControl
     {
         if (_viewModel != null && _stateManager != null)
         {
-            // When the formatting toolbar is open, clicking its buttons may briefly steal focus
-            // from the TextBox. Defer the focus-loss handling so the toolbar action can execute
-            // and refocus the TextBox before we tear anything down.
             if (_formattingToolbarOverlayId != null)
             {
                 Dispatcher.UIThread.Post(() =>
                 {
-                    var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-                    if (textBox != null && textBox.IsFocused) return;
+                    var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+                    if (editor != null && editor.IsFocused) return;
                     if (_currentFormattingToolbar?.IsInteractingWithToolbar == true) return;
                     CompleteLostFocus();
                 }, DispatcherPriority.Input);
@@ -479,10 +472,8 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
-        if (sender is not TextBox textBox || _viewModel == null || _stateManager == null)
-        {
+        if (sender is not RichTextEditor editor || _viewModel == null || _stateManager == null)
             return;
-        }
         
         if (_stateManager.IsUpdatingFromViewModel)
         {
@@ -490,21 +481,24 @@ public partial class EditableBlock : UserControl
             return;
         }
         
-        var text = textBox.Text ?? string.Empty;
+        var text = editor.Text;
         var previousText = _stateManager.PreviousText;
         
-        HandleSlashMenuToggle(text, textBox);
+        HandleSlashMenuToggle(text, editor);
         
         if (text == previousText)
+            return;
+
+        // RichTextEditor: component already committed via CommitRunsFromEditor; just keep state in sync
+        if (sender is RichTextEditor)
         {
+            _stateManager.PreviousText = text;
             return;
         }
 
         _viewModel.PreviousContent = previousText;
         var parentEditor = FindParentBlockEditor();
         parentEditor?.TrackTypingEdit(_viewModel, previousText);
-        if (parentEditor == null)
-            BlockEditorLogger.Log($"TextBox_TextChanged: parent BlockEditor NOT FOUND for blockId={_viewModel.Id}");
 
         BlockEditorLogger.Log($"TextBox_TextChanged: blockId={_viewModel.Id} prev='{previousText}' -> new='{text}'");
         _viewModel.Content = text;
@@ -513,7 +507,7 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (_viewModel == null || sender is not TextBox textBox || _keyboardHandler == null)
+        if (_viewModel == null || sender is not RichTextEditor editor || _keyboardHandler == null)
             return;
 
         if (e.Key == Key.Back && _backspaceHandledInTunnel)
@@ -525,31 +519,23 @@ public partial class EditableBlock : UserControl
         if (e.Key != Key.Back)
             _backspaceHandledInTunnel = false;
 
-        // Handle markdown shortcuts on space
         if (e.Key == Key.Space)
-        {
-            _markdownDetector?.TryDetectShortcut(textBox);
-        }
+            _markdownDetector?.TryDetectShortcut(editor);
 
-        // Optimistic slash menu handling: show immediately on slash key when textbox is empty
-        // TextChanged will validate and correct state if needed (handles all edge cases)
         var isSlashKey = e.Key == Key.Divide || e.Key == Key.OemQuestion || e.Key == Key.Oem2;
-        if (isSlashKey && string.IsNullOrWhiteSpace(textBox.Text) && _stateManager != null && _slashMenuOverlayId == null)
+        if (isSlashKey && string.IsNullOrWhiteSpace(editor.Text) && _stateManager != null && _slashMenuOverlayId == null)
         {
-            // Text will become "/" after this keypress - show menu optimistically for immediate feedback
-            // TextChanged will validate this and correct if needed
             Dispatcher.UIThread.Post(() =>
             {
-                var currentText = textBox.Text ?? string.Empty;
+                var currentText = editor.Text;
                 if (currentText == "/" && _slashMenuOverlayId == null)
                 {
-                    ShowSlashMenu(textBox, currentText);
+                    ShowSlashMenu(editor, currentText);
                     _stateManager?.SetShowingSlashMenu();
                 }
             }, DispatcherPriority.Input);
         }
 
-        // Handle Enter key when slash menu is visible
         if (e.Key == Key.Enter && _slashMenuOverlayId != null && _currentSlashMenu != null)
         {
             _currentSlashMenu.HandleEnter();
@@ -557,31 +543,17 @@ public partial class EditableBlock : UserControl
             return;
         }
 
-        // Handle Up/Down when slash menu is visible for keyboard navigation
         if (_slashMenuOverlayId != null && _currentSlashMenu != null)
         {
-            if (e.Key == Key.Up)
-            {
-                _currentSlashMenu.HandleUp();
-                e.Handled = true;
-                return;
-            }
-            if (e.Key == Key.Down)
-            {
-                _currentSlashMenu.HandleDown();
-                e.Handled = true;
-                return;
-            }
+            if (e.Key == Key.Up) { _currentSlashMenu.HandleUp(); e.Handled = true; return; }
+            if (e.Key == Key.Down) { _currentSlashMenu.HandleDown(); e.Handled = true; return; }
         }
 
-        // Fallback: Hide menu if visible and any non-slash key is pressed (covers cases where TextChanged doesn't fire)
-        // This ensures menu state is always correct regardless of event timing
         if (_slashMenuOverlayId != null && !isSlashKey && e.Key != Key.Escape && e.Key != Key.Enter && e.Key != Key.Up && e.Key != Key.Down)
         {
             Dispatcher.UIThread.Post(() =>
             {
-                var currentText = textBox.Text ?? string.Empty;
-                if (currentText != "/" && _stateManager != null)
+                if (editor.Text != "/" && _stateManager != null)
                 {
                     CloseSlashMenu();
                     _stateManager.SetNormal();
@@ -589,8 +561,7 @@ public partial class EditableBlock : UserControl
             }, DispatcherPriority.Input);
         }
 
-        // Delegate to keyboard handler
-        _keyboardHandler.HandleKeyDown(e, textBox, _viewModel);
+        _keyboardHandler.HandleKeyDown(e, editor, _viewModel);
     }
 
     #endregion
@@ -603,7 +574,7 @@ public partial class EditableBlock : UserControl
         _keyboardHandler.HandleBackspaceOnEmptyBlock(_viewModel);
     }
 
-    private void HandleSlashMenuToggle(string text, TextBox textBox)
+    private void HandleSlashMenuToggle(string text, RichTextEditor textBox)
     {
         if (_stateManager == null)
         {
@@ -655,8 +626,7 @@ public partial class EditableBlock : UserControl
     {
         if (_viewModel == null || _stateManager == null) return;
 
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox;
-        var content = textBox?.Text ?? _viewModel.Content;
+        var content = _currentBlockComponent?.GetRichTextEditor()?.Text ?? _viewModel.Content;
 
         _viewModel.NotifyStructuralChangeStarting();
         _stateManager.SetUpdatingFromViewModel();
@@ -738,7 +708,7 @@ public partial class EditableBlock : UserControl
     private const double SlashMenuHeightEstimate = 320;
 
     /// <summary>Returns true to show menu above the textbox, false to show below. Default when both fit is below.</summary>
-    private static bool ShouldShowSlashMenuAbove(TextBox textBox)
+    private static bool ShouldShowSlashMenuAbove(Control textBox)
     {
         if (textBox == null || !textBox.IsVisible) return false;
 
@@ -782,7 +752,7 @@ public partial class EditableBlock : UserControl
         return false;
     }
 
-    private void ShowSlashMenu(TextBox textBox, string filterText = "")
+    private void ShowSlashMenu(RichTextEditor textBox, string filterText = "")
     {
         if (_overlayService == null || textBox == null || !textBox.IsVisible) return;
 
@@ -881,7 +851,7 @@ public partial class EditableBlock : UserControl
 
     private void ShowFormattingToolbar()
     {
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
+        var textBox = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
         if (_overlayService == null || textBox == null || !textBox.IsVisible) return;
 
         CloseFormattingToolbar();
@@ -925,7 +895,7 @@ public partial class EditableBlock : UserControl
         }
     }
 
-    private static bool ShouldShowToolbarAbove(TextBox textBox)
+    private static bool ShouldShowToolbarAbove(Control textBox)
     {
         if (textBox == null || !textBox.IsVisible) return true;
 
@@ -962,40 +932,38 @@ public partial class EditableBlock : UserControl
 
     private void ApplyInlineFormat(InlineFormatKind kind, string? color = null)
     {
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox?.Text == null || _viewModel == null) return;
+        var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+        if (editor == null || _viewModel == null) return;
 
-        // Use cached selection if the live one is gone (focus was stolen by overlay)
         var range = GetSelectionRange() ?? _cachedSelectionRange;
         if (range == null) return;
 
-        string content = textBox.Text;
-        string previousText = content;
+        string previousText = _viewModel.Content;
 
-        var (newContent, newSelStart, newSelEnd) = InlineFormatApplier.Apply(
-            content, range.Value.start, range.Value.end, kind, color);
+        var (newSelStart, newSelEnd) = _viewModel.ApplyFormat(range.Value.start, range.Value.end, kind, color);
 
-        if (newContent == content) return;
+        _stateManager?.SetUpdatingFromViewModel();
 
-        textBox.Text = newContent;
-        textBox.SelectionStart = newSelStart;
-        textBox.SelectionEnd = newSelEnd;
-        _viewModel.PreviousContent = previousText;
-        _viewModel.Content = newContent;
+        // Sync runs from VM into editor
+        editor.Runs = _viewModel.Runs;
+        editor.SelectionStart = newSelStart;
+        editor.SelectionEnd = newSelEnd;
+        editor.CaretIndex = newSelEnd;
 
         if (_stateManager != null)
-            _stateManager.PreviousText = newContent;
+            _stateManager.PreviousText = _viewModel.Content;
+
+        _stateManager?.SetNormal();
 
         _cachedSelectionRange = (newSelStart, newSelEnd);
 
         var parentEditor = FindParentBlockEditor();
         parentEditor?.TrackTypingEdit(_viewModel, previousText);
 
-        // Refocus TextBox so selection stays visible and user can continue editing
-        textBox.Focus();
+        editor.Focus();
     }
 
-    private void AttachToolbarOutsideClickHandler(TextBox anchorTextBox)
+    private void AttachToolbarOutsideClickHandler(Control anchorTextBox)
     {
         DetachToolbarOutsideClickHandler();
         _toolbarPointerTopLevel = TopLevel.GetTopLevel(anchorTextBox);
@@ -1019,8 +987,8 @@ public partial class EditableBlock : UserControl
         if (_currentFormattingToolbar.IsEventFromToolbarOverlay(e.Source))
             return;
 
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox != null && e.Source is Visual sourceVisual && IsDescendantOf(sourceVisual, textBox))
+        var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+        if (editor != null && e.Source is Visual sourceVisual && IsDescendantOf(sourceVisual, editor))
             return;
 
         CloseFormattingToolbar();
@@ -1143,9 +1111,9 @@ public partial class EditableBlock : UserControl
         }
     }
 
-    /// <summary>
-    /// Gets the currently selected text from this block's TextBox, or null if no selection or no TextBox.
-    /// </summary>
+    private RichTextEditor? GetEditor() =>
+        _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+
     public string? GetSelectedText()
     {
         var range = GetSelectionRange();
@@ -1157,151 +1125,104 @@ public partial class EditableBlock : UserControl
         return content.Substring(start, end - start);
     }
 
-    /// <summary>
-    /// Gets the (SelectionStart, SelectionEnd) from this block's TextBox, or null if no TextBox.
-    /// </summary>
     public (int start, int end)? GetSelectionRange()
     {
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox?.Text == null) return null;
-        int start = Math.Min(textBox.SelectionStart, textBox.SelectionEnd);
-        int end = Math.Max(textBox.SelectionStart, textBox.SelectionEnd);
+        var editor = GetEditor();
+        if (editor == null) return null;
+        int start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
+        int end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
         if (start >= end) return null;
         return (start, end);
     }
 
-    /// <summary>
-    /// Gets the selection range or (caret, caret) from this block's TextBox. Used for paste-to-current-block.
-    /// </summary>
     public (int start, int end)? GetSelectionOrCaretRange()
     {
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox?.Text == null) return null;
-        int start = Math.Min(textBox.SelectionStart, textBox.SelectionEnd);
-        int end = Math.Max(textBox.SelectionStart, textBox.SelectionEnd);
+        var editor = GetEditor();
+        if (editor == null) return null;
+        int start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
+        int end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
         return (start, end);
     }
 
-    /// <summary>
-    /// Sets the TextBox caret to the given index. No-op if no TextBox. Used after programmatic content change (e.g. paste).
-    /// </summary>
     public void SetCaretIndex(int index)
     {
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox?.Text == null) return;
-        int c = Math.Clamp(index, 0, textBox.Text.Length);
-        textBox.CaretIndex = c;
-        textBox.SelectionStart = c;
-        textBox.SelectionEnd = c;
+        var editor = GetEditor();
+        if (editor == null) return;
+        int c = Math.Clamp(index, 0, editor.TextLength);
+        editor.CaretIndex = c;
+        editor.SelectionStart = c;
+        editor.SelectionEnd = c;
     }
 
-    /// <summary>
-    /// Deletes the currently selected text in this block's TextBox and syncs to the view model.
-    /// No-op if there is no selection or no TextBox. Used for Backspace/Delete with text selection (including cross-block).
-    /// </summary>
     public bool DeleteSelection()
     {
         var range = GetSelectionRange();
         if (range == null || _viewModel == null) return false;
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox?.Text == null) return false;
-        string text = textBox.Text;
+        var editor = GetEditor();
+        if (editor == null) return false;
+        string text = editor.Text;
         int start = range.Value.start;
         int len = range.Value.end - start;
         if (len <= 0 || start < 0 || start + len > text.Length) return false;
-        string newText = text.Remove(start, len);
-        textBox.Text = newText;
-        textBox.CaretIndex = start;
-        textBox.SelectionStart = start;
-        textBox.SelectionEnd = start;
-        _viewModel.Content = newText;
+        // Let RichTextEditor handle the run-aware deletion
+        editor.SelectionStart = start;
+        editor.SelectionEnd = start + len;
+        // Trigger deletion by invoking the internal delete logic via key simulation is complex;
+        // instead manipulate runs directly through InlineRunFormatApplier
+        var newRuns = Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(
+            editor.Runs, text, text.Remove(start, len));
+        editor.Runs = newRuns;
+        editor.CaretIndex = start;
+        editor.SelectionStart = start;
+        editor.SelectionEnd = start;
+        _viewModel.CommitRunsFromEditor(editor.Runs);
         return true;
     }
 
-    /// <summary>
-    /// Inserts the given text at the current caret (or replaces the current selection) and syncs to the view model.
-    /// Returns true if the block has a TextBox and the insert was performed. Used for inline paste.
-    /// </summary>
     public bool InsertTextAtCursor(string text)
     {
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox?.Text == null || _viewModel == null) return false;
-        int start = Math.Min(textBox.SelectionStart, textBox.SelectionEnd);
-        int end = Math.Max(textBox.SelectionStart, textBox.SelectionEnd);
-        int len = textBox.Text.Length;
+        var editor = GetEditor();
+        if (editor == null || _viewModel == null) return false;
+        int start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
+        int end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
+        var flat = editor.Text;
+        int len = flat.Length;
         start = Math.Clamp(start, 0, len);
         end = Math.Clamp(end, 0, len);
-        string newText = textBox.Text.Remove(start, end - start).Insert(start, text);
-        textBox.Text = newText;
+        var newFlat = flat.Remove(start, end - start).Insert(start, text);
+        var newRuns = Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(editor.Runs, flat, newFlat);
+        editor.Runs = newRuns;
         int newCaret = start + text.Length;
-        textBox.CaretIndex = newCaret;
-        textBox.SelectionStart = newCaret;
-        textBox.SelectionEnd = newCaret;
-        _viewModel.Content = newText;
+        editor.CaretIndex = newCaret;
+        editor.SelectionStart = newCaret;
+        editor.SelectionEnd = newCaret;
+        _viewModel.CommitRunsFromEditor(editor.Runs);
         return true;
     }
 
-    /// <summary>
-    /// Applies a text selection range to this block's TextBox (for cross-block selection).
-    /// No-op if the block has no TextBox (e.g. Divider).
-    /// </summary>
     public void ApplyTextSelection(int start, int end)
     {
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox == null) return;
-        var len = textBox.Text?.Length ?? 0;
+        var editor = GetEditor();
+        if (editor == null) return;
+        var len = editor.TextLength;
         int selStart = Math.Clamp(Math.Min(start, end), 0, len);
         int selEnd = Math.Clamp(Math.Max(start, end), 0, len);
 
-        // When clearing selection (selStart == selEnd == 0), skip the assignment in two cases:
-        // 1) This TextBox is currently focused — we're in the middle of a focus transfer to another
-        //    block; setting SelectionStart/End = 0 here snaps the caret to 0 for one frame (flicker).
-        // 2) This TextBox is unfocused and already has no selection — no-op.
         bool isClear = selStart == 0 && selEnd == 0;
-        bool alreadyClear = textBox.SelectionStart == 0 && textBox.SelectionEnd == 0;
-        if (isClear && (textBox.IsFocused || alreadyClear)) return;
+        bool alreadyClear = editor.SelectionStart == 0 && editor.SelectionEnd == 0;
+        if (isClear && (editor.IsFocused || alreadyClear)) return;
 
-        textBox.SelectionStart = selStart;
-        textBox.SelectionEnd = selEnd;
-        // Do NOT set CaretIndex here — doing so on an unfocused TextBox causes it to steal
-        // keyboard focus, which creates a focus-thrashing loop during cross-block drag selection.
-        // SelectionStart/End alone are sufficient to render the highlight.
+        editor.SelectionStart = selStart;
+        editor.SelectionEnd = selEnd;
     }
 
-    /// <summary>
-    /// Gets the character index in this block's TextBox closest to the given point (in this control's coordinates).
-    /// Uses the TextPresenter's already-rendered TextLayout for a side-effect-free, pixel-accurate hit-test.
-    /// </summary>
     public int GetCharacterIndexFromPoint(Point pointInBlock)
     {
-        var textBox = _currentBlockComponent?.GetInputControl() as TextBox ?? _focusManager?.GetCurrentTextBox();
-        if (textBox == null) return 0;
-
-        var presenter = textBox.GetVisualDescendants()
-            .OfType<Avalonia.Controls.Presenters.TextPresenter>()
-            .FirstOrDefault();
-        if (presenter == null) return 0;
-
-        // Translate into the TextPresenter's coordinate space — this accounts for all TextBox
-        // padding so the hit-test uses the exact same origin the rendered glyphs use.
-        var ptInPresenter = this.TranslatePoint(pointInBlock, presenter);
-        if (!ptInPresenter.HasValue) return 0;
-
-        var len = textBox.Text?.Length ?? 0;
-        if (len == 0) return 0;
-
-        try
-        {
-            var result = presenter.TextLayout.HitTestPoint(ptInPresenter.Value);
-            var pos = result.TextPosition;
-            if (result.IsTrailing && pos < len)
-                pos++;
-            return Math.Clamp(pos, 0, len);
-        }
-        catch
-        {
-            return 0;
-        }
+        var editor = GetEditor();
+        if (editor == null) return 0;
+        var ptInEditor = this.TranslatePoint(pointInBlock, editor);
+        if (!ptInEditor.HasValue) return 0;
+        return editor.HitTestPoint(ptInEditor.Value);
     }
 
     private BlockEditor? FindParentBlockEditor()

@@ -55,7 +55,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     // Text-edit batching (300ms idle flush)
     private DispatcherTimer? _typingBatchTimer;
     private string? _typingBatchBlockId;
-    private string? _typingBatchTextBefore;
+    private List<InlineRun>? _typingBatchRunsBefore;
     private CaretState? _typingBatchCaretBefore;
     private const int TypingBatchIdleMs = 300;
 
@@ -1545,7 +1545,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             var b = Blocks[i];
             snapshots[i] = new BlockSnapshot(
-                b.Id, b.Type, b.Content ?? string.Empty,
+                b.Id, b.Type, b.CloneRuns(),
                 b.Meta ?? new Dictionary<string, object>(), i);
         }
         return snapshots;
@@ -1617,7 +1617,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 if (existingById.TryGetValue(blk.Id, out var existing) && usedIds.Add(blk.Id))
                 {
-                    existing.Content = blk.Content ?? string.Empty;
+                    blk.EnsureInlineRuns();
+                    existing.SetRuns(blk.InlineRuns!);
                     existing.Type = blk.Type;
                     existing.Meta = new Dictionary<string, object>(blk.Meta ?? new Dictionary<string, object>());
                     existing.Order = blk.Order;
@@ -1683,9 +1684,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Callback used by TextEditOperation to restore a single block's text.
+    /// Callback used by TextEditOperation to restore a single block's runs.
     /// </summary>
-    private void RestoreBlockText(string blockId, string text, CaretState? caret)
+    private void RestoreBlockRuns(string blockId, List<InlineRun> runs, CaretState? caret)
     {
         _isRestoringFromHistory = true;
         try
@@ -1693,12 +1694,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var vm = Blocks.FirstOrDefault(b => b.Id == blockId);
             if (vm != null)
             {
-                vm.Content = text;
-                BlockEditorLogger.Log($"RestoreBlockText blockId={blockId} text='{Truncate(text)}'");
+                vm.SetRuns(runs);
+                BlockEditorLogger.Log($"RestoreBlockRuns blockId={blockId} text='{Truncate(vm.Content)}'");
             }
             else
             {
-                BlockEditorLogger.Log($"RestoreBlockText blockId={blockId} NOT FOUND in Blocks");
+                BlockEditorLogger.Log($"RestoreBlockRuns blockId={blockId} NOT FOUND in Blocks");
             }
 
             ApplyCaretFocus(caret);
@@ -1763,7 +1764,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (_typingBatchBlockId == null)
         {
             _typingBatchBlockId = block.Id;
-            _typingBatchTextBefore = previousText;
+            _typingBatchRunsBefore = block.CloneRuns();
+            // Reconstruct the runs as they were *before* this edit using the previous text
+            if (previousText != block.Content)
+            {
+                _typingBatchRunsBefore = Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(
+                    _typingBatchRunsBefore, block.Content, previousText);
+            }
             _typingBatchCaretBefore = CaptureCaretState() ?? new CaretState { BlockIndex = idx, CaretPosition = 0 };
             BlockEditorLogger.Log($"TrackTypingEdit: NEW batch for block {block.Id} before={Truncate(previousText)} current={Truncate(block.Content)}");
         }
@@ -1799,19 +1806,22 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             BlockEditorLogger.Log($"FlushTypingBatch: block {_typingBatchBlockId} not found, discarding");
             _typingBatchBlockId = null;
-            _typingBatchTextBefore = null;
+            _typingBatchRunsBefore = null;
             _typingBatchCaretBefore = null;
             return;
         }
 
+        var runsAfter = vm.CloneRuns();
+        var runsBefore = _typingBatchRunsBefore ?? new List<InlineRun> { InlineRun.Plain(string.Empty) };
+
+        var textBefore = Core.Formatting.InlineRunFormatApplier.Flatten(runsBefore);
         var textAfter = vm.Content ?? string.Empty;
-        var textBefore = _typingBatchTextBefore ?? string.Empty;
 
         if (textBefore == textAfter)
         {
             BlockEditorLogger.Log($"FlushTypingBatch: no-op (before==after) block={_typingBatchBlockId} text={Truncate(textBefore)}");
             _typingBatchBlockId = null;
-            _typingBatchTextBefore = null;
+            _typingBatchRunsBefore = null;
             _typingBatchCaretBefore = null;
             return;
         }
@@ -1826,16 +1836,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var op = new TextEditOperation(
             "Typing",
             vm.Id,
-            textBefore,
-            textAfter,
+            runsBefore,
+            runsAfter,
             _typingBatchCaretBefore,
             caretAfter,
-            RestoreBlockText);
+            RestoreBlockRuns);
 
         _history.Push(op);
 
         _typingBatchBlockId = null;
-        _typingBatchTextBefore = null;
+        _typingBatchRunsBefore = null;
         _typingBatchCaretBefore = null;
     }
 

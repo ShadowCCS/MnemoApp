@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Avalonia;
+using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.UI;
@@ -14,7 +15,8 @@ public class BlockViewModel : INotifyPropertyChanged
 {
     private string _id;
     private BlockType _type;
-    private string _content;
+    private List<InlineRun> _inlineRuns = new() { InlineRun.Plain(string.Empty) };
+    private string _cachedFlatContent = string.Empty;
     private Dictionary<string, object> _meta;
     private int _order;
     private int _listNumberIndex = 1;
@@ -42,21 +44,79 @@ public class BlockViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Flattened plain text view of the inline runs.
+    /// Setting this applies a text diff to the run list, preserving styles outside the edit region.
+    /// </summary>
     public string Content
     {
-        get => _content;
-        set 
-        { 
-            if (_content != value)
-            {
-                _previousContent = _content;
-                _content = value ?? string.Empty;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Watermark));
-                ContentChanged?.Invoke(this);
-            }
+        get => _cachedFlatContent;
+        set
+        {
+            var newText = value ?? string.Empty;
+            if (_cachedFlatContent == newText)
+                return;
+
+            _previousContent = _cachedFlatContent;
+            _inlineRuns = InlineRunFormatApplier.ApplyTextEdit(_inlineRuns, _cachedFlatContent, newText);
+            _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Watermark));
+            OnPropertyChanged(nameof(Runs));
+            ContentChanged?.Invoke(this);
         }
     }
+
+    /// <summary>
+    /// The structured inline runs (source of truth for rich text).
+    /// </summary>
+    public IReadOnlyList<InlineRun> Runs => _inlineRuns;
+
+    /// <summary>
+    /// Replace the entire run list (e.g. for undo/redo or deserialization).
+    /// Normalizes and refreshes Content. Does not raise ContentChanged.
+    /// </summary>
+    public void SetRuns(IReadOnlyList<InlineRun> runs)
+    {
+        _inlineRuns = InlineRunFormatApplier.Normalize(runs);
+        if (_inlineRuns.Count == 0)
+            _inlineRuns.Add(InlineRun.Plain(string.Empty));
+        _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(Runs));
+        OnPropertyChanged(nameof(Watermark));
+    }
+
+    /// <summary>
+    /// Commit runs from the editor: capture previous content for history, update runs, then raise ContentChanged.
+    /// Use this for user edits (typing, paste, delete selection); use SetRuns for restore/undo.
+    /// </summary>
+    public void CommitRunsFromEditor(IReadOnlyList<InlineRun> newRuns)
+    {
+        _previousContent = _cachedFlatContent;
+        SetRuns(newRuns);
+        ContentChanged?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Apply a format toggle to the selection range.
+    /// Returns the (unchanged) selection for the caller to restore on the TextBox.
+    /// </summary>
+    public (int Start, int End) ApplyFormat(int start, int end, InlineFormatKind kind, string? color = null)
+    {
+        _previousContent = _cachedFlatContent;
+        _inlineRuns = InlineRunFormatApplier.Apply(_inlineRuns, start, end, kind, color);
+        _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(Runs));
+        ContentChanged?.Invoke(this);
+        return (start, end);
+    }
+
+    /// <summary>
+    /// Deep-copy the current runs for snapshotting (undo/redo).
+    /// </summary>
+    public List<InlineRun> CloneRuns() => new(_inlineRuns);
 
     public Dictionary<string, object> Meta
     {
@@ -205,11 +265,11 @@ public class BlockViewModel : INotifyPropertyChanged
     {
         _id = Guid.NewGuid().ToString();
         _type = type;
-        _content = content;
+        _inlineRuns = new List<InlineRun> { InlineRun.Plain(content ?? string.Empty) };
+        _cachedFlatContent = content ?? string.Empty;
         _meta = new Dictionary<string, object>();
         _order = order;
         
-        // Ensure required meta keys exist based on block type
         EnsureMetaKeys();
     }
 
@@ -217,11 +277,15 @@ public class BlockViewModel : INotifyPropertyChanged
     {
         _id = string.IsNullOrEmpty(block.Id) ? Guid.NewGuid().ToString() : block.Id;
         _type = block.Type;
-        _content = block.Content ?? string.Empty;
         _meta = new Dictionary<string, object>(block.Meta ?? new Dictionary<string, object>());
         _order = block.Order;
+
+        block.EnsureInlineRuns();
+        _inlineRuns = InlineRunFormatApplier.Normalize(block.InlineRuns!);
+        if (_inlineRuns.Count == 0)
+            _inlineRuns.Add(InlineRun.Plain(string.Empty));
+        _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
         
-        // Ensure required meta keys exist based on block type
         EnsureMetaKeys();
     }
     
@@ -260,7 +324,7 @@ public class BlockViewModel : INotifyPropertyChanged
         {
             Id = Id,
             Type = Type,
-            Content = Content,
+            InlineRuns = new List<InlineRun>(_inlineRuns),
             Meta = Meta,
             Order = Order
         };

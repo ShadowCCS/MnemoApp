@@ -1,4 +1,3 @@
-using Avalonia.Controls;
 using Mnemo.Core.Models;
 using System;
 using System.Collections.Generic;
@@ -24,25 +23,18 @@ public class MarkdownShortcutDetector
 
     public event Action<BlockType, Dictionary<string, object>?>? ShortcutDetected;
 
-    public bool TryDetectShortcut(TextBox textBox)
+    public bool TryDetectShortcut(RichTextEditor editor)
     {
-        if (textBox?.Text == null) return false;
-
-        var text = textBox.Text.Trim();
-        
+        if (editor == null) return false;
+        var text = editor.Text.Trim();
         if (Shortcuts.TryGetValue(text, out var conversion))
         {
             ShortcutDetected?.Invoke(conversion.Type, conversion.Meta);
             return true;
         }
-
         return false;
     }
 
-    public bool IsMarkdownShortcutKey(string text)
-    {
-        return !string.IsNullOrWhiteSpace(text) && Shortcuts.ContainsKey(text.Trim());
-    }
+    public bool IsMarkdownShortcutKey(string text) =>
+        !string.IsNullOrWhiteSpace(text) && Shortcuts.ContainsKey(text.Trim());
 }
-
-

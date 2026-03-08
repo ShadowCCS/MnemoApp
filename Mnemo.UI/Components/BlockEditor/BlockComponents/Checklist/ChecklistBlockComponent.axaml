@@ -2,6 +2,7 @@
     x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Checklist.ChecklistBlockComponent"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:editor="using:Mnemo.UI.Components.BlockEditor"
     x:CompileBindings="False">
     <Grid ColumnDefinitions="Auto,*">
         <CheckBox
@@ -12,23 +13,15 @@
             MinHeight="20"
             VerticalAlignment="Top"
             Cursor="Hand" />
-        <TextBox
-            x:Name="InputTextBox"
+        <editor:RichTextEditor
+            x:Name="Editor"
             Grid.Column="1"
-            AcceptsReturn="False"
-            Background="Transparent"
-            BorderThickness="0"
+            MinWidth="200"
+            HorizontalAlignment="Stretch"
             FontSize="14"
-            Padding="0"
-            VerticalAlignment="Top"
-            Text="{Binding Content, Mode=TwoWay}"
-            TextWrapping="Wrap"
+            Foreground="{DynamicResource TextPrimaryBrush}"
+            CaretBrush="{DynamicResource TextPrimaryBrush}"
+            SelectionBrush="{DynamicResource SystemAccentColor}"
             Watermark="{Binding Watermark}" />
     </Grid>
 </UserControl>
-
-
-
-
-
-
