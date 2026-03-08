@@ -49,9 +49,11 @@ public class BlockViewModel : INotifyPropertyChanged
         { 
             if (_content != value)
             {
-                _content = value; 
+                _previousContent = _content;
+                _content = value ?? string.Empty;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Watermark));
+                ContentChanged?.Invoke(this);
             }
         }
     }
@@ -117,6 +119,7 @@ public class BlockViewModel : INotifyPropertyChanged
     }
 
     private int? _pendingCaretIndex;
+    private string? _previousContent;
 
     /// <summary>
     /// When set, EditableBlock should move the caret to this index after the next focus.
@@ -128,21 +131,32 @@ public class BlockViewModel : INotifyPropertyChanged
         set { _pendingCaretIndex = value; OnPropertyChanged(); }
     }
 
+    /// <summary>
+    /// Set by EditableBlock just before NotifyContentChanged to carry the pre-edit text.
+    /// Consumed and cleared by the history system. Not persisted.
+    /// </summary>
+    public string? PreviousContent
+    {
+        get => _previousContent;
+        set => _previousContent = value;
+    }
+
     public bool IsChecked
     {
         get
         {
             if (!_meta.TryGetValue("checked", out var value)) return false;
             if (value is bool b) return b;
-            // After JSON deserialization, Meta values can be JsonElement
             if (value is JsonElement je && je.ValueKind == JsonValueKind.True) return true;
             if (value is JsonElement je2 && je2.ValueKind == JsonValueKind.False) return false;
             return false;
         }
         set
         {
+            NotifyStructuralChangeStarting();
             _meta["checked"] = value;
             OnPropertyChanged();
+            ContentChanged?.Invoke(this);
         }
     }
 
@@ -181,6 +195,11 @@ public class BlockViewModel : INotifyPropertyChanged
     public event Action<BlockViewModel>? FocusPreviousRequested;
     public event Action<BlockViewModel>? FocusNextRequested;
     public event Action<BlockViewModel>? MergeWithPreviousRequested;
+    /// <summary>
+    /// Raised before a structural change (Enter split, backspace merge, type change)
+    /// so the editor can snapshot the document while VMs are still unmodified.
+    /// </summary>
+    public event Action? StructuralChangeStarting;
 
     public BlockViewModel(BlockType type, string content = "", int order = 0)
     {
@@ -250,6 +269,11 @@ public class BlockViewModel : INotifyPropertyChanged
     public void NotifyContentChanged()
     {
         ContentChanged?.Invoke(this);
+    }
+
+    public void NotifyStructuralChangeStarting()
+    {
+        StructuralChangeStarting?.Invoke();
     }
 
     public void RequestDelete()

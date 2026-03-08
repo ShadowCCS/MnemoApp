@@ -10,6 +10,8 @@ using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services;
 
+using Mnemo.Core.History;
+using Mnemo.Infrastructure.History;
 using Mnemo.Infrastructure.Services.AI;
 using Mnemo.Infrastructure.Services.Knowledge;
 using Mnemo.Infrastructure.Services.Speech;
@@ -23,6 +25,7 @@ public static class Bootstrapper
         var services = new ServiceCollection();
 
         // 1. Register Core/Infrastructure Services
+        services.AddSingleton<IHistoryManager, HistoryManager>();
         services.AddSingleton<ILoggerService, LoggerService>();
         services.AddSingleton<IStorageProvider, SqliteStorageProvider>();
         services.AddSingleton<ISettingsService, SettingsService>();

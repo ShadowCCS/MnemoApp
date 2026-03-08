@@ -36,6 +36,7 @@ public partial class EditableBlock : UserControl
     private BlockComponentBase? _currentBlockComponent;
     private TextBox? _currentTunnelTextBox;
     private EventHandler<KeyEventArgs>? _backspaceTunnelHandler;
+    private bool _backspaceHandledInTunnel;
     private string? _slashMenuOverlayId;
     private SlashCommandMenu? _currentSlashMenu;
 
@@ -87,11 +88,13 @@ public partial class EditableBlock : UserControl
             var caretIndex = Math.Clamp(textBox.CaretIndex, 0, text.Length);
             var textBefore = text.Substring(0, caretIndex);
             var textAfter = text.Substring(caretIndex);
+            _viewModel.NotifyStructuralChangeStarting();
             _viewModel.Content = textBefore;
             _viewModel.RequestNewBlock(textAfter);
         }
         else
         {
+            _viewModel.NotifyStructuralChangeStarting();
             _viewModel.RequestNewBlock();
         }
     }
@@ -231,21 +234,23 @@ public partial class EditableBlock : UserControl
 
         if (isEmpty)
         {
-            // Empty block: delete/convert
+            _viewModel.NotifyStructuralChangeStarting();
+            _backspaceHandledInTunnel = true;
             e.Handled = true;
             HandleBackspaceOnEmptyBlock();
         }
         else if (_viewModel.Type != BlockType.Text)
         {
-            // Non-text block with content at position 0: convert to Text, preserving content
+            _viewModel.NotifyStructuralChangeStarting();
+            _backspaceHandledInTunnel = true;
             e.Handled = true;
             HandleConvertToTextPreservingContent();
         }
         else
         {
-            // Text block with content at position 0: merge with the block above.
-            // Sync TextBox content to ViewModel first — TextChanged hasn't fired yet at KeyDown time.
+            _viewModel.NotifyStructuralChangeStarting();
             _viewModel.Content = text;
+            _backspaceHandledInTunnel = true;
             e.Handled = true;
             _viewModel.RequestMergeWithPrevious();
         }
@@ -425,9 +430,9 @@ public partial class EditableBlock : UserControl
         if (_viewModel != null && _stateManager != null)
         {
             _viewModel.IsFocused = false;
-            // Notify content changed when focus is lost, so unsaved changes get saved
-            // This ensures saves happen even when just clicking away from a block
-            _viewModel.NotifyContentChanged();
+            var parentEditor = FindParentBlockEditor();
+            parentEditor?.FlushTypingBatch();
+            parentEditor?.NotifyBlocksChanged();
         }
     }
 
@@ -440,31 +445,28 @@ public partial class EditableBlock : UserControl
         
         if (_stateManager.IsUpdatingFromViewModel)
         {
+            BlockEditorLogger.Log($"TextBox_TextChanged: SKIPPED (updating from VM) blockId={_viewModel.Id}");
             return;
         }
         
         var text = textBox.Text ?? string.Empty;
         var previousText = _stateManager.PreviousText;
         
-        // Always sync slash menu state FIRST - it's independent of whether text changed
-        // This ensures menu state is correct even if PreviousText tracking is off
         HandleSlashMenuToggle(text, textBox);
         
-        // Skip other handlers if text hasn't actually changed (e.g., programmatic updates)
         if (text == previousText)
         {
             return;
         }
-        
-        // Update ViewModel content - always update to ensure binding is in sync
-        // The Content setter will only fire PropertyChanged if value actually changed
+
+        _viewModel.PreviousContent = previousText;
+        var parentEditor = FindParentBlockEditor();
+        parentEditor?.TrackTypingEdit(_viewModel, previousText);
+        if (parentEditor == null)
+            BlockEditorLogger.Log($"TextBox_TextChanged: parent BlockEditor NOT FOUND for blockId={_viewModel.Id}");
+
+        BlockEditorLogger.Log($"TextBox_TextChanged: blockId={_viewModel.Id} prev='{previousText}' -> new='{text}'");
         _viewModel.Content = text;
-        
-        // Notify content changed AFTER updating the Content property
-        // This ensures the save mechanism is triggered on every user edit
-        // Note: We call this AFTER setting Content so the event fires even if
-        // PropertyChanged handler sets IsUpdatingFromViewModel flag
-        _viewModel.NotifyContentChanged();
         _stateManager.PreviousText = text;
     }
 
@@ -472,6 +474,15 @@ public partial class EditableBlock : UserControl
     {
         if (_viewModel == null || sender is not TextBox textBox || _keyboardHandler == null)
             return;
+
+        if (e.Key == Key.Back && _backspaceHandledInTunnel)
+        {
+            _backspaceHandledInTunnel = false;
+            e.Handled = true;
+            return;
+        }
+        if (e.Key != Key.Back)
+            _backspaceHandledInTunnel = false;
 
         // Handle markdown shortcuts on space
         if (e.Key == Key.Space)
@@ -603,12 +614,10 @@ public partial class EditableBlock : UserControl
     {
         if (_viewModel == null || _stateManager == null) return;
 
-        // Read content from the live TextBox before the component is swapped out
         var textBox = _currentBlockComponent?.GetInputControl() as TextBox;
         var content = textBox?.Text ?? _viewModel.Content;
 
-        // Change type — this causes the ContentControl to swap to a new TextBlockComponent.
-        // We use BeginUpdate so TextChanged on the new component doesn't misfire.
+        _viewModel.NotifyStructuralChangeStarting();
         _stateManager.SetUpdatingFromViewModel();
         _viewModel.Type = BlockType.Text;
 
@@ -629,12 +638,14 @@ public partial class EditableBlock : UserControl
     {
         if (_viewModel == null || _stateManager == null) return;
 
+        _viewModel.NotifyStructuralChangeStarting();
+
         using (_stateManager.BeginUpdate())
         {
             _viewModel.Type = blockType;
             _viewModel.Content = string.Empty;
             _stateManager.PreviousText = string.Empty;
-            _focusManager?.ClearCache(); // Clear cache when type changes
+            _focusManager?.ClearCache();
             
             if (meta != null)
             {
@@ -645,12 +656,10 @@ public partial class EditableBlock : UserControl
             }
         }
 
-        // When converting to a non-editable block (e.g. Divider), ensure there is an editable block below so the user can keep typing
         var addedBlockBelow = blockType == BlockType.Divider && EnsureEditableBlockBelowIfNeeded();
 
         if (!addedBlockBelow)
         {
-            // Keep focus on this block after conversion (explicit Post needed when IsFocused was already true)
             _viewModel.IsFocused = true;
             Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
         }
@@ -775,6 +784,7 @@ public partial class EditableBlock : UserControl
 
         CloseSlashMenu();
 
+        _viewModel.NotifyStructuralChangeStarting();
         _viewModel.Type = blockType;
         _viewModel.Content = string.Empty;
         _stateManager.PreviousText = string.Empty;
@@ -967,7 +977,6 @@ public partial class EditableBlock : UserControl
         textBox.SelectionStart = start;
         textBox.SelectionEnd = start;
         _viewModel.Content = newText;
-        _viewModel.NotifyContentChanged();
         return true;
     }
 
@@ -991,7 +1000,6 @@ public partial class EditableBlock : UserControl
         textBox.SelectionStart = newCaret;
         textBox.SelectionEnd = newCaret;
         _viewModel.Content = newText;
-        _viewModel.NotifyContentChanged();
         return true;
     }
 

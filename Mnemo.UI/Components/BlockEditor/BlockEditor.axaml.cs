@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,9 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Mnemo.Core.History;
 using Mnemo.Core.Models;
+using Mnemo.UI.Modules.Notes.Operations;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
@@ -42,6 +45,29 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private Point _crossBlockStartPoint;
     /// <summary>Hysteresis: last endpoint block index to avoid boundary flicker when dragging across blocks.</summary>
     private int _lastCrossBlockCurrentIndex = -1;
+
+    // History / undo-redo
+    private IHistoryManager? _history;
+    private BlockSnapshot[]? _pendingSnapshot;
+    private CaretState? _pendingCaretBefore;
+    private bool _isRestoringFromHistory;
+
+    // Text-edit batching (300ms idle flush)
+    private DispatcherTimer? _typingBatchTimer;
+    private string? _typingBatchBlockId;
+    private string? _typingBatchTextBefore;
+    private CaretState? _typingBatchCaretBefore;
+    private const int TypingBatchIdleMs = 300;
+
+    /// <summary>
+    /// Set by the owning view to enable document-wide undo/redo.
+    /// Cleared on document switch so history does not leak between notes.
+    /// </summary>
+    public IHistoryManager? History
+    {
+        get => _history;
+        set => _history = value;
+    }
 
     public ObservableCollection<BlockViewModel> Blocks
     {
@@ -129,6 +155,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     public void LoadBlocks(Block[] blocks)
     {
+        FlushTypingBatch();
+        _pendingSnapshot = null;
+        _pendingCaretBefore = null;
+        _history?.Clear();
+
         // Unsubscribe from old blocks
         foreach (var block in Blocks)
         {
@@ -227,6 +258,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.FocusPreviousRequested += OnFocusPreviousRequested;
         block.FocusNextRequested += OnFocusNextRequested;
         block.MergeWithPreviousRequested += OnMergeWithPreviousRequested;
+        block.StructuralChangeStarting += OnStructuralChangeStarting;
     }
 
     private void UnsubscribeFromBlock(BlockViewModel block)
@@ -240,6 +272,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.FocusPreviousRequested -= OnFocusPreviousRequested;
         block.FocusNextRequested -= OnFocusNextRequested;
         block.MergeWithPreviousRequested -= OnMergeWithPreviousRequested;
+        block.StructuralChangeStarting -= OnStructuralChangeStarting;
+    }
+
+    private void OnStructuralChangeStarting()
+    {
+        BeginStructuralChange();
     }
 
     private void OnBlockPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -247,6 +285,19 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (e.PropertyName == nameof(BlockViewModel.Type))
         {
             UpdateListNumbers();
+            if (!_isRestoringFromHistory && _pendingSnapshot != null)
+            {
+                CommitStructuralChange("Change block type");
+            }
+            return;
+        }
+
+        if (e.PropertyName == nameof(BlockViewModel.IsChecked))
+        {
+            if (!_isRestoringFromHistory && _pendingSnapshot != null)
+            {
+                CommitStructuralChange("Toggle checklist");
+            }
             return;
         }
 
@@ -275,9 +326,25 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnBlockContentChanged(BlockViewModel block)
     {
-        // Clear block selection when user edits text (typing, paste, etc.)
         ClearBlockSelection();
-        // Trigger save in parent
+        var prev = block.PreviousContent;
+        block.PreviousContent = null;
+
+        if (!_isRestoringFromHistory && _pendingSnapshot == null)
+        {
+            if (prev != null)
+            {
+                TrackTypingEdit(block, prev);
+            }
+            else
+            {
+                BlockEditorLogger.Log($"ContentChanged but PreviousContent=null, skipping typing track. blockId={block.Id}");
+            }
+        }
+        else
+        {
+            BlockEditorLogger.Log($"ContentChanged during restore/structural op. blockId={block.Id} restoring={_isRestoringFromHistory} pending={_pendingSnapshot != null}");
+        }
         BlocksChanged?.Invoke();
     }
 
@@ -294,7 +361,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private void OnMergeWithPreviousRequested(BlockViewModel block)
     {
         var index = Blocks.IndexOf(block);
-        if (index <= 0) return; // No previous block to merge into
+        if (index <= 0) return;
+
+        if (_pendingSnapshot == null)
+            BeginStructuralChange();
 
         var previousBlock = Blocks[index - 1];
         var insertionPoint = previousBlock.Content?.Length ?? 0;
@@ -304,83 +374,91 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         Blocks.Remove(block);
 
         ReorderBlocks();
+        CommitStructuralChange("Merge blocks");
         BlocksChanged?.Invoke();
 
-        // Set PendingCaretIndex before IsFocused so the IsFocused handler can read it
         var caretTarget = insertionPoint;
-        Avalonia.Threading.Dispatcher.UIThread.Post(
+        Dispatcher.UIThread.Post(
             () =>
             {
                 previousBlock.PendingCaretIndex = caretTarget;
                 previousBlock.IsFocused = true;
             },
-            Avalonia.Threading.DispatcherPriority.Input);
+            DispatcherPriority.Input);
     }
 
     private void DeleteBlock(BlockViewModel block)
     {
         var index = Blocks.IndexOf(block);
-        if (index == -1) return; // Block not found, safety check
+        if (index == -1) return;
 
-        // Don't delete if it's the only block - just clear and keep as text
+        if (_pendingSnapshot == null)
+            BeginStructuralChange();
+
         if (Blocks.Count == 1)
         {
             block.Content = string.Empty;
             block.Type = BlockType.Text;
-            block.IsFocused = true; // Keep focus on the cleared block
-            UpdateListNumbers(); // Update list numbers in case type changed
+            block.IsFocused = true;
+            UpdateListNumbers();
+            CommitStructuralChange("Clear block");
             return;
         }
 
         UnsubscribeFromBlock(block);
         Blocks.Remove(block);
 
-        // Focus previous block (index > 0) or new first block (index == 0)
         var targetIndex = index > 0 ? index - 1 : 0;
         if (Blocks.Count > targetIndex)
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(
+            Dispatcher.UIThread.Post(
                 () => Blocks[targetIndex].IsFocused = true, 
-                Avalonia.Threading.DispatcherPriority.Input);
+                DispatcherPriority.Input);
         }
 
         ReorderBlocks();
+        CommitStructuralChange("Delete block");
         BlocksChanged?.Invoke();
     }
 
     private void OnNewBlockRequested(BlockViewModel block, string? initialContent)
     {
+        if (_pendingSnapshot == null)
+            BeginStructuralChange();
+
         var index = Blocks.IndexOf(block);
         AddBlock(BlockType.Text, index + 1, initialContent);
 
-        // Focus new block after UI has updated
         var newBlockIndex = index + 1;
         if (newBlockIndex < Blocks.Count)
         {
             var newBlock = Blocks[newBlockIndex];
-            Avalonia.Threading.Dispatcher.UIThread.Post(
+            Dispatcher.UIThread.Post(
                 () => newBlock.IsFocused = true, 
-                Avalonia.Threading.DispatcherPriority.Render);
+                DispatcherPriority.Render);
         }
 
+        CommitStructuralChange("Split block");
         BlocksChanged?.Invoke();
     }
 
     private void OnNewBlockOfTypeRequested(BlockViewModel block, BlockType type)
     {
+        BeginStructuralChange();
+
         var index = Blocks.IndexOf(block);
         AddBlock(type, index + 1);
 
-        // Focus new block after UI has updated
         var newBlockIndex = index + 1;
         if (newBlockIndex < Blocks.Count)
         {
             var newBlock = Blocks[newBlockIndex];
-            Avalonia.Threading.Dispatcher.UIThread.Post(
+            Dispatcher.UIThread.Post(
                 () => newBlock.IsFocused = true, 
-                Avalonia.Threading.DispatcherPriority.Render);
+                DispatcherPriority.Render);
         }
 
+        CommitStructuralChange("New block");
         BlocksChanged?.Invoke();
     }
 
@@ -805,6 +883,27 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             _ = TryPasteFromClipboardAsync(hasBlockSelection);
             e.Handled = true;
+            return;
+        }
+
+        // 4. Ctrl+Z: undo
+        bool ctrlZ = e.Key == Key.Z && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control
+                                     && (e.KeyModifiers & KeyModifiers.Shift) == 0;
+        if (ctrlZ)
+        {
+            _ = UndoAsync();
+            e.Handled = true;
+            return;
+        }
+
+        // 5. Ctrl+Y / Ctrl+Shift+Z: redo
+        bool ctrlY = e.Key == Key.Y && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
+        bool ctrlShiftZ = e.Key == Key.Z && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control
+                                          && (e.KeyModifiers & KeyModifiers.Shift) != 0;
+        if (ctrlY || ctrlShiftZ)
+        {
+            _ = RedoAsync();
+            e.Handled = true;
         }
     }
 
@@ -821,8 +920,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         if (selectedIndices.Count == 0) return;
 
+        BeginStructuralChange();
+
         int firstIndex = selectedIndices.Min();
-        // Remove from highest index downward so indices stay valid
         var toRemove = selectedIndices.OrderByDescending(x => x).ToList();
         foreach (int i in toRemove)
         {
@@ -831,29 +931,28 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             Blocks.RemoveAt(i);
         }
 
-        // Ensure at least one block remains
         if (Blocks.Count == 0)
         {
             var defaultBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
             SubscribeToBlock(defaultBlock);
             Blocks.Add(defaultBlock);
-            Avalonia.Threading.Dispatcher.UIThread.Post(
+            Dispatcher.UIThread.Post(
                 () => defaultBlock.IsFocused = true,
-                Avalonia.Threading.DispatcherPriority.Input);
+                DispatcherPriority.Input);
         }
         else
         {
-            // Focus the block that replaced the first deleted one
             int focusIndex = Math.Min(firstIndex, Blocks.Count - 1);
             if (focusIndex < 0) focusIndex = 0;
             var target = Blocks[focusIndex];
-            Avalonia.Threading.Dispatcher.UIThread.Post(
+            Dispatcher.UIThread.Post(
                 () => target.IsFocused = true,
-                Avalonia.Threading.DispatcherPriority.Input);
+                DispatcherPriority.Input);
         }
 
         ReorderBlocks();
         ClearBlockSelection();
+        CommitStructuralChange("Delete selected blocks");
         BlocksChanged?.Invoke();
     }
 
@@ -894,13 +993,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private void RemoveEmptyBlocksAfterTextDelete(int firstBlockInDeletion)
     {
+        BeginStructuralChange();
+
         var emptyIndices = new List<int>();
         for (int i = 0; i < Blocks.Count; i++)
         {
             if (string.IsNullOrWhiteSpace(Blocks[i].Content ?? string.Empty))
                 emptyIndices.Add(i);
         }
-        // Never remove the first block that had selection — it stays (empty) and gets focus
         var toRemove = emptyIndices.Where(i => i != firstBlockInDeletion).ToList();
 
         foreach (int i in toRemove.OrderByDescending(x => x))
@@ -910,7 +1010,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             Blocks.RemoveAt(i);
         }
 
-        // After removals, the block that was at firstBlockInDeletion may have a new index
         int newFocusIndex = firstBlockInDeletion - toRemove.Count(i => i < firstBlockInDeletion);
         newFocusIndex = Math.Clamp(newFocusIndex, 0, Math.Max(0, Blocks.Count - 1));
 
@@ -919,20 +1018,21 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var defaultBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
             SubscribeToBlock(defaultBlock);
             Blocks.Add(defaultBlock);
-            Avalonia.Threading.Dispatcher.UIThread.Post(
+            Dispatcher.UIThread.Post(
                 () => defaultBlock.IsFocused = true,
-                Avalonia.Threading.DispatcherPriority.Input);
+                DispatcherPriority.Input);
         }
         else
         {
             var target = Blocks[newFocusIndex];
-            Avalonia.Threading.Dispatcher.UIThread.Post(
+            Dispatcher.UIThread.Post(
                 () => target.IsFocused = true,
-                Avalonia.Threading.DispatcherPriority.Input);
+                DispatcherPriority.Input);
         }
 
         ReorderBlocks();
         ClearBlockSelection();
+        CommitStructuralChange("Delete text selection");
         BlocksChanged?.Invoke();
     }
 
@@ -996,7 +1096,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var pasted = BlockMarkdownSerializer.Deserialize(text);
             if (pasted.Length == 0) return;
 
-            // When not replacing a block selection: paste first block into current block at caret/selection; remaining pasted blocks become new blocks; tail of current block goes to last pasted block.
+            BeginStructuralChange();
+
             if (!replaceBlockSelection && pasted.Length >= 1)
             {
                 int focusedIndex = GetFocusedBlockIndex();
@@ -1030,6 +1131,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                     ReorderBlocks();
                                 }
                                 ClearBlockSelection();
+                                CommitStructuralChange("Paste");
                                 BlocksChanged?.Invoke();
                                 return;
                             }
@@ -1048,6 +1150,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                             }
                             ReorderBlocks();
                             ClearBlockSelection();
+                            CommitStructuralChange("Paste");
                             BlocksChanged?.Invoke();
                             return;
                         }
@@ -1091,14 +1194,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
             ReorderBlocks();
             ClearBlockSelection();
+            CommitStructuralChange("Paste");
             BlocksChanged?.Invoke();
 
             if (pasted.Length > 0)
             {
                 var firstPasted = pasted[0];
-                Avalonia.Threading.Dispatcher.UIThread.Post(
+                Dispatcher.UIThread.Post(
                     () => firstPasted.IsFocused = true,
-                    Avalonia.Threading.DispatcherPriority.Input);
+                    DispatcherPriority.Input);
             }
         }
         catch { /* paste can fail */ }
@@ -1328,18 +1432,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var draggedIndex = Blocks.IndexOf(draggedBlock);
         if (draggedIndex < 0) return false;
 
-        // _currentDropInsertIndex is an insert-before index (0..Count).
-        // ObservableCollection.Move(old, new) places the item at the *final* position after removal.
-        // When draggedIndex < insertIndex the removal shifts all subsequent items left by 1,
-        // so the final index must be decremented by 1 to land in the right slot.
         var insertIndex = Math.Min(_currentDropInsertIndex, Blocks.Count - 1);
         var targetIndex = draggedIndex < insertIndex ? insertIndex - 1 : insertIndex;
 
         if (draggedIndex == targetIndex) return false;
 
+        BeginStructuralChange();
         Blocks.Move(draggedIndex, targetIndex);
         for (int i = 0; i < Blocks.Count; i++)
             Blocks[i].Order = i;
+        CommitStructuralChange("Move block");
         NotifyBlocksChanged();
         return true;
     }
@@ -1427,6 +1529,337 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         var container = containers[index];
         return container as EditableBlock ?? container.GetVisualDescendants().OfType<EditableBlock>().FirstOrDefault();
+    }
+
+    #endregion
+
+    #region History helpers
+
+    private static string Truncate(string? s, int max = 40) =>
+        s == null ? "<null>" : s.Length <= max ? $"'{s}'" : $"'{s[..max]}…'";
+
+    private BlockSnapshot[] CaptureSnapshot()
+    {
+        var snapshots = new BlockSnapshot[Blocks.Count];
+        for (int i = 0; i < Blocks.Count; i++)
+        {
+            var b = Blocks[i];
+            snapshots[i] = new BlockSnapshot(
+                b.Id, b.Type, b.Content ?? string.Empty,
+                b.Meta ?? new Dictionary<string, object>(), i);
+        }
+        return snapshots;
+    }
+
+    private CaretState? CaptureCaretState()
+    {
+        int idx = GetFocusedBlockIndex();
+        if (idx < 0) return null;
+        var editableBlock = GetEditableBlockAt(idx);
+        var range = editableBlock?.GetSelectionOrCaretRange();
+        return new CaretState { BlockIndex = idx, CaretPosition = range?.start ?? 0 };
+    }
+
+    /// <summary>
+    /// Call before any structural mutation (insert/delete/merge/move/type-change/paste).
+    /// Captures a snapshot of the current document state for undo.
+    /// If a previous snapshot was never committed (orphaned), it is discarded.
+    /// </summary>
+    private void BeginStructuralChange()
+    {
+        if (_history == null || _isRestoringFromHistory) return;
+        FlushTypingBatch();
+        if (_pendingSnapshot != null)
+            BlockEditorLogger.Log("BeginStructuralChange: overwriting orphaned _pendingSnapshot");
+        _pendingSnapshot = CaptureSnapshot();
+        _pendingCaretBefore = CaptureCaretState();
+        BlockEditorLogger.Log($"BeginStructuralChange: captured {_pendingSnapshot.Length} blocks");
+    }
+
+    /// <summary>
+    /// Call after a structural mutation has completed. Pushes a DocumentOperation onto the undo stack.
+    /// </summary>
+    private void CommitStructuralChange(string description)
+    {
+        if (_history == null || _isRestoringFromHistory || _pendingSnapshot == null) return;
+
+        var after = CaptureSnapshot();
+        var caretAfter = CaptureCaretState();
+        var before = _pendingSnapshot;
+        var caretBefore = _pendingCaretBefore;
+        _pendingSnapshot = null;
+        _pendingCaretBefore = null;
+
+        BlockEditorLogger.Log($"CommitStructuralChange: PUSH DocumentOp '{description}' before={before.Length}blocks after={after.Length}blocks");
+
+        var op = new DocumentOperation(description, before, after, caretBefore, caretAfter, RestoreDocument);
+        _history.Push(op);
+    }
+
+    /// <summary>
+    /// Callback used by DocumentOperation to restore the editor to a previous state.
+    /// Updates blocks in-place where possible to avoid a full UI rebuild.
+    /// </summary>
+    private void RestoreDocument(Block[] blocks, CaretState? caret)
+    {
+        _isRestoringFromHistory = true;
+        try
+        {
+            var targetBlocks = blocks ?? Array.Empty<Block>();
+            var existingById = new Dictionary<string, BlockViewModel>();
+            foreach (var b in Blocks)
+                existingById[b.Id] = b;
+
+            var newList = new List<BlockViewModel>(targetBlocks.Length);
+            var usedIds = new HashSet<string>();
+
+            foreach (var blk in targetBlocks.OrderBy(b => b.Order))
+            {
+                if (existingById.TryGetValue(blk.Id, out var existing) && usedIds.Add(blk.Id))
+                {
+                    existing.Content = blk.Content ?? string.Empty;
+                    existing.Type = blk.Type;
+                    existing.Meta = new Dictionary<string, object>(blk.Meta ?? new Dictionary<string, object>());
+                    existing.Order = blk.Order;
+                    newList.Add(existing);
+                }
+                else
+                {
+                    var vm = new BlockViewModel(blk);
+                    SubscribeToBlock(vm);
+                    newList.Add(vm);
+                }
+            }
+
+            // Unsubscribe from blocks that are no longer present
+            foreach (var kvp in existingById)
+            {
+                if (!usedIds.Contains(kvp.Key))
+                    UnsubscribeFromBlock(kvp.Value);
+            }
+
+            // Ensure at least one block
+            if (newList.Count == 0)
+            {
+                var defaultBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
+                SubscribeToBlock(defaultBlock);
+                newList.Add(defaultBlock);
+            }
+
+            // Sync ObservableCollection in-place: remove extras, reorder, insert new
+            for (int i = 0; i < newList.Count; i++)
+            {
+                if (i < Blocks.Count)
+                {
+                    if (!ReferenceEquals(Blocks[i], newList[i]))
+                    {
+                        var existIdx = Blocks.IndexOf(newList[i]);
+                        if (existIdx >= 0)
+                            Blocks.Move(existIdx, i);
+                        else
+                            Blocks.Insert(i, newList[i]);
+                    }
+                }
+                else
+                {
+                    Blocks.Add(newList[i]);
+                }
+            }
+            while (Blocks.Count > newList.Count)
+                Blocks.RemoveAt(Blocks.Count - 1);
+
+            _focusedBlockIndex = -1;
+            UpdateListNumbers();
+
+            ApplyCaretFocus(caret);
+            BlocksChanged?.Invoke();
+        }
+        finally
+        {
+            // Defer clearing the flag so any TextChanged events fired by async
+            // binding propagation still see _isRestoringFromHistory = true.
+            Dispatcher.UIThread.Post(() => _isRestoringFromHistory = false, DispatcherPriority.Render);
+        }
+    }
+
+    /// <summary>
+    /// Callback used by TextEditOperation to restore a single block's text.
+    /// </summary>
+    private void RestoreBlockText(string blockId, string text, CaretState? caret)
+    {
+        _isRestoringFromHistory = true;
+        try
+        {
+            var vm = Blocks.FirstOrDefault(b => b.Id == blockId);
+            if (vm != null)
+            {
+                vm.Content = text;
+                BlockEditorLogger.Log($"RestoreBlockText blockId={blockId} text='{Truncate(text)}'");
+            }
+            else
+            {
+                BlockEditorLogger.Log($"RestoreBlockText blockId={blockId} NOT FOUND in Blocks");
+            }
+
+            ApplyCaretFocus(caret);
+            BlocksChanged?.Invoke();
+        }
+        finally
+        {
+            Dispatcher.UIThread.Post(() => _isRestoringFromHistory = false, DispatcherPriority.Render);
+        }
+    }
+
+    private void ApplyCaretFocus(CaretState? caret)
+    {
+        if (caret == null || caret.BlockIndex < 0 || caret.BlockIndex >= Blocks.Count)
+            return;
+
+        // Clear stale VM focus flags first; rapid undo can leave IsFocused=true while
+        // the real TextBox has already lost focus.
+        for (int i = 0; i < Blocks.Count; i++)
+            Blocks[i].IsFocused = false;
+
+        var blockIndex = caret.BlockIndex;
+        var caretPos = caret.CaretPosition;
+        var target = Blocks[blockIndex];
+        target.PendingCaretIndex = caretPos;
+
+        // Force a fresh focus transition at Input priority for rapid undo/redo stability.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (blockIndex < 0 || blockIndex >= Blocks.Count) return;
+            var latestTarget = Blocks[blockIndex];
+            latestTarget.PendingCaretIndex = caretPos;
+            latestTarget.IsFocused = true;
+        }, DispatcherPriority.Input);
+    }
+
+    #endregion
+
+    #region Typing batch (300ms idle → commit)
+
+    /// <summary>
+    /// Called by OnBlockContentChanged to start/extend a typing batch for the given block.
+    /// <paramref name="previousText"/> is the text *before* this edit (from EditorStateManager).
+    /// Must not be null — caller must have a valid pre-edit snapshot.
+    /// </summary>
+    internal void TrackTypingEdit(BlockViewModel block, string previousText)
+    {
+        if (_history == null || _isRestoringFromHistory)
+        {
+            BlockEditorLogger.Log($"TrackTypingEdit skipped: history={_history != null} restoring={_isRestoringFromHistory}");
+            return;
+        }
+
+        var idx = Blocks.IndexOf(block);
+
+        if (_typingBatchBlockId != null && _typingBatchBlockId != block.Id)
+        {
+            BlockEditorLogger.Log($"TrackTypingEdit: block switch {_typingBatchBlockId} -> {block.Id}, flushing");
+            FlushTypingBatch();
+        }
+
+        if (_typingBatchBlockId == null)
+        {
+            _typingBatchBlockId = block.Id;
+            _typingBatchTextBefore = previousText;
+            _typingBatchCaretBefore = CaptureCaretState() ?? new CaretState { BlockIndex = idx, CaretPosition = 0 };
+            BlockEditorLogger.Log($"TrackTypingEdit: NEW batch for block {block.Id} before={Truncate(previousText)} current={Truncate(block.Content)}");
+        }
+
+        _typingBatchTimer?.Stop();
+        _typingBatchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TypingBatchIdleMs) };
+        _typingBatchTimer.Tick += OnTypingBatchIdle;
+        _typingBatchTimer.Start();
+    }
+
+    private void OnTypingBatchIdle(object? sender, EventArgs e)
+    {
+        FlushTypingBatch();
+    }
+
+    /// <summary>
+    /// Flush the active typing batch into a TextEditOperation. Called on idle, Enter,
+    /// merge, paste, block switch, and note switch.
+    /// </summary>
+    public void FlushTypingBatch()
+    {
+        _typingBatchTimer?.Stop();
+        if (_typingBatchTimer != null)
+        {
+            _typingBatchTimer.Tick -= OnTypingBatchIdle;
+            _typingBatchTimer = null;
+        }
+
+        if (_history == null || _typingBatchBlockId == null) return;
+
+        var vm = Blocks.FirstOrDefault(b => b.Id == _typingBatchBlockId);
+        if (vm == null)
+        {
+            BlockEditorLogger.Log($"FlushTypingBatch: block {_typingBatchBlockId} not found, discarding");
+            _typingBatchBlockId = null;
+            _typingBatchTextBefore = null;
+            _typingBatchCaretBefore = null;
+            return;
+        }
+
+        var textAfter = vm.Content ?? string.Empty;
+        var textBefore = _typingBatchTextBefore ?? string.Empty;
+
+        if (textBefore == textAfter)
+        {
+            BlockEditorLogger.Log($"FlushTypingBatch: no-op (before==after) block={_typingBatchBlockId} text={Truncate(textBefore)}");
+            _typingBatchBlockId = null;
+            _typingBatchTextBefore = null;
+            _typingBatchCaretBefore = null;
+            return;
+        }
+
+        var idx = Blocks.IndexOf(vm);
+        var editableBlock = GetEditableBlockAt(idx);
+        var range = editableBlock?.GetSelectionOrCaretRange();
+        var caretAfter = new CaretState { BlockIndex = idx, CaretPosition = range?.start ?? 0 };
+
+        BlockEditorLogger.Log($"FlushTypingBatch: PUSH TextEditOp block={vm.Id} before={Truncate(textBefore)} after={Truncate(textAfter)}");
+
+        var op = new TextEditOperation(
+            "Typing",
+            vm.Id,
+            textBefore,
+            textAfter,
+            _typingBatchCaretBefore,
+            caretAfter,
+            RestoreBlockText);
+
+        _history.Push(op);
+
+        _typingBatchBlockId = null;
+        _typingBatchTextBefore = null;
+        _typingBatchCaretBefore = null;
+    }
+
+    public async Task UndoAsync()
+    {
+        if (_history == null || !_history.CanUndo)
+        {
+            BlockEditorLogger.Log($"UndoAsync: nothing to undo (history={_history != null} canUndo={_history?.CanUndo})");
+            return;
+        }
+        FlushTypingBatch();
+        BlockEditorLogger.Log("UndoAsync: executing");
+        await _history.UndoAsync();
+    }
+
+    public async Task RedoAsync()
+    {
+        if (_history == null || !_history.CanRedo)
+        {
+            BlockEditorLogger.Log($"RedoAsync: nothing to redo (history={_history != null} canRedo={_history?.CanRedo})");
+            return;
+        }
+        BlockEditorLogger.Log("RedoAsync: executing");
+        await _history.RedoAsync();
     }
 
     #endregion

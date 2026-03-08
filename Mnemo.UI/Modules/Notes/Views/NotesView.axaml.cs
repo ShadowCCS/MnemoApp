@@ -7,6 +7,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.History;
 using Mnemo.Core.Models;
 using Mnemo.UI.Components.BlockEditor;
 using Mnemo.UI.Controls;
@@ -47,6 +49,7 @@ public partial class NotesView : UserControl
             return;
 
         FlushPendingSave();
+
         Dispatcher.UIThread.Post(() => LoadBlocksForCurrentNote(), DispatcherPriority.Loaded);
     }
 
@@ -68,6 +71,13 @@ public partial class NotesView : UserControl
         var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
         if (editor == null)
             return;
+
+        if (editor.History == null)
+        {
+            var historyManager = ((App)Application.Current!).Services?.GetService<IHistoryManager>();
+            if (historyManager != null)
+                editor.History = historyManager;
+        }
 
         editor.LoadBlocks(vm.GetBlocksForCurrentNote());
 

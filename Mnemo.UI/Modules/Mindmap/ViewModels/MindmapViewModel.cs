@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.History;
 using Mnemo.Core.Models.Mindmap;
 using Mnemo.Core.Services;
 using Mnemo.UI.ViewModels;
@@ -16,6 +17,7 @@ namespace Mnemo.UI.Modules.Mindmap.ViewModels;
 public partial class MindmapViewModel : ViewModelBase, INavigationAware
 {
     private readonly IMindmapService _mindmapService;
+    private readonly IHistoryManager _historyManager;
     private MindmapModel? _currentMindmap;
 
     [ObservableProperty]
@@ -39,9 +41,10 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     public event EventHandler? RecenterRequested;
 
-    public MindmapViewModel(IMindmapService mindmapService)
+    public MindmapViewModel(IMindmapService mindmapService, IHistoryManager historyManager)
     {
         _mindmapService = mindmapService;
+        _historyManager = historyManager;
         AddNodeCommand = new AsyncRelayCommand(AddNodeAsync);
         DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync);
         ConnectSelectedCommand = new AsyncRelayCommand(ConnectSelectedAsync);
@@ -94,6 +97,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         {
             _currentMindmap = result.Value;
             Title = _currentMindmap.Title;
+            _historyManager.Clear();
             RefreshView();
         }
     }
