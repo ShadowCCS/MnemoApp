@@ -143,7 +143,18 @@ public static class InlineRunFormatApplier
 
             if (runEnd <= deleteStart || offset >= deleteEnd)
             {
-                result.Add(run);
+                // Insertion at caret: use style of run at boundary so typed text continues formatting
+                if (deleteStart == deleteEnd && inserted.Length > 0 && !foundInsertStyle)
+                {
+                    if (runEnd == deleteStart)
+                    { result.Add(run); result.Add(new InlineRun(inserted, run.Style)); foundInsertStyle = true; }
+                    else if (offset == deleteEnd)
+                    { result.Add(new InlineRun(inserted, run.Style)); result.Add(run); foundInsertStyle = true; }
+                    else
+                    { result.Add(run); }
+                }
+                else
+                { result.Add(run); }
             }
             else
             {

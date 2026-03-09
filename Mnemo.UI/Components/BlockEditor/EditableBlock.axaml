@@ -65,7 +65,7 @@
             Height="3"
             VerticalAlignment="Top"
             HorizontalAlignment="Stretch"
-            Background="{DynamicResource CardAccentBrush}"
+            Background="{DynamicResource BlockEditorDropLineBrush}"
             CornerRadius="1"
             IsHitTestVisible="False"
             IsVisible="False"

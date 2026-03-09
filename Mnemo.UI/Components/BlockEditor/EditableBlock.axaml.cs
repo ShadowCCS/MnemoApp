@@ -978,7 +978,10 @@ public partial class EditableBlock : UserControl
 
     private void OnFormatRequested(InlineFormatKind kind)
     {
-        ApplyInlineFormat(kind);
+        string? color = null;
+        if (kind == InlineFormatKind.Highlight && Application.Current?.TryFindResource("InlineHighlightColor", out var res) == true && res is Color c)
+            color = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+        ApplyInlineFormat(kind, color);
     }
 
     private void OnBackgroundColorRequested(string hex)
@@ -989,6 +992,18 @@ public partial class EditableBlock : UserControl
     private (int start, int end)? _cachedSelectionRange;
 
     private void ApplyInlineFormat(InlineFormatKind kind, string? color = null)
+    {
+        var blockEditor = FindParentBlockEditor();
+        if (blockEditor != null && blockEditor.HasCrossBlockTextSelection())
+        {
+            blockEditor.ApplyInlineFormatToCrossBlockSelection(kind, color);
+            return;
+        }
+
+        ApplyInlineFormatInternal(kind, color);
+    }
+
+    internal void ApplyInlineFormatInternal(InlineFormatKind kind, string? color = null)
     {
         var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
         if (editor == null || _viewModel == null) return;

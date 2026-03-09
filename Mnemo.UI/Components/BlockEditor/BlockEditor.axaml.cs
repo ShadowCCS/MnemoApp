@@ -45,6 +45,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private Point _crossBlockStartPoint;
     /// <summary>Hysteresis: last endpoint block index to avoid boundary flicker when dragging across blocks.</summary>
     private int _lastCrossBlockCurrentIndex = -1;
+    /// <summary>True while applying inline format to a cross-block selection; prevents focus changes from clearing other blocks' selection.</summary>
+    private bool _isApplyingCrossBlockFormat;
 
     // History / undo-redo
     private IHistoryManager? _history;
@@ -314,6 +316,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             // selection. Clearing it here (triggered by IsFocused changes on each block we
             // update) would fight with UpdateCrossBlockSelection and cause flicker.
             if (_isCrossBlockSelecting || _crossBlockArmed) return;
+            // When applying format to cross-block selection we focus each block in turn; don't clear other blocks' selection.
+            if (_isApplyingCrossBlockFormat) return;
 
             ClearBlockSelection();
             if (idx >= 0)
@@ -579,8 +583,21 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
-        // Double/triple clicks must reach the TextBox for word/line selection — don't intercept them.
-        if (e.ClickCount > 1) return;
+        // Double/triple clicks: still clear other blocks so only the block under the tap has selection, then let event reach TextBox for word/line selection.
+        if (e.ClickCount > 1)
+        {
+            var pt = e.GetPosition(this);
+            if (IsPointInsideAnyBlock(pt))
+            {
+                var blockIndex = GetBlockIndexAtPoint(pt);
+                if (blockIndex >= 0 && blockIndex < Blocks.Count)
+                {
+                    ClearBlockSelection();
+                    ClearTextSelectionInAllBlocksExcept(blockIndex);
+                }
+            }
+            return;
+        }
 
         // If the press originated on the drag handle, let it propagate so DoDragDrop can run.
         var source = e.Source as Visual;
@@ -999,7 +1016,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         BlocksChanged?.Invoke();
     }
 
-    private bool HasCrossBlockTextSelection()
+    public bool HasCrossBlockTextSelection()
     {
         var containers = GetBlockContainersInOrder();
         if (containers == null) return false;
@@ -1009,6 +1026,32 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (editableBlock?.GetSelectionRange() != null) return true;
         }
         return false;
+    }
+
+    public void ApplyInlineFormatToCrossBlockSelection(Mnemo.Core.Formatting.InlineFormatKind kind, string? color = null)
+    {
+        var containers = GetBlockContainersInOrder();
+        if (containers == null) return;
+
+        BeginStructuralChange();
+        _isApplyingCrossBlockFormat = true;
+        try
+        {
+            for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+            {
+                var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+                if (editableBlock?.GetSelectionRange() != null)
+                {
+                    editableBlock.ApplyInlineFormatInternal(kind, color);
+                }
+            }
+        }
+        finally
+        {
+            _isApplyingCrossBlockFormat = false;
+        }
+
+        CommitStructuralChange("Format Selection");
     }
 
     private void TryDeleteTextSelection()

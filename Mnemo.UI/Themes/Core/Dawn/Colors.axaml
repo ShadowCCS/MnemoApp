@@ -382,6 +382,11 @@
     
     <!-- Rich Text Highlighting -->
     <Color x:Key="HighlightedText">#E5E5E5</Color>
+    <!-- Inline text highlight (formatting toolbar marker) -->
+    <Color x:Key="InlineHighlightColor">#FFD7AA</Color>
+
+    <!-- Block Editor - drop line -->
+    <Color x:Key="BlockEditorDropLineBrush">#E5E5E5</Color>
 
     <!-- Generic border (card/panel dividers) -->
     <Color x:Key="Border">#E5E5E5</Color>

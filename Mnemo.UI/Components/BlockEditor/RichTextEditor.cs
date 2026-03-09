@@ -573,7 +573,10 @@ public class RichTextEditor : Control
                 // in-block backspace (caret not at 0, or active selection).
                 if (_caretIndex > 0 || HasSelection)
                 {
-                    HandleBackspace();
+                    if (ctrl && !HasSelection)
+                        HandleBackspaceWord();
+                    else
+                        HandleBackspace();
                     e.Handled = true;
                 }
                 break;
@@ -641,6 +644,17 @@ public class RichTextEditor : Control
         CaretIndex = newCaret;
         SelectionStart = newCaret;
         SelectionEnd = newCaret;
+    }
+
+    private void HandleBackspaceWord()
+    {
+        if (_caretIndex <= 0) return;
+        int deleteStart = FindWordStart(_caretIndex - 1);
+        if (deleteStart >= _caretIndex) return;
+        DeleteRange(deleteStart, _caretIndex);
+        CaretIndex = deleteStart;
+        SelectionStart = deleteStart;
+        SelectionEnd = deleteStart;
     }
 
     private void DeleteSelection()

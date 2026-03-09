@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Avalonia;
@@ -36,7 +37,13 @@ public class BlockViewModel : INotifyPropertyChanged
         { 
             if (_type != value)
             {
-                _type = value; 
+                _type = value;
+                if (value is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+                {
+                    EnsureHeadingBold();
+                    OnPropertyChanged(nameof(Content));
+                    OnPropertyChanged(nameof(Runs));
+                }
                 EnsureMetaKeys();
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Watermark));
@@ -60,6 +67,7 @@ public class BlockViewModel : INotifyPropertyChanged
             _previousContent = _cachedFlatContent;
             _previousRuns = CloneRuns();
             _inlineRuns = InlineRunFormatApplier.ApplyTextEdit(_inlineRuns, _cachedFlatContent, newText);
+            EnsureHeadingBold();
             _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
             OnPropertyChanged();
             OnPropertyChanged(nameof(Watermark));
@@ -73,6 +81,16 @@ public class BlockViewModel : INotifyPropertyChanged
     /// </summary>
     public IReadOnlyList<InlineRun> Runs => _inlineRuns;
 
+    private void EnsureHeadingBold()
+    {
+        if (_type is not (BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3))
+            return;
+        var boldRuns = _inlineRuns.Select(r => new InlineRun(r.Text, r.Style.WithSet(InlineFormatKind.Bold))).ToList();
+        _inlineRuns = InlineRunFormatApplier.Normalize(boldRuns);
+        if (_inlineRuns.Count == 0)
+            _inlineRuns.Add(new InlineRun(string.Empty, new InlineStyle(Bold: true)));
+    }
+
     /// <summary>
     /// Replace the entire run list (e.g. for undo/redo or deserialization).
     /// Normalizes and refreshes Content. Does not raise ContentChanged.
@@ -82,6 +100,7 @@ public class BlockViewModel : INotifyPropertyChanged
         _inlineRuns = InlineRunFormatApplier.Normalize(runs);
         if (_inlineRuns.Count == 0)
             _inlineRuns.Add(InlineRun.Plain(string.Empty));
+        EnsureHeadingBold();
         _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(Runs));
@@ -278,7 +297,8 @@ public class BlockViewModel : INotifyPropertyChanged
     {
         _id = Guid.NewGuid().ToString();
         _type = type;
-        _inlineRuns = new List<InlineRun> { InlineRun.Plain(content ?? string.Empty) };
+        var defaultStyle = type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 ? new InlineStyle(Bold: true) : InlineStyle.Default;
+        _inlineRuns = new List<InlineRun> { new InlineRun(content ?? string.Empty, defaultStyle) };
         _cachedFlatContent = content ?? string.Empty;
         _meta = new Dictionary<string, object>();
         _order = order;
@@ -297,6 +317,7 @@ public class BlockViewModel : INotifyPropertyChanged
         _inlineRuns = InlineRunFormatApplier.Normalize(block.InlineRuns!);
         if (_inlineRuns.Count == 0)
             _inlineRuns.Add(InlineRun.Plain(string.Empty));
+        EnsureHeadingBold();
         _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
         
         EnsureMetaKeys();
