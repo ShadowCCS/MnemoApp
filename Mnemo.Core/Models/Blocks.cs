@@ -43,7 +43,10 @@ public class Block
         set
         {
             _legacyContent = value;
-            InlineRuns = new List<InlineRun> { InlineRun.Plain(value ?? string.Empty) };
+            if (InlineRuns == null || InlineRuns.Count == 0)
+            {
+                InlineRuns = new List<InlineRun> { InlineRun.Plain(value ?? string.Empty) };
+            }
         }
     }
 

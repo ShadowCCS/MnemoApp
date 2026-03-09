@@ -30,4 +30,8 @@
     <Style Selector="Button.FormattingToolbarIcon">
         <Setter Property="Padding" Value="5,4" />
     </Style>
+
+    <Style Selector="Button.FormattingToolbarIcon.FormattingToolbarIconActive /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SlashCommandItemBackgroundSelectedBrush}" />
+    </Style>
 </Styles>

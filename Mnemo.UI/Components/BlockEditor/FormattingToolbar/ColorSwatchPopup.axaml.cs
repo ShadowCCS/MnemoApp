@@ -13,10 +13,11 @@ namespace Mnemo.UI.Components.BlockEditor.FormattingToolbar;
 
 public partial class ColorSwatchPopup : UserControl
 {
-    private static readonly string[] SwatchColors =
+    private static readonly string[] SwatchColorKeys =
     {
-        "#E0E0E0", "#64B5F6", "#42A5F5", "#7C5CFC", "#EF5350",
-        "#66BB6A", "#FF9800", "#FF5722", "#29B6F6", "#26A69A"
+        "ColorSwatch1", "ColorSwatch2", "ColorSwatch3", "ColorSwatch4",
+        "ColorSwatch5", "ColorSwatch6", "ColorSwatch7", "ColorSwatch8",
+        "ColorSwatch9", "ColorSwatch10"
     };
 
     private string? _selectedColor;
@@ -44,25 +45,31 @@ public partial class ColorSwatchPopup : UserControl
         if (headerLabel != null && loc != null)
             headerLabel.Text = loc.T("TextColor", "NotesEditor") ?? "TEXT COLOR";
 
-        foreach (var hex in SwatchColors)
+        var app = Application.Current;
+        for (int i = 0; i < SwatchColorKeys.Length; i++)
         {
-            var ellipse = new Ellipse
+            var key = SwatchColorKeys[i];
+            var swatchName = "swatch" + (i + 1);
+            if (app != null && app.TryFindResource(key, out var res) && res is Color color)
             {
-                Width = 28,
-                Height = 28,
-                Fill = new SolidColorBrush(Color.Parse(hex)),
-                Margin = new Thickness(3),
-                Cursor = new Cursor(StandardCursorType.Hand)
-            };
+                var ellipse = new Ellipse
+                {
+                    Width = 28,
+                    Height = 28,
+                    Fill = new SolidColorBrush(color),
+                    Margin = new Thickness(3),
+                    Cursor = new Cursor(StandardCursorType.Hand)
+                };
 
-            ellipse.PointerPressed += (s, args) =>
-            {
-                _selectedColor = hex;
-                ColorSelected?.Invoke(hex);
-                args.Handled = true;
-            };
+                ellipse.PointerPressed += (s, args) =>
+                {
+                    _selectedColor = swatchName;
+                    ColorSelected?.Invoke(swatchName);
+                    args.Handled = true;
+                };
 
-            panel.Children.Add(ellipse);
+                panel.Children.Add(ellipse);
+            }
         }
 
         Loaded -= OnLoaded;

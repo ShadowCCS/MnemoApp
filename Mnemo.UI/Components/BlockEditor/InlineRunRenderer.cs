@@ -56,7 +56,17 @@ public static class InlineRunRenderer
         if (!string.IsNullOrEmpty(style.BackgroundColor))
         {
             if (Color.TryParse(style.BackgroundColor, out var color))
+            {
                 run.Background = new SolidColorBrush(color);
+            }
+            else if (style.BackgroundColor.StartsWith("swatch", System.StringComparison.OrdinalIgnoreCase) && Application.Current != null)
+            {
+                var key = "ColorSwatch" + style.BackgroundColor.Substring(6);
+                if (Application.Current.TryFindResource(key, out var res) && res is Color swatchColor)
+                {
+                    run.Background = new SolidColorBrush(swatchColor);
+                }
+            }
         }
     }
 }

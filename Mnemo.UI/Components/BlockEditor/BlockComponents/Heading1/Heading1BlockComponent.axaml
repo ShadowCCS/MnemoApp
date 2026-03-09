@@ -12,6 +12,6 @@
         FontWeight="Bold"
         Foreground="{DynamicResource TextPrimaryBrush}"
         CaretBrush="{DynamicResource TextPrimaryBrush}"
-        SelectionBrush="{DynamicResource SystemAccentColor}"
+        SelectionBrush="{DynamicResource TextControlSelectionHighlightColorBrush}"
         Watermark="{Binding Watermark}" />
 </UserControl>

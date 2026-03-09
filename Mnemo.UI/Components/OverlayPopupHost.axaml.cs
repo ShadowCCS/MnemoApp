@@ -216,31 +216,67 @@ namespace Mnemo.UI.Components
                             Dispatcher.UIThread.Post(() => UpdateOverlayPosition(border, overlay), DispatcherPriority.Loaded);
                         }
                     }
-                    border.Margin = margin;
-                    border.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
-                    border.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
+                    // Prevent layout loops by using RenderTransform for anchored overlays instead of Margin.
+                    // Margin affects available size for layout, which can cause the border's Height to shrink if pushed off-screen,
+                    // which changes the Margin again (if TopLeft), causing an infinite layout loop.
+                    var transform = border.RenderTransform as Avalonia.Media.TranslateTransform;
+                    if (transform == null)
+                    {
+                        transform = new Avalonia.Media.TranslateTransform();
+                        border.RenderTransform = transform;
+                    }
+
+                    if (Math.Abs(transform.X - margin.Left) > 0.1 || Math.Abs(transform.Y - margin.Top) > 0.1)
+                    {
+                        transform.X = margin.Left;
+                        transform.Y = margin.Top;
+                    }
+
+                    // Reset Margin to 0 so it doesn't constrain the popup and cause it to shrink when pushed near window edges
+                    if (border.Margin != new Thickness(0))
+                        border.Margin = new Thickness(0);
+
+                    if (border.HorizontalAlignment != Avalonia.Layout.HorizontalAlignment.Left)
+                        border.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
+
+                    if (border.VerticalAlignment != Avalonia.Layout.VerticalAlignment.Top)
+                        border.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
                 }
             }
             else
             {
                 // Handle non-anchored overlay positioning
                 if (overlay.Options.HorizontalAlignment is string hStr && Enum.TryParse<HorizontalAlignment>(hStr, true, out var hAlign))
-                    border.HorizontalAlignment = hAlign;
+                {
+                    if (border.HorizontalAlignment != hAlign) border.HorizontalAlignment = hAlign;
+                }
                 else if (overlay.Options.HorizontalAlignment is HorizontalAlignment hEnum)
-                    border.HorizontalAlignment = hEnum;
+                {
+                    if (border.HorizontalAlignment != hEnum) border.HorizontalAlignment = hEnum;
+                }
 
                 if (overlay.Options.VerticalAlignment is string vStr && Enum.TryParse<VerticalAlignment>(vStr, true, out var vAlign))
-                    border.VerticalAlignment = vAlign;
+                {
+                    if (border.VerticalAlignment != vAlign) border.VerticalAlignment = vAlign;
+                }
                 else if (overlay.Options.VerticalAlignment is VerticalAlignment vEnum)
-                    border.VerticalAlignment = vEnum;
+                {
+                    if (border.VerticalAlignment != vEnum) border.VerticalAlignment = vEnum;
+                }
 
                 if (overlay.Options.Margin is string mStr)
                 {
-                    try { border.Margin = Thickness.Parse(mStr); }
+                    try 
+                    { 
+                        var parsed = Thickness.Parse(mStr); 
+                        if (border.Margin != parsed) border.Margin = parsed;
+                    }
                     catch { /* Ignore invalid thickness strings */ }
                 }
                 else if (overlay.Options.Margin is Thickness mThickness)
-                    border.Margin = mThickness;
+                {
+                    if (border.Margin != mThickness) border.Margin = mThickness;
+                }
             }
         }
     }

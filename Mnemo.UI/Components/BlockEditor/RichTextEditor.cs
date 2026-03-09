@@ -303,9 +303,21 @@ public class RichTextEditor : Control
             }
 
             IBrush? background = null;
-            if (!string.IsNullOrEmpty(style.BackgroundColor) &&
-                Color.TryParse(style.BackgroundColor, out var bgColor))
-                background = new SolidColorBrush(bgColor);
+            if (!string.IsNullOrEmpty(style.BackgroundColor))
+            {
+                if (Color.TryParse(style.BackgroundColor, out var bgColor))
+                {
+                    background = new SolidColorBrush(bgColor);
+                }
+                else if (style.BackgroundColor.StartsWith("swatch", StringComparison.OrdinalIgnoreCase) && Application.Current != null)
+                {
+                    var key = "ColorSwatch" + style.BackgroundColor.Substring(6);
+                    if (Application.Current.TryFindResource(key, out var res) && res is Color rc)
+                    {
+                        background = new SolidColorBrush(rc);
+                    }
+                }
+            }
 
             var props = new GenericTextRunProperties(
                 typeface,

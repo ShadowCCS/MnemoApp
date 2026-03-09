@@ -91,7 +91,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragLeaveEvent, Editor_DragLeave, RoutingStrategies.Bubble);
         AddHandler(PointerPressedEvent, Editor_PointerPressedTunnel, RoutingStrategies.Tunnel);
-        AddHandler(PointerPressedEvent, Editor_PointerPressedBubble, RoutingStrategies.Bubble);
+        AddHandler(PointerPressedEvent, Editor_PointerPressedBubble, RoutingStrategies.Bubble, handledEventsToo: true);
         // When we capture the pointer (cross-block or box-select), we receive moves/releases on this control
         AddHandler(PointerMovedEvent, Editor_PointerMoved, RoutingStrategies.Tunnel);
         AddHandler(PointerReleasedEvent, Editor_PointerReleased, RoutingStrategies.Tunnel);
@@ -601,10 +601,19 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var editableBlock = GetEditableBlockAt(blockIndex);
             if (editableBlock == null) return;
 
+            var vm = Blocks[blockIndex];
+            // If this block already has focus, let the event reach RichTextEditor so it can set
+            // the caret from the click (HitTestPoint). Otherwise we'd set Handled and the caret would never move.
+            if (vm.IsFocused)
+            {
+                ClearTextSelectionInAllBlocksExcept(blockIndex);
+                ClearBlockSelection();
+                return;
+            }
+
             var pointInBlock = this.TranslatePoint(pos, editableBlock);
             if (!pointInBlock.HasValue) return;
 
-            var vm = Blocks[blockIndex];
             var charIndex = editableBlock.GetCharacterIndexFromPoint(pointInBlock.Value);
 
             ClearBlockSelection();
@@ -669,18 +678,22 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         ClearBlockSelection();
 
         var source = e.Source as Visual;
-        bool hitIsInTextBox = source is TextBox || (source != null && source.GetVisualAncestors().Any(a => a is TextBox));
+        bool hitIsInTextBox = source is TextBox || source is RichTextEditor || (source != null && source.GetVisualAncestors().Any(a => a is TextBox || a is RichTextEditor));
         if (!hitIsInTextBox || source == null) return;
 
         var textBox = source as TextBox ?? source.GetVisualAncestors().OfType<TextBox>().FirstOrDefault();
+        var richTextEditor = source as RichTextEditor ?? source.GetVisualAncestors().OfType<RichTextEditor>().FirstOrDefault();
         var editableBlock = source as EditableBlock ?? source.GetVisualAncestors().OfType<EditableBlock>().FirstOrDefault();
-        if (textBox == null || editableBlock == null || editableBlock.DataContext is not BlockViewModel vm || !Blocks.Contains(vm))
+        if ((textBox == null && richTextEditor == null) || editableBlock == null || editableBlock.DataContext is not BlockViewModel vm || !Blocks.Contains(vm))
             return;
+
+        int caretIndex = textBox?.CaretIndex ?? richTextEditor?.CaretIndex ?? 0;
+        int textLength = textBox?.Text?.Length ?? richTextEditor?.TextLength ?? 0;
 
         // Arm cross-block select — capture happens in PointerMoved once drag leaves the source block
         _crossBlockAnchorBlock = vm;
         _crossBlockAnchorBlockIndex = Blocks.IndexOf(vm);
-        _crossBlockAnchorCharIndex = Math.Clamp(textBox.CaretIndex, 0, textBox.Text?.Length ?? 0);
+        _crossBlockAnchorCharIndex = Math.Clamp(caretIndex, 0, textLength);
         _crossBlockStartPoint = e.GetPosition(this);
         _crossBlockArmed = true;
         _isCrossBlockSelecting = false;
@@ -800,6 +813,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         else if (wasCrossBlockSelecting)
         {
             e.Pointer.Capture(null);
+            if (clickAnchorBlock != null)
+            {
+                var anchorIndex = Blocks.IndexOf(clickAnchorBlock);
+                if (anchorIndex >= 0)
+                {
+                    var anchorBlock = GetEditableBlockAt(anchorIndex);
+                    anchorBlock?.NotifySelectionChangedByEditor();
+                }
+            }
         }
         else if (wasArmedButNotDragged && clickAnchorBlock != null)
         {

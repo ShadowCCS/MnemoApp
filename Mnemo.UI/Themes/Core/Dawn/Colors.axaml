@@ -182,7 +182,7 @@
     <Color x:Key="TextControlBorderFocused">#e95b45</Color>
     <Color x:Key="TextControlBorderDisabled">#F5F5F5</Color>
     <Color x:Key="TextControlPlaceholderForeground">#888888</Color>
-    <Color x:Key="TextControlSelectionHighlightColor">#FFD700</Color>
+    <Color x:Key="TextControlSelectionHighlightColor">#ffe7d4</Color>
     <Color x:Key="TextControlTransparentBackground">Transparent</Color>
     <Color x:Key="InputDialogSelectionForeground">#1A1A1A</Color>
     <Color x:Key="InputDialogButtonHoverForeground">#1A1A1A</Color>
@@ -396,6 +396,18 @@
     <Color x:Key="MindmapNodeBackgroundHover">#FFF0EE</Color>
     <Color x:Key="MindmapEdgeStroke">#888888</Color>
     <Color x:Key="MindmapGridColor">#40000000</Color>
+
+    <!-- Color Swatches -->
+    <Color x:Key="ColorSwatch1">#F5F5F5</Color>
+    <Color x:Key="ColorSwatch2">#E6E6FA</Color>
+    <Color x:Key="ColorSwatch3">#D8DCEC</Color>
+    <Color x:Key="ColorSwatch4">#C4B5FD</Color>
+    <Color x:Key="ColorSwatch5">#FADBD8</Color>
+    <Color x:Key="ColorSwatch6">#E8F5E9</Color>
+    <Color x:Key="ColorSwatch7">#FFF3CD</Color>
+    <Color x:Key="ColorSwatch8">#FFE0B2</Color>
+    <Color x:Key="ColorSwatch9">#DBEAFE</Color>
+    <Color x:Key="ColorSwatch10">#D1EDDA</Color>
 
     <!-- Notes module (pane, section headers, editor) -->
     <Color x:Key="BlockSelectionBackground">#FDECEA</Color>

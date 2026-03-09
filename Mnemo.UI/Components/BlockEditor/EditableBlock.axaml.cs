@@ -206,6 +206,7 @@ public partial class EditableBlock : UserControl
                 editor.AddHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler, Avalonia.Interactivity.RoutingStrategies.Tunnel);
 
                 editor.PointerReleased += OnTextBoxPointerReleasedForToolbar;
+                editor.PointerMoved += OnTextBoxPointerMovedForToolbar;
                 editor.KeyUp += OnTextBoxKeyUpForToolbar;
             }
             else
@@ -227,6 +228,7 @@ public partial class EditableBlock : UserControl
             if (_backspaceTunnelHandler != null)
                 _currentEditor.RemoveHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler);
             _currentEditor.PointerReleased -= OnTextBoxPointerReleasedForToolbar;
+            _currentEditor.PointerMoved -= OnTextBoxPointerMovedForToolbar;
             _currentEditor.KeyUp -= OnTextBoxKeyUpForToolbar;
             _currentEditor = null;
             _backspaceTunnelHandler = null;
@@ -823,6 +825,20 @@ public partial class EditableBlock : UserControl
         Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
     }
 
+    private void OnTextBoxPointerMovedForToolbar(object? sender, PointerEventArgs e)
+    {
+        if (sender is not RichTextEditor editor) return;
+        if (!e.GetCurrentPoint(editor).Properties.IsLeftButtonPressed) return;
+        var start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
+        var end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
+        if (end <= start) return;
+        _cachedSelectionRange = (start, end);
+        if (_formattingToolbarOverlayId == null)
+            ShowFormattingToolbar();
+        else
+            UpdateFormattingToolbarState();
+    }
+
     private void OnTextBoxKeyUpForToolbar(object? sender, KeyEventArgs e)
     {
         if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ||
@@ -841,12 +857,20 @@ public partial class EditableBlock : UserControl
             _cachedSelectionRange = range;
             if (_formattingToolbarOverlayId == null)
                 ShowFormattingToolbar();
+            else
+                UpdateFormattingToolbarState();
         }
         else
         {
             _cachedSelectionRange = null;
             CloseFormattingToolbar();
         }
+    }
+
+    /// <summary>Called by BlockEditor when selection was set by cross-block drag (editor had capture so TextBox never got PointerReleased and toolbar never opened).</summary>
+    public void NotifySelectionChangedByEditor()
+    {
+        Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
     }
 
     private void ShowFormattingToolbar()
@@ -875,6 +899,7 @@ public partial class EditableBlock : UserControl
 
         _formattingToolbarOverlayId = _overlayService.CreateOverlay(toolbar, options, "InlineFormattingToolbar");
         AttachToolbarOutsideClickHandler(textBox);
+        Dispatcher.UIThread.Post(UpdateFormattingToolbarState, DispatcherPriority.Loaded);
     }
 
     private void CloseFormattingToolbar()
@@ -916,6 +941,39 @@ public partial class EditableBlock : UserControl
         var ptInWindow = textBox.TranslatePoint(new Point(0, 0), topLevel);
         if (!ptInWindow.HasValue) return true;
         return ptInWindow.Value.Y >= FormattingToolbarHeightEstimate;
+    }
+
+    private void UpdateFormattingToolbarState()
+    {
+        if (_currentFormattingToolbar == null || _cachedSelectionRange == null || _viewModel == null) return;
+        var (start, end) = _cachedSelectionRange.Value;
+        var state = GetFormatStateForRange(_viewModel.Runs, start, end);
+        _currentFormattingToolbar.UpdateFormatState(state.bold, state.italic, state.underline, state.strikethrough, state.highlight, state.backgroundColor);
+    }
+
+    private static (bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor) GetFormatStateForRange(IReadOnlyList<InlineRun> runs, int start, int end)
+    {
+        if (runs.Count == 0 || start >= end) return (false, false, false, false, false, null);
+        bool bold = true, italic = true, underline = true, strikethrough = true, highlight = true;
+        string? backgroundColor = null;
+        bool anyOverlap = false;
+        int pos = 0;
+        foreach (var run in runs)
+        {
+            int runEnd = pos + run.Text.Length;
+            if (runEnd <= start || pos >= end) { pos = runEnd; continue; }
+            anyOverlap = true;
+            if (!run.Style.Bold) bold = false;
+            if (!run.Style.Italic) italic = false;
+            if (!run.Style.Underline) underline = false;
+            if (!run.Style.Strikethrough) strikethrough = false;
+            if (run.Style.BackgroundColor == null) highlight = false;
+            else if (backgroundColor == null) backgroundColor = run.Style.BackgroundColor;
+            else if (backgroundColor != run.Style.BackgroundColor) highlight = false;
+            pos = runEnd;
+        }
+        if (!anyOverlap) return (false, false, false, false, false, null);
+        return (bold, italic, underline, strikethrough, highlight, backgroundColor);
     }
 
     private void OnFormatRequested(InlineFormatKind kind)
@@ -960,6 +1018,7 @@ public partial class EditableBlock : UserControl
         var parentEditor = FindParentBlockEditor();
         parentEditor?.TrackTypingEdit(_viewModel, previousText);
 
+        UpdateFormattingToolbarState();
         editor.Focus();
     }
 

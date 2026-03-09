@@ -26,6 +26,47 @@ public partial class InlineFormattingToolbar : UserControl
     /// <summary>Raised when a background color is selected from the color dropdown.</summary>
     public event Action<string>? BackgroundColorRequested;
 
+    private const string ActiveClass = "FormattingToolbarIconActive";
+
+    /// <summary>Updates toggle state of format buttons from the current selection.</summary>
+    public void UpdateFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor)
+    {
+        SetButtonActive("BoldButton", bold);
+        SetButtonActive("ItalicButton", italic);
+        SetButtonActive("UnderlineButton", underline);
+        SetButtonActive("StrikethroughButton", strikethrough);
+        SetButtonActive("HighlightButton", highlight);
+        if (this.FindControl<Ellipse>("ColorSwatch") is { } swatch && backgroundColor != null)
+        {
+            Color newColor = Colors.Transparent;
+            if (Color.TryParse(backgroundColor, out var c))
+            {
+                newColor = c;
+            }
+            else if (backgroundColor.StartsWith("swatch", StringComparison.OrdinalIgnoreCase) && Application.Current != null)
+            {
+                var key = "ColorSwatch" + backgroundColor.Substring(6);
+                if (Application.Current.TryFindResource(key, out var res) && res is Color rc)
+                    newColor = rc;
+            }
+
+            if (newColor != Colors.Transparent && !(swatch.Fill is SolidColorBrush solidBrush && solidBrush.Color == newColor))
+            {
+                swatch.Fill = new SolidColorBrush(newColor);
+            }
+        }
+    }
+
+    private void SetButtonActive(string name, bool active)
+    {
+        if (this.FindControl<Button>(name) is not { } btn) return;
+        var hasClass = btn.Classes.Contains(ActiveClass);
+        if (active && !hasClass)
+            btn.Classes.Add(ActiveClass);
+        else if (!active && hasClass)
+            btn.Classes.Remove(ActiveClass);
+    }
+
     public bool IsInteractingWithToolbar
     {
         get
@@ -106,13 +147,30 @@ public partial class InlineFormattingToolbar : UserControl
         _colorOverlayId = _overlayService.CreateOverlay(popup, options, "ColorSwatchPopup");
     }
 
-    private void OnSwatchColorSelected(string hex)
+    private void OnSwatchColorSelected(string colorOrSwatch)
     {
         _lastInteractionUtc = DateTime.UtcNow;
         CloseColorPopup();
         if (_colorSwatch != null)
-            _colorSwatch.Fill = new SolidColorBrush(Color.Parse(hex));
-        BackgroundColorRequested?.Invoke(hex);
+        {
+            Color newColor = Colors.Transparent;
+            if (Color.TryParse(colorOrSwatch, out var c))
+            {
+                newColor = c;
+            }
+            else if (colorOrSwatch.StartsWith("swatch", StringComparison.OrdinalIgnoreCase) && Application.Current != null)
+            {
+                var key = "ColorSwatch" + colorOrSwatch.Substring(6);
+                if (Application.Current.TryFindResource(key, out var res) && res is Color rc)
+                    newColor = rc;
+            }
+
+            if (newColor != Colors.Transparent)
+            {
+                _colorSwatch.Fill = new SolidColorBrush(newColor);
+            }
+        }
+        BackgroundColorRequested?.Invoke(colorOrSwatch);
     }
 
     private void CloseColorPopup()

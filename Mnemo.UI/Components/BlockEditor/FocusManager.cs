@@ -39,8 +39,12 @@ public class FocusManager
     {
         var targetCaret = caretPosition ?? editor.TextLength;
         editor.CaretIndex = targetCaret;
-        editor.SelectionStart = targetCaret;
-        editor.SelectionEnd = targetCaret;
+        // Don't overwrite selection when it was set by cross-block drag (FocusTextBox is posted on IsFocused, so it can run after PointerMoved has already set a range).
+        if (editor.SelectionStart == editor.SelectionEnd)
+        {
+            editor.SelectionStart = targetCaret;
+            editor.SelectionEnd = targetCaret;
+        }
         editor.Focus();
         _cachedEditor = editor;
     }
