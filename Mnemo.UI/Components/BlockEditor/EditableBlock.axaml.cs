@@ -1015,9 +1015,6 @@ public partial class EditableBlock : UserControl
 
         _cachedSelectionRange = (newSelStart, newSelEnd);
 
-        var parentEditor = FindParentBlockEditor();
-        parentEditor?.TrackTypingEdit(_viewModel, previousText);
-
         UpdateFormattingToolbarState();
         editor.Focus();
     }
@@ -1192,6 +1189,12 @@ public partial class EditableBlock : UserControl
         int end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
         if (start >= end) return null;
         return (start, end);
+    }
+
+    public int? GetCaretIndex()
+    {
+        var editor = GetEditor();
+        return editor?.CaretIndex;
     }
 
     public (int start, int end)? GetSelectionOrCaretRange()

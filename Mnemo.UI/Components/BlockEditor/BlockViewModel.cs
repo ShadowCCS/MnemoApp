@@ -58,6 +58,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 return;
 
             _previousContent = _cachedFlatContent;
+            _previousRuns = CloneRuns();
             _inlineRuns = InlineRunFormatApplier.ApplyTextEdit(_inlineRuns, _cachedFlatContent, newText);
             _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
             OnPropertyChanged();
@@ -94,6 +95,7 @@ public class BlockViewModel : INotifyPropertyChanged
     public void CommitRunsFromEditor(IReadOnlyList<InlineRun> newRuns)
     {
         _previousContent = _cachedFlatContent;
+        _previousRuns = CloneRuns();
         SetRuns(newRuns);
         ContentChanged?.Invoke(this);
     }
@@ -105,6 +107,7 @@ public class BlockViewModel : INotifyPropertyChanged
     public (int Start, int End) ApplyFormat(int start, int end, InlineFormatKind kind, string? color = null)
     {
         _previousContent = _cachedFlatContent;
+        _previousRuns = CloneRuns();
         _inlineRuns = InlineRunFormatApplier.Apply(_inlineRuns, start, end, kind, color);
         _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
         OnPropertyChanged(nameof(Content));
@@ -180,6 +183,7 @@ public class BlockViewModel : INotifyPropertyChanged
 
     private int? _pendingCaretIndex;
     private string? _previousContent;
+    private List<InlineRun>? _previousRuns;
 
     /// <summary>
     /// When set, EditableBlock should move the caret to this index after the next focus.
@@ -199,6 +203,15 @@ public class BlockViewModel : INotifyPropertyChanged
     {
         get => _previousContent;
         set => _previousContent = value;
+    }
+
+    /// <summary>
+    /// Set alongside PreviousContent to carry the pre-edit formatting runs.
+    /// </summary>
+    public List<InlineRun>? PreviousRuns
+    {
+        get => _previousRuns;
+        set => _previousRuns = value;
     }
 
     public bool IsChecked

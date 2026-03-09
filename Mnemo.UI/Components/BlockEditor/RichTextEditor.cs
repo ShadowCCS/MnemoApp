@@ -579,6 +579,12 @@ public class RichTextEditor : Control
                 break;
 
             case Key.A when ctrl:
+                if (Math.Min(SelectionStart, SelectionEnd) == 0 && Math.Max(SelectionStart, SelectionEnd) == TextLength)
+                {
+                    // Full text already selected, let parent (BlockEditor) handle it to select all blocks
+                    e.Handled = false;
+                    break;
+                }
                 SelectionStart = 0;
                 SelectionEnd = TextLength;
                 CaretIndex = TextLength;

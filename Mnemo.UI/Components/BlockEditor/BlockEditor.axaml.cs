@@ -97,6 +97,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         AddHandler(PointerReleasedEvent, Editor_PointerReleased, RoutingStrategies.Tunnel);
         // Tunnel so we get keys before the focused TextBox (for block-selection Backspace/Copy/Paste)
         AddHandler(KeyDownEvent, Editor_KeyDown, RoutingStrategies.Tunnel);
+        AddHandler(KeyDownEvent, Editor_KeyDown_Bubble, RoutingStrategies.Bubble);
         Loaded += Editor_Loaded;
         Unloaded += Editor_Unloaded;
 
@@ -328,13 +329,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         ClearBlockSelection();
         var prev = block.PreviousContent;
+        var prevRuns = block.PreviousRuns;
         block.PreviousContent = null;
+        block.PreviousRuns = null;
 
         if (!_isRestoringFromHistory && _pendingSnapshot == null)
         {
-            if (prev != null)
+            if (prev != null || prevRuns != null)
             {
-                TrackTypingEdit(block, prev);
+                TrackTypingEdit(block, prev ?? block.Content, prevRuns);
             }
             else
             {
@@ -925,6 +928,24 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (ctrlY || ctrlShiftZ)
         {
             _ = RedoAsync();
+            e.Handled = true;
+            return;
+        }
+    }
+
+    private void Editor_KeyDown_Bubble(object? sender, KeyEventArgs e)
+    {
+        if (e.Handled) return;
+
+        // 6. Ctrl+A: select all blocks
+        bool ctrlA = e.Key == Key.A && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
+        if (ctrlA)
+        {
+            ClearTextSelectionInAllBlocksExcept(-1);
+            foreach (var block in Blocks)
+            {
+                block.IsSelected = true;
+            }
             e.Handled = true;
         }
     }
@@ -1578,8 +1599,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         int idx = GetFocusedBlockIndex();
         if (idx < 0) return null;
         var editableBlock = GetEditableBlockAt(idx);
-        var range = editableBlock?.GetSelectionOrCaretRange();
-        return new CaretState { BlockIndex = idx, CaretPosition = range?.start ?? 0 };
+        var caretIdx = editableBlock?.GetCaretIndex();
+        return new CaretState { BlockIndex = idx, CaretPosition = caretIdx ?? 0 };
     }
 
     /// <summary>
@@ -1767,7 +1788,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// <paramref name="previousText"/> is the text *before* this edit (from EditorStateManager).
     /// Must not be null — caller must have a valid pre-edit snapshot.
     /// </summary>
-    internal void TrackTypingEdit(BlockViewModel block, string previousText)
+    internal void TrackTypingEdit(BlockViewModel block, string previousText, List<InlineRun>? previousRuns = null)
     {
         if (_history == null || _isRestoringFromHistory)
         {
@@ -1786,12 +1807,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (_typingBatchBlockId == null)
         {
             _typingBatchBlockId = block.Id;
-            _typingBatchRunsBefore = block.CloneRuns();
-            // Reconstruct the runs as they were *before* this edit using the previous text
-            if (previousText != block.Content)
+            
+            if (previousRuns != null)
             {
-                _typingBatchRunsBefore = Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(
-                    _typingBatchRunsBefore, block.Content, previousText);
+                _typingBatchRunsBefore = previousRuns;
+            }
+            else
+            {
+                _typingBatchRunsBefore = block.CloneRuns();
+                // Reconstruct the runs as they were *before* this edit using the previous text
+                if (previousText != block.Content)
+                {
+                    _typingBatchRunsBefore = Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(
+                        _typingBatchRunsBefore, block.Content, previousText);
+                }
             }
             _typingBatchCaretBefore = CaptureCaretState() ?? new CaretState { BlockIndex = idx, CaretPosition = 0 };
             BlockEditorLogger.Log($"TrackTypingEdit: NEW batch for block {block.Id} before={Truncate(previousText)} current={Truncate(block.Content)}");
@@ -1836,22 +1865,24 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var runsAfter = vm.CloneRuns();
         var runsBefore = _typingBatchRunsBefore ?? new List<InlineRun> { InlineRun.Plain(string.Empty) };
 
-        var textBefore = Core.Formatting.InlineRunFormatApplier.Flatten(runsBefore);
-        var textAfter = vm.Content ?? string.Empty;
+        bool runsEqual = runsBefore.Count == runsAfter.Count && runsBefore.SequenceEqual(runsAfter);
 
-        if (textBefore == textAfter)
+        if (runsEqual)
         {
-            BlockEditorLogger.Log($"FlushTypingBatch: no-op (before==after) block={_typingBatchBlockId} text={Truncate(textBefore)}");
+            BlockEditorLogger.Log($"FlushTypingBatch: no-op (runs equal) block={_typingBatchBlockId}");
             _typingBatchBlockId = null;
             _typingBatchRunsBefore = null;
             _typingBatchCaretBefore = null;
             return;
         }
 
+        var textBefore = Core.Formatting.InlineRunFormatApplier.Flatten(runsBefore);
+        var textAfter = vm.Content ?? string.Empty;
+
         var idx = Blocks.IndexOf(vm);
         var editableBlock = GetEditableBlockAt(idx);
-        var range = editableBlock?.GetSelectionOrCaretRange();
-        var caretAfter = new CaretState { BlockIndex = idx, CaretPosition = range?.start ?? 0 };
+        var caretIdx = editableBlock?.GetCaretIndex();
+        var caretAfter = new CaretState { BlockIndex = idx, CaretPosition = caretIdx ?? 0 };
 
         BlockEditorLogger.Log($"FlushTypingBatch: PUSH TextEditOp block={vm.Id} before={Truncate(textBefore)} after={Truncate(textAfter)}");
 
