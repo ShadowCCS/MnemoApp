@@ -583,18 +583,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
-        // Double/triple clicks: still clear other blocks so only the block under the tap has selection, then let event reach TextBox for word/line selection.
+        // Double/triple clicks: clear all blocks so only the block under the tap will get word/line selection from TextBox.
         if (e.ClickCount > 1)
         {
             var pt = e.GetPosition(this);
             if (IsPointInsideAnyBlock(pt))
             {
-                var blockIndex = GetBlockIndexAtPoint(pt);
-                if (blockIndex >= 0 && blockIndex < Blocks.Count)
-                {
-                    ClearBlockSelection();
-                    ClearTextSelectionInAllBlocksExcept(blockIndex);
-                }
+                ClearBlockSelection();
+                ClearTextSelectionInAllBlocksExcept(-1);
             }
             return;
         }
@@ -626,7 +622,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             // the caret from the click (HitTestPoint). Otherwise we'd set Handled and the caret would never move.
             if (vm.IsFocused)
             {
-                ClearTextSelectionInAllBlocksExcept(blockIndex);
+                // Clear all blocks so the other block's selection always breaks; don't rely on GetBlockIndexAtPoint.
+                ClearTextSelectionInAllBlocksExcept(-1);
                 ClearBlockSelection();
                 return;
             }
@@ -643,8 +640,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             _crossBlockArmed = true;
             _isCrossBlockSelecting = false;
 
+            // Clear all blocks first so the other block's selection always breaks; then set this block's caret.
+            ClearTextSelectionInAllBlocksExcept(-1);
             editableBlock.ApplyTextSelection(_crossBlockAnchorCharIndex, _crossBlockAnchorCharIndex);
-            ClearTextSelectionInAllBlocksExcept(blockIndex);
             // Set PendingCaretIndex before IsFocused so FocusTextBox lands at the click position
             // directly — without this it would snap to the end first, causing a visible flicker.
             vm.PendingCaretIndex = _crossBlockAnchorCharIndex;

@@ -412,6 +412,27 @@ public class RichTextEditor : Control
         }
     }
 
+    /// <summary>Returns the bounding rect of the current selection in local coordinates, or null if no selection or layout not ready.</summary>
+    public Rect? GetSelectionBounds()
+    {
+        int selStart = Math.Min(_selectionStart, _selectionEnd);
+        int selEnd = Math.Max(_selectionStart, _selectionEnd);
+        if (selEnd <= selStart || _textLayout == null) return null;
+        try
+        {
+            var rects = _textLayout.HitTestTextRange(selStart, selEnd - selStart).ToList();
+            if (rects.Count == 0) return null;
+            var r = rects[0];
+            for (int i = 1; i < rects.Count; i++)
+                r = r.Union(rects[i]);
+            return r;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private Rect GetCaretRect()
     {
         if (_textLayout == null) return new Rect(0, 0, 1, FontSize);

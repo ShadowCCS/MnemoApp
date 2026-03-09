@@ -890,12 +890,36 @@ public partial class EditableBlock : UserControl
         {
             ShowBackdrop = false,
             CloseOnOutsideClick = true,
-            AnchorControl = textBox,
-            AnchorPosition = showAbove ? AnchorPosition.TopLeft : AnchorPosition.BottomLeft,
             AnchorOffset = showAbove ? new Thickness(0, -8, 0, 0) : new Thickness(0, 4, 0, 0),
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
         };
+
+        // Position by selection center when available so toolbar appears near selected text (e.g. on right side)
+        if (textBox is RichTextEditor rte)
+        {
+            var selBounds = rte.GetSelectionBounds();
+            var topLevel = textBox.FindAncestorOfType<TopLevel>();
+            if (selBounds is { } rect && topLevel != null)
+            {
+                var centerX = rect.X + rect.Width / 2;
+                var ptCenter = textBox.TranslatePoint(new Point(centerX, 0), topLevel);
+                var ptTop = textBox.TranslatePoint(new Point(0, rect.Top), topLevel);
+                var ptBottom = textBox.TranslatePoint(new Point(0, rect.Bottom), topLevel);
+                if (ptCenter.HasValue && ptTop.HasValue && ptBottom.HasValue)
+                {
+                    options.AnchorPointX = ptCenter.Value.X;
+                    options.AnchorPointY = showAbove ? ptTop.Value.Y : ptBottom.Value.Y;
+                    options.AnchorPosition = showAbove ? AnchorPosition.TopCenter : AnchorPosition.BottomCenter;
+                }
+            }
+        }
+
+        if (!options.AnchorPointX.HasValue)
+        {
+            options.AnchorControl = textBox;
+            options.AnchorPosition = showAbove ? AnchorPosition.TopLeft : AnchorPosition.BottomLeft;
+        }
 
         _formattingToolbarOverlayId = _overlayService.CreateOverlay(toolbar, options, "InlineFormattingToolbar");
         AttachToolbarOutsideClickHandler(textBox);
@@ -1287,7 +1311,9 @@ public partial class EditableBlock : UserControl
 
         bool isClear = selStart == 0 && selEnd == 0;
         bool alreadyClear = editor.SelectionStart == 0 && editor.SelectionEnd == 0;
-        if (isClear && (editor.IsFocused || alreadyClear)) return;
+        // Don't skip based on editor.IsFocused: when clearing cross-block selection the "other" block
+        // may still have keyboard focus, and we must clear it so selection reliably breaks.
+        if (isClear && alreadyClear) return;
 
         editor.SelectionStart = selStart;
         editor.SelectionEnd = selEnd;

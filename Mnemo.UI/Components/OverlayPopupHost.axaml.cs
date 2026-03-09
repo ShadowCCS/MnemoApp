@@ -70,9 +70,9 @@ namespace Mnemo.UI.Components
 
             foreach (var overlay in OverlayService.Overlays)
             {
-                if (overlay.Options.AnchorControl != null)
+                if (overlay.Options.AnchorControl != null || (overlay.Options.AnchorPointX.HasValue && overlay.Options.AnchorPointY.HasValue))
                 {
-                    var calculatedMargin = CalculateAnchorMargin(overlay, topLevel);
+                    var calculatedMargin = CalculateAnchorMargin(overlay, topLevel, null);
                     if (calculatedMargin.HasValue)
                     {
                         overlay.Options.Margin = calculatedMargin.Value;
@@ -81,8 +81,36 @@ namespace Mnemo.UI.Components
             }
         }
 
-        private Thickness? CalculateAnchorMargin(OverlayInstance overlay, TopLevel topLevel)
+        private Thickness? CalculateAnchorMargin(OverlayInstance overlay, TopLevel topLevel, Size? overlaySize)
         {
+            var offset = overlay.Options.AnchorOffset as Thickness? ?? new Thickness(0);
+            double x, y;
+
+            if (overlay.Options.AnchorPointX is { } px && overlay.Options.AnchorPointY is { } py)
+            {
+                if (!overlaySize.HasValue)
+                    return null;
+                var pos = overlay.Options.AnchorPosition;
+                var w = overlaySize.Value.Width;
+                var h = overlaySize.Value.Height;
+                if (pos == AnchorPosition.TopCenter)
+                {
+                    x = px - w / 2;
+                    y = py - h - (offset.Top <= 0 ? -offset.Top : 4);
+                }
+                else if (pos == AnchorPosition.BottomCenter)
+                {
+                    x = px - w / 2;
+                    y = py + (offset.Top > 0 ? offset.Top : 4);
+                }
+                else
+                {
+                    x = px;
+                    y = py;
+                }
+                return new Thickness(x + offset.Left, y + offset.Top, offset.Right, offset.Bottom);
+            }
+
             var anchor = overlay.Options.AnchorControl as Control;
             if (anchor == null) return null;
             if (!anchor.IsVisible) return null;
@@ -94,10 +122,9 @@ namespace Mnemo.UI.Components
 
                 var anchorWidth = anchor.Bounds.Width;
                 var anchorHeight = anchor.Bounds.Height;
-                var offset = overlay.Options.AnchorOffset as Thickness? ?? new Thickness(0);
 
-                double x = anchorBounds.Value.X;
-                double y = anchorBounds.Value.Y;
+                x = anchorBounds.Value.X;
+                y = anchorBounds.Value.Y;
 
                 switch (overlay.Options.AnchorPosition)
                 {
@@ -193,14 +220,23 @@ namespace Mnemo.UI.Components
             var topLevel = this.FindAncestorOfType<TopLevel>();
             if (topLevel == null) return;
 
-            if (overlay.Options.AnchorControl != null)
+            var usePointAnchor = overlay.Options.AnchorPointX.HasValue && overlay.Options.AnchorPointY.HasValue;
+            if (usePointAnchor && border.Bounds.Height <= 0)
             {
-                var calculatedMargin = CalculateAnchorMargin(overlay, topLevel);
+                Dispatcher.UIThread.Post(() => UpdateOverlayPosition(border, overlay), DispatcherPriority.Loaded);
+                return;
+            }
+
+            if (overlay.Options.AnchorControl != null || usePointAnchor)
+            {
+                var overlaySize = usePointAnchor ? new Size(border.Bounds.Width, border.Bounds.Height) : (Size?)null;
+                var calculatedMargin = CalculateAnchorMargin(overlay, topLevel, overlaySize);
                 if (calculatedMargin.HasValue)
                 {
                     var margin = calculatedMargin.Value;
-                    // For TopLeft: position so overlay BOTTOM is just above the anchor (no overlap)
-                    if (overlay.Options.AnchorPosition == AnchorPosition.TopLeft &&
+                    // For TopLeft (control anchor only): position so overlay BOTTOM is just above the anchor (no overlap)
+                    if (!usePointAnchor &&
+                        overlay.Options.AnchorPosition == AnchorPosition.TopLeft &&
                         overlay.Options.AnchorControl is Control anchor &&
                         anchor.TranslatePoint(new Point(0, 0), topLevel) is { } anchorPt)
                     {
@@ -212,8 +248,8 @@ namespace Mnemo.UI.Components
                         }
                         else
                         {
-                            // Height not yet available; re-run after layout so we can position correctly
                             Dispatcher.UIThread.Post(() => UpdateOverlayPosition(border, overlay), DispatcherPriority.Loaded);
+                            return;
                         }
                     }
                     // Prevent layout loops by using RenderTransform for anchored overlays instead of Margin.

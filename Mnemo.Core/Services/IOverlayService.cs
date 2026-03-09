@@ -21,6 +21,9 @@ public class OverlayOptions
 {
     public object? AnchorControl { get; set; } 
     public AnchorPosition AnchorPosition { get; set; }
+    /// <summary>When set with AnchorPointY, positions overlay by this point (e.g. selection center) in top-level coordinates instead of AnchorControl.</summary>
+    public double? AnchorPointX { get; set; }
+    public double? AnchorPointY { get; set; }
     public object? AnchorOffset { get; set; } 
     public object Margin { get; set; } = "0";
     public bool CloseOnOutsideClick { get; set; } = true;
