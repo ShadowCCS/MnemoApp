@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Mnemo.UI.Modules.Mindmap.ViewModels;
 
 namespace Mnemo.UI.Modules.Mindmap.Views;
@@ -18,12 +19,26 @@ public partial class MindmapView : UserControl
     private double _gridOpacity = 0.2;
     private string _gridType = "Dotted";
     private string _modifierBehaviour = "Selecting";
+    private string _minimapVisibilityMode = "Auto";
 
     private const double DotScaleExponent = 0.35;
     private const double BaseDotScreenPixels = 3.5;
     private const double MinDotSourceSize = 0.5;
     private const double MaxDotSourceSize = 10.0;
 
+    private Matrix _minimapMatrix = Matrix.Identity;
+    private Rect _viewportRectInMinimap;
+    private enum MinimapDragMode { None, ViewportRect, Outside }
+    private MinimapDragMode _minimapDragMode = MinimapDragMode.None;
+    private Point _minimapPressContentPoint; // content point at press (for viewport drag delta)
+    private Point _minimapLastMmPoint;       // last minimap position (for 1:1 pan)
+    private bool _minimapHasMoved;
+    private double _lastMinimapWidth;
+    private double _lastMinimapHeight;
+    private double _lastMainCanvasWidth;
+    private double _minimapContentMinX, _minimapContentMaxX, _minimapContentMinY, _minimapContentMaxY;
+    private bool _minimapContentBoundsInitialized;
+    private double _lastMainCanvasHeight;
     private bool _isDragging;
     private bool _isPanning;
     private bool _isSelecting;
@@ -40,6 +55,8 @@ public partial class MindmapView : UserControl
     private Border? _selectionBox;
 
     private const double ClickDragThreshold = 5.0; // pixels
+    private const double MinimapZoomThreshold = 0.6; // show minimap when scale <= 60%
+    private const int MinimapEaseMs = 250;
 
     public MindmapView()
     {
@@ -55,7 +72,9 @@ public partial class MindmapView : UserControl
         _selectionBox = this.FindControl<Border>("SelectionBox");
 
         DataContextChanged += OnDataContextChanged;
-        
+
+        Loaded += OnViewLoaded;
+
         // Try to get settings service from global locator or wait for DataContext
         if (Application.Current is Mnemo.UI.App mnemoApp && mnemoApp.Services != null)
         {
@@ -67,6 +86,13 @@ public partial class MindmapView : UserControl
             _settingsService.SettingChanged += OnSettingChanged;
             _ = LoadSettingsAsync();
         }
+    }
+
+    private void OnViewLoaded(object? sender, RoutedEventArgs e)
+    {
+        UpdateMinimap();
+        UpdateMinimapVisibility();
+        Loaded -= OnViewLoaded;
     }
 
     private void OnSettingChanged(object? sender, string key)
@@ -83,6 +109,13 @@ public partial class MindmapView : UserControl
         {
             Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(LoadSettingsAsync);
         }
+        else if (key == "Mindmap.MinimapVisibility")
+        {
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () => {
+                await LoadSettingsAsync();
+                UpdateMinimapVisibility();
+            });
+        }
     }
 
     private async Task LoadSettingsAsync()
@@ -91,6 +124,7 @@ public partial class MindmapView : UserControl
         
         _gridType = await _settingsService.GetAsync("Mindmap.GridType", "Dotted");
         _modifierBehaviour = await _settingsService.GetAsync("Mindmap.ModifierBehaviour", "Selecting");
+        _minimapVisibilityMode = await _settingsService.GetAsync("Mindmap.MinimapVisibility", "Auto") ?? "Auto";
         var sizeStr = await _settingsService.GetAsync("Mindmap.GridSize", "40");
         var dotSizeStr = await _settingsService.GetAsync("Mindmap.GridDotSize", "1.5");
         var opacityStr = await _settingsService.GetAsync("Mindmap.GridOpacity", "0.2");
@@ -98,6 +132,8 @@ public partial class MindmapView : UserControl
         if (double.TryParse(sizeStr, System.Globalization.CultureInfo.InvariantCulture, out var size)) _gridSpacing = size;
         if (double.TryParse(dotSizeStr, System.Globalization.CultureInfo.InvariantCulture, out var dotSize)) _gridDotSize = dotSize;
         if (double.TryParse(opacityStr, System.Globalization.CultureInfo.InvariantCulture, out var opacity)) _gridOpacity = opacity;
+
+        UpdateMinimapVisibility();
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -111,6 +147,18 @@ public partial class MindmapView : UserControl
 
     private void OnNodesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
+        // Subscribe/unsubscribe node property changes so minimap updates when nodes move
+        if (e.NewItems != null)
+        {
+            foreach (NodeViewModel node in e.NewItems)
+                node.PropertyChanged += OnNodePropertyChangedForMinimap;
+        }
+        if (e.OldItems != null)
+        {
+            foreach (NodeViewModel node in e.OldItems)
+                node.PropertyChanged -= OnNodePropertyChangedForMinimap;
+        }
+
         // Auto-recenter after nodes are loaded, with a delay to allow layout
         if (DataContext is MindmapViewModel vm && vm.Nodes.Any())
         {
@@ -118,7 +166,17 @@ public partial class MindmapView : UserControl
             {
                 await Task.Delay(50); // Allow layout to complete
                 RecenterView();
+                UpdateMinimap();
             });
+        }
+    }
+
+    private void OnNodePropertyChangedForMinimap(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(NodeViewModel.X) or nameof(NodeViewModel.Y)
+                            or nameof(NodeViewModel.Width) or nameof(NodeViewModel.Height))
+        {
+            UpdateMinimap();
         }
     }
 
@@ -131,6 +189,8 @@ public partial class MindmapView : UserControl
     {
         if (e.NewSize.Width > 0 && e.NewSize.Height > 0)
         {
+            _lastMainCanvasWidth = e.NewSize.Width;
+            _lastMainCanvasHeight = e.NewSize.Height;
             UpdateTransform();
         }
     }
@@ -141,42 +201,21 @@ public partial class MindmapView : UserControl
 
         var nodes = vm.Nodes;
 
-        // Calculate bounding box of all nodes
-        double minX = nodes.Min(n => n.X);
-        double maxX = nodes.Max(n => n.X + (n.Width ?? 120));
-        double minY = nodes.Min(n => n.Y);
-        double maxY = nodes.Max(n => n.Y + (n.Height ?? 40));
+        double centerX = (nodes.Min(n => n.X) + nodes.Max(n => n.X + (n.Width ?? 120))) / 2;
+        double centerY = (nodes.Min(n => n.Y) + nodes.Max(n => n.Y + (n.Height ?? 40))) / 2;
 
-        double centerX = (minX + maxX) / 2;
-        double centerY = (minY + maxY) / 2;
-        double width = maxX - minX;
-        double height = maxY - minY;
-
-        // Get viewport size
         var mainCanvas = this.FindControl<Panel>("MainCanvas");
         if (mainCanvas == null) return;
 
         double viewportWidth = mainCanvas.Bounds.Width;
         double viewportHeight = mainCanvas.Bounds.Height;
-
         if (viewportWidth <= 0 || viewportHeight <= 0) return;
 
-        // Calculate scale to fit with padding
-        double padding = 50;
-        double scaleX = (viewportWidth - padding * 2) / Math.Max(width, 1);
-        double scaleY = (viewportHeight - padding * 2) / Math.Max(height, 1);
-        double scale = Math.Min(scaleX, scaleY);
-        scale = Math.Clamp(scale, MinScale, MaxScale);
-
-        // Reset transform
-        _transformMatrix = Matrix.Identity;
-
-        // Center the content
-        // offset = viewportCenter - contentCenter * scale (for S * T order)
+        // Keep current zoom; only pan so content center is at viewport center
+        double scale = GetScaleFromMatrix(_transformMatrix);
         double offsetX = viewportWidth / 2 - centerX * scale;
         double offsetY = viewportHeight / 2 - centerY * scale;
 
-        // Scale first, then translate: point * scale + offset
         _transformMatrix = Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(offsetX, offsetY);
         UpdateTransform();
     }
@@ -236,10 +275,34 @@ public partial class MindmapView : UserControl
         var canvas = this.FindControl<Panel>("TransformCanvas");
         if (canvas != null)
         {
+            // Assign new instance so Avalonia sees a change and applies zoom/pan
             canvas.RenderTransform = new MatrixTransform(_transformMatrix);
+            canvas.InvalidateArrange();
+            canvas.InvalidateVisual();
         }
 
         UpdateGrid();
+        UpdateMinimap();
+        UpdateMinimapVisibility();
+        // Run again after layout so viewport box uses definitive Bounds
+        Avalonia.Threading.Dispatcher.UIThread.Post(UpdateMinimap, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void UpdateMinimapVisibility()
+    {
+        var minimapBorder = this.FindControl<Border>("MinimapBorder");
+        if (minimapBorder == null) return;
+
+        bool byZoom = GetScaleFromMatrix(_transformMatrix) <= MinimapZoomThreshold;
+        bool visible = _minimapVisibilityMode switch
+        {
+            "Off" => false,
+            "On" => true,
+            _ => byZoom // "Auto" or any other
+        };
+
+        minimapBorder.Opacity = visible ? 1 : 0;
+        minimapBorder.IsHitTestVisible = visible;
     }
 
     private Color? GetGridColorFromTheme()
@@ -472,6 +535,7 @@ public partial class MindmapView : UserControl
             }
             
             _lastPointerPosition = currentPosition;
+            UpdateMinimap();
             e.Handled = true;
         }
         else if (_isPanning)
@@ -625,5 +689,285 @@ public partial class MindmapView : UserControl
             contentControl.Width = double.NaN;
             contentControl.Height = double.NaN;
         }
+    }
+
+    private void UpdateMinimap()
+    {
+        var minimapPanel = this.FindControl<Panel>("MinimapPanel");
+        var minimapTransformPanel = this.FindControl<Panel>("MinimapTransformPanel");
+        var minimapViewportBox = this.FindControl<Border>("MinimapViewportBox");
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
+
+        if (minimapPanel == null || minimapTransformPanel == null || minimapViewportBox == null || mainCanvas == null) return;
+
+        if (DataContext is not MindmapViewModel vm || !vm.Nodes.Any())
+        {
+            minimapViewportBox.IsVisible = false;
+            _minimapContentBoundsInitialized = false;
+            return;
+        }
+
+        minimapViewportBox.IsVisible = true;
+
+        double minimapWidth = minimapPanel.Bounds.Width > 0 ? minimapPanel.Bounds.Width : _lastMinimapWidth;
+        double minimapHeight = minimapPanel.Bounds.Height > 0 ? minimapPanel.Bounds.Height : _lastMinimapHeight;
+        if (minimapWidth <= 0 || minimapHeight <= 0) return;
+
+        _lastMinimapWidth = minimapWidth;
+        _lastMinimapHeight = minimapHeight;
+
+        // --- Fit all nodes into the minimap (allow shrink, never grow so dragging a node out doesn't expand minimap) ---
+        var nodes = vm.Nodes;
+        double curMinX = nodes.Min(n => n.X);
+        double curMaxX = nodes.Max(n => n.X + (n.Width ?? 120));
+        double curMinY = nodes.Min(n => n.Y);
+        double curMaxY = nodes.Max(n => n.Y + (n.Height ?? 40));
+
+        if (!_minimapContentBoundsInitialized)
+        {
+            _minimapContentMinX = curMinX;
+            _minimapContentMaxX = curMaxX;
+            _minimapContentMinY = curMinY;
+            _minimapContentMaxY = curMaxY;
+            _minimapContentBoundsInitialized = true;
+        }
+        else
+        {
+            // Only shrink the tracked bounds when content is fully inside (never grow)
+            if (curMinX >= _minimapContentMinX && curMaxX <= _minimapContentMaxX &&
+                curMinY >= _minimapContentMinY && curMaxY <= _minimapContentMaxY)
+            {
+                _minimapContentMinX = curMinX;
+                _minimapContentMaxX = curMaxX;
+                _minimapContentMinY = curMinY;
+                _minimapContentMaxY = curMaxY;
+            }
+        }
+
+        double minX = _minimapContentMinX;
+        double maxX = _minimapContentMaxX;
+        double minY = _minimapContentMinY;
+        double maxY = _minimapContentMaxY;
+        double contentWidth  = maxX - minX;
+        double contentHeight = maxY - minY;
+
+        const double padding = 10;
+        double scaleX = (minimapWidth  - padding * 2) / Math.Max(contentWidth,  1);
+        double scaleY = (minimapHeight - padding * 2) / Math.Max(contentHeight, 1);
+        double mmScaleFit = Math.Min(scaleX, scaleY);
+        double viewportScale = GetScaleFromMatrix(_transformMatrix);
+        double mmScale = mmScaleFit * viewportScale;
+
+        // Offset so node content is centered in the minimap
+        double mmOffsetX = minimapWidth  / 2.0 - (minX + contentWidth  / 2.0) * mmScale;
+        double mmOffsetY = minimapHeight / 2.0 - (minY + contentHeight / 2.0) * mmScale;
+
+        var minimapMatrix = Matrix.CreateScale(mmScale, mmScale)
+                          * Matrix.CreateTranslation(mmOffsetX, mmOffsetY);
+
+        if (minimapTransformPanel.RenderTransform is MatrixTransform mmt)
+            mmt.Matrix = minimapMatrix;
+        else
+            minimapTransformPanel.RenderTransform = new MatrixTransform(minimapMatrix);
+
+        _minimapMatrix = minimapMatrix;
+
+        // Size transform panel to fill minimap (Canvas does not size children)
+        minimapTransformPanel.Width = minimapWidth;
+        minimapTransformPanel.Height = minimapHeight;
+
+        minimapTransformPanel.InvalidateVisual();
+
+        // --- Map the main viewport into minimap space ---
+        double vpWidth  = mainCanvas.Bounds.Width  > 0 ? mainCanvas.Bounds.Width  : _lastMainCanvasWidth;
+        double vpHeight = mainCanvas.Bounds.Height > 0 ? mainCanvas.Bounds.Height : _lastMainCanvasHeight;
+        if (vpWidth <= 0 || vpHeight <= 0) return;
+
+        _lastMainCanvasWidth  = vpWidth;
+        _lastMainCanvasHeight = vpHeight;
+
+        double det = _transformMatrix.M11 * _transformMatrix.M22
+                   - _transformMatrix.M12 * _transformMatrix.M21;
+        if (Math.Abs(det) < 1e-10) return;
+
+        // _transformMatrix: content → screen.  Invert to get screen → content.
+        var invMain = _transformMatrix.Invert();
+
+        // Viewport corners in screen space → content space → minimap space
+        var tlContent = new Point(0,       0)       * invMain;
+        var brContent = new Point(vpWidth, vpHeight) * invMain;
+
+        var tlMm = tlContent * minimapMatrix;
+        var brMm = brContent * minimapMatrix;
+
+        double boxX = Math.Min(tlMm.X, brMm.X);
+        double boxY = Math.Min(tlMm.Y, brMm.Y);
+        double boxW = Math.Abs(brMm.X - tlMm.X);
+        double boxH = Math.Abs(brMm.Y - tlMm.Y);
+
+        _viewportRectInMinimap = new Rect(boxX, boxY, boxW, boxH);
+
+
+        const double viewportBoxScale = 0.90;
+        double displayW = Math.Max(boxW * viewportBoxScale, 2);
+        double displayH = Math.Max(boxH * viewportBoxScale, 2);
+        double displayX = boxX + (boxW - displayW) / 2;
+        double displayY = boxY + (boxH - displayH) / 2;
+
+        minimapViewportBox.Width  = displayW;
+        minimapViewportBox.Height = displayH;
+
+        if (minimapViewportBox.RenderTransform is TranslateTransform tt)
+        {
+            tt.X = displayX;
+            tt.Y = displayY;
+        }
+        else
+            minimapViewportBox.RenderTransform = new TranslateTransform(displayX, displayY);
+
+        minimapViewportBox.InvalidateVisual();
+    }
+
+    private void OnMinimapSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (e.NewSize.Width > 0 && e.NewSize.Height > 0)
+        {
+            _lastMinimapWidth = e.NewSize.Width;
+            _lastMinimapHeight = e.NewSize.Height;
+        }
+        UpdateMinimap();
+    }
+
+    private void OnMinimapPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var properties = e.GetCurrentPoint(this).Properties;
+        if (!properties.IsLeftButtonPressed) return;
+
+        var minimapPanel = this.FindControl<Panel>("MinimapPanel");
+        if (minimapPanel == null) return;
+
+        var ptMm = e.GetPosition(minimapPanel);
+        _minimapHasMoved = false;
+        bool onViewport = _viewportRectInMinimap.Contains(ptMm);
+
+        if (onViewport)
+        {
+            _minimapDragMode = MinimapDragMode.ViewportRect;
+            _minimapLastMmPoint = ptMm;
+        }
+        else
+        {
+            _minimapDragMode = MinimapDragMode.Outside;
+            _minimapLastMmPoint = ptMm;
+            var invMinimap = _minimapMatrix.Invert();
+            _minimapPressContentPoint = ptMm * invMinimap;
+            // Snap viewport to cursor position (instant), then subsequent move will pan
+            CenterViewportOnContentPoint(_minimapPressContentPoint);
+        }
+        e.Handled = true;
+    }
+
+    private void OnMinimapPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_minimapDragMode == MinimapDragMode.None) return;
+
+        var minimapPanel = this.FindControl<Panel>("MinimapPanel");
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
+        if (minimapPanel == null || mainCanvas == null) return;
+
+        var ptMm = e.GetPosition(minimapPanel);
+        double mmScale = Math.Sqrt(_minimapMatrix.M11 * _minimapMatrix.M11 + _minimapMatrix.M12 * _minimapMatrix.M12);
+        if (mmScale < 1e-10) return;
+
+        if (Math.Abs(ptMm.X - _minimapLastMmPoint.X) > ClickDragThreshold ||
+            Math.Abs(ptMm.Y - _minimapLastMmPoint.Y) > ClickDragThreshold)
+            _minimapHasMoved = true;
+
+        if (_minimapDragMode == MinimapDragMode.ViewportRect)
+        {
+            // 1:1 pan: delta in minimap space → same delta in content space → screen delta = contentDelta * scale
+            double scale = GetScaleFromMatrix(_transformMatrix);
+            double contentDx = (ptMm.X - _minimapLastMmPoint.X) / mmScale;
+            double contentDy = (ptMm.Y - _minimapLastMmPoint.Y) / mmScale;
+            double screenDx = contentDx * scale;
+            double screenDy = contentDy * scale;
+            _transformMatrix = _transformMatrix * Matrix.CreateTranslation(screenDx, screenDy);
+            UpdateTransform();
+        }
+        else if (_minimapDragMode == MinimapDragMode.Outside)
+        {
+            // Pan so that content under cursor stays under cursor (same as snap then drag)
+            var invMinimap = _minimapMatrix.Invert();
+            var contentPoint = ptMm * invMinimap;
+            CenterViewportOnContentPoint(contentPoint);
+        }
+
+        _minimapLastMmPoint = ptMm;
+        e.Handled = true;
+    }
+
+    private void OnMinimapPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_minimapDragMode == MinimapDragMode.Outside && !_minimapHasMoved)
+        {
+            // Click (no drag): center on point with short ease animation
+            CenterViewportOnContentPointWithEase(_minimapPressContentPoint);
+        }
+        _minimapDragMode = MinimapDragMode.None;
+        e.Handled = true;
+    }
+
+    private void CenterViewportOnContentPoint(Point contentPoint)
+    {
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
+        if (mainCanvas == null) return;
+        double vpW = mainCanvas.Bounds.Width > 0 ? mainCanvas.Bounds.Width : _lastMainCanvasWidth;
+        double vpH = mainCanvas.Bounds.Height > 0 ? mainCanvas.Bounds.Height : _lastMainCanvasHeight;
+        if (vpW <= 0 || vpH <= 0) return;
+        double scale = GetScaleFromMatrix(_transformMatrix);
+        double offsetX = vpW / 2.0 - contentPoint.X * scale;
+        double offsetY = vpH / 2.0 - contentPoint.Y * scale;
+        _transformMatrix = Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(offsetX, offsetY);
+        UpdateTransform();
+    }
+
+    private void CenterViewportOnContentPointWithEase(Point contentPoint)
+    {
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
+        if (mainCanvas == null) return;
+        double vpW = mainCanvas.Bounds.Width > 0 ? mainCanvas.Bounds.Width : _lastMainCanvasWidth;
+        double vpH = mainCanvas.Bounds.Height > 0 ? mainCanvas.Bounds.Height : _lastMainCanvasHeight;
+        if (vpW <= 0 || vpH <= 0) return;
+        double scale = GetScaleFromMatrix(_transformMatrix);
+        double targetOffsetX = vpW / 2.0 - contentPoint.X * scale;
+        double targetOffsetY = vpH / 2.0 - contentPoint.Y * scale;
+        var targetMatrix = Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(targetOffsetX, targetOffsetY);
+
+        var startMatrix = _transformMatrix;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var timer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(16)
+        };
+        void Tick(object? s, EventArgs args)
+        {
+            double t = sw.ElapsedMilliseconds / (double)MinimapEaseMs;
+            if (t >= 1)
+            {
+                _transformMatrix = targetMatrix;
+                UpdateTransform();
+                timer.Stop();
+                timer.Tick -= Tick;
+                return;
+            }
+            double u = 1 - t;
+            double e = 1 - (u * u * u); // ease-out cubic
+            double m31 = startMatrix.M31 + (targetMatrix.M31 - startMatrix.M31) * e;
+            double m32 = startMatrix.M32 + (targetMatrix.M32 - startMatrix.M32) * e;
+            _transformMatrix = new Matrix(scale, 0, 0, scale, m31, m32);
+            UpdateTransform();
+        }
+        timer.Tick += Tick;
+        timer.Start();
     }
 }

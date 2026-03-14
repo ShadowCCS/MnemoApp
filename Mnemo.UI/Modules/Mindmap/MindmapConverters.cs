@@ -5,6 +5,8 @@ using Avalonia.Collections;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Mnemo.Core.Models.Mindmap;
+using Mnemo.Core.Services;
+using Mnemo.UI;
 using Mnemo.UI.Modules.Mindmap.ViewModels;
 using LayoutAlgorithms = Mnemo.Core.Models.Mindmap.LayoutAlgorithms;
 
@@ -79,19 +81,21 @@ public class MindmapMinSizeConverter : IValueConverter
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
 }
 
-/// <summary>Converts layout algorithm ID to display name for the layout dropdown.</summary>
+/// <summary>Converts layout algorithm ID to display name for the layout dropdown using Mindmap namespace.</summary>
 public class LayoutAlgorithmToDisplayNameConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        return value switch
+        if (value is not string id) return value?.ToString();
+        var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+        var key = id switch
         {
-            nameof(LayoutAlgorithms.Freeform) => "Freeform",
-            nameof(LayoutAlgorithms.TreeVertical) => "Tree (vertical)",
-            nameof(LayoutAlgorithms.TreeHorizontal) => "Tree (horizontal)",
-            nameof(LayoutAlgorithms.Radial) => "Radial",
-            _ => value?.ToString()
+            LayoutAlgorithms.TreeVertical => "LayoutTreeVertical",
+            LayoutAlgorithms.TreeHorizontal => "LayoutTreeHorizontal",
+            LayoutAlgorithms.Radial => "LayoutRadial",
+            _ => null
         };
+        return key != null ? loc?.T(key, "Mindmap") ?? id : id;
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();

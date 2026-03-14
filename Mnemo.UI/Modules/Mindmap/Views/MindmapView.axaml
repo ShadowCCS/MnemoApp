@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Mnemo.UI.Modules.Mindmap.ViewModels"
              xmlns:local="using:Mnemo.UI.Modules.Mindmap"
+             xmlns:markup="using:Mnemo.UI.Markup"
              xmlns:converters="using:Mnemo.UI.Converters"
              xmlns:controls="using:Mnemo.UI.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
@@ -55,6 +56,7 @@
         <local:MindmapMinSizeConverter x:Key="MindmapMinSizeConverter"/>
         <local:DoubleToCornerRadiusConverter x:Key="DoubleToCornerRadiusConverter"/>
         <local:LayoutAlgorithmToDisplayNameConverter x:Key="LayoutAlgorithmToDisplayNameConverter"/>
+        <converters:NullableDoubleToNaNConverter x:Key="NullableDoubleToNaNConverter"/>
 
         <!-- Node Templates -->
         <DataTemplate x:Key="TextNodeTemplate" DataType="vm:NodeViewModel">
@@ -172,6 +174,8 @@
                             <DataTemplate x:DataType="vm:NodeViewModel">
                                 <ContentControl Content="{Binding}" 
                                                 ContentTemplate="{StaticResource TextNodeTemplate}"
+                                                Width="{Binding Width, Converter={StaticResource NullableDoubleToNaNConverter}}"
+                                                Height="{Binding Height, Converter={StaticResource NullableDoubleToNaNConverter}}"
                                                 PointerPressed="OnNodePointerPressed"
                                                 PointerMoved="OnNodePointerMoved"
                                                 PointerReleased="OnNodePointerReleased"
@@ -192,7 +196,7 @@
                     BoxShadow="{DynamicResource MindmapToolbarBoxShadow}">
                 <StackPanel Spacing="6">
                     <!-- Layout -->
-                    <TextBlock Text="Layout" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,0,0,2"/>
+                    <TextBlock Text="{markup:T Ns=Mindmap, Key=Layout}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,0,0,2"/>
                     <ComboBox ItemsSource="{Binding LayoutAlgorithmIds}"
                               SelectedItem="{Binding SelectedLayoutAlgorithm}"
                               Width="140"
@@ -205,30 +209,32 @@
                     </ComboBox>
                     <Separator Background="{DynamicResource BorderBrush}" Height="1" Margin="0,4"/>
                     <!-- Edit -->
-                    <TextBlock Text="Edit" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,2"/>
+                    <TextBlock Text="{markup:T Ns=Mindmap, Key=Edit}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,2"/>
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Button Command="{Binding AddNodeCommand}" ToolTip.Tip="Add Node (Ctrl+N)" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
+                        <Button Command="{Binding AddNodeCommand}" ToolTip.Tip="{markup:T Ns=Mindmap, Key=AddNodeTooltip}" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg" Width="18" Height="18" Color="{DynamicResource CardIconColorBrush}"/>
                         </Button>
-                        <Button Command="{Binding ConnectSelectedCommand}" ToolTip.Tip="Connect Selected (Ctrl+L)" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
+                        <Button Command="{Binding ConnectSelectedCommand}" ToolTip.Tip="{markup:T Ns=Mindmap, Key=ConnectSelectedTooltip}" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" Width="18" Height="18" Color="{DynamicResource CardIconColorBrush}"/>
                         </Button>
-                        <Button Command="{Binding DetachSelectedCommand}" ToolTip.Tip="Detach Selected" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
+                        <Button Command="{Binding DetachSelectedCommand}" ToolTip.Tip="{markup:T Ns=Mindmap, Key=DetachSelectedTooltip}" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link-off.svg" Width="18" Height="18" Color="{DynamicResource CardIconColorBrush}"/>
                         </Button>
-                        <Button Command="{Binding AutoLayoutCommand}" ToolTip.Tip="Auto Layout" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
+                        <Button Command="{Binding AutoLayoutCommand}" ToolTip.Tip="{markup:T Ns=Mindmap, Key=AutoLayoutTooltip}" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout.svg" Width="18" Height="18" Color="{DynamicResource CardIconColorBrush}"/>
                         </Button>
                     </StackPanel>
                     <Separator Background="{DynamicResource BorderBrush}" Height="1" Margin="0,4"/>
                     <!-- View -->
-                    <TextBlock Text="View" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,2"/>
-                    <Button Command="{Binding RecenterCommand}" ToolTip.Tip="Recenter View" Width="36" Height="36" Padding="0" HorizontalAlignment="Left" Foreground="{DynamicResource ButtonForegroundBrush}">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/home.svg" Width="18" Height="18" Color="{DynamicResource CardIconColorBrush}"/>
-                    </Button>
+                    <TextBlock Text="{markup:T Ns=Mindmap, Key=View}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,2"/>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Button Command="{Binding RecenterCommand}" ToolTip.Tip="{markup:T Ns=Mindmap, Key=RecenterViewTooltip}" Width="36" Height="36" Padding="0" Foreground="{DynamicResource ButtonForegroundBrush}">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/home.svg" Width="18" Height="18" Color="{DynamicResource CardIconColorBrush}"/>
+                        </Button>
+                    </StackPanel>
                     <Separator Background="{DynamicResource BorderBrush}" Height="1" Margin="0,4"/>
                     <!-- Delete -->
-                    <Button Command="{Binding DeleteSelectedCommand}" ToolTip.Tip="Delete Selected (Del)" Width="36" Height="36" Padding="0" Classes="Danger" HorizontalAlignment="Left" Foreground="{DynamicResource DestructiveButtonColorBrush}">
+                    <Button Command="{Binding DeleteSelectedCommand}" ToolTip.Tip="{markup:T Ns=Mindmap, Key=DeleteSelectedTooltip}" Width="36" Height="36" Padding="0" Classes="Danger" HorizontalAlignment="Left" Foreground="{DynamicResource DestructiveButtonColorBrush}">
                         <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" Width="18" Height="18" Color="{DynamicResource DestructiveButtonColorBrush}"/>
                     </Button>
                 </StackPanel>
@@ -248,35 +254,174 @@
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                             <Rectangle Width="14" Height="14" RadiusX="2" RadiusY="2" Fill="{DynamicResource MindmapNodeBorderBrush}"/>
                         </Button>
-                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#e95b45" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="Coral" BorderThickness="0" CornerRadius="4">
+                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#e95b45" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="{markup:T Ns=Mindmap, Key=ColorCoral}" BorderThickness="0" CornerRadius="4">
                             <Rectangle Width="16" Height="16" RadiusX="2" RadiusY="2" Fill="#e95b45"/>
                         </Button>
-                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#2686C2" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="Blue" BorderThickness="0" CornerRadius="4">
+                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#2686C2" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="{markup:T Ns=Mindmap, Key=ColorBlue}" BorderThickness="0" CornerRadius="4">
                             <Rectangle Width="16" Height="16" RadiusX="2" RadiusY="2" Fill="#2686C2"/>
                         </Button>
-                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#6DA861" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="Green" BorderThickness="0" CornerRadius="4">
+                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#6DA861" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="{markup:T Ns=Mindmap, Key=ColorGreen}" BorderThickness="0" CornerRadius="4">
                             <Rectangle Width="16" Height="16" RadiusX="2" RadiusY="2" Fill="#6DA861"/>
                         </Button>
-                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#EAB308" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="Amber" BorderThickness="0" CornerRadius="4">
+                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#EAB308" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="{markup:T Ns=Mindmap, Key=ColorAmber}" BorderThickness="0" CornerRadius="4">
                             <Rectangle Width="16" Height="16" RadiusX="2" RadiusY="2" Fill="#EAB308"/>
                         </Button>
-                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#886ce4" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="Purple" BorderThickness="0" CornerRadius="4">
+                        <Button Command="{Binding SetSelectedNodesColorCommand}" CommandParameter="#886ce4" Width="24" Height="24" Padding="0" Margin="0,0,4,4" ToolTip.Tip="{markup:T Ns=Mindmap, Key=ColorPurple}" BorderThickness="0" CornerRadius="4">
                             <Rectangle Width="16" Height="16" RadiusX="2" RadiusY="2" Fill="#886ce4"/>
                         </Button>
                     </WrapPanel>
-                    <TextBlock Text="Shape" FontSize="10" Foreground="{DynamicResource TextTertiaryBrush}"/>
+                    <TextBlock Text="{markup:T Ns=Mindmap, Key=Shape}" FontSize="10" Foreground="{DynamicResource TextTertiaryBrush}"/>
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Button Command="{Binding SetSelectedNodesShapeCommand}" CommandParameter="rectangle" ToolTip.Tip="Rectangle" Width="36" Height="36" Padding="0">
+                        <Button Command="{Binding SetSelectedNodesShapeCommand}" CommandParameter="rectangle" ToolTip.Tip="{markup:T Ns=Mindmap, Key=Rectangle}" Width="36" Height="36" Padding="0">
                             <Border Width="20" Height="14" CornerRadius="0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundPrimaryBrush}"/>
                         </Button>
-                        <Button Command="{Binding SetSelectedNodesShapeCommand}" CommandParameter="pill" ToolTip.Tip="Pill" Width="36" Height="36" Padding="0">
+                        <Button Command="{Binding SetSelectedNodesShapeCommand}" CommandParameter="pill" ToolTip.Tip="{markup:T Ns=Mindmap, Key=Pill}" Width="36" Height="36" Padding="0">
                             <Border Width="24" Height="14" CornerRadius="7" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource CardBackgroundPrimaryBrush}"/>
                         </Button>
-                        <Button Command="{Binding SetSelectedNodesShapeCommand}" CommandParameter="circle" ToolTip.Tip="Circle" Width="36" Height="36" Padding="0">
+                        <Button Command="{Binding SetSelectedNodesShapeCommand}" CommandParameter="circle" ToolTip.Tip="{markup:T Ns=Mindmap, Key=Circle}" Width="36" Height="36" Padding="0">
                             <Ellipse Width="18" Height="18" Stroke="{DynamicResource BorderBrush}" StrokeThickness="1" Fill="{DynamicResource CardBackgroundPrimaryBrush}"/>
                         </Button>
                     </StackPanel>
                 </StackPanel>
+            </Border>
+
+            <!-- Minimap -->
+            <Border Name="MinimapBorder" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20"
+                    Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    BoxShadow="{DynamicResource MindmapToolbarBoxShadow}"
+                    Width="240" Height="170"
+                    ClipToBounds="True"
+                    Opacity="0">
+                <Border.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Opacity" Duration="0:0:0.3" Easing="LinearEasing"/>
+                    </Transitions>
+                </Border.Transitions>
+
+                <Canvas Name="MinimapPanel" ClipToBounds="True" Background="Transparent"
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                       PointerPressed="OnMinimapPointerPressed"
+                       PointerMoved="OnMinimapPointerMoved"
+                       PointerReleased="OnMinimapPointerReleased"
+                       SizeChanged="OnMinimapSizeChanged">
+
+                    <Panel Name="MinimapTransformPanel" ClipToBounds="False" RenderTransformOrigin="0,0"
+                           Canvas.Left="0" Canvas.Top="0">
+                        <Panel.RenderTransform>
+                            <MatrixTransform />
+                        </Panel.RenderTransform>
+
+                        <!-- Dot-grid background texture -->
+                        <Canvas Width="240" Height="170" IsHitTestVisible="False">
+                            <Canvas.Background>
+                                <VisualBrush TileMode="Tile"
+                                             SourceRect="0,0,12,12"
+                                             DestinationRect="0,0,12,12">
+                                    <VisualBrush.Visual>
+                                        <Canvas Width="12" Height="12">
+                                            <Ellipse Width="1.4" Height="1.4"
+                                                     Fill="{DynamicResource BorderBrush}"
+                                                     Opacity="0.5"
+                                                     Canvas.Left="0.3" Canvas.Top="0.3"/>
+                                        </Canvas>
+                                    </VisualBrush.Visual>
+                                </VisualBrush>
+                            </Canvas.Background>
+                        </Canvas>
+
+                        <!-- Edges -->
+                        <ItemsControl ItemsSource="{Binding Edges}" ClipToBounds="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas Background="Transparent" ClipToBounds="False"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:EdgeViewModel">
+                                    <Path Stroke="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
+                                          StrokeThickness="3"
+                                          StrokeLineCap="Round"
+                                          IsHitTestVisible="False">
+                                        <Path.Data>
+                                            <PathGeometry>
+                                                <PathFigure StartPoint="{Binding StartPoint}" IsClosed="False">
+                                                    <BezierSegment Point1="{Binding ControlPoint1}"
+                                                                   Point2="{Binding ControlPoint2}"
+                                                                   Point3="{Binding EndPoint}"/>
+                                                </PathFigure>
+                                            </PathGeometry>
+                                        </Path.Data>
+                                    </Path>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Nodes -->
+                        <ItemsControl ItemsSource="{Binding Nodes}" ClipToBounds="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas Background="Transparent" ClipToBounds="False"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.Styles>
+                                <Style Selector="ItemsControl > ContentPresenter" x:DataType="vm:NodeViewModel">
+                                    <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                                    <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                                </Style>
+                            </ItemsControl.Styles>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:NodeViewModel">
+                                    <Border Width="{Binding Width, TargetNullValue=100}"
+                                            Height="{Binding Height, TargetNullValue=40}"
+                                            Background="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapNodeBorderBrush}"
+                                            CornerRadius="{Binding CornerRadius, Converter={StaticResource DoubleToCornerRadiusConverter}}"
+                                            Opacity="0.85"
+                                            IsHitTestVisible="False"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Panel>
+
+                    <!-- Viewport box -->
+                    <Border Name="MinimapViewportBox"
+                            Canvas.Left="0" Canvas.Top="0"
+                            BorderBrush="{DynamicResource AccentPrimaryBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Background="#10000000"
+                            BoxShadow="0 0 0 1 #18000000, 0 2 8 0 #20000000"
+                            IsHitTestVisible="False"
+                            RenderTransformOrigin="0,0">
+                        <Border.RenderTransform>
+                            <TranslateTransform/>
+                        </Border.RenderTransform>
+                        <!-- Top accent strip -->
+                        <Border VerticalAlignment="Top"
+                                Height="3"
+                                CornerRadius="6 6 0 0"
+                                Margin="-1 -1 -1 0"
+                                Opacity="0.5">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="{DynamicResource AccentPrimary}" Offset="0"/>
+                                    <GradientStop Color="Transparent" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                    </Border>
+
+                    <!-- "Minimap" label -->
+                    <TextBlock Canvas.Left="10" Canvas.Bottom="8"
+                               Text="{markup:T Ns=Mindmap, Key=Minimap}"
+                               FontSize="8"
+                               FontWeight="SemiBold"
+                               LetterSpacing="1.2"
+                               Foreground="{DynamicResource TextTertiaryBrush}"
+                               IsHitTestVisible="False"/>
+                </Canvas>
             </Border>
 
             <!-- Selection Box -->

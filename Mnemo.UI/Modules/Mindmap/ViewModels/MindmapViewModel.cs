@@ -49,10 +49,10 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     public bool HasSelectedNodes => Nodes.Any(n => n.IsSelected);
 
     /// <summary>Available layout algorithm IDs for binding.</summary>
-    public static IReadOnlyList<string> LayoutAlgorithmIds { get; } = new[] { LayoutAlgorithms.Freeform, LayoutAlgorithms.TreeVertical, LayoutAlgorithms.TreeHorizontal, LayoutAlgorithms.Radial };
+    public static IReadOnlyList<string> LayoutAlgorithmIds { get; } = new[] { LayoutAlgorithms.TreeVertical, LayoutAlgorithms.TreeHorizontal, LayoutAlgorithms.Radial };
 
     [ObservableProperty]
-    private string _selectedLayoutAlgorithm = LayoutAlgorithms.Freeform;
+    private string _selectedLayoutAlgorithm = LayoutAlgorithms.TreeVertical;
 
     public event EventHandler? RecenterRequested;
 
@@ -98,6 +98,12 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         foreach (var node in selected)
         {
             node.Shape = shape;
+            // When switching from circle, clear stored size so the view re-measures (circle forces square; pill/rect use content size).
+            if (shape != "circle")
+            {
+                node.Width = null;
+                node.Height = null;
+            }
             SyncNodeStyleToModel(node);
             await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, node.Id, BuildStyleDict(node));
         }
@@ -181,7 +187,13 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     {
         if (_currentMindmap == null) return;
 
-        SelectedLayoutAlgorithm = _currentMindmap.Layout.Algorithm;
+        var algorithm = _currentMindmap.Layout.Algorithm;
+        if (string.IsNullOrEmpty(algorithm) || algorithm == "Freeform" || !LayoutAlgorithmIds.Contains(algorithm))
+        {
+            algorithm = LayoutAlgorithms.TreeVertical;
+            _currentMindmap.Layout.Algorithm = algorithm;
+        }
+        SelectedLayoutAlgorithm = algorithm;
         foreach (var edge in Edges) edge.Dispose();
         Nodes.Clear();
         Edges.Clear();
@@ -357,8 +369,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     {
         if (_currentMindmap == null || !Nodes.Any()) return;
 
-        var algorithm = _currentMindmap.Layout.Algorithm ?? LayoutAlgorithms.Freeform;
-        if (algorithm == LayoutAlgorithms.Freeform) return;
+        var algorithm = _currentMindmap.Layout.Algorithm ?? LayoutAlgorithms.TreeVertical;
 
         var hierarchyOutgoing = GetHierarchyChildren();
         var roots = Nodes.Where(n => !_currentMindmap!.Edges.Any(e => e.ToId == n.Id && e.Kind == MindmapEdgeKind.Hierarchy)).ToList();
