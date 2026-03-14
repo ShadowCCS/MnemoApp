@@ -258,6 +258,35 @@ public class MindmapService : IMindmapService
         return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
     }
 
+    public async Task<Result> UpdateNodeStyleAsync(string mindmapId, string nodeId, IReadOnlyDictionary<string, string?> styleUpdates)
+    {
+        var mapResult = await GetMindmapAsync(mindmapId).ConfigureAwait(false);
+        if (!mapResult.IsSuccess) return Result.Failure(mapResult.ErrorMessage!);
+
+        var mindmap = mapResult.Value!;
+        var node = mindmap.Nodes.FirstOrDefault(n => n.Id == nodeId);
+        if (node == null) return Result.Failure("Node not found");
+
+        foreach (var kv in styleUpdates)
+        {
+            if (kv.Value == null)
+                node.Style.Remove(kv.Key);
+            else
+                node.Style[kv.Key] = kv.Value;
+        }
+
+        return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
+    }
+
+    public async Task<Result> UpdateLayoutAlgorithmAsync(string mindmapId, string algorithm)
+    {
+        var mapResult = await GetMindmapAsync(mindmapId).ConfigureAwait(false);
+        if (!mapResult.IsSuccess) return Result.Failure(mapResult.ErrorMessage!);
+        var mindmap = mapResult.Value!;
+        mindmap.Layout.Algorithm = algorithm;
+        return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
+    }
+
     public bool WouldCreateCycle(Mindmap mindmap, string fromId, string toId)
     {
         // Simple BFS to see if toId can reach fromId via hierarchy edges

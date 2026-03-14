@@ -40,6 +40,10 @@ public partial class NodeViewModel : ViewModelBase
     [ObservableProperty]
     private string? _color; // When null, view uses theme MindmapNodeBorderBrush
 
+    /// <summary>One of: rectangle, pill, circle. Default pill.</summary>
+    [ObservableProperty]
+    private string _shape = "pill";
+
     public NodeViewModel(MindmapNode node, NodeLayout layout)
     {
         _node = node;
@@ -53,6 +57,26 @@ public partial class NodeViewModel : ViewModelBase
         _height = layout.Height;
         _text = (node.Content as TextNodeContent)?.Text ?? "";
         _color = node.Style.TryGetValue("color", out var color) ? color : null;
+        _shape = node.Style.TryGetValue("shape", out var shape) && !string.IsNullOrEmpty(shape) ? shape : "pill";
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(Width) or nameof(Height))
+                NotifyShapeDependent();
+        };
+    }
+
+    /// <summary>Corner radius for the node border. Rectangle=0, pill/circle=999.</summary>
+    public double CornerRadius => Shape switch { "rectangle" => 0, "circle" => 999, "pill" => 999, _ => 20 };
+
+    /// <summary>When shape is circle, fixed min so the node can shrink with content; otherwise 0.</summary>
+    public double EffectiveMinSize => Shape == "circle" ? 40 : 0;
+
+    partial void OnShapeChanged(string value) => NotifyShapeDependent();
+
+    private void NotifyShapeDependent()
+    {
+        OnPropertyChanged(nameof(CornerRadius));
+        OnPropertyChanged(nameof(EffectiveMinSize));
     }
 
     partial void OnTextChanged(string value)

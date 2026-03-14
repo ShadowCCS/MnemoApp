@@ -597,12 +597,33 @@ public partial class MindmapView : UserControl
 
     private void OnNodeSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        if (sender is Control control && control.DataContext is NodeViewModel node)
+        if (sender is not Control control || control.DataContext is not NodeViewModel node)
+            return;
+
+        double w = e.NewSize.Width;
+        double h = e.NewSize.Height;
+        if (node.Shape == "circle")
         {
-            // Update node dimensions to match actual rendered size
-            // This ensures edge calculations use the correct bounds
-            node.Width = e.NewSize.Width;
-            node.Height = e.NewSize.Height;
+            double side = Math.Max(w, h);
+            control.Width = side;
+            control.Height = side;
+            w = side;
+            h = side;
+        }
+        node.Width = w;
+        node.Height = h;
+    }
+
+    private void OnNodeTextBoxTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        // When text changes, clear circle node's fixed size so it can re-measure and grow
+        if (sender is not Control textBox || textBox.DataContext is not NodeViewModel node || node.Shape != "circle")
+            return;
+        var contentControl = textBox.Parent?.Parent as Control;
+        if (contentControl != null)
+        {
+            contentControl.Width = double.NaN;
+            contentControl.Height = double.NaN;
         }
     }
 }

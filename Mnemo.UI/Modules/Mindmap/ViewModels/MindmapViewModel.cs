@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -9,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.History;
 using Mnemo.Core.Models.Mindmap;
 using Mnemo.Core.Services;
+using LayoutAlgorithms = Mnemo.Core.Models.Mindmap.LayoutAlgorithms;
 using Mnemo.UI.ViewModels;
 using MindmapModel = Mnemo.Core.Models.Mindmap.Mindmap;
 
@@ -38,6 +40,19 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     public ICommand DetachSelectedCommand { get; }
     public ICommand AutoLayoutCommand { get; }
     public ICommand RecenterCommand { get; }
+    public ICommand SetSelectedNodesColorCommand { get; }
+    public ICommand SetSelectedNodesShapeCommand { get; }
+
+    /// <summary>First selected node, for properties panel. Refreshes when selection changes.</summary>
+    public NodeViewModel? FirstSelectedNode => Nodes.FirstOrDefault(n => n.IsSelected);
+
+    public bool HasSelectedNodes => Nodes.Any(n => n.IsSelected);
+
+    /// <summary>Available layout algorithm IDs for binding.</summary>
+    public static IReadOnlyList<string> LayoutAlgorithmIds { get; } = new[] { LayoutAlgorithms.Freeform, LayoutAlgorithms.TreeVertical, LayoutAlgorithms.TreeHorizontal, LayoutAlgorithms.Radial };
+
+    [ObservableProperty]
+    private string _selectedLayoutAlgorithm = LayoutAlgorithms.Freeform;
 
     public event EventHandler? RecenterRequested;
 
@@ -51,6 +66,58 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         DetachSelectedCommand = new AsyncRelayCommand(DetachSelectedAsync);
         AutoLayoutCommand = new AsyncRelayCommand(AutoLayoutAsync);
         RecenterCommand = new RelayCommand(RecenterView);
+        SetSelectedNodesColorCommand = new RelayCommand<string?>(SetSelectedNodesColor);
+        SetSelectedNodesShapeCommand = new RelayCommand<string?>(SetSelectedNodesShape);
+    }
+
+    private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(NodeViewModel.IsSelected))
+        {
+            OnPropertyChanged(nameof(FirstSelectedNode));
+            OnPropertyChanged(nameof(HasSelectedNodes));
+        }
+    }
+
+    private async void SetSelectedNodesColor(string? color)
+    {
+        if (_currentMindmap == null) return;
+        var selected = Nodes.Where(n => n.IsSelected).ToList();
+        foreach (var node in selected)
+        {
+            node.Color = color;
+            SyncNodeStyleToModel(node);
+            await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, node.Id, BuildStyleDict(node));
+        }
+    }
+
+    private async void SetSelectedNodesShape(string? shape)
+    {
+        if (_currentMindmap == null || string.IsNullOrEmpty(shape)) return;
+        var selected = Nodes.Where(n => n.IsSelected).ToList();
+        foreach (var node in selected)
+        {
+            node.Shape = shape;
+            SyncNodeStyleToModel(node);
+            await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, node.Id, BuildStyleDict(node));
+        }
+    }
+
+    private static Dictionary<string, string?> BuildStyleDict(NodeViewModel node)
+    {
+        var d = new Dictionary<string, string?>();
+        d["color"] = node.Color;
+        d["shape"] = node.Shape;
+        return d;
+    }
+
+    private void SyncNodeStyleToModel(NodeViewModel nodeVm)
+    {
+        var node = _currentMindmap?.Nodes.FirstOrDefault(n => n.Id == nodeVm.Id);
+        if (node == null) return;
+        if (nodeVm.Color != null) node.Style["color"] = nodeVm.Color;
+        else node.Style.Remove("color");
+        node.Style["shape"] = nodeVm.Shape;
     }
 
     public void OnNavigatedTo(object? parameter)
@@ -102,10 +169,19 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         }
     }
 
+    partial void OnSelectedLayoutAlgorithmChanged(string value)
+    {
+        if (_currentMindmap == null || string.IsNullOrEmpty(value)) return;
+        if (_currentMindmap.Layout.Algorithm == value) return; // avoid redundant save when syncing from load
+        _currentMindmap.Layout.Algorithm = value;
+        _ = _mindmapService.UpdateLayoutAlgorithmAsync(_currentMindmap.Id, value);
+    }
+
     private void RefreshView()
     {
         if (_currentMindmap == null) return;
 
+        SelectedLayoutAlgorithm = _currentMindmap.Layout.Algorithm;
         foreach (var edge in Edges) edge.Dispose();
         Nodes.Clear();
         Edges.Clear();
@@ -119,6 +195,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             if (_currentMindmap.Layout.Nodes.TryGetValue(node.Id, out var layout))
             {
                 var nodeVm = new NodeViewModel(node, layout);
+                nodeVm.PropertyChanged += OnNodePropertyChanged;
                 Nodes.Add(nodeVm);
                 nodeMap[node.Id] = nodeVm;
             }
@@ -280,50 +357,114 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     {
         if (_currentMindmap == null || !Nodes.Any()) return;
 
-        var roots = Nodes.Where(n => !_incoming.ContainsKey(n.Id)).ToList();
+        var algorithm = _currentMindmap.Layout.Algorithm ?? LayoutAlgorithms.Freeform;
+        if (algorithm == LayoutAlgorithms.Freeform) return;
+
+        var hierarchyOutgoing = GetHierarchyChildren();
+        var roots = Nodes.Where(n => !_currentMindmap!.Edges.Any(e => e.ToId == n.Id && e.Kind == MindmapEdgeKind.Hierarchy)).ToList();
         if (!roots.Any()) roots.Add(Nodes.First());
 
-        double currentY = 100;
         var visited = new HashSet<string>();
 
-        foreach (var root in roots)
+        switch (algorithm)
         {
-            currentY = LayoutNodeHierarchy(root, 100, currentY, visited);
-            currentY += 100;
+            case LayoutAlgorithms.TreeVertical:
+                double currentY = 100;
+                foreach (var root in roots)
+                {
+                    currentY = LayoutTreeVertical(root, 100, currentY, hierarchyOutgoing, visited);
+                    currentY += 100;
+                }
+                break;
+            case LayoutAlgorithms.TreeHorizontal:
+                double currentX = 100;
+                foreach (var root in roots)
+                {
+                    currentX = LayoutTreeHorizontal(root, currentX, 100, hierarchyOutgoing, visited);
+                    currentX += 100;
+                }
+                break;
+            case LayoutAlgorithms.Radial:
+                const double cx = 400, cy = 300, radiusStep = 180;
+                foreach (var root in roots)
+                    LayoutRadial(root, cx, cy, 0, radiusStep, 0, Math.Tau, hierarchyOutgoing, visited);
+                break;
         }
 
         foreach (var node in Nodes)
-        {
             await _mindmapService.UpdateNodeLayoutAsync(_currentMindmap.Id, node.Id, node.X, node.Y);
-        }
     }
 
-    private double LayoutNodeHierarchy(NodeViewModel node, double x, double y, HashSet<string> visited)
+    private static Dictionary<string, List<NodeViewModel>> GetHierarchyChildrenFromMindmap(MindmapModel mindmap, IList<NodeViewModel> nodes)
+    {
+        var nodeById = nodes.ToDictionary(n => n.Id);
+        var children = new Dictionary<string, List<NodeViewModel>>();
+        foreach (var e in mindmap.Edges.Where(x => x.Kind == MindmapEdgeKind.Hierarchy))
+        {
+            if (!nodeById.TryGetValue(e.FromId, out var from) || !nodeById.TryGetValue(e.ToId, out var to)) continue;
+            if (!children.ContainsKey(from.Id)) children[from.Id] = new List<NodeViewModel>();
+            children[from.Id].Add(to);
+        }
+        return children;
+    }
+
+    private Dictionary<string, List<NodeViewModel>> GetHierarchyChildren()
+    {
+        return GetHierarchyChildrenFromMindmap(_currentMindmap!, Nodes);
+    }
+
+    private static double LayoutTreeVertical(NodeViewModel node, double x, double y, IReadOnlyDictionary<string, List<NodeViewModel>> children, HashSet<string> visited)
     {
         if (visited.Contains(node.Id)) return y;
         visited.Add(node.Id);
-
         node.X = x;
         node.Y = y;
-
-        if (!_outgoing.TryGetValue(node.Id, out var edges) || !edges.Any())
-        {
+        if (!children.TryGetValue(node.Id, out var childList) || childList.Count == 0)
             return y + 80;
-        }
-
         double childX = x + 250;
         double childY = y;
         double firstChildY = y;
-        
-        foreach (var edge in edges)
-        {
-            childY = LayoutNodeHierarchy(edge.To, childX, childY, visited);
-        }
-
+        foreach (var child in childList)
+            childY = LayoutTreeVertical(child, childX, childY, children, visited);
         double lastChildBottom = childY - 80;
         node.Y = (firstChildY + lastChildBottom) / 2;
-
         return childY;
+    }
+
+    private static double LayoutTreeHorizontal(NodeViewModel node, double x, double y, IReadOnlyDictionary<string, List<NodeViewModel>> children, HashSet<string> visited)
+    {
+        if (visited.Contains(node.Id)) return x;
+        visited.Add(node.Id);
+        node.X = x;
+        node.Y = y;
+        if (!children.TryGetValue(node.Id, out var childList) || childList.Count == 0)
+            return x + 120;
+        double childY = y + 200;
+        double childX = x;
+        double firstChildX = x;
+        foreach (var child in childList)
+            childX = LayoutTreeHorizontal(child, childX, childY, children, visited);
+        double midX = (firstChildX + (childX - 120)) / 2;
+        node.X = midX;
+        return childX;
+    }
+
+    private static void LayoutRadial(NodeViewModel node, double cx, double cy, int level, double radiusStep, double angleStart, double angleEnd, IReadOnlyDictionary<string, List<NodeViewModel>> children, HashSet<string> visited)
+    {
+        if (visited.Contains(node.Id)) return;
+        visited.Add(node.Id);
+        double r = level * radiusStep;
+        double angle = (angleStart + angleEnd) / 2;
+        node.X = cx + r * Math.Cos(angle);
+        node.Y = cy + r * Math.Sin(angle);
+        if (!children.TryGetValue(node.Id, out var childList) || childList.Count == 0) return;
+        double slice = (angleEnd - angleStart) / childList.Count;
+        for (int i = 0; i < childList.Count; i++)
+        {
+            double a0 = angleStart + i * slice;
+            double a1 = angleStart + (i + 1) * slice;
+            LayoutRadial(childList[i], cx, cy, level + 1, radiusStep, a0, a1, children, visited);
+        }
     }
 
     private void RecenterView()

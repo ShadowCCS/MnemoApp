@@ -20,7 +20,9 @@ public interface IMindmapService
     Task<Result> RemoveEdgeAsync(string mindmapId, string edgeId);
     Task<Result> UpdateNodeContentAsync(string mindmapId, string nodeId, IMindmapNodeContent content);
     Task<Result> UpdateNodeLayoutAsync(string mindmapId, string nodeId, double x, double y, double? width = null, double? height = null);
-    
+    Task<Result> UpdateNodeStyleAsync(string mindmapId, string nodeId, IReadOnlyDictionary<string, string?> styleUpdates);
+    Task<Result> UpdateLayoutAlgorithmAsync(string mindmapId, string algorithm);
+
     // Integrity
     bool WouldCreateCycle(Mindmap mindmap, string fromId, string toId);
 }
