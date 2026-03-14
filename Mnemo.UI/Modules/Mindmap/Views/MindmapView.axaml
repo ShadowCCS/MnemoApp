@@ -56,6 +56,8 @@
         <local:MindmapMinSizeConverter x:Key="MindmapMinSizeConverter"/>
         <local:DoubleToCornerRadiusConverter x:Key="DoubleToCornerRadiusConverter"/>
         <local:LayoutAlgorithmToDisplayNameConverter x:Key="LayoutAlgorithmToDisplayNameConverter"/>
+        <local:NotNullToBoolConverter x:Key="NotNullToBoolConverter"/>
+        <converters:BoolToDoubleConverter x:Key="BoolToDoubleConverter"/>
         <converters:NullableDoubleToNaNConverter x:Key="NullableDoubleToNaNConverter"/>
 
         <!-- Node Templates -->
@@ -118,7 +120,9 @@
                Focusable="True"
                PointerPressed="OnCanvasPointerPressed"
                PointerMoved="OnNodePointerMoved"
-               PointerReleased="OnNodePointerReleased">
+               PointerReleased="OnNodePointerReleased"
+               PointerExited="OnCanvasPointerExited"
+               KeyDown="OnMindmapKeyDown">
             
             <!-- Background Grid -->
             <Canvas Name="GridCanvas" Background="Transparent" IsHitTestVisible="False">
@@ -132,7 +136,8 @@
                     <MatrixTransform />
                 </Panel.RenderTransform>
                 
-                    <ItemsControl ItemsSource="{Binding Edges}" ClipToBounds="False">
+                    <!-- Edges (drawn under nodes) -->
+                    <ItemsControl ItemsSource="{Binding Edges}" ClipToBounds="False" IsHitTestVisible="False">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <Canvas Background="Transparent" ClipToBounds="False"/>
@@ -142,8 +147,7 @@
                             <DataTemplate x:DataType="vm:EdgeViewModel">
                                 <Path Stroke="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
                                       StrokeThickness="1.5"
-                                      StrokeDashArray="{Binding Kind, Converter={StaticResource EdgeKindToStrokeDashArrayConverter}}"
-                                      IsHitTestVisible="False">
+                                      StrokeDashArray="{Binding Kind, Converter={StaticResource EdgeKindToStrokeDashArrayConverter}}">
                                     <Path.Data>
                                         <PathGeometry>
                                             <PathFigure StartPoint="{Binding StartPoint}" IsClosed="False">
@@ -154,6 +158,62 @@
                                         </PathGeometry>
                                     </Path.Data>
                                 </Path>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Edge hit areas and labels (under nodes so nodes remain draggable) -->
+                    <ItemsControl Name="EdgeHitLayer" ItemsSource="{Binding Edges}" ClipToBounds="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas Background="Transparent" ClipToBounds="False"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EdgeViewModel">
+                                <Canvas>
+                                    <Path Stroke="Transparent" StrokeThickness="12" IsHitTestVisible="True"
+                                          Cursor="Hand" PointerEntered="OnEdgePointerEnter" PointerExited="OnEdgePointerLeave"
+                                          PointerPressed="OnEdgeHitPathPointerPressed">
+                                        <Path.Data>
+                                            <PathGeometry>
+                                                <PathFigure StartPoint="{Binding StartPoint}" IsClosed="False">
+                                                    <BezierSegment Point1="{Binding ControlPoint1}"
+                                                                   Point2="{Binding ControlPoint2}"
+                                                                   Point3="{Binding EndPoint}"/>
+                                                </PathFigure>
+                                            </PathGeometry>
+                                        </Path.Data>
+                                    </Path>
+                                    <Border Name="EdgeLabelBorder"
+                                            IsVisible="{Binding Label, Converter={StaticResource NotNullToBoolConverter}}"
+                                            Opacity="{Binding IsLabelHighlighted, Converter={StaticResource BoolToDoubleConverter}, ConverterParameter='1|0.75'}"
+                                            Canvas.Left="{Binding CenterPoint.X}" Canvas.Top="{Binding CenterPoint.Y}"
+                                            RenderTransformOrigin="0.5,0.5"
+                                            Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1" CornerRadius="4"
+                                            MinWidth="60" MinHeight="22" Padding="6,2"
+                                            PointerEntered="OnEdgePointerEnter" PointerExited="OnEdgePointerLeave"
+                                            PointerPressed="OnEdgeLabelPointerPressed"
+                                            Cursor="Hand">
+                                        <Border.RenderTransform>
+                                            <TranslateTransform X="-30" Y="-11"/>
+                                        </Border.RenderTransform>
+                                        <Border.Transitions>
+                                            <Transitions>
+                                                <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="LinearEasing"/>
+                                            </Transitions>
+                                        </Border.Transitions>
+                                        <TextBox Name="EdgeLabelBox"
+                                                 Text="{Binding Label}"
+                                                 Background="Transparent" BorderThickness="0"
+                                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                                 FontSize="11" MinWidth="48" MinHeight="18"
+                                                 PointerPressed="OnEdgeLabelPointerPressed"
+                                                 LostFocus="OnEdgeLabelLostFocus"/>
+                                    </Border>
+                                </Canvas>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -179,6 +239,8 @@
                                                 PointerPressed="OnNodePointerPressed"
                                                 PointerMoved="OnNodePointerMoved"
                                                 PointerReleased="OnNodePointerReleased"
+                                                PointerEntered="OnNodePointerEnter"
+                                                PointerExited="OnNodePointerLeave"
                                                 SizeChanged="OnNodeSizeChanged"
                                                 Background="Transparent"/>
                             </DataTemplate>

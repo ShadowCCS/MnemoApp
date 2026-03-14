@@ -36,6 +36,13 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private Point _controlPoint2;
 
+    [ObservableProperty]
+    private Point _centerPoint;
+
+    /// <summary>View state: true when this edge or its endpoints are hovered (label at full opacity).</summary>
+    [ObservableProperty]
+    private bool _isLabelHighlighted = false;
+
     public NodeViewModel From => _from;
     public NodeViewModel To => _to;
 
@@ -121,6 +128,12 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
             ControlPoint1 = StartPoint;
             ControlPoint2 = EndPoint;
         }
+
+        // Cubic Bezier at t=0.5 for label placement
+        double t = 0.5, u = 1 - t;
+        double cx = u * u * u * StartPoint.X + 3 * u * u * t * ControlPoint1.X + 3 * u * t * t * ControlPoint2.X + t * t * t * EndPoint.X;
+        double cy = u * u * u * StartPoint.Y + 3 * u * u * t * ControlPoint1.Y + 3 * u * t * t * ControlPoint2.Y + t * t * t * EndPoint.Y;
+        CenterPoint = new Point(cx, cy);
     }
 
     /// <summary>Unit outward normal for the attach side. Same dominant-direction logic as GetAttachPoint.</summary>
@@ -142,5 +155,24 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
         }
         if (dy >= 0) return new Point(x + w / 2, y + h); // bottom
         return new Point(x + w / 2, y); // top
+    }
+
+    /// <summary>Minimum distance from point to the cubic bezier (approximate by sampling).</summary>
+    public double GetDistanceToCurve(Point p)
+    {
+        const int steps = 32;
+        double min = double.MaxValue;
+        double px = p.X, py = p.Y;
+        for (int i = 0; i <= steps; i++)
+        {
+            double t = (double)i / steps;
+            double u = 1 - t;
+            double x = u * u * u * StartPoint.X + 3 * u * u * t * ControlPoint1.X + 3 * u * t * t * ControlPoint2.X + t * t * t * EndPoint.X;
+            double y = u * u * u * StartPoint.Y + 3 * u * u * t * ControlPoint1.Y + 3 * u * t * t * ControlPoint2.Y + t * t * t * EndPoint.Y;
+            double dx = px - x, dy = py - y;
+            double d = Math.Sqrt(dx * dx + dy * dy);
+            if (d < min) min = d;
+        }
+        return min;
     }
 }

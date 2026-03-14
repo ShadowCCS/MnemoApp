@@ -54,6 +54,12 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private string _selectedLayoutAlgorithm = LayoutAlgorithms.TreeVertical;
 
+    [ObservableProperty]
+    private EdgeViewModel? _selectedEdge;
+
+    private string? _hoveredEdgeId;
+    private readonly HashSet<string> _hoveredNodeIds = new();
+
     public event EventHandler? RecenterRequested;
 
     public MindmapViewModel(IMindmapService mindmapService, IHistoryManager historyManager)
@@ -77,6 +83,86 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             OnPropertyChanged(nameof(FirstSelectedNode));
             OnPropertyChanged(nameof(HasSelectedNodes));
         }
+    }
+
+    public async void EdgeClicked(EdgeViewModel edge)
+    {
+        if (_currentMindmap == null) return;
+        if (edge.Label == null)
+        {
+            edge.Label = "";
+            await _mindmapService.UpdateEdgeLabelAsync(_currentMindmap.Id, edge.Id, "").ConfigureAwait(false);
+        }
+        SelectedEdge = edge;
+    }
+
+    public async void CommitEdgeLabel(EdgeViewModel edge)
+    {
+        if (_currentMindmap == null) return;
+        var mindmapId = _currentMindmap.Id;
+        var edgeId = edge.Id;
+        var labelToSave = edge.Label;
+        if (string.IsNullOrWhiteSpace(labelToSave))
+        {
+            edge.Label = null;
+            await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, null).ConfigureAwait(false);
+        }
+        else
+        {
+            await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, labelToSave).ConfigureAwait(false);
+        }
+        // No code after await that uses edge/_currentMindmap; ids used above avoid stale refs if blur/close races.
+    }
+
+    public void SetHoveredEdge(string? edgeId)
+    {
+        if (_hoveredEdgeId == edgeId) return;
+        var previousEdgeId = _hoveredEdgeId;
+        _hoveredEdgeId = edgeId;
+        UpdateEdgeHighlightingForEdges(previousEdgeId, edgeId);
+    }
+
+    public void SetHoveredNode(string nodeId, bool hovered)
+    {
+        if (hovered)
+            _hoveredNodeIds.Add(nodeId);
+        else
+            _hoveredNodeIds.Remove(nodeId);
+        UpdateEdgeHighlightingForNode(nodeId);
+    }
+
+    public void ClearHoverState()
+    {
+        if (_hoveredEdgeId == null && _hoveredNodeIds.Count == 0) return;
+        var prevEdgeId = _hoveredEdgeId;
+        var nodeIds = _hoveredNodeIds.ToList();
+        _hoveredEdgeId = null;
+        _hoveredNodeIds.Clear();
+        UpdateEdgeHighlightingForEdges(prevEdgeId, null);
+        foreach (var nid in nodeIds) UpdateEdgeHighlightingForNode(nid);
+    }
+
+    private void UpdateEdgeHighlightingForEdges(string? edgeId1, string? edgeId2)
+    {
+        foreach (var id in new[] { edgeId1, edgeId2 }.Where(x => x != null).Distinct())
+        {
+            var edge = Edges.FirstOrDefault(e => e.Id == id);
+            if (edge != null)
+                edge.IsLabelHighlighted = edge.Id == _hoveredEdgeId
+                    || _hoveredNodeIds.Contains(edge.From.Id)
+                    || _hoveredNodeIds.Contains(edge.To.Id);
+        }
+    }
+
+    private void UpdateEdgeHighlightingForNode(string nodeId)
+    {
+        var edgesToUpdate = new List<EdgeViewModel>();
+        if (_outgoing.TryGetValue(nodeId, out var outEdges)) edgesToUpdate.AddRange(outEdges);
+        if (_incoming.TryGetValue(nodeId, out var inEdges)) edgesToUpdate.AddRange(inEdges);
+        foreach (var edge in edgesToUpdate.Distinct())
+            edge.IsLabelHighlighted = edge.Id == _hoveredEdgeId
+                || _hoveredNodeIds.Contains(edge.From.Id)
+                || _hoveredNodeIds.Contains(edge.To.Id);
     }
 
     private async void SetSelectedNodesColor(string? color)

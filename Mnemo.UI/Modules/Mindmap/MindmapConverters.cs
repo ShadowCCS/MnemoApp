@@ -55,6 +55,13 @@ public class EdgeKindToStrokeDashArrayConverter : IValueConverter
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
 }
 
+/// <summary>Returns true when value is not null (for edge label box visibility).</summary>
+public class NotNullToBoolConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value != null;
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
 /// <summary>Converts double to Avalonia CornerRadius (uniform).</summary>
 public class DoubleToCornerRadiusConverter : IValueConverter
 {

@@ -7,6 +7,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Mnemo.UI.Modules.Mindmap.ViewModels;
 
 namespace Mnemo.UI.Modules.Mindmap.Views;
@@ -57,6 +58,13 @@ public partial class MindmapView : UserControl
     private const double ClickDragThreshold = 5.0; // pixels
     private const double MinimapZoomThreshold = 0.6; // show minimap when scale <= 60%
     private const int MinimapEaseMs = 250;
+    private const double EdgeDoubleClickMs = 400;
+    private const double EdgeDoubleClickDist = 15;
+    private const double EdgeHitThreshold = 20;
+
+    private DateTime _lastEdgeClickTime = DateTime.MinValue;
+    private Point? _lastEdgeClickContentPoint;
+    private string? _lastEdgeClickEdgeId;
 
     public MindmapView()
     {
@@ -576,6 +584,58 @@ public partial class MindmapView : UserControl
             }
             e.Handled = true;
         }
+        else
+        {
+            UpdateEdgeHoverAndCursor(e);
+        }
+    }
+
+    private void UpdateEdgeHoverAndCursor(PointerEventArgs e)
+    {
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
+        if (mainCanvas == null || DataContext is not MindmapViewModel vm) return;
+        var pos = e.GetPosition(mainCanvas);
+        var contentPoint = pos * _transformMatrix.Invert();
+
+        foreach (var node in vm.Nodes)
+        {
+            var w = node.Width ?? 120;
+            var h = node.Height ?? 40;
+            if (contentPoint.X >= node.X && contentPoint.X <= node.X + w && contentPoint.Y >= node.Y && contentPoint.Y <= node.Y + h)
+            {
+                mainCanvas.Cursor = null;
+                vm.SetHoveredEdge(null);
+                return;
+            }
+        }
+
+        const double labelHalfW = 30;
+        const double labelHalfH = 11;
+        foreach (var edge in vm.Edges)
+        {
+            var d = edge.GetDistanceToCurve(contentPoint);
+            if (d < EdgeHitThreshold)
+            {
+                mainCanvas.Cursor = new Cursor(StandardCursorType.Hand);
+                vm.SetHoveredEdge(edge.Id);
+                return;
+            }
+            if (edge.Label != null)
+            {
+                var cx = edge.CenterPoint.X;
+                var cy = edge.CenterPoint.Y;
+                if (contentPoint.X >= cx - labelHalfW && contentPoint.X <= cx + labelHalfW
+                    && contentPoint.Y >= cy - labelHalfH && contentPoint.Y <= cy + labelHalfH)
+                {
+                    mainCanvas.Cursor = new Cursor(StandardCursorType.Hand);
+                    vm.SetHoveredEdge(edge.Id);
+                    return;
+                }
+            }
+        }
+
+        mainCanvas.Cursor = null;
+        vm.SetHoveredEdge(null);
     }
 
     private void UpdateNodeSelection(MindmapViewModel vm)
@@ -640,14 +700,71 @@ public partial class MindmapView : UserControl
         
         if (_isPanning)
         {
-            // If we're panning and didn't move significantly, it was a click - deselect all nodes
+            // If we're panning and didn't move significantly, it was a click on empty space
             if (!_hasMovedSignificantly && DataContext is MindmapViewModel viewModel)
             {
                 foreach (var node in viewModel.Nodes) node.IsSelected = false;
+                // Nodes are on top so edge hit Path never gets the click; hit-test edges in code
+                var mainCanvas = this.FindControl<Panel>("MainCanvas");
+                if (mainCanvas != null)
+                {
+                    var pos = e.GetPosition(mainCanvas);
+                    var contentPoint = pos * _transformMatrix.Invert();
+                    EdgeViewModel? nearest = null;
+                    double nearestDist = EdgeHitThreshold;
+                    foreach (var edge in viewModel.Edges)
+                    {
+                        var d = edge.GetDistanceToCurve(contentPoint);
+                        if (d < nearestDist) { nearestDist = d; nearest = edge; }
+                    }
+                    if (nearest != null)
+                    {
+                        var now = DateTime.UtcNow;
+                        var prev = _lastEdgeClickContentPoint;
+                        bool isDoubleClick = _lastEdgeClickEdgeId == nearest.Id
+                            && prev is { } p
+                            && (contentPoint.X - p.X) * (contentPoint.X - p.X) + (contentPoint.Y - p.Y) * (contentPoint.Y - p.Y) < EdgeDoubleClickDist * EdgeDoubleClickDist
+                            && (now - _lastEdgeClickTime).TotalMilliseconds < EdgeDoubleClickMs;
+                        if (isDoubleClick)
+                        {
+                            viewModel.EdgeClicked(nearest);
+                            FocusEdgeLabelBox(nearest);
+                            _lastEdgeClickEdgeId = null;
+                            _lastEdgeClickContentPoint = null;
+                        }
+                        else
+                        {
+                            _lastEdgeClickTime = now;
+                            _lastEdgeClickContentPoint = contentPoint;
+                            _lastEdgeClickEdgeId = nearest.Id;
+                        }
+                    }
+                    else
+                    {
+                        _lastEdgeClickEdgeId = null;
+                        _lastEdgeClickContentPoint = null;
+                    }
+                }
             }
-            
             _isPanning = false;
             e.Handled = true;
+        }
+    }
+
+    private void FocusEdgeLabelBox(EdgeViewModel edge)
+    {
+        var layer = this.FindControl<ItemsControl>("EdgeHitLayer");
+        if (layer == null) return;
+        var container = layer.GetVisualDescendants().FirstOrDefault(v => v is Control c && c.DataContext == edge) as Control;
+        if (container != null)
+        {
+            var box = container.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+            if (box != null)
+                Dispatcher.UIThread.Post(() =>
+                {
+                    box.Focus();
+                    box.CaretIndex = box.Text?.Length ?? 0;
+                }, DispatcherPriority.Loaded);
         }
     }
 
@@ -657,6 +774,88 @@ public partial class MindmapView : UserControl
         {
             await vm.UpdateNodeTextAsync(node, textBox.Text ?? string.Empty);
         }
+    }
+
+    private void OnEdgePointerEnter(object? sender, PointerEventArgs e)
+    {
+        if (sender is Control c && c.DataContext is EdgeViewModel edge && DataContext is MindmapViewModel vm)
+            vm.SetHoveredEdge(edge.Id);
+    }
+
+    private void OnEdgePointerLeave(object? sender, PointerEventArgs e)
+    {
+        if (DataContext is MindmapViewModel vm)
+            vm.SetHoveredEdge(null);
+    }
+
+    private void OnCanvasPointerExited(object? sender, PointerEventArgs e)
+    {
+        if (DataContext is MindmapViewModel vm)
+            vm.ClearHoverState();
+    }
+
+    private void OnMindmapKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MindmapViewModel vm || vm.SelectedEdge == null) return;
+        if (e.Key != Key.F2 && e.Key != Key.Enter) return;
+        e.Handled = true;
+        vm.EdgeClicked(vm.SelectedEdge);
+        FocusEdgeLabelBox(vm.SelectedEdge);
+    }
+
+    private void OnNodePointerEnter(object? sender, PointerEventArgs e)
+    {
+        if (sender is Control c && c.DataContext is NodeViewModel node && DataContext is MindmapViewModel vm)
+            vm.SetHoveredNode(node.Id, true);
+    }
+
+    private void OnNodePointerLeave(object? sender, PointerEventArgs e)
+    {
+        if (sender is Control c && c.DataContext is NodeViewModel node && DataContext is MindmapViewModel vm)
+            vm.SetHoveredNode(node.Id, false);
+    }
+
+    private void OnEdgeHitPathPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control c || c.DataContext is not EdgeViewModel edge || DataContext is not MindmapViewModel vm)
+            return;
+        e.Handled = true; // Consume so canvas doesn't start pan; single-click selects, double-click edits
+        if (e.ClickCount == 2)
+        {
+            vm.EdgeClicked(edge);
+            FocusEdgeLabelBox(edge);
+        }
+        else if (e.ClickCount == 1)
+            vm.SelectedEdge = edge;
+    }
+
+    private void OnEdgeLabelPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control control || control.DataContext is not EdgeViewModel edge ||
+            DataContext is not MindmapViewModel vm)
+            return;
+        e.Handled = true; // Prevents pan starting on label; single-click selects, double-click enters edit
+        if (e.ClickCount == 2)
+        {
+            vm.EdgeClicked(edge);
+            if (sender is TextBox box)
+                Dispatcher.UIThread.Post(() =>
+                {
+                    box.Focus();
+                    box.CaretIndex = box.Text?.Length ?? 0;
+                }, DispatcherPriority.Loaded);
+            else
+                FocusEdgeLabelBox(edge);
+        }
+        else if (e.ClickCount == 1)
+            vm.SelectedEdge = edge;
+    }
+
+    private void OnEdgeLabelLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control c || c.DataContext is not EdgeViewModel edge || DataContext is not MindmapViewModel vm)
+            return;
+        vm.CommitEdgeLabel(edge);
     }
 
     private void OnNodeSizeChanged(object? sender, SizeChangedEventArgs e)
@@ -808,7 +1007,7 @@ public partial class MindmapView : UserControl
         _viewportRectInMinimap = new Rect(boxX, boxY, boxW, boxH);
 
 
-        const double viewportBoxScale = 0.90;
+        const double viewportBoxScale = 1;
         double displayW = Math.Max(boxW * viewportBoxScale, 2);
         double displayH = Math.Max(boxH * viewportBoxScale, 2);
         double displayX = boxX + (boxW - displayW) / 2;

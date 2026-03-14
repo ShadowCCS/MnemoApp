@@ -225,6 +225,19 @@ public class MindmapService : IMindmapService
         return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
     }
 
+    public async Task<Result> UpdateEdgeLabelAsync(string mindmapId, string edgeId, string? label)
+    {
+        var mapResult = await GetMindmapAsync(mindmapId).ConfigureAwait(false);
+        if (!mapResult.IsSuccess) return Result.Failure(mapResult.ErrorMessage!);
+
+        var mindmap = mapResult.Value!;
+        var edge = mindmap.Edges.FirstOrDefault(e => e.Id == edgeId);
+        if (edge == null) return Result.Failure("Edge not found");
+
+        edge.Label = label;
+        return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
+    }
+
     public async Task<Result> UpdateNodeContentAsync(string mindmapId, string nodeId, IMindmapNodeContent content)
     {
         var mapResult = await GetMindmapAsync(mindmapId).ConfigureAwait(false);
