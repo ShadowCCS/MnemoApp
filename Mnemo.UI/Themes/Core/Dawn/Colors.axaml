@@ -401,6 +401,22 @@
     <Color x:Key="MindmapNodeBackgroundHover">#FFF0EE</Color>
     <Color x:Key="MindmapEdgeStroke">#888888</Color>
     <Color x:Key="MindmapGridColor">#40000000</Color>
+    <!-- Mindmap toolbar (floating panel) -->
+    <Color x:Key="MindmapToolbarPanelBackground">#FAFAF9</Color>
+    <Color x:Key="MindmapToolbarSectionBackground">#FFFFFF</Color>
+    <Color x:Key="MindmapToolbarLabel">#5C5B5A</Color>
+    <Color x:Key="MindmapToolbarIcon">#5C5B5A</Color>
+    <Color x:Key="MindmapToolbarBorder">#E2E1E0</Color>
+    <Color x:Key="MindmapToolbarTabActiveBackground">#E8E7E6</Color>
+    <Color x:Key="MindmapToolbarTabActiveForeground">#1A1A1A</Color>
+    <Color x:Key="MindmapToolbarButtonHover">#EEEDEC</Color>
+    <!-- Mindmap toolbar node color swatches; 1 = default (null color) for new nodes -->
+    <Color x:Key="MindmapToolbarNodeColorSwatchOne">#888888</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchTwo">#e95b45</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchThree">#2686C2</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchFour">#6DA861</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchFive">#EAB308</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchSix">#886ce4</Color>
 
     <!-- Color Swatches -->
     <Color x:Key="ColorSwatch1">#F5F5F5</Color>

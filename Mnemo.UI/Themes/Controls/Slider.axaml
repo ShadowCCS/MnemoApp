@@ -89,9 +89,9 @@
   </ControlTheme>
 
   <ControlTheme x:Key="{x:Type Slider}" TargetType="Slider">
-    <Setter Property="Background" Value="{DynamicResource SliderTrackFill}" />
+    <Setter Property="Background" Value="{DynamicResource SliderTrackFillBrush}" />
     <Setter Property="BorderThickness" Value="{DynamicResource SliderBorderThemeThickness}" />
-    <Setter Property="Foreground" Value="{DynamicResource SliderTrackValueFill}" />
+    <Setter Property="Foreground" Value="{DynamicResource SliderTrackValueFillBrush}" />
     <Style Selector="^:horizontal">
       <Setter Property="Template">
         <ControlTemplate>
@@ -102,7 +102,7 @@
                 CornerRadius="{TemplateBinding CornerRadius}">
                 <Grid x:Name="SliderContainer"
                       Margin="{TemplateBinding Padding}"
-                      Background="{DynamicResource SliderContainerBackground}">
+                      Background="{DynamicResource SliderContainerBackgroundBrush}">
                   <Grid.Styles>
                     <Style Selector="TickBar">
                       <Setter Property="ReservedSpace" Value="{Binding #PART_Track.Thumb.Bounds}" />
@@ -131,7 +131,7 @@
                         Placement="Top" 
                         IsVisible="False"
                         IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
-                        Fill="{DynamicResource SliderTickBarFill}"/>
+                        Fill="{DynamicResource SliderTickBarFillBrush}"/>
                     <TickBar
                         Name="BottomTickBar"
                         Grid.Row="2"
@@ -147,7 +147,7 @@
                         Placement="Bottom"
                         IsVisible="False"
                         IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
-                        Fill="{DynamicResource SliderTickBarFill}" />
+                        Fill="{DynamicResource SliderTickBarFillBrush}" />
                     <Track
                         Name="PART_Track"
                         Grid.Row="1"
@@ -177,7 +177,7 @@
                           Height="{DynamicResource SliderHorizontalThumbHeight}"
                           Margin="0"
                           Padding="0"
-                          Background="{DynamicResource SliderThumbBackground}"
+                          Background="{DynamicResource SliderThumbBackgroundBrush}"
                           BorderThickness="0"
                           Theme="{StaticResource FluentSliderThumbTheme}"
                           DataContext="{TemplateBinding Value}"/>
@@ -199,7 +199,7 @@
                 CornerRadius="{TemplateBinding CornerRadius}">
                 <Grid x:Name="SliderContainer"
                       Grid.Row="1"
-                      Background="{DynamicResource SliderContainerBackground}"
+                      Background="{DynamicResource SliderContainerBackgroundBrush}"
                       Margin="{TemplateBinding Padding}">
                   <Grid.Styles>
                     <Style Selector="TickBar">
@@ -229,7 +229,7 @@
                         Placement="Left"
                         IsVisible="False"
                         IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
-                        Fill="{DynamicResource SliderTickBarFill}"/>
+                        Fill="{DynamicResource SliderTickBarFillBrush}"/>
                     <TickBar 
                         Name="RightTickBar"
                         Grid.RowSpan="3"
@@ -245,7 +245,7 @@
                         Placement="Right" 
                         IsVisible="False"
                         IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
-                        Fill="{DynamicResource SliderTickBarFill}"/>
+                        Fill="{DynamicResource SliderTickBarFillBrush}"/>
                     <Track
                         Name="PART_Track"
                         Grid.RowSpan="3"
@@ -276,7 +276,7 @@
                           Height="{DynamicResource SliderVerticalThumbHeight}"
                           Margin="0"
                           Padding="0"
-                          Background="{DynamicResource SliderThumbBackground}"
+                          Background="{DynamicResource SliderThumbBackgroundBrush}"
                           BorderThickness="0"
                           Theme="{StaticResource FluentSliderThumbTheme}"
                           DataContext="{TemplateBinding Value}" />
@@ -310,22 +310,22 @@
     <!--  PointerOver State  -->
     <Style Selector="^:pointerover">
       <Style Selector="^ /template/ Grid#SliderContainer">
-        <Setter Property="Background" Value="{DynamicResource SliderContainerBackgroundDisabled}" />
+        <Setter Property="Background" Value="{DynamicResource SliderContainerBackgroundDisabledBrush}" />
       </Style>
       <Style Selector="^ /template/ RepeatButton#PART_IncreaseButton">
-        <Setter Property="Background" Value="{DynamicResource SliderTrackFillPointerOver}" />
+        <Setter Property="Background" Value="{DynamicResource SliderTrackFillPointerOverBrush}" />
       </Style>
 
       <Style Selector="^ /template/ Thumb">
-        <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundPointerOver}" />
+        <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundPointerOverBrush}" />
       </Style>
 
       <Style Selector="^ /template/ Grid#SliderContainer">
-        <Setter Property="Background" Value="{DynamicResource SliderContainerBackgroundPointerOver}" />
+        <Setter Property="Background" Value="{DynamicResource SliderContainerBackgroundPointerOverBrush}" />
       </Style>
 
       <Style Selector="^ /template/ RepeatButton#PART_DecreaseButton">
-        <Setter Property="Background" Value="{DynamicResource SliderTrackValueFillPointerOver}" />
+        <Setter Property="Background" Value="{DynamicResource SliderTrackValueFillPointerOverBrush}" />
       </Style>
 
     </Style>
@@ -333,36 +333,36 @@
     <!--  Pressed State  -->
     <Style Selector="^:pressed">
       <Style Selector="^ /template/ Grid#SliderContainer">
-        <Setter Property="Background" Value="{DynamicResource SliderContainerBackgroundPressed}" />
+        <Setter Property="Background" Value="{DynamicResource SliderContainerBackgroundPressedBrush}" />
       </Style>
       <Style Selector="^ /template/ RepeatButton#PART_DecreaseButton">
-        <Setter Property="Background" Value="{DynamicResource SliderTrackValueFillPressed}" />
+        <Setter Property="Background" Value="{DynamicResource SliderTrackValueFillPressedBrush}" />
       </Style>
       <Style Selector="^ /template/ RepeatButton#PART_IncreaseButton">
-        <Setter Property="Background" Value="{DynamicResource SliderTrackFillPressed}" />
+        <Setter Property="Background" Value="{DynamicResource SliderTrackFillPressedBrush}" />
       </Style>
 
       <Style Selector="^ /template/ Thumb">
-        <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundPressed}" />
+        <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundPressedBrush}" />
       </Style>
     </Style>
 
     <!--  Disabled State  -->
     <Style Selector="^:disabled">
       <Style Selector="^ /template/ RepeatButton#PART_DecreaseButton">
-        <Setter Property="Background" Value="{DynamicResource SliderTrackValueFillDisabled}" />
+        <Setter Property="Background" Value="{DynamicResource SliderTrackValueFillDisabledBrush}" />
       </Style>
 
       <Style Selector="^ /template/ RepeatButton#PART_IncreaseButton">
-        <Setter Property="Background" Value="{DynamicResource SliderTrackFillDisabled}" />
+        <Setter Property="Background" Value="{DynamicResource SliderTrackFillDisabledBrush}" />
       </Style>
 
       <Style Selector="^ /template/ Thumb">
-        <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundDisabled}" />
+        <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundDisabledBrush}" />
       </Style>
 
       <Style Selector="^ /template/ TickBar">
-        <Setter Property="Fill" Value="{DynamicResource SliderTickBarFillDisabled}" />
+        <Setter Property="Fill" Value="{DynamicResource SliderTickBarFillDisabledBrush}" />
       </Style>
     </Style>
 

@@ -28,6 +28,7 @@
     <AvaloniaResource Include="Icons\SlashCommand\*.svg" />
     <AvaloniaResource Include="Icons\FormattingToolbar\*.svg" />
     <AvaloniaResource Include="Icons\Assets\*.svg" />
+    <AvaloniaResource Include="Icons\MindmapToolbar\*.svg" />
     <AvaloniaResource Include="Assets\ProfilePictures\*.png" />
     <AvaloniaResource Include="Languages\**" />
     <EmbeddedResource Include="Modules\Overview\Widgets\**\Translations\*.json" />

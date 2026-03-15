@@ -20,7 +20,6 @@ public partial class MindmapView : UserControl
     private double _gridOpacity = 0.2;
     private string _gridType = "Dotted";
     private string _modifierBehaviour = "Selecting";
-    private string _minimapVisibilityMode = "Auto";
 
     private const double DotScaleExponent = 0.35;
     private const double BaseDotScreenPixels = 3.5;
@@ -119,8 +118,10 @@ public partial class MindmapView : UserControl
         }
         else if (key == "Mindmap.MinimapVisibility")
         {
-            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () => {
-                await LoadSettingsAsync();
+            Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (DataContext is MindmapViewModel vm)
+                    await vm.RefreshGlobalMinimapSettingAsync();
                 UpdateMinimapVisibility();
             });
         }
@@ -132,7 +133,6 @@ public partial class MindmapView : UserControl
         
         _gridType = await _settingsService.GetAsync("Mindmap.GridType", "Dotted");
         _modifierBehaviour = await _settingsService.GetAsync("Mindmap.ModifierBehaviour", "Selecting");
-        _minimapVisibilityMode = await _settingsService.GetAsync("Mindmap.MinimapVisibility", "Auto") ?? "Auto";
         var sizeStr = await _settingsService.GetAsync("Mindmap.GridSize", "40");
         var dotSizeStr = await _settingsService.GetAsync("Mindmap.GridDotSize", "1.5");
         var opacityStr = await _settingsService.GetAsync("Mindmap.GridOpacity", "0.2");
@@ -140,17 +140,61 @@ public partial class MindmapView : UserControl
         if (double.TryParse(sizeStr, System.Globalization.CultureInfo.InvariantCulture, out var size)) _gridSpacing = size;
         if (double.TryParse(dotSizeStr, System.Globalization.CultureInfo.InvariantCulture, out var dotSize)) _gridDotSize = dotSize;
         if (double.TryParse(opacityStr, System.Globalization.CultureInfo.InvariantCulture, out var opacity)) _gridOpacity = opacity;
-
-        UpdateMinimapVisibility();
     }
+
+    private MindmapViewModel? _boundMindmapVm;
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        if (_boundMindmapVm != null)
+        {
+            _boundMindmapVm.RecenterRequested -= OnRecenterRequested;
+            _boundMindmapVm.Nodes.CollectionChanged -= OnNodesCollectionChanged;
+            _boundMindmapVm.PropertyChanged -= OnMindmapViewModelPropertyChanged;
+            _boundMindmapVm = null;
+        }
         if (DataContext is MindmapViewModel vm)
         {
+            _boundMindmapVm = vm;
             vm.RecenterRequested += OnRecenterRequested;
             vm.Nodes.CollectionChanged += OnNodesCollectionChanged;
+            vm.PropertyChanged += OnMindmapViewModelPropertyChanged;
+            vm.ZoomLevel = GetScaleFromMatrix(_transformMatrix);
         }
+    }
+
+    private void OnMindmapViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MindmapViewModel.ZoomLevel) && DataContext is MindmapViewModel vm)
+        {
+            ApplyZoomFromVm(vm.ZoomLevel);
+        }
+        else if (e.PropertyName == nameof(MindmapViewModel.MinimapVisibilityMode))
+        {
+            UpdateMinimapVisibility();
+        }
+    }
+
+    private void ApplyZoomFromVm(double scale)
+    {
+        scale = Math.Clamp(scale, MinScale, MaxScale);
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
+        if (mainCanvas == null || mainCanvas.Bounds.Width <= 0 || mainCanvas.Bounds.Height <= 0)
+        {
+            double tx = _transformMatrix.M31;
+            double ty = _transformMatrix.M32;
+            _transformMatrix = Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(tx, ty);
+        }
+        else
+        {
+            var viewportCenter = new Point(mainCanvas.Bounds.Width / 2, mainCanvas.Bounds.Height / 2);
+            var inverseMatrix = _transformMatrix.Invert();
+            var contentPointAtCenter = viewportCenter * inverseMatrix;
+            double tx = viewportCenter.X - contentPointAtCenter.X * scale;
+            double ty = viewportCenter.Y - contentPointAtCenter.Y * scale;
+            _transformMatrix = Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(tx, ty);
+        }
+        UpdateTransform();
     }
 
     private void OnNodesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -264,17 +308,17 @@ public partial class MindmapView : UserControl
         _transformMatrix = _transformMatrix * Matrix.CreateTranslation(offset.X, offset.Y);
 
         UpdateTransform();
-        
-        // Update selection box visual position if we're currently selecting
+
+        if (DataContext is MindmapViewModel vm)
+            vm.ZoomLevel = GetScaleFromMatrix(_transformMatrix);
+
         if (_isSelecting)
         {
-            // Update current selection position to match where the cursor now is in content-space
-            // This keeps the selection's "current" corner tracking the mouse during zoom
             var inv = _transformMatrix.Invert();
             _selectionCurrentInCanvas = pointerPos * inv;
             UpdateSelectionBoxFromContentSpace();
         }
-        
+
         e.Handled = true;
     }
 
@@ -301,12 +345,13 @@ public partial class MindmapView : UserControl
         var minimapBorder = this.FindControl<Border>("MinimapBorder");
         if (minimapBorder == null) return;
 
+        string mode = DataContext is MindmapViewModel vm ? vm.MinimapVisibilityMode : "Auto";
         bool byZoom = GetScaleFromMatrix(_transformMatrix) <= MinimapZoomThreshold;
-        bool visible = _minimapVisibilityMode switch
+        bool visible = mode switch
         {
             "Off" => false,
             "On" => true,
-            _ => byZoom // "Auto" or any other
+            _ => byZoom
         };
 
         minimapBorder.Opacity = visible ? 1 : 0;

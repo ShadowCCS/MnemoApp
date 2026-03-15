@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Collections;
@@ -103,6 +104,44 @@ public class LayoutAlgorithmToDisplayNameConverter : IValueConverter
             _ => null
         };
         return key != null ? loc?.T(key, "Mindmap") ?? id : id;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
+/// <summary>Converts MindmapEdgeKind to localized display name for toolbar.</summary>
+public class EdgeKindToDisplayNameConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not MindmapEdgeKind kind) return value?.ToString();
+        var key = kind == MindmapEdgeKind.Link ? "EdgeDashed" : "EdgeSolid";
+        var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+        return loc?.T(key, "Mindmap") ?? key;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
+/// <summary>Multi-value converter: returns true when all values are true (for edge label visibility).</summary>
+public class BoolAndConverter : IMultiValueConverter
+{
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values == null || values.Count < 2) return false;
+        return values[0] is true && values[1] is true;
+    }
+}
+
+/// <summary>Converts minimap visibility mode string to localized display name.</summary>
+public class MinimapVisibilityToDisplayConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not string s) return value?.ToString();
+        var key = s switch { "On" => "MinimapOn", "Off" => "MinimapOff", _ => "MinimapAuto" };
+        var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+        return loc?.T(key, "Mindmap") ?? s;
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();

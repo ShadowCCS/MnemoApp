@@ -38,7 +38,7 @@ public partial class NodeViewModel : ViewModelBase
     private string _text;
 
     [ObservableProperty]
-    private string? _color; // When null, view uses theme MindmapNodeBorderBrush
+    private string? _color; // When null, view uses MindmapToolbarNodeColorSwatchOneBrush (default gray)
 
     /// <summary>One of: rectangle, pill, circle. Default pill.</summary>
     [ObservableProperty]

@@ -20,6 +20,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 {
     private readonly IMindmapService _mindmapService;
     private readonly IHistoryManager _historyManager;
+    private readonly ISettingsService? _settingsService;
     private MindmapModel? _currentMindmap;
 
     [ObservableProperty]
@@ -27,6 +28,50 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     [ObservableProperty]
     private bool _isLoading;
+
+    /// <summary>Active toolbar tab: Edit, Style, View.</summary>
+    [ObservableProperty]
+    private string _toolbarCategory = "Edit";
+
+    [ObservableProperty]
+    private string? _defaultNodeColor;
+
+    [ObservableProperty]
+    private string _defaultNodeShape = "pill";
+
+    [ObservableProperty]
+    private MindmapEdgeKind _defaultEdgeKind = MindmapEdgeKind.Hierarchy;
+
+    [ObservableProperty]
+    private bool _showEdgeLabels = true;
+
+    private const string MinimapOverridesKey = "Mindmap.MinimapVisibilityOverrides";
+    private string _globalMinimapDefault = "Auto";
+    private string? _localMinimapOverride;
+
+    /// <summary>Effective minimap mode: local override for this mindmap, or global default from settings.</summary>
+    public string MinimapVisibilityMode
+    {
+        get => _localMinimapOverride ?? _globalMinimapDefault;
+        set
+        {
+            if (string.IsNullOrEmpty(value)) return;
+            _localMinimapOverride = value;
+            OnPropertyChanged(nameof(MinimapVisibilityMode));
+            OnPropertyChanged(nameof(IsMinimapOff));
+            OnPropertyChanged(nameof(IsMinimapAuto));
+            OnPropertyChanged(nameof(IsMinimapOn));
+            if (_currentMindmap != null && _settingsService != null)
+                _ = SaveMinimapOverrideAsync(_currentMindmap.Id, value);
+        }
+    }
+
+    public bool IsMinimapOff { get => MinimapVisibilityMode == "Off"; set { if (value) MinimapVisibilityMode = "Off"; } }
+    public bool IsMinimapAuto { get => MinimapVisibilityMode == "Auto"; set { if (value) MinimapVisibilityMode = "Auto"; } }
+    public bool IsMinimapOn { get => MinimapVisibilityMode == "On"; set { if (value) MinimapVisibilityMode = "On"; } }
+
+    [ObservableProperty]
+    private double _zoomLevel = 1.0;
 
     public ObservableCollection<NodeViewModel> Nodes { get; } = new();
     public ObservableCollection<EdgeViewModel> Edges { get; } = new();
@@ -38,21 +83,59 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     public ICommand DeleteSelectedCommand { get; }
     public ICommand ConnectSelectedCommand { get; }
     public ICommand DetachSelectedCommand { get; }
-    public ICommand AutoLayoutCommand { get; }
+    public ICommand SetLayoutAlgorithmCommand { get; }
     public ICommand RecenterCommand { get; }
     public ICommand SetSelectedNodesColorCommand { get; }
     public ICommand SetSelectedNodesShapeCommand { get; }
+    public ICommand SetSelectedEdgeKindCommand { get; }
+    public ICommand SetMinimapVisibilityCommand { get; }
+    public ICommand SetToolbarCategoryCommand { get; }
+
+    public static IReadOnlyList<string> ToolbarCategories { get; } = new[] { "Edit", "Style", "View" };
+    public static IReadOnlyList<string> MinimapVisibilityOptions { get; } = new[] { "Auto", "On", "Off" };
+    public static IReadOnlyList<MindmapEdgeKind> EdgeKindOptions { get; } = new[] { MindmapEdgeKind.Hierarchy, MindmapEdgeKind.Link };
 
     /// <summary>First selected node, for properties panel. Refreshes when selection changes.</summary>
     public NodeViewModel? FirstSelectedNode => Nodes.FirstOrDefault(n => n.IsSelected);
 
     public bool HasSelectedNodes => Nodes.Any(n => n.IsSelected);
 
+    /// <summary>Color to show in Style tab: selection or default for new nodes.</summary>
+    public string? EffectiveStyleColor => HasSelectedNodes ? FirstSelectedNode?.Color : DefaultNodeColor;
+
+    /// <summary>Shape to show in Style tab: selection or default for new nodes.</summary>
+    public string EffectiveStyleShape => HasSelectedNodes ? (FirstSelectedNode?.Shape ?? "pill") : DefaultNodeShape;
+
+    /// <summary>Edge kind to show in Style tab: selected edge or default for new edges.</summary>
+    public MindmapEdgeKind EffectiveEdgeKind => SelectedEdge != null ? SelectedEdge.Kind : DefaultEdgeKind;
+
+    /// <summary>Settable for ComboBox two-way bind; get returns EffectiveEdgeKind, set applies to selection or default.</summary>
+    public MindmapEdgeKind StyleEdgeKindSelected
+    {
+        get => EffectiveEdgeKind;
+        set => SetSelectedEdgeKind(value);
+    }
+
+    public bool IsEditTab => ToolbarCategory == "Edit";
+    public bool IsStyleTab => ToolbarCategory == "Style";
+    public bool IsViewTab => ToolbarCategory == "View";
+
     /// <summary>Available layout algorithm IDs for binding.</summary>
     public static IReadOnlyList<string> LayoutAlgorithmIds { get; } = new[] { LayoutAlgorithms.TreeVertical, LayoutAlgorithms.TreeHorizontal, LayoutAlgorithms.Radial };
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLayoutTreeVertical))]
+    [NotifyPropertyChangedFor(nameof(IsLayoutTreeHorizontal))]
+    [NotifyPropertyChangedFor(nameof(IsLayoutRadial))]
     private string _selectedLayoutAlgorithm = LayoutAlgorithms.TreeVertical;
+
+    public bool IsLayoutTreeVertical => SelectedLayoutAlgorithm == LayoutAlgorithms.TreeVertical;
+    public bool IsLayoutTreeHorizontal => SelectedLayoutAlgorithm == LayoutAlgorithms.TreeHorizontal;
+    public bool IsLayoutRadial => SelectedLayoutAlgorithm == LayoutAlgorithms.Radial;
+
+    public bool IsShapeRectangle => EffectiveStyleShape == "rectangle";
+    public bool IsShapePill => EffectiveStyleShape == "pill";
+    public bool IsShapeCircle => EffectiveStyleShape == "circle";
 
     [ObservableProperty]
     private EdgeViewModel? _selectedEdge;
@@ -62,18 +145,22 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     public event EventHandler? RecenterRequested;
 
-    public MindmapViewModel(IMindmapService mindmapService, IHistoryManager historyManager)
+    public MindmapViewModel(IMindmapService mindmapService, IHistoryManager historyManager, ISettingsService? settingsService = null)
     {
         _mindmapService = mindmapService;
         _historyManager = historyManager;
+        _settingsService = settingsService;
         AddNodeCommand = new AsyncRelayCommand(AddNodeAsync);
         DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync);
         ConnectSelectedCommand = new AsyncRelayCommand(ConnectSelectedAsync);
         DetachSelectedCommand = new AsyncRelayCommand(DetachSelectedAsync);
-        AutoLayoutCommand = new AsyncRelayCommand(AutoLayoutAsync);
+        SetLayoutAlgorithmCommand = new AsyncRelayCommand<string?>(SetLayoutAlgorithmAsync);
         RecenterCommand = new RelayCommand(RecenterView);
         SetSelectedNodesColorCommand = new RelayCommand<string?>(SetSelectedNodesColor);
         SetSelectedNodesShapeCommand = new RelayCommand<string?>(SetSelectedNodesShape);
+        SetSelectedEdgeKindCommand = new RelayCommand<MindmapEdgeKind?>(SetSelectedEdgeKind);
+        SetMinimapVisibilityCommand = new RelayCommand<string?>(SetMinimapVisibility);
+        SetToolbarCategoryCommand = new RelayCommand<string?>(c => { if (!string.IsNullOrEmpty(c)) ToolbarCategory = c; });
     }
 
     private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -82,7 +169,120 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         {
             OnPropertyChanged(nameof(FirstSelectedNode));
             OnPropertyChanged(nameof(HasSelectedNodes));
+            NotifyEffectiveStyleChanged();
         }
+        else if (e.PropertyName is nameof(NodeViewModel.Color) or nameof(NodeViewModel.Shape))
+        {
+            NotifyEffectiveStyleChanged();
+        }
+    }
+
+    private void NotifyEffectiveStyleChanged()
+    {
+        OnPropertyChanged(nameof(EffectiveStyleColor));
+        OnPropertyChanged(nameof(EffectiveStyleShape));
+        OnPropertyChanged(nameof(IsShapeRectangle));
+        OnPropertyChanged(nameof(IsShapePill));
+        OnPropertyChanged(nameof(IsShapeCircle));
+    }
+
+    partial void OnDefaultNodeColorChanged(string? value)
+    {
+        if (!HasSelectedNodes) NotifyEffectiveStyleChanged();
+    }
+
+    partial void OnDefaultNodeShapeChanged(string value)
+    {
+        if (!HasSelectedNodes) NotifyEffectiveStyleChanged();
+    }
+
+    partial void OnSelectedEdgeChanged(EdgeViewModel? value)
+    {
+        OnPropertyChanged(nameof(EffectiveEdgeKind));
+        OnPropertyChanged(nameof(StyleEdgeKindSelected));
+    }
+
+    partial void OnDefaultEdgeKindChanged(MindmapEdgeKind value)
+    {
+        if (SelectedEdge == null)
+        {
+            OnPropertyChanged(nameof(EffectiveEdgeKind));
+            OnPropertyChanged(nameof(StyleEdgeKindSelected));
+        }
+    }
+
+    partial void OnToolbarCategoryChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsEditTab));
+        OnPropertyChanged(nameof(IsStyleTab));
+        OnPropertyChanged(nameof(IsViewTab));
+    }
+
+    private void SetMinimapVisibility(string? mode)
+    {
+        if (string.IsNullOrEmpty(mode)) return;
+        MinimapVisibilityMode = mode;
+    }
+
+    private async Task SaveMinimapOverrideAsync(string mindmapId, string mode)
+    {
+        if (_settingsService == null) return;
+        var overrides = await _settingsService.GetAsync(MinimapOverridesKey, new Dictionary<string, string>()).ConfigureAwait(false)
+            ?? new Dictionary<string, string>();
+        if (mode == _globalMinimapDefault)
+            overrides.Remove(mindmapId);
+        else
+            overrides[mindmapId] = mode;
+        await _settingsService.SetAsync(MinimapOverridesKey, overrides).ConfigureAwait(false);
+    }
+
+    /// <summary>Refreshes global default from settings. When global changes, clears all per-mindmap overrides so every mindmap uses the new global until locally changed.</summary>
+    public async Task RefreshGlobalMinimapSettingAsync()
+    {
+        if (_settingsService == null) return;
+        var mode = await _settingsService.GetAsync("Mindmap.MinimapVisibility", "Auto").ConfigureAwait(false);
+        if (mode == null) return;
+        _globalMinimapDefault = mode;
+        var overrides = await _settingsService.GetAsync(MinimapOverridesKey, new Dictionary<string, string>()).ConfigureAwait(false)
+            ?? new Dictionary<string, string>();
+        if (overrides.Count > 0)
+        {
+            overrides.Clear();
+            await _settingsService.SetAsync(MinimapOverridesKey, overrides).ConfigureAwait(false);
+        }
+        _localMinimapOverride = null;
+        OnPropertyChanged(nameof(MinimapVisibilityMode));
+        OnPropertyChanged(nameof(IsMinimapOff));
+        OnPropertyChanged(nameof(IsMinimapAuto));
+        OnPropertyChanged(nameof(IsMinimapOn));
+    }
+
+    private async void SetSelectedEdgeKind(MindmapEdgeKind? kind)
+    {
+        if (kind == null) return;
+        if (SelectedEdge != null && _currentMindmap != null)
+        {
+            var edge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == SelectedEdge.Id);
+            if (edge != null && kind == MindmapEdgeKind.Hierarchy && WouldCreateCycle(_currentMindmap, edge.FromId, edge.ToId))
+                return;
+            SelectedEdge.Kind = kind.Value;
+            if (edge != null)
+            {
+                edge.Kind = kind.Value;
+                await _mindmapService.UpdateEdgeKindAsync(_currentMindmap.Id, edge.Id, kind.Value);
+            }
+            OnPropertyChanged(nameof(EffectiveEdgeKind));
+            OnPropertyChanged(nameof(StyleEdgeKindSelected));
+        }
+        else
+        {
+            DefaultEdgeKind = kind.Value;
+        }
+    }
+
+    private bool WouldCreateCycle(MindmapModel mindmap, string fromId, string toId)
+    {
+        return _mindmapService.WouldCreateCycle(mindmap, fromId, toId);
     }
 
     public async void EdgeClicked(EdgeViewModel edge)
@@ -167,6 +367,11 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     private async void SetSelectedNodesColor(string? color)
     {
+        if (!HasSelectedNodes)
+        {
+            DefaultNodeColor = color;
+            return;
+        }
         if (_currentMindmap == null) return;
         var selected = Nodes.Where(n => n.IsSelected).ToList();
         foreach (var node in selected)
@@ -179,12 +384,17 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     private async void SetSelectedNodesShape(string? shape)
     {
-        if (_currentMindmap == null || string.IsNullOrEmpty(shape)) return;
+        if (string.IsNullOrEmpty(shape)) return;
+        if (!HasSelectedNodes)
+        {
+            DefaultNodeShape = shape;
+            return;
+        }
+        if (_currentMindmap == null) return;
         var selected = Nodes.Where(n => n.IsSelected).ToList();
         foreach (var node in selected)
         {
             node.Shape = shape;
-            // When switching from circle, clear stored size so the view re-measures (circle forces square; pill/rect use content size).
             if (shape != "circle")
             {
                 node.Width = null;
@@ -214,6 +424,8 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     public void OnNavigatedTo(object? parameter)
     {
+        if (_settingsService != null)
+            _ = LoadMinimapSettingAsync();
         if (parameter is string id)
         {
             _ = LoadMindmapAsync(id);
@@ -221,6 +433,20 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         else
         {
             _ = LoadInitialMindmapAsync();
+        }
+    }
+
+    private async Task LoadMinimapSettingAsync()
+    {
+        if (_settingsService == null) return;
+        var mode = await _settingsService.GetAsync("Mindmap.MinimapVisibility", "Auto").ConfigureAwait(false);
+        if (mode != null) _globalMinimapDefault = mode;
+        if (_currentMindmap == null && _localMinimapOverride == null)
+        {
+            OnPropertyChanged(nameof(MinimapVisibilityMode));
+            OnPropertyChanged(nameof(IsMinimapOff));
+            OnPropertyChanged(nameof(IsMinimapAuto));
+            OnPropertyChanged(nameof(IsMinimapOn));
         }
     }
 
@@ -257,6 +483,18 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             _currentMindmap = result.Value;
             Title = _currentMindmap.Title;
             _historyManager.Clear();
+            if (_settingsService != null)
+            {
+                var overrides = await _settingsService.GetAsync(MinimapOverridesKey, new Dictionary<string, string>()).ConfigureAwait(false)
+                    ?? new Dictionary<string, string>();
+                _localMinimapOverride = overrides.TryGetValue(id, out var saved) ? saved : null;
+            }
+            else
+                _localMinimapOverride = null;
+            OnPropertyChanged(nameof(MinimapVisibilityMode));
+            OnPropertyChanged(nameof(IsMinimapOff));
+            OnPropertyChanged(nameof(IsMinimapAuto));
+            OnPropertyChanged(nameof(IsMinimapOn));
             RefreshView();
         }
     }
@@ -342,11 +580,16 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         if (result.IsSuccess)
         {
             var newNode = result.Value!;
+            var style = new Dictionary<string, string?>();
+            if (DefaultNodeColor != null) style["color"] = DefaultNodeColor;
+            style["shape"] = DefaultNodeShape;
+            if (style.Count > 0)
+                await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, newNode.Id, style);
             foreach (var selected in selectedNodes)
             {
-                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, selected.Id, newNode.Id, MindmapEdgeKind.Hierarchy);
+                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, selected.Id, newNode.Id, DefaultEdgeKind);
             }
-            
+
             await LoadMindmapAsync(_currentMindmap.Id);
         }
     }
@@ -366,7 +609,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             // Check if already connected to avoid duplicates
             if (!_currentMindmap.Edges.Any(e => (e.FromId == from.Id && e.ToId == to.Id) || (e.FromId == to.Id && e.ToId == from.Id)))
             {
-                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, from.Id, to.Id, MindmapEdgeKind.Hierarchy);
+                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, from.Id, to.Id, DefaultEdgeKind);
                 changed = true;
             }
         }
@@ -451,7 +694,14 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         await _mindmapService.UpdateNodeLayoutAsync(_currentMindmap.Id, node.Id, x, y);
     }
 
-    private async Task AutoLayoutAsync()
+    private async Task SetLayoutAlgorithmAsync(string? algorithmId)
+    {
+        if (_currentMindmap == null || string.IsNullOrEmpty(algorithmId) || !LayoutAlgorithmIds.Contains(algorithmId)) return;
+        SelectedLayoutAlgorithm = algorithmId;
+        await ApplyLayoutAsync();
+    }
+
+    private async Task ApplyLayoutAsync()
     {
         if (_currentMindmap == null || !Nodes.Any()) return;
 

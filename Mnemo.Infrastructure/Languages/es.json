@@ -309,11 +309,12 @@
     "Pill": "Píldora",
     "Circle": "Círculo",
     "Minimap": "MINIMAPA",
-    "ColorCoral": "Coral",
-    "ColorBlue": "Azul",
-    "ColorGreen": "Verde",
-    "ColorAmber": "Ámbar",
-    "ColorPurple": "Púrpura"
+    "Swatch1": "Muestra 1",
+    "Swatch2": "Muestra 2",
+    "Swatch3": "Muestra 3",
+    "Swatch4": "Muestra 4",
+    "Swatch5": "Muestra 5",
+    "Swatch6": "Muestra 6"
   },
   "Topbar": {
     "SearchPlaceholder": "Busca una lección, mapa mental, etc.",

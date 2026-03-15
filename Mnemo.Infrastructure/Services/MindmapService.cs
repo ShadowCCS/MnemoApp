@@ -238,6 +238,22 @@ public class MindmapService : IMindmapService
         return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
     }
 
+    public async Task<Result> UpdateEdgeKindAsync(string mindmapId, string edgeId, MindmapEdgeKind kind)
+    {
+        var mapResult = await GetMindmapAsync(mindmapId).ConfigureAwait(false);
+        if (!mapResult.IsSuccess) return Result.Failure(mapResult.ErrorMessage!);
+
+        var mindmap = mapResult.Value!;
+        var edge = mindmap.Edges.FirstOrDefault(e => e.Id == edgeId);
+        if (edge == null) return Result.Failure("Edge not found");
+
+        if (kind == MindmapEdgeKind.Hierarchy && WouldCreateCycle(mindmap, edge.FromId, edge.ToId))
+            return Result.Failure("Cannot set hierarchy: would create a cycle");
+
+        edge.Kind = kind;
+        return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
+    }
+
     public async Task<Result> UpdateNodeContentAsync(string mindmapId, string nodeId, IMindmapNodeContent content)
     {
         var mapResult = await GetMindmapAsync(mindmapId).ConfigureAwait(false);

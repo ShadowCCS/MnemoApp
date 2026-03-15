@@ -475,12 +475,46 @@
     <BoxShadows x:Key="MindmapNodeBoxShadowHover">0 4 8 0 #35000000</BoxShadows>
     <BoxShadows x:Key="MindmapNodeBoxShadowSelected">0 0 0 2 #50e95b45</BoxShadows>
     <BoxShadows x:Key="MindmapToolbarBoxShadow">0 4 12 0 #30000000</BoxShadows>
+    <SolidColorBrush x:Key="MindmapToolbarPanelBackgroundBrush" Color="{DynamicResource MindmapToolbarPanelBackground}"/>
+    <SolidColorBrush x:Key="MindmapToolbarSectionBackgroundBrush" Color="{DynamicResource MindmapToolbarSectionBackground}"/>
+    <SolidColorBrush x:Key="MindmapToolbarLabelBrush" Color="{DynamicResource MindmapToolbarLabel}"/>
+    <SolidColorBrush x:Key="MindmapToolbarIconBrush" Color="{DynamicResource MindmapToolbarIcon}"/>
+    <SolidColorBrush x:Key="MindmapToolbarBorderBrush" Color="{DynamicResource MindmapToolbarBorder}"/>
+    <SolidColorBrush x:Key="MindmapToolbarTabActiveBackgroundBrush" Color="{DynamicResource MindmapToolbarTabActiveBackground}"/>
+    <SolidColorBrush x:Key="MindmapToolbarTabActiveForegroundBrush" Color="{DynamicResource MindmapToolbarTabActiveForeground}"/>
+    <SolidColorBrush x:Key="MindmapToolbarButtonHoverBrush" Color="{DynamicResource MindmapToolbarButtonHover}"/>
+    <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchOneBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchOne}"/>
+    <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchTwoBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchTwo}"/>
+    <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchThreeBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchThree}"/>
+    <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchFourBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchFour}"/>
+    <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchFiveBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchFive}"/>
+    <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchSixBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchSix}"/>
 
     <!-- Notes module -->
     <SolidColorBrush x:Key="NotesPaneBackgroundBrush" Color="{DynamicResource NotesPaneBackground}"/>
     <SolidColorBrush x:Key="NotesSectionHeaderForegroundBrush" Color="{DynamicResource NotesSectionHeaderForeground}"/>
     <SolidColorBrush x:Key="NotesPaneDividerBrush" Color="{DynamicResource NotesPaneDivider}"/>
     <SolidColorBrush x:Key="NotesEditorSeparatorBrush" Color="{DynamicResource NotesEditorSeparator}"/>
+
+    <!-- Slider Brushes -->
+    <SolidColorBrush x:Key="SliderTrackFillBrush" Color="{DynamicResource SliderTrackFill}"/>
+    <SolidColorBrush x:Key="SliderTrackValueFillBrush" Color="{DynamicResource SliderTrackValueFill}"/>
+    <SolidColorBrush x:Key="SliderThumbBackgroundBrush" Color="{DynamicResource SliderThumbBackground}"/>
+    <SolidColorBrush x:Key="SliderTickBarFillBrush" Color="{DynamicResource SliderTickBarFill}"/>
+    <SolidColorBrush x:Key="SliderContainerBackgroundBrush" Color="{DynamicResource SliderContainerBackground}"/>
+    <SolidColorBrush x:Key="SliderTrackFillPointerOverBrush" Color="{DynamicResource SliderTrackFillPointerOver}"/>
+    <SolidColorBrush x:Key="SliderTrackValueFillPointerOverBrush" Color="{DynamicResource SliderTrackValueFillPointerOver}"/>
+    <SolidColorBrush x:Key="SliderThumbBackgroundPointerOverBrush" Color="{DynamicResource SliderThumbBackgroundPointerOver}"/>
+    <SolidColorBrush x:Key="SliderContainerBackgroundPointerOverBrush" Color="{DynamicResource SliderContainerBackgroundPointerOver}"/>
+    <SolidColorBrush x:Key="SliderTrackFillPressedBrush" Color="{DynamicResource SliderTrackFillPressed}"/>
+    <SolidColorBrush x:Key="SliderTrackValueFillPressedBrush" Color="{DynamicResource SliderTrackValueFillPressed}"/>
+    <SolidColorBrush x:Key="SliderThumbBackgroundPressedBrush" Color="{DynamicResource SliderThumbBackgroundPressed}"/>
+    <SolidColorBrush x:Key="SliderContainerBackgroundPressedBrush" Color="{DynamicResource SliderContainerBackgroundPressed}"/>
+    <SolidColorBrush x:Key="SliderTrackFillDisabledBrush" Color="{DynamicResource SliderTrackFillDisabled}"/>
+    <SolidColorBrush x:Key="SliderTrackValueFillDisabledBrush" Color="{DynamicResource SliderTrackValueFillDisabled}"/>
+    <SolidColorBrush x:Key="SliderThumbBackgroundDisabledBrush" Color="{DynamicResource SliderThumbBackgroundDisabled}"/>
+    <SolidColorBrush x:Key="SliderTickBarFillDisabledBrush" Color="{DynamicResource SliderTickBarFillDisabled}"/>
+    <SolidColorBrush x:Key="SliderContainerBackgroundDisabledBrush" Color="{DynamicResource SliderContainerBackgroundDisabled}"/>
 </ResourceDictionary>
 
 

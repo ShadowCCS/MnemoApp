@@ -397,6 +397,46 @@
     <Color x:Key="MindmapNodeBackgroundHover">#464549</Color>
     <Color x:Key="MindmapEdgeStroke">#797573</Color>
     <Color x:Key="MindmapGridColor">#40FFFFFF</Color>
+    <!-- Mindmap toolbar (floating panel) -->
+    <Color x:Key="MindmapToolbarPanelBackground">#2A2827</Color>
+    <Color x:Key="MindmapToolbarSectionBackground">#363432</Color>
+    <Color x:Key="MindmapToolbarLabel">#9A9896</Color>
+    <Color x:Key="MindmapToolbarIcon">#AAAAAA</Color>
+    <Color x:Key="MindmapToolbarBorder">#3D3B3A</Color>
+    <Color x:Key="MindmapToolbarTabActiveBackground">#464549</Color>
+    <Color x:Key="MindmapToolbarTabActiveForeground">#E8E7E6</Color>
+    <Color x:Key="MindmapToolbarButtonHover">#404044</Color>
+    <!-- Mindmap toolbar node color swatches; 1 = default (null color) for new nodes -->
+    <Color x:Key="MindmapToolbarNodeColorSwatchOne">#797573</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchTwo">#e95b45</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchThree">#2686C2</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchFour">#6DA861</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchFive">#EAB308</Color>
+    <Color x:Key="MindmapToolbarNodeColorSwatchSix">#886ce4</Color>
+
+    <!-- Slider -->
+    <Color x:Key="SliderTrackFill">#464549</Color>
+    <Color x:Key="SliderTrackValueFill">#e95b45</Color>
+    <Color x:Key="SliderThumbBackground">#5C5B5A</Color>
+    <Color x:Key="SliderThumbBorder">#3D3B3A</Color>
+    <Color x:Key="SliderTickBarFill">#5C5B5A</Color>
+    <Color x:Key="SliderContainerBackground">Transparent</Color>
+    <!-- Slider PointerOver -->
+    <Color x:Key="SliderTrackFillPointerOver">#5C5B5A</Color>
+    <Color x:Key="SliderTrackValueFillPointerOver">#FF6B55</Color>
+    <Color x:Key="SliderThumbBackgroundPointerOver">#6A6968</Color>
+    <Color x:Key="SliderContainerBackgroundPointerOver">Transparent</Color>
+    <!-- Slider Pressed -->
+    <Color x:Key="SliderTrackFillPressed">#363432</Color>
+    <Color x:Key="SliderTrackValueFillPressed">#D14F3B</Color>
+    <Color x:Key="SliderThumbBackgroundPressed">#5C5B5A</Color>
+    <Color x:Key="SliderContainerBackgroundPressed">Transparent</Color>
+    <!-- Slider Disabled -->
+    <Color x:Key="SliderTrackFillDisabled">#2A2827</Color>
+    <Color x:Key="SliderTrackValueFillDisabled">#464549</Color>
+    <Color x:Key="SliderThumbBackgroundDisabled">#3D3B3A</Color>
+    <Color x:Key="SliderTickBarFillDisabled">#3D3B3A</Color>
+    <Color x:Key="SliderContainerBackgroundDisabled">Transparent</Color>
 
     <!-- Color Swatches -->
     <Color x:Key="ColorSwatch1">#3A3A3D</Color>

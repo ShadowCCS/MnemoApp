@@ -44,13 +44,23 @@ namespace Mnemo.UI.Controls
             }
         }
 
-        public static readonly StyledProperty<IBrush?> ColorProperty =
-        AvaloniaProperty.Register<SvgIcon, IBrush?>(nameof(Color));
+        public static readonly StyledProperty<object?> ColorProperty =
+            AvaloniaProperty.Register<SvgIcon, object?>(
+                nameof(Color),
+                defaultValue: null,
+                coerce: (_, value) =>
+                {
+                    if (value is null) return null;
+                    if (value is Color c) return new SolidColorBrush(c);
+                    if (value is IBrush b) return b;
+                    return null;
+                });
 
     public static readonly StyledProperty<string?> SvgPathProperty =
         AvaloniaProperty.Register<SvgIcon, string?>(nameof(SvgPath));
 
-    public IBrush? Color { get => GetValue(ColorProperty); set => SetValue(ColorProperty, value); }
+    /// <summary>Gets or sets the tint. Accepts <see cref="Color"/> or <see cref="IBrush"/> (e.g. SolidColorBrush) from theme resources.</summary>
+    public IBrush? Color { get => GetValue(ColorProperty) as IBrush; set => SetValue(ColorProperty, value); }
     public string? SvgPath { get => GetValue(SvgPathProperty); set => SetValue(SvgPathProperty, value); }
 
         private RefCountedPicture? _svgPicture;

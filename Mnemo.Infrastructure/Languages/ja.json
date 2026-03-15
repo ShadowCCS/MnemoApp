@@ -309,11 +309,12 @@
       "Pill": "ピル",
       "Circle": "円",
       "Minimap": "ミニマップ",
-      "ColorCoral": "コーラル",
-      "ColorBlue": "青",
-      "ColorGreen": "緑",
-      "ColorAmber": "アンバー",
-      "ColorPurple": "紫"
+      "Swatch1": "スウォッチ 1",
+      "Swatch2": "スウォッチ 2",
+      "Swatch3": "スウォッチ 3",
+      "Swatch4": "スウォッチ 4",
+      "Swatch5": "スウォッチ 5",
+      "Swatch6": "スウォッチ 6"
     },
     "Topbar": {
       "SearchPlaceholder": "レッスンやマインドマップなどを検索...",

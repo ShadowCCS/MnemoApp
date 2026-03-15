@@ -309,11 +309,12 @@
     "Pill": "Pille",
     "Circle": "Kreis",
     "Minimap": "MINIMAP",
-    "ColorCoral": "Koralle",
-    "ColorBlue": "Blau",
-    "ColorGreen": "Grün",
-    "ColorAmber": "Bernstein",
-    "ColorPurple": "Lila"
+    "Swatch1": "Swatch 1",
+    "Swatch2": "Swatch 2",
+    "Swatch3": "Swatch 3",
+    "Swatch4": "Swatch 4",
+    "Swatch5": "Swatch 5",
+    "Swatch6": "Swatch 6"
   },
   "Topbar": {
     "SearchPlaceholder": "Suche nach einem Lernstoff, Mindmap etc.",
