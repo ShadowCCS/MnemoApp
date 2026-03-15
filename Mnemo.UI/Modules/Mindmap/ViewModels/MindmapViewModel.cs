@@ -105,6 +105,8 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     public ICommand SetMinimapVisibilityCommand { get; }
     public ICommand SetToolbarCategoryCommand { get; }
     public ICommand SetMindmapModeCommand { get; }
+    /// <summary>Command to request PNG export of the mindmap viewport. View handles capture and save.</summary>
+    public ICommand ExportAsPngCommand { get; }
 
     public static IReadOnlyList<string> ToolbarCategories { get; } = new[] { "Edit", "Style", "View" };
     public static IReadOnlyList<string> MinimapVisibilityOptions { get; } = new[] { "Auto", "On", "Off" };
@@ -179,6 +181,10 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     private string? _hoveredEdgeId;
     private readonly HashSet<string> _hoveredNodeIds = new();
 
+    /// <summary>When true, PNG export uses a transparent background instead of the workspace color.</summary>
+    [ObservableProperty]
+    private bool _exportPngTransparentBackground;
+
     public event EventHandler? RecenterRequested;
 
     public MindmapViewModel(IMindmapService mindmapService, IHistoryManager historyManager, ISettingsService? settingsService = null)
@@ -199,7 +205,13 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         SetMinimapVisibilityCommand = new RelayCommand<string?>(SetMinimapVisibility);
         SetToolbarCategoryCommand = new RelayCommand<string?>(c => { if (!string.IsNullOrEmpty(c)) ToolbarCategory = c; });
         SetMindmapModeCommand = new RelayCommand<string?>(c => { if (!string.IsNullOrEmpty(c)) MindmapMode = c; });
+        ExportAsPngCommand = new RelayCommand(OnExportAsPng);
     }
+
+    /// <summary>Raised when user requests PNG export. View captures viewport and saves.</summary>
+    public event EventHandler? ExportRequested;
+
+    private void OnExportAsPng() => ExportRequested?.Invoke(this, EventArgs.Empty);
 
     private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

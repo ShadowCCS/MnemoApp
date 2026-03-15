@@ -198,7 +198,9 @@
                PointerReleased="OnNodePointerReleased"
                PointerExited="OnCanvasPointerExited"
                KeyDown="OnMindmapKeyDown">
-            
+
+            <!-- Mindmap only (grid + content); toolbar/minimap/mode switcher are siblings below -->
+            <Panel Name="MindmapContentOnly" Background="{DynamicResource WorkspaceBackgroundBrush}">
             <!-- Background Grid -->
             <Canvas Name="GridCanvas" Background="Transparent" IsHitTestVisible="False">
                 <Canvas.RenderTransform>
@@ -371,6 +373,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </Panel>
+            </Panel>
             </Panel>
 
             <!-- Mode switcher: Edit | Preview (top right), theme brushes only -->
@@ -615,6 +618,24 @@
                                         <TextBlock Text="{markup:T Ns=Mindmap, Key=MinimapOn}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                     </Button>
                                 </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,0" Padding="8,6" CornerRadius="8">
+                            <StackPanel Spacing="6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{markup:T Ns=Mindmap, Key=ExportMap}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource MindmapToolbarLabelBrush}" LetterSpacing="0.5"
+                                               IsVisible="{Binding HasSelectedNodes, Converter={StaticResource BoolNegationConverter}}"/>
+                                    <TextBlock Text="{markup:T Ns=Mindmap, Key=ExportSelection}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource MindmapToolbarLabelBrush}" LetterSpacing="0.5"
+                                               IsVisible="{Binding HasSelectedNodes}"/>
+                                </StackPanel>
+                                <CheckBox IsChecked="{Binding ExportPngTransparentBackground}" Content="{markup:T Ns=Mindmap, Key=ExportTransparentBackground}"
+                                          FontSize="11" Foreground="{DynamicResource MindmapToolbarLabelBrush}" VerticalAlignment="Center"/>
+                                <Button Command="{Binding ExportAsPngCommand}" Classes="toolbar-action" MinWidth="0" Height="36" Padding="12,0" CornerRadius="8" ToolTip.Tip="{markup:T Ns=Mindmap, Key=Png}" VerticalContentAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/MindmapToolbar/download.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                                        <TextBlock Text="{markup:T Ns=Mindmap, Key=Png}" FontSize="12" Foreground="{DynamicResource MindmapToolbarLabelBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
                         </Border>
                         <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,8" Padding="8,6" CornerRadius="8">
