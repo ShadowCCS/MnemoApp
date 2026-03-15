@@ -88,12 +88,14 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     public ICommand SetSelectedNodesColorCommand { get; }
     public ICommand SetSelectedNodesShapeCommand { get; }
     public ICommand SetSelectedEdgeKindCommand { get; }
+    public ICommand SetSelectedEdgeTypeCommand { get; }
     public ICommand SetMinimapVisibilityCommand { get; }
     public ICommand SetToolbarCategoryCommand { get; }
 
     public static IReadOnlyList<string> ToolbarCategories { get; } = new[] { "Edit", "Style", "View" };
     public static IReadOnlyList<string> MinimapVisibilityOptions { get; } = new[] { "Auto", "On", "Off" };
     public static IReadOnlyList<MindmapEdgeKind> EdgeKindOptions { get; } = new[] { MindmapEdgeKind.Hierarchy, MindmapEdgeKind.Link };
+    public static IReadOnlyList<string> EdgeTypeIds { get; } = EdgeTypes.All;
 
     /// <summary>First selected node, for properties panel. Refreshes when selection changes.</summary>
     public NodeViewModel? FirstSelectedNode => Nodes.FirstOrDefault(n => n.IsSelected);
@@ -115,6 +117,26 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         get => EffectiveEdgeKind;
         set => SetSelectedEdgeKind(value);
     }
+
+    [ObservableProperty]
+    private string _defaultEdgeType = EdgeTypes.Solid;
+
+    /// <summary>Edge type to show in Style tab: selected edge or default for new edges.</summary>
+    public string EffectiveEdgeType => SelectedEdge != null ? SelectedEdge.Type : DefaultEdgeType;
+
+    /// <summary>Settable for toolbar; get returns EffectiveEdgeType, set applies to selection or default.</summary>
+    public string StyleEdgeTypeSelected
+    {
+        get => EffectiveEdgeType;
+        set => SetSelectedEdgeType(value);
+    }
+
+    public bool IsEdgeTypeSolid => EffectiveEdgeType == EdgeTypes.Solid;
+    public bool IsEdgeTypeDashed => EffectiveEdgeType == EdgeTypes.Dashed;
+    public bool IsEdgeTypeDotted => EffectiveEdgeType == EdgeTypes.Dotted;
+    public bool IsEdgeTypeDouble => EffectiveEdgeType == EdgeTypes.Double;
+    public bool IsEdgeTypeArrow => EffectiveEdgeType == EdgeTypes.Arrow;
+    public bool IsEdgeTypeBidirect => EffectiveEdgeType == EdgeTypes.Bidirect;
 
     public bool IsEditTab => ToolbarCategory == "Edit";
     public bool IsStyleTab => ToolbarCategory == "Style";
@@ -159,6 +181,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         SetSelectedNodesColorCommand = new RelayCommand<string?>(SetSelectedNodesColor);
         SetSelectedNodesShapeCommand = new RelayCommand<string?>(SetSelectedNodesShape);
         SetSelectedEdgeKindCommand = new RelayCommand<MindmapEdgeKind?>(SetSelectedEdgeKind);
+        SetSelectedEdgeTypeCommand = new RelayCommand<string?>(SetSelectedEdgeType);
         SetMinimapVisibilityCommand = new RelayCommand<string?>(SetMinimapVisibility);
         SetToolbarCategoryCommand = new RelayCommand<string?>(c => { if (!string.IsNullOrEmpty(c)) ToolbarCategory = c; });
     }
@@ -184,6 +207,19 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         OnPropertyChanged(nameof(IsShapeRectangle));
         OnPropertyChanged(nameof(IsShapePill));
         OnPropertyChanged(nameof(IsShapeCircle));
+        NotifyEffectiveEdgeTypeChanged();
+    }
+
+    private void NotifyEffectiveEdgeTypeChanged()
+    {
+        OnPropertyChanged(nameof(EffectiveEdgeType));
+        OnPropertyChanged(nameof(StyleEdgeTypeSelected));
+        OnPropertyChanged(nameof(IsEdgeTypeSolid));
+        OnPropertyChanged(nameof(IsEdgeTypeDashed));
+        OnPropertyChanged(nameof(IsEdgeTypeDotted));
+        OnPropertyChanged(nameof(IsEdgeTypeDouble));
+        OnPropertyChanged(nameof(IsEdgeTypeArrow));
+        OnPropertyChanged(nameof(IsEdgeTypeBidirect));
     }
 
     partial void OnDefaultNodeColorChanged(string? value)
@@ -196,10 +232,16 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         if (!HasSelectedNodes) NotifyEffectiveStyleChanged();
     }
 
+    partial void OnDefaultEdgeTypeChanged(string value)
+    {
+        if (SelectedEdge == null) NotifyEffectiveEdgeTypeChanged();
+    }
+
     partial void OnSelectedEdgeChanged(EdgeViewModel? value)
     {
         OnPropertyChanged(nameof(EffectiveEdgeKind));
         OnPropertyChanged(nameof(StyleEdgeKindSelected));
+        NotifyEffectiveEdgeTypeChanged();
     }
 
     partial void OnDefaultEdgeKindChanged(MindmapEdgeKind value)
@@ -277,6 +319,27 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         else
         {
             DefaultEdgeKind = kind.Value;
+        }
+    }
+
+    private async void SetSelectedEdgeType(string? type)
+    {
+        if (string.IsNullOrEmpty(type) || !EdgeTypeIds.Contains(type)) return;
+        if (SelectedEdge != null && _currentMindmap != null)
+        {
+            var edge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == SelectedEdge.Id);
+            if (edge != null)
+            {
+                SelectedEdge.Type = type;
+                edge.Type = type;
+                await _mindmapService.UpdateEdgeTypeAsync(_currentMindmap.Id, edge.Id, type);
+            }
+            NotifyEffectiveEdgeTypeChanged();
+        }
+        else
+        {
+            DefaultEdgeType = type;
+            NotifyEffectiveEdgeTypeChanged();
         }
     }
 
@@ -587,7 +650,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
                 await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, newNode.Id, style);
             foreach (var selected in selectedNodes)
             {
-                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, selected.Id, newNode.Id, DefaultEdgeKind);
+                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, selected.Id, newNode.Id, DefaultEdgeKind, null, DefaultEdgeType);
             }
 
             await LoadMindmapAsync(_currentMindmap.Id);
@@ -609,7 +672,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             // Check if already connected to avoid duplicates
             if (!_currentMindmap.Edges.Any(e => (e.FromId == from.Id && e.ToId == to.Id) || (e.FromId == to.Id && e.ToId == from.Id)))
             {
-                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, from.Id, to.Id, DefaultEdgeKind);
+                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, from.Id, to.Id, DefaultEdgeKind, null, DefaultEdgeType);
                 changed = true;
             }
         }

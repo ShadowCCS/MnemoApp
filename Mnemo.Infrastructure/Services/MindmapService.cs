@@ -186,7 +186,7 @@ public class MindmapService : IMindmapService
         return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
     }
 
-    public async Task<Result<MindmapEdge>> AddEdgeAsync(string mindmapId, string fromId, string toId, MindmapEdgeKind kind, string? label = null)
+    public async Task<Result<MindmapEdge>> AddEdgeAsync(string mindmapId, string fromId, string toId, MindmapEdgeKind kind, string? label = null, string? type = null)
     {
         var mapResult = await GetMindmapAsync(mindmapId).ConfigureAwait(false);
         if (!mapResult.IsSuccess) return Result<MindmapEdge>.Failure(mapResult.ErrorMessage!);
@@ -204,6 +204,7 @@ public class MindmapService : IMindmapService
             FromId = fromId,
             ToId = toId,
             Kind = kind,
+            Type = type ?? EdgeTypes.Solid,
             Label = label
         };
 
@@ -251,6 +252,19 @@ public class MindmapService : IMindmapService
             return Result.Failure("Cannot set hierarchy: would create a cycle");
 
         edge.Kind = kind;
+        return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
+    }
+
+    public async Task<Result> UpdateEdgeTypeAsync(string mindmapId, string edgeId, string type)
+    {
+        var mapResult = await GetMindmapAsync(mindmapId).ConfigureAwait(false);
+        if (!mapResult.IsSuccess) return Result.Failure(mapResult.ErrorMessage!);
+
+        var mindmap = mapResult.Value!;
+        var edge = mindmap.Edges.FirstOrDefault(e => e.Id == edgeId);
+        if (edge == null) return Result.Failure("Edge not found");
+
+        edge.Type = type;
         return await SaveMindmapAsync(mindmap).ConfigureAwait(false);
     }
 

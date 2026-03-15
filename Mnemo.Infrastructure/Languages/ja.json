@@ -308,6 +308,8 @@
       "Rectangle": "四角",
       "Pill": "ピル",
       "Circle": "円",
+      "EdgeArrow": "矢印",
+      "EdgeArrowTooltip": "先端に矢印の線",
       "Minimap": "ミニマップ",
       "Swatch1": "スウォッチ 1",
       "Swatch2": "スウォッチ 2",

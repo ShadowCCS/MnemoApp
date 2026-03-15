@@ -92,6 +92,10 @@
         <local:MindmapContentToTextConverter x:Key="MindmapContentToTextConverter"/>
         <local:NodeToCenterPointConverter x:Key="NodeToCenterPointConverter"/>
         <local:EdgeKindToStrokeDashArrayConverter x:Key="EdgeKindToStrokeDashArrayConverter"/>
+        <local:EdgeTypeToStrokeDashArrayConverter x:Key="EdgeTypeToStrokeDashArrayConverter"/>
+        <local:EdgeTypeToOpacityConverter x:Key="EdgeTypeToOpacityConverter"/>
+        <local:EdgeTypeEqualsConverter x:Key="EdgeTypeEqualsConverter"/>
+        <local:EdgeTypeInConverter x:Key="EdgeTypeInConverter"/>
         <converters:BoolNegationConverter x:Key="BoolNegationConverter"/>
         <converters:StringToBrushWithFallbackConverter x:Key="MindmapColorToBrushConverter"/>
         <local:MindmapMinSizeConverter x:Key="MindmapMinSizeConverter"/>
@@ -100,6 +104,7 @@
         <local:MinimapVisibilityToDisplayConverter x:Key="MinimapVisibilityToDisplayConverter"/>
         <local:BoolAndConverter x:Key="BoolAndConverter"/>
         <local:NotNullToBoolConverter x:Key="NotNullToBoolConverter"/>
+        <local:SelectedEdgeToTooltipConverter x:Key="SelectedEdgeToTooltipConverter"/>
         <converters:BoolToDoubleConverter x:Key="BoolToDoubleConverter"/>
         <converters:NullableDoubleToNaNConverter x:Key="NullableDoubleToNaNConverter"/>
 
@@ -188,19 +193,38 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:EdgeViewModel">
-                                <Path Stroke="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
-                                      StrokeThickness="1.5"
-                                      StrokeDashArray="{Binding Kind, Converter={StaticResource EdgeKindToStrokeDashArrayConverter}}">
-                                    <Path.Data>
-                                        <PathGeometry>
-                                            <PathFigure StartPoint="{Binding StartPoint}" IsClosed="False">
-                                                <BezierSegment Point1="{Binding ControlPoint1}"
-                                                               Point2="{Binding ControlPoint2}"
-                                                               Point3="{Binding EndPoint}"/>
-                                            </PathFigure>
-                                        </PathGeometry>
-                                    </Path.Data>
-                                </Path>
+                                <Canvas>
+                                    <!-- Main stroke -->
+                                    <Path Stroke="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
+                                          StrokeThickness="1.5"
+                                          Opacity="{Binding Type, Converter={StaticResource EdgeTypeToOpacityConverter}}"
+                                          StrokeDashArray="{Binding Type, Converter={StaticResource EdgeTypeToStrokeDashArrayConverter}}">
+                                        <Path.Data>
+                                            <PathGeometry>
+                                                <PathFigure StartPoint="{Binding StartPoint}" IsClosed="False">
+                                                    <BezierSegment Point1="{Binding ControlPoint1}"
+                                                                   Point2="{Binding ControlPoint2}"
+                                                                   Point3="{Binding EndPoint}"/>
+                                                </PathFigure>
+                                            </PathGeometry>
+                                        </Path.Data>
+                                    </Path>
+                                    <!-- Double: second parallel line -->
+                                    <Path Stroke="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
+                                          StrokeThickness="1.5" StrokeDashArray="{Binding Type, Converter={StaticResource EdgeTypeToStrokeDashArrayConverter}}"
+                                          Opacity="{Binding Type, Converter={StaticResource EdgeTypeToOpacityConverter}}"
+                                          IsVisible="{Binding Type, Converter={StaticResource EdgeTypeEqualsConverter}, ConverterParameter=double}">
+                                        <Path.Data>
+                                            <PathGeometry>
+                                                <PathFigure StartPoint="{Binding OffsetStartPoint}" IsClosed="False">
+                                                    <BezierSegment Point1="{Binding OffsetControlPoint1}"
+                                                                   Point2="{Binding OffsetControlPoint2}"
+                                                                   Point3="{Binding OffsetEndPoint}"/>
+                                                </PathFigure>
+                                            </PathGeometry>
+                                        </Path.Data>
+                                    </Path>
+                                </Canvas>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -291,6 +315,29 @@
                                                 PointerExited="OnNodePointerLeave"
                                                 SizeChanged="OnNodeSizeChanged"
                                                 Background="Transparent"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Bidirect arrow heads (above nodes so start arrow is visible) -->
+                    <ItemsControl ItemsSource="{Binding Edges}" ClipToBounds="False" IsHitTestVisible="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas Background="Transparent" ClipToBounds="False"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EdgeViewModel">
+                                <Canvas>
+                                    <Polygon Points="{Binding ArrowStartPoints}"
+                                             Fill="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
+                                             Opacity="{Binding Type, Converter={StaticResource EdgeTypeToOpacityConverter}}"
+                                             IsVisible="{Binding Type, Converter={StaticResource EdgeTypeEqualsConverter}, ConverterParameter=bidirect}"/>
+                                    <Polygon Points="{Binding ArrowEndPoints}"
+                                             Fill="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
+                                             Opacity="{Binding Type, Converter={StaticResource EdgeTypeToOpacityConverter}}"
+                                             IsVisible="{Binding Type, Converter={StaticResource EdgeTypeInConverter}, ConverterParameter=bidirect;arrow}"/>
+                                </Canvas>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -446,18 +493,38 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-                        <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,8" Padding="8,6" CornerRadius="8">
+                        <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,8" Padding="8,6" CornerRadius="8"
+                                IsEnabled="{Binding SelectedEdge, Converter={StaticResource NotNullToBoolConverter}}"
+                                ToolTip.Tip="{Binding SelectedEdge, Converter={StaticResource SelectedEdgeToTooltipConverter}}"
+                                ToolTip.ShowOnDisabled="True">
                             <StackPanel Spacing="6">
-                                <TextBlock Text="{markup:T Ns=Mindmap, Key=EdgeStyle}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource MindmapToolbarLabelBrush}" LetterSpacing="0.5"/>
-                                <ComboBox ItemsSource="{Binding EdgeKindOptions}"
-                                          SelectedItem="{Binding StyleEdgeKindSelected}"
-                                          Width="144" HorizontalAlignment="Stretch">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Converter={StaticResource EdgeKindToDisplayNameConverter}}"/>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
+                                <TextBlock Text="{markup:T Ns=Mindmap, Key=EdgeType}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource MindmapToolbarLabelBrush}" LetterSpacing="0.5"/>
+                                <Grid ColumnDefinitions="Auto,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="6">
+                                    <Button Grid.Row="0" Grid.Column="0" Command="{Binding SetSelectedEdgeTypeCommand}" CommandParameter="solid" Classes="toolbar-tab" Classes.selected="{Binding IsEdgeTypeSolid}"
+                                            ToolTip.Tip="{markup:T Ns=Mindmap, Key=EdgeSolidTooltip}" Height="48" MinWidth="48" Padding="6" CornerRadius="8">
+                                        <controls:SvgIcon Classes="toolbar-tab-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapToolbar/EdgeTypes/solid.svg" Width="26" Height="18" HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <Button Grid.Row="0" Grid.Column="1" Command="{Binding SetSelectedEdgeTypeCommand}" CommandParameter="dashed" Classes="toolbar-tab" Classes.selected="{Binding IsEdgeTypeDashed}"
+                                            ToolTip.Tip="{markup:T Ns=Mindmap, Key=EdgeDashedTooltip}" Height="48" MinWidth="48" Padding="6" CornerRadius="8">
+                                        <controls:SvgIcon Classes="toolbar-tab-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapToolbar/EdgeTypes/dashed.svg" Width="26" Height="18" HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <Button Grid.Row="0" Grid.Column="2" Command="{Binding SetSelectedEdgeTypeCommand}" CommandParameter="dotted" Classes="toolbar-tab" Classes.selected="{Binding IsEdgeTypeDotted}"
+                                            ToolTip.Tip="{markup:T Ns=Mindmap, Key=EdgeDottedTooltip}" Height="48" MinWidth="48" Padding="6" CornerRadius="8">
+                                        <controls:SvgIcon Classes="toolbar-tab-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapToolbar/EdgeTypes/dotted.svg" Width="26" Height="18" HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <Button Grid.Row="1" Grid.Column="0" Command="{Binding SetSelectedEdgeTypeCommand}" CommandParameter="double" Classes="toolbar-tab" Classes.selected="{Binding IsEdgeTypeDouble}"
+                                            ToolTip.Tip="{markup:T Ns=Mindmap, Key=EdgeDoubleTooltip}" Height="48" MinWidth="48" Padding="6" CornerRadius="8">
+                                        <controls:SvgIcon Classes="toolbar-tab-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapToolbar/EdgeTypes/double.svg" Width="26" Height="18" HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <Button Grid.Row="1" Grid.Column="1" Command="{Binding SetSelectedEdgeTypeCommand}" CommandParameter="arrow" Classes="toolbar-tab" Classes.selected="{Binding IsEdgeTypeArrow}"
+                                            ToolTip.Tip="{markup:T Ns=Mindmap, Key=EdgeArrowTooltip}" Height="48" MinWidth="48" Padding="6" CornerRadius="8">
+                                        <controls:SvgIcon Classes="toolbar-tab-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapToolbar/EdgeTypes/arrow.svg" Width="26" Height="18" HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <Button Grid.Row="1" Grid.Column="2" Command="{Binding SetSelectedEdgeTypeCommand}" CommandParameter="bidirect" Classes="toolbar-tab" Classes.selected="{Binding IsEdgeTypeBidirect}"
+                                            ToolTip.Tip="{markup:T Ns=Mindmap, Key=EdgeBidirectTooltip}" Height="48" MinWidth="48" Padding="6" CornerRadius="8">
+                                        <controls:SvgIcon Classes="toolbar-tab-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapToolbar/EdgeTypes/bidirect.svg" Width="26" Height="18" HorizontalAlignment="Center"/>
+                                    </Button>
+                                </Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                     <TextBlock Text="{markup:T Ns=Mindmap, Key=ShowEdgeLabels}" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource MindmapToolbarLabelBrush}"/>
                                     <ToggleSwitch IsChecked="{Binding ShowEdgeLabels}" OffContent="{x:Null}" OnContent="{x:Null}"/>
@@ -560,8 +627,9 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:EdgeViewModel">
                                     <Path Stroke="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
-                                          StrokeThickness="3"
-                                          StrokeLineCap="Round"
+                                          StrokeThickness="3" StrokeLineCap="Round"
+                                          Opacity="{Binding Type, Converter={StaticResource EdgeTypeToOpacityConverter}}"
+                                          StrokeDashArray="{Binding Type, Converter={StaticResource EdgeTypeToStrokeDashArrayConverter}}"
                                           IsHitTestVisible="False">
                                         <Path.Data>
                                             <PathGeometry>

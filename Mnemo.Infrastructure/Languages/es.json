@@ -308,6 +308,8 @@
     "Rectangle": "Rectángulo",
     "Pill": "Píldora",
     "Circle": "Círculo",
+    "EdgeArrow": "Flecha",
+    "EdgeArrowTooltip": "Línea con flecha al final",
     "Minimap": "MINIMAPA",
     "Swatch1": "Muestra 1",
     "Swatch2": "Muestra 2",

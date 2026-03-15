@@ -308,6 +308,8 @@
     "Rectangle": "Rechteck",
     "Pill": "Pille",
     "Circle": "Kreis",
+    "EdgeArrow": "Pfeil",
+    "EdgeArrowTooltip": "Linie mit Pfeil am Ende",
     "Minimap": "MINIMAP",
     "Swatch1": "Swatch 1",
     "Swatch2": "Swatch 2",

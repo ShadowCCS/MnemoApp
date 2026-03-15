@@ -56,10 +56,80 @@ public class EdgeKindToStrokeDashArrayConverter : IValueConverter
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
 }
 
+/// <summary>Converts edge type string to StrokeDashArray for path rendering.</summary>
+public class EdgeTypeToStrokeDashArrayConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var type = value as string;
+        return type switch
+        {
+            EdgeTypes.Dashed => new AvaloniaList<double> { 6, 4 },
+            EdgeTypes.Dotted => new AvaloniaList<double> { 2, 3 },
+            _ => null // solid, double, bidirect, arrow: solid line
+        };
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
+/// <summary>Converts edge type string to opacity (all full opacity).</summary>
+public class EdgeTypeToOpacityConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        return 1.0;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
+/// <summary>Returns true when value equals parameter (string). Used to show double line / bidirect arrows by type.</summary>
+public class EdgeTypeEqualsConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var s = value?.ToString();
+        var p = parameter?.ToString();
+        return string.Equals(s, p, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
+/// <summary>Returns true when value equals one of the semicolon-separated parameter strings (e.g. "bidirect;arrow").</summary>
+public class EdgeTypeInConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var s = value?.ToString();
+        var p = parameter?.ToString();
+        if (string.IsNullOrEmpty(p)) return false;
+        foreach (var part in p.Split(';'))
+            if (string.Equals(s, part.Trim(), StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
 /// <summary>Returns true when value is not null (for edge label box visibility).</summary>
 public class NotNullToBoolConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value != null;
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
+/// <summary>When value (SelectedEdge) is null returns localized "Select an edge to change its type"; otherwise null (no tooltip).</summary>
+public class SelectedEdgeToTooltipConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value != null) return null;
+        var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+        return loc?.T("SelectEdgeToChangeType", "Mindmap") ?? "Select an edge to change its type";
+    }
+
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
 }
 

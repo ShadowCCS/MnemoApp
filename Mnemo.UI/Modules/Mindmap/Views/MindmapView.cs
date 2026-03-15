@@ -499,6 +499,7 @@ public partial class MindmapView : UserControl
             {
                 _isPanning = false;
                 _isSelecting = true;
+                if (DataContext is MindmapViewModel vm) vm.SelectedEdge = null;
                 _addToSelectionOnBoxSelect = e.KeyModifiers.HasFlag(KeyModifiers.Control);
                 _selectionStart = mainCanvas != null ? e.GetPosition(mainCanvas) : e.GetPosition(this);
                 var inv = _transformMatrix.Invert();
@@ -540,6 +541,7 @@ public partial class MindmapView : UserControl
         {
             if (DataContext is MindmapViewModel vm)
             {
+                vm.SelectedEdge = null; // Node selection context; edge panel greyed out
                 // Multi-select with Ctrl, otherwise single select
                 if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift))
                 {
@@ -749,6 +751,7 @@ public partial class MindmapView : UserControl
             if (!_hasMovedSignificantly && DataContext is MindmapViewModel viewModel)
             {
                 foreach (var node in viewModel.Nodes) node.IsSelected = false;
+                viewModel.SelectedEdge = null; // Clear edge selection; sidebar shows no selection
                 // Nodes are on top so edge hit Path never gets the click; hit-test edges in code
                 var mainCanvas = this.FindControl<Panel>("MainCanvas");
                 if (mainCanvas != null)
