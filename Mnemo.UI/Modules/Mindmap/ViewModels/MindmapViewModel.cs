@@ -11,6 +11,7 @@ using Mnemo.Core.History;
 using Mnemo.Core.Models.Mindmap;
 using Mnemo.Core.Services;
 using LayoutAlgorithms = Mnemo.Core.Models.Mindmap.LayoutAlgorithms;
+using Mnemo.UI.Modules.Mindmap.Operations;
 using Mnemo.UI.ViewModels;
 using MindmapModel = Mnemo.Core.Models.Mindmap.Mindmap;
 
@@ -107,6 +108,14 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     public ICommand SetMindmapModeCommand { get; }
     /// <summary>Command to request PNG export of the mindmap viewport. View handles capture and save.</summary>
     public ICommand ExportAsPngCommand { get; }
+    public ICommand UndoCommand { get; }
+    public ICommand RedoCommand { get; }
+
+    public bool CanUndo => _historyManager.CanUndo;
+    public bool CanRedo => _historyManager.CanRedo;
+
+    /// <summary>When true, the view should not auto-recenter on the next Nodes collection change (e.g. undo/redo restore).</summary>
+    public bool SuppressRecenterOnNextCollectionChange { get; set; }
 
     public static IReadOnlyList<string> ToolbarCategories { get; } = new[] { "Edit", "Style", "View" };
     public static IReadOnlyList<string> MinimapVisibilityOptions { get; } = new[] { "Auto", "On", "Off" };
@@ -206,6 +215,55 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         SetToolbarCategoryCommand = new RelayCommand<string?>(c => { if (!string.IsNullOrEmpty(c)) ToolbarCategory = c; });
         SetMindmapModeCommand = new RelayCommand<string?>(c => { if (!string.IsNullOrEmpty(c)) MindmapMode = c; });
         ExportAsPngCommand = new RelayCommand(OnExportAsPng);
+        UndoCommand = new AsyncRelayCommand(UndoAsync, () => CanUndo);
+        RedoCommand = new AsyncRelayCommand(RedoAsync, () => CanRedo);
+        _historyManager.StateChanged += OnHistoryStateChanged;
+    }
+
+    private void OnHistoryStateChanged()
+    {
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
+        (UndoCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+        (RedoCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+    }
+
+    private async Task RestoreMindmapStateAsync(MindmapModel m)
+    {
+        _currentMindmap = m;
+        Title = m.Title;
+        SuppressRecenterOnNextCollectionChange = true;
+        RefreshView();
+        await _mindmapService.SaveMindmapAsync(m);
+    }
+
+    public async Task UndoAsync()
+    {
+        if (!_historyManager.CanUndo) return;
+        await _historyManager.UndoAsync();
+    }
+
+    public async Task RedoAsync()
+    {
+        if (!_historyManager.CanRedo) return;
+        await _historyManager.RedoAsync();
+    }
+
+    private void SyncLayoutFromView()
+    {
+        if (_currentMindmap == null) return;
+        foreach (var n in Nodes)
+        {
+            if (!_currentMindmap.Layout.Nodes.TryGetValue(n.Id, out var layout))
+            {
+                layout = new NodeLayout();
+                _currentMindmap.Layout.Nodes[n.Id] = layout;
+            }
+            layout.X = n.X;
+            layout.Y = n.Y;
+            layout.Width = n.Width;
+            layout.Height = n.Height;
+        }
     }
 
     /// <summary>Raised when user requests PNG export. View captures viewport and saves.</summary>
@@ -365,8 +423,11 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             var edge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == SelectedEdge.Id);
             if (edge != null)
             {
+                var before = MindmapSnapshotHelper.Clone(_currentMindmap);
                 SelectedEdge.Type = type;
                 edge.Type = type;
+                var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+                _historyManager.Push(new MindmapStateOperation("Change edge type", before, after, RestoreMindmapStateAsync));
                 await _mindmapService.UpdateEdgeTypeAsync(_currentMindmap.Id, edge.Id, type);
             }
             NotifyEffectiveEdgeTypeChanged();
@@ -388,8 +449,16 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         if (_currentMindmap == null) return;
         if (edge.Label == null)
         {
-            edge.Label = "";
-            await _mindmapService.UpdateEdgeLabelAsync(_currentMindmap.Id, edge.Id, "").ConfigureAwait(false);
+            var modelEdge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == edge.Id);
+            if (modelEdge != null)
+            {
+                var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+                modelEdge.Label = "";
+                edge.Label = "";
+                var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+                _historyManager.Push(new MindmapStateOperation("Add edge label", before, after, RestoreMindmapStateAsync));
+                await _mindmapService.UpdateEdgeLabelAsync(_currentMindmap.Id, edge.Id, "").ConfigureAwait(false);
+            }
         }
         SelectedEdge = edge;
     }
@@ -400,16 +469,26 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         var mindmapId = _currentMindmap.Id;
         var edgeId = edge.Id;
         var labelToSave = edge.Label;
+        var modelEdge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == edgeId);
+        if (modelEdge == null) return;
+
+        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
         if (string.IsNullOrWhiteSpace(labelToSave))
         {
+            modelEdge.Label = null;
             edge.Label = null;
-            await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, null).ConfigureAwait(false);
         }
         else
         {
-            await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, labelToSave).ConfigureAwait(false);
+            modelEdge.Label = labelToSave;
         }
-        // No code after await that uses edge/_currentMindmap; ids used above avoid stale refs if blur/close races.
+        var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+        _historyManager.Push(new MindmapStateOperation("Edit edge label", before, after, RestoreMindmapStateAsync));
+
+        if (string.IsNullOrWhiteSpace(labelToSave))
+            await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, null).ConfigureAwait(false);
+        else
+            await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, labelToSave).ConfigureAwait(false);
     }
 
     public void SetHoveredEdge(string? edgeId)
@@ -659,8 +738,8 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     {
         if (_currentMindmap == null) return;
 
+        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
         var selectedNodes = Nodes.Where(n => n.IsSelected).ToList();
-        
         double x = 400, y = 300;
         if (selectedNodes.Any())
         {
@@ -670,9 +749,9 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         }
 
         var result = await _mindmapService.AddNodeAsync(
-            _currentMindmap.Id, 
-            "text", 
-            new TextNodeContent { Text = "New Node" }, 
+            _currentMindmap.Id,
+            "text",
+            new TextNodeContent { Text = "New Node" },
             x, y);
 
         if (result.IsSuccess)
@@ -684,11 +763,11 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             if (style.Count > 0)
                 await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, newNode.Id, style);
             foreach (var selected in selectedNodes)
-            {
                 await _mindmapService.AddEdgeAsync(_currentMindmap.Id, selected.Id, newNode.Id, DefaultEdgeKind, null, DefaultEdgeType);
-            }
 
             await LoadMindmapAsync(_currentMindmap.Id);
+            var after = MindmapSnapshotHelper.Clone(_currentMindmap!);
+            _historyManager.Push(new MindmapStateOperation("Add node", before, after, RestoreMindmapStateAsync));
         }
     }
 
@@ -698,23 +777,24 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         var selected = Nodes.Where(n => n.IsSelected).ToList();
         if (selected.Count < 2) return;
 
-        // Connect first selected to all others
+        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
         var from = selected[0];
         bool changed = false;
         for (int i = 1; i < selected.Count; i++)
         {
             var to = selected[i];
-            // Check if already connected to avoid duplicates
             if (!_currentMindmap.Edges.Any(e => (e.FromId == from.Id && e.ToId == to.Id) || (e.FromId == to.Id && e.ToId == from.Id)))
             {
                 await _mindmapService.AddEdgeAsync(_currentMindmap.Id, from.Id, to.Id, DefaultEdgeKind, null, DefaultEdgeType);
                 changed = true;
             }
         }
-        
+
         if (changed)
         {
             await LoadMindmapAsync(_currentMindmap.Id);
+            var after = MindmapSnapshotHelper.Clone(_currentMindmap!);
+            _historyManager.Push(new MindmapStateOperation("Connect nodes", before, after, RestoreMindmapStateAsync));
         }
     }
 
@@ -722,17 +802,11 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     {
         if (_currentMindmap == null) return;
         var selectedIds = Nodes.Where(n => n.IsSelected).Select(n => n.Id).ToHashSet();
-        
-        // If only one node is selected, we might want to detach all its edges?
-        // But the user asked to select two nodes and click it to detach them.
-        // Let's support both: if 2+ selected, detach between them. If 1 selected, do nothing (or we could detach all).
         if (selectedIds.Count < 1) return;
 
         List<MindmapEdge> edgesToRemove;
         if (selectedIds.Count == 1)
         {
-            // If only one node selected, maybe detach all its connections?
-            // Actually, let's stick to the "select two nodes" requirement first but be more lenient.
             var singleId = selectedIds.First();
             edgesToRemove = _currentMindmap.Edges
                 .Where(e => e.FromId == singleId || e.ToId == singleId)
@@ -740,7 +814,6 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         }
         else
         {
-            // Detach only between selected nodes
             edgesToRemove = _currentMindmap.Edges
                 .Where(e => selectedIds.Contains(e.FromId) && selectedIds.Contains(e.ToId))
                 .ToList();
@@ -748,6 +821,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
         if (!edgesToRemove.Any()) return;
 
+        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
         bool changed = false;
         foreach (var edge in edgesToRemove)
         {
@@ -758,37 +832,78 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         if (changed)
         {
             await LoadMindmapAsync(_currentMindmap.Id);
+            var after = MindmapSnapshotHelper.Clone(_currentMindmap!);
+            _historyManager.Push(new MindmapStateOperation("Detach edges", before, after, RestoreMindmapStateAsync));
         }
     }
 
     private async Task DeleteSelectedAsync()
     {
         if (_currentMindmap == null) return;
-
         var selectedNodes = Nodes.Where(n => n.IsSelected).ToList();
-        foreach (var node in selectedNodes)
-        {
-            await _mindmapService.RemoveNodeAsync(_currentMindmap.Id, node.Id);
-        }
+        if (!selectedNodes.Any()) return;
 
-        if (selectedNodes.Any())
-        {
-            await LoadMindmapAsync(_currentMindmap.Id);
-        }
+        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+        foreach (var node in selectedNodes)
+            await _mindmapService.RemoveNodeAsync(_currentMindmap.Id, node.Id);
+
+        await LoadMindmapAsync(_currentMindmap.Id);
+        var after = MindmapSnapshotHelper.Clone(_currentMindmap!);
+        _historyManager.Push(new MindmapStateOperation("Delete nodes", before, after, RestoreMindmapStateAsync));
     }
 
     public async Task UpdateNodeTextAsync(NodeViewModel node, string text)
     {
         if (_currentMindmap == null) return;
+        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+        var mn = _currentMindmap.Nodes.FirstOrDefault(n => n.Id == node.Id);
+        if (mn != null) mn.Content = new TextNodeContent { Text = text };
+        var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+        _historyManager.Push(new MindmapStateOperation("Edit node", before, after, RestoreMindmapStateAsync));
         node.Text = text;
         await _mindmapService.UpdateNodeContentAsync(_currentMindmap.Id, node.Id, new TextNodeContent { Text = text });
+    }
+
+    /// <summary>Capture current mindmap state for a move operation. Call at drag start so undo restores pre-drag positions.</summary>
+    public MindmapModel? CaptureMoveSnapshot() => _currentMindmap == null ? null : MindmapSnapshotHelper.Clone(_currentMindmap);
+
+    /// <summary>Apply one or more node position updates and push a single undo entry. Use the snapshot from CaptureMoveSnapshot() at drag start.</summary>
+    public async Task UpdateNodesPositionAsync(MindmapModel before, IReadOnlyList<(NodeViewModel node, double x, double y)> moves)
+    {
+        if (_currentMindmap == null || moves.Count == 0) return;
+        foreach (var (node, x, y) in moves)
+        {
+            if (!_currentMindmap.Layout.Nodes.TryGetValue(node.Id, out var layout))
+            {
+                layout = new NodeLayout();
+                _currentMindmap.Layout.Nodes[node.Id] = layout;
+            }
+            layout.X = x;
+            layout.Y = y;
+            node.X = x;
+            node.Y = y;
+        }
+        var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+        _historyManager.Push(new MindmapStateOperation("Move node", before, after, RestoreMindmapStateAsync));
+        foreach (var (node, x, y) in moves)
+            await _mindmapService.UpdateNodeLayoutAsync(_currentMindmap.Id, node.Id, x, y);
     }
 
     public async Task UpdateNodePositionAsync(NodeViewModel node, double x, double y)
     {
         if (_currentMindmap == null) return;
+        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+        if (!_currentMindmap.Layout.Nodes.TryGetValue(node.Id, out var layout))
+        {
+            layout = new NodeLayout();
+            _currentMindmap.Layout.Nodes[node.Id] = layout;
+        }
+        layout.X = x;
+        layout.Y = y;
         node.X = x;
         node.Y = y;
+        var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+        _historyManager.Push(new MindmapStateOperation("Move node", before, after, RestoreMindmapStateAsync));
         await _mindmapService.UpdateNodeLayoutAsync(_currentMindmap.Id, node.Id, x, y);
     }
 
@@ -803,12 +918,11 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     {
         if (_currentMindmap == null || !Nodes.Any()) return;
 
+        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
         var algorithm = _currentMindmap.Layout.Algorithm ?? LayoutAlgorithms.TreeVertical;
-
         var hierarchyOutgoing = GetHierarchyChildren();
         var roots = Nodes.Where(n => !_currentMindmap!.Edges.Any(e => e.ToId == n.Id && e.Kind == MindmapEdgeKind.Hierarchy)).ToList();
         if (!roots.Any()) roots.Add(Nodes.First());
-
         var visited = new HashSet<string>();
 
         switch (algorithm)
@@ -836,6 +950,9 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
                 break;
         }
 
+        SyncLayoutFromView();
+        var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+        _historyManager.Push(new MindmapStateOperation("Auto layout", before, after, RestoreMindmapStateAsync));
         foreach (var node in Nodes)
             await _mindmapService.UpdateNodeLayoutAsync(_currentMindmap.Id, node.Id, node.X, node.Y);
     }

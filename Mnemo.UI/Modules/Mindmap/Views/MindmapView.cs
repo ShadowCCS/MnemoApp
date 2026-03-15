@@ -17,6 +17,7 @@ using Avalonia.Collections;
 using Mnemo.Core.Enums;
 using Mnemo.Core.Models.Mindmap;
 using Mnemo.Core.Services;
+using MindmapModel = Mnemo.Core.Models.Mindmap.Mindmap;
 using Mnemo.UI.Modules.Mindmap.ViewModels;
 
 namespace Mnemo.UI.Modules.Mindmap.Views;
@@ -58,6 +59,7 @@ public partial class MindmapView : UserControl
     private Point _selectionCurrentInCanvas; // content-space current position, updated as mouse moves
     private Point _lastPointerPosition;
     private NodeViewModel? _draggedNode;
+    private MindmapModel? _moveBeforeSnapshot; // captured at drag start for correct undo
     private Matrix _transformMatrix = Matrix.Identity;
     private VisualBrush? _gridBrush;
     private ISettingsService? _settingsService;
@@ -222,15 +224,23 @@ public partial class MindmapView : UserControl
                 node.PropertyChanged -= OnNodePropertyChangedForMinimap;
         }
 
-        // Auto-recenter after nodes are loaded, with a delay to allow layout
+        // Auto-recenter after nodes are loaded, but not when restoring state (undo/redo) so node positions update without camera snap
         if (DataContext is MindmapViewModel vm && vm.Nodes.Any())
         {
-            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            if (vm.SuppressRecenterOnNextCollectionChange)
             {
-                await Task.Delay(50); // Allow layout to complete
-                RecenterView();
+                vm.SuppressRecenterOnNextCollectionChange = false;
                 UpdateMinimap();
-            });
+            }
+            else
+            {
+                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    await Task.Delay(50); // Allow layout to complete
+                    RecenterView();
+                    UpdateMinimap();
+                });
+            }
         }
     }
 
@@ -566,6 +576,7 @@ public partial class MindmapView : UserControl
                     foreach (var n in vm.Nodes) n.IsSelected = false;
                 }
                 node.IsSelected = true;
+                _moveBeforeSnapshot = vm.CaptureMoveSnapshot();
             }
 
             _isDragging = true;
@@ -741,19 +752,27 @@ public partial class MindmapView : UserControl
     {
         if (_isDragging && _draggedNode != null && DataContext is MindmapViewModel vm)
         {
-            var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
-            if (selectedNodes.Contains(_draggedNode))
+            if (_moveBeforeSnapshot != null)
             {
-                foreach (var node in selectedNodes)
-                {
-                    await vm.UpdateNodePositionAsync(node, node.X, node.Y);
-                }
+                var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
+                var moves = selectedNodes.Contains(_draggedNode)
+                    ? selectedNodes.Select(n => (n, n.X, n.Y)).ToList()
+                    : new List<(NodeViewModel node, double x, double y)> { (_draggedNode, _draggedNode.X, _draggedNode.Y) };
+                await vm.UpdateNodesPositionAsync(_moveBeforeSnapshot, moves);
+                _moveBeforeSnapshot = null;
             }
             else
             {
-                await vm.UpdateNodePositionAsync(_draggedNode, _draggedNode.X, _draggedNode.Y);
+                var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
+                if (selectedNodes.Contains(_draggedNode))
+                {
+                    foreach (var node in selectedNodes)
+                        await vm.UpdateNodePositionAsync(node, node.X, node.Y);
+                }
+                else
+                    await vm.UpdateNodePositionAsync(_draggedNode, _draggedNode.X, _draggedNode.Y);
             }
-            
+
             _isDragging = false;
             _draggedNode = null;
             e.Handled = true;
@@ -871,9 +890,24 @@ public partial class MindmapView : UserControl
             vm.ClearHoverState();
     }
 
-    private void OnMindmapKeyDown(object? sender, KeyEventArgs e)
+    private async void OnMindmapKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MindmapViewModel vm || vm.SelectedEdge == null || !vm.IsEditingEnabled) return;
+        if (DataContext is not MindmapViewModel vm || !vm.IsEditingEnabled) return;
+
+        if (e.Key == Key.Z && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            await vm.UndoAsync();
+            return;
+        }
+        if (e.Key == Key.Y && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            await vm.RedoAsync();
+            return;
+        }
+
+        if (vm.SelectedEdge == null) return;
         if (e.Key != Key.F2 && e.Key != Key.Enter) return;
         e.Handled = true;
         vm.EdgeClicked(vm.SelectedEdge);
@@ -994,38 +1028,12 @@ public partial class MindmapView : UserControl
         _lastMinimapWidth = minimapWidth;
         _lastMinimapHeight = minimapHeight;
 
-        // --- Fit all nodes into the minimap (allow shrink, never grow so dragging a node out doesn't expand minimap) ---
+        // --- Fit all nodes into the minimap and center on them ---
         var nodes = vm.Nodes;
-        double curMinX = nodes.Min(n => n.X);
-        double curMaxX = nodes.Max(n => n.X + (n.Width ?? 120));
-        double curMinY = nodes.Min(n => n.Y);
-        double curMaxY = nodes.Max(n => n.Y + (n.Height ?? 40));
-
-        if (!_minimapContentBoundsInitialized)
-        {
-            _minimapContentMinX = curMinX;
-            _minimapContentMaxX = curMaxX;
-            _minimapContentMinY = curMinY;
-            _minimapContentMaxY = curMaxY;
-            _minimapContentBoundsInitialized = true;
-        }
-        else
-        {
-            // Only shrink the tracked bounds when content is fully inside (never grow)
-            if (curMinX >= _minimapContentMinX && curMaxX <= _minimapContentMaxX &&
-                curMinY >= _minimapContentMinY && curMaxY <= _minimapContentMaxY)
-            {
-                _minimapContentMinX = curMinX;
-                _minimapContentMaxX = curMaxX;
-                _minimapContentMinY = curMinY;
-                _minimapContentMaxY = curMaxY;
-            }
-        }
-
-        double minX = _minimapContentMinX;
-        double maxX = _minimapContentMaxX;
-        double minY = _minimapContentMinY;
-        double maxY = _minimapContentMaxY;
+        double minX = nodes.Min(n => n.X);
+        double maxX = nodes.Max(n => n.X + (n.Width ?? 120));
+        double minY = nodes.Min(n => n.Y);
+        double maxY = nodes.Max(n => n.Y + (n.Height ?? 40));
         double contentWidth  = maxX - minX;
         double contentHeight = maxY - minY;
 

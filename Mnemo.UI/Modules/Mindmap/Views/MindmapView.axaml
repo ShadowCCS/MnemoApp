@@ -70,6 +70,10 @@
             <Setter Property="Background" Value="{DynamicResource MindmapToolbarButtonHoverBrush}"/>
             <Setter Property="CornerRadius" Value="8"/>
         </Style>
+        <Style Selector="Border#UndoRedoPanel Button.toolbar-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource MindmapToolbarButtonHoverBrush}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
         <Style Selector="Border#UnifiedToolbar Button.toolbar-tab .toolbar-tab-icon" x:SetterTargetType="controls:SvgIcon">
             <Setter Property="Color" Value="{DynamicResource MindmapToolbarIcon}"/>
         </Style>
@@ -376,6 +380,25 @@
             </Panel>
             </Panel>
 
+            <!-- Undo / Redo (top left), hidden in Preview mode -->
+            <Border Name="UndoRedoPanel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16"
+                    IsVisible="{Binding IsToolbarVisible}"
+                    Background="{DynamicResource MindmapToolbarPanelBackgroundBrush}"
+                    BorderBrush="{DynamicResource MindmapToolbarBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="4"
+                    BoxShadow="{DynamicResource MindmapToolbarBoxShadow}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Command="{Binding UndoCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=UndoTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8" IsEnabled="{Binding CanUndo}">
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                    </Button>
+                    <Button Command="{Binding RedoCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=RedoTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8" IsEnabled="{Binding CanRedo}">
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                    </Button>
+                </StackPanel>
+            </Border>
+
             <!-- Mode switcher: Edit | Preview (top right), theme brushes only -->
             <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="16"
                     Background="Transparent"
@@ -557,7 +580,7 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-                        <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,8" Padding="8,6" CornerRadius="8"
+                        <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,0" Padding="8,6" CornerRadius="8"
                                 IsEnabled="{Binding SelectedEdge, Converter={StaticResource NotNullToBoolConverter}}"
                                 ToolTip.Tip="{Binding SelectedEdge, Converter={StaticResource SelectedEdgeToTooltipConverter}}"
                                 ToolTip.ShowOnDisabled="True">
@@ -589,10 +612,12 @@
                                         <controls:SvgIcon Classes="toolbar-tab-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapToolbar/EdgeTypes/bidirect.svg" Width="26" Height="18" HorizontalAlignment="Center"/>
                                     </Button>
                                 </Grid>
-                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <TextBlock Text="{markup:T Ns=Mindmap, Key=ShowEdgeLabels}" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource MindmapToolbarLabelBrush}"/>
-                                    <ToggleSwitch IsChecked="{Binding ShowEdgeLabels}" OffContent="{x:Null}" OnContent="{x:Null}"/>
-                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,8" Padding="8,6" CornerRadius="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Text="{markup:T Ns=Mindmap, Key=ShowEdgeLabels}" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource MindmapToolbarLabelBrush}"/>
+                                <ToggleSwitch IsChecked="{Binding ShowEdgeLabels}" OffContent="{x:Null}" OnContent="{x:Null}"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
