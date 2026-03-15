@@ -487,6 +487,11 @@
     <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchFourBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchFour}"/>
     <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchFiveBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchFive}"/>
     <SolidColorBrush x:Key="MindmapToolbarNodeColorSwatchSixBrush" Color="{DynamicResource MindmapToolbarNodeColorSwatchSix}"/>
+    <SolidColorBrush x:Key="MindmapModeSwitcherBorderBrush" Color="{DynamicResource MindmapModeSwitcherBorder}"/>
+    <SolidColorBrush x:Key="MindmapModeSwitcherInactiveBackgroundBrush" Color="{DynamicResource MindmapModeSwitcherInactiveBackground}"/>
+    <SolidColorBrush x:Key="MindmapModeSwitcherActiveBackgroundBrush" Color="{DynamicResource MindmapModeSwitcherActiveBackground}"/>
+    <SolidColorBrush x:Key="MindmapModeSwitcherActiveForegroundBrush" Color="{DynamicResource MindmapModeSwitcherActiveForeground}"/>
+    <SolidColorBrush x:Key="MindmapModeSwitcherInactiveForegroundBrush" Color="{DynamicResource MindmapModeSwitcherInactiveForeground}"/>
 
     <!-- Notes module -->
     <SolidColorBrush x:Key="NotesPaneBackgroundBrush" Color="{DynamicResource NotesPaneBackground}"/>

@@ -297,6 +297,7 @@
       "LayoutTreeHorizontal": "ツリー（横）",
       "LayoutRadial": "放射状",
       "Edit": "編集",
+      "Preview": "プレビュー",
       "View": "表示",
       "AddNodeTooltip": "ノードを追加 (Ctrl+N)",
       "ConnectSelectedTooltip": "選択を接続 (Ctrl+L)",

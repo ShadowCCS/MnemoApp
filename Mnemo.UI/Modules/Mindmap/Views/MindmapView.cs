@@ -477,6 +477,11 @@ public partial class MindmapView : UserControl
         bool modifierMeansSelect = _modifierBehaviour == "Selecting";
         bool doPan = modifierMeansSelect ? !isShiftPressed : isShiftPressed;
         bool doSelect = !doPan;
+        if (DataContext is MindmapViewModel vm && !vm.IsEditingEnabled)
+        {
+            doPan = true;
+            doSelect = false;
+        }
 
         var mainCanvas = this.FindControl<Panel>("MainCanvas");
 
@@ -499,7 +504,7 @@ public partial class MindmapView : UserControl
             {
                 _isPanning = false;
                 _isSelecting = true;
-                if (DataContext is MindmapViewModel vm) vm.SelectedEdge = null;
+                if (DataContext is MindmapViewModel viewModel) viewModel.SelectedEdge = null;
                 _addToSelectionOnBoxSelect = e.KeyModifiers.HasFlag(KeyModifiers.Control);
                 _selectionStart = mainCanvas != null ? e.GetPosition(mainCanvas) : e.GetPosition(this);
                 var inv = _transformMatrix.Invert();
@@ -537,6 +542,8 @@ public partial class MindmapView : UserControl
 
     private void OnNodePointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (DataContext is MindmapViewModel editVm && !editVm.IsEditingEnabled)
+            return;
         if (sender is Control control && control.DataContext is NodeViewModel node)
         {
             if (DataContext is MindmapViewModel vm)
@@ -658,25 +665,28 @@ public partial class MindmapView : UserControl
 
         const double labelHalfW = 30;
         const double labelHalfH = 11;
-        foreach (var edge in vm.Edges)
+        if (vm.IsEditingEnabled)
         {
-            var d = edge.GetDistanceToCurve(contentPoint);
-            if (d < EdgeHitThreshold)
+            foreach (var edge in vm.Edges)
             {
-                mainCanvas.Cursor = new Cursor(StandardCursorType.Hand);
-                vm.SetHoveredEdge(edge.Id);
-                return;
-            }
-            if (edge.Label != null)
-            {
-                var cx = edge.CenterPoint.X;
-                var cy = edge.CenterPoint.Y;
-                if (contentPoint.X >= cx - labelHalfW && contentPoint.X <= cx + labelHalfW
-                    && contentPoint.Y >= cy - labelHalfH && contentPoint.Y <= cy + labelHalfH)
+                var d = edge.GetDistanceToCurve(contentPoint);
+                if (d < EdgeHitThreshold)
                 {
                     mainCanvas.Cursor = new Cursor(StandardCursorType.Hand);
                     vm.SetHoveredEdge(edge.Id);
                     return;
+                }
+                if (edge.Label != null)
+                {
+                    var cx = edge.CenterPoint.X;
+                    var cy = edge.CenterPoint.Y;
+                    if (contentPoint.X >= cx - labelHalfW && contentPoint.X <= cx + labelHalfW
+                        && contentPoint.Y >= cy - labelHalfH && contentPoint.Y <= cy + labelHalfH)
+                    {
+                        mainCanvas.Cursor = new Cursor(StandardCursorType.Hand);
+                        vm.SetHoveredEdge(edge.Id);
+                        return;
+                    }
                 }
             }
         }
@@ -752,45 +762,53 @@ public partial class MindmapView : UserControl
             {
                 foreach (var node in viewModel.Nodes) node.IsSelected = false;
                 viewModel.SelectedEdge = null; // Clear edge selection; sidebar shows no selection
-                // Nodes are on top so edge hit Path never gets the click; hit-test edges in code
-                var mainCanvas = this.FindControl<Panel>("MainCanvas");
-                if (mainCanvas != null)
+                if (!viewModel.IsEditingEnabled)
                 {
-                    var pos = e.GetPosition(mainCanvas);
-                    var contentPoint = pos * _transformMatrix.Invert();
-                    EdgeViewModel? nearest = null;
-                    double nearestDist = EdgeHitThreshold;
-                    foreach (var edge in viewModel.Edges)
+                    _lastEdgeClickEdgeId = null;
+                    _lastEdgeClickContentPoint = null;
+                }
+                else
+                {
+                    // Nodes are on top so edge hit Path never gets the click; hit-test edges in code
+                    var mainCanvas = this.FindControl<Panel>("MainCanvas");
+                    if (mainCanvas != null)
                     {
-                        var d = edge.GetDistanceToCurve(contentPoint);
-                        if (d < nearestDist) { nearestDist = d; nearest = edge; }
-                    }
-                    if (nearest != null)
-                    {
-                        var now = DateTime.UtcNow;
-                        var prev = _lastEdgeClickContentPoint;
-                        bool isDoubleClick = _lastEdgeClickEdgeId == nearest.Id
-                            && prev is { } p
-                            && (contentPoint.X - p.X) * (contentPoint.X - p.X) + (contentPoint.Y - p.Y) * (contentPoint.Y - p.Y) < EdgeDoubleClickDist * EdgeDoubleClickDist
-                            && (now - _lastEdgeClickTime).TotalMilliseconds < EdgeDoubleClickMs;
-                        if (isDoubleClick)
+                        var pos = e.GetPosition(mainCanvas);
+                        var contentPoint = pos * _transformMatrix.Invert();
+                        EdgeViewModel? nearest = null;
+                        double nearestDist = EdgeHitThreshold;
+                        foreach (var edge in viewModel.Edges)
                         {
-                            viewModel.EdgeClicked(nearest);
-                            FocusEdgeLabelBox(nearest);
-                            _lastEdgeClickEdgeId = null;
-                            _lastEdgeClickContentPoint = null;
+                            var d = edge.GetDistanceToCurve(contentPoint);
+                            if (d < nearestDist) { nearestDist = d; nearest = edge; }
+                        }
+                        if (nearest != null)
+                        {
+                            var now = DateTime.UtcNow;
+                            var prev = _lastEdgeClickContentPoint;
+                            bool isDoubleClick = _lastEdgeClickEdgeId == nearest.Id
+                                && prev is { } p
+                                && (contentPoint.X - p.X) * (contentPoint.X - p.X) + (contentPoint.Y - p.Y) * (contentPoint.Y - p.Y) < EdgeDoubleClickDist * EdgeDoubleClickDist
+                                && (now - _lastEdgeClickTime).TotalMilliseconds < EdgeDoubleClickMs;
+                            if (isDoubleClick)
+                            {
+                                viewModel.EdgeClicked(nearest);
+                                FocusEdgeLabelBox(nearest);
+                                _lastEdgeClickEdgeId = null;
+                                _lastEdgeClickContentPoint = null;
+                            }
+                            else
+                            {
+                                _lastEdgeClickTime = now;
+                                _lastEdgeClickContentPoint = contentPoint;
+                                _lastEdgeClickEdgeId = nearest.Id;
+                            }
                         }
                         else
                         {
-                            _lastEdgeClickTime = now;
-                            _lastEdgeClickContentPoint = contentPoint;
-                            _lastEdgeClickEdgeId = nearest.Id;
+                            _lastEdgeClickEdgeId = null;
+                            _lastEdgeClickContentPoint = null;
                         }
-                    }
-                    else
-                    {
-                        _lastEdgeClickEdgeId = null;
-                        _lastEdgeClickContentPoint = null;
                     }
                 }
             }
@@ -844,7 +862,7 @@ public partial class MindmapView : UserControl
 
     private void OnMindmapKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MindmapViewModel vm || vm.SelectedEdge == null) return;
+        if (DataContext is not MindmapViewModel vm || vm.SelectedEdge == null || !vm.IsEditingEnabled) return;
         if (e.Key != Key.F2 && e.Key != Key.Enter) return;
         e.Handled = true;
         vm.EdgeClicked(vm.SelectedEdge);
@@ -867,6 +885,7 @@ public partial class MindmapView : UserControl
     {
         if (sender is not Control c || c.DataContext is not EdgeViewModel edge || DataContext is not MindmapViewModel vm)
             return;
+        if (!vm.IsEditingEnabled) return;
         e.Handled = true; // Consume so canvas doesn't start pan; single-click selects, double-click edits
         if (e.ClickCount == 2)
         {
@@ -882,6 +901,7 @@ public partial class MindmapView : UserControl
         if (sender is not Control control || control.DataContext is not EdgeViewModel edge ||
             DataContext is not MindmapViewModel vm)
             return;
+        if (!vm.IsEditingEnabled) return;
         e.Handled = true; // Prevents pan starting on label; single-click selects, double-click enters edit
         if (e.ClickCount == 2)
         {

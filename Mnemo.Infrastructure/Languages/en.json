@@ -302,6 +302,7 @@
     "Tools": "TOOLS",
     "NodeShape": "NODE SHAPE",
     "Edit": "Edit",
+    "Preview": "Preview",
     "View": "View",
     "AddNodeTooltip": "Add Node (Ctrl+N)",
     "ConnectSelectedTooltip": "Connect Selected (Ctrl+L)",

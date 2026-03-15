@@ -33,6 +33,19 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private string _toolbarCategory = "Edit";
 
+    /// <summary>Mindmap mode: Edit (toolbar visible, editing enabled) or Preview (toolbar hidden, read-only).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEditMode))]
+    [NotifyPropertyChangedFor(nameof(IsPreviewMode))]
+    [NotifyPropertyChangedFor(nameof(IsToolbarVisible))]
+    [NotifyPropertyChangedFor(nameof(IsEditingEnabled))]
+    private string _mindmapMode = "Edit";
+
+    public bool IsEditMode => MindmapMode == "Edit";
+    public bool IsPreviewMode => MindmapMode == "Preview";
+    public bool IsToolbarVisible => !IsPreviewMode;
+    public bool IsEditingEnabled => !IsPreviewMode;
+
     [ObservableProperty]
     private string? _defaultNodeColor;
 
@@ -91,6 +104,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     public ICommand SetSelectedEdgeTypeCommand { get; }
     public ICommand SetMinimapVisibilityCommand { get; }
     public ICommand SetToolbarCategoryCommand { get; }
+    public ICommand SetMindmapModeCommand { get; }
 
     public static IReadOnlyList<string> ToolbarCategories { get; } = new[] { "Edit", "Style", "View" };
     public static IReadOnlyList<string> MinimapVisibilityOptions { get; } = new[] { "Auto", "On", "Off" };
@@ -184,6 +198,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         SetSelectedEdgeTypeCommand = new RelayCommand<string?>(SetSelectedEdgeType);
         SetMinimapVisibilityCommand = new RelayCommand<string?>(SetMinimapVisibility);
         SetToolbarCategoryCommand = new RelayCommand<string?>(c => { if (!string.IsNullOrEmpty(c)) ToolbarCategory = c; });
+        SetMindmapModeCommand = new RelayCommand<string?>(c => { if (!string.IsNullOrEmpty(c)) MindmapMode = c; });
     }
 
     private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -258,6 +273,14 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         OnPropertyChanged(nameof(IsEditTab));
         OnPropertyChanged(nameof(IsStyleTab));
         OnPropertyChanged(nameof(IsViewTab));
+    }
+
+    partial void OnMindmapModeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsEditMode));
+        OnPropertyChanged(nameof(IsPreviewMode));
+        OnPropertyChanged(nameof(IsToolbarVisible));
+        OnPropertyChanged(nameof(IsEditingEnabled));
     }
 
     private void SetMinimapVisibility(string? mode)

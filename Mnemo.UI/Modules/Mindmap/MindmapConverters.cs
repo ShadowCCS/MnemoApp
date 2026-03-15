@@ -203,6 +203,18 @@ public class BoolAndConverter : IMultiValueConverter
     }
 }
 
+/// <summary>Multi-value converter: returns true when (IsPreviewMode || !IsSelected) for node editor read-only.</summary>
+public class PreviewOrUnselectedConverter : IMultiValueConverter
+{
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values == null || values.Count < 2) return true;
+        bool isPreviewMode = values[0] is true;
+        bool isSelected = values[1] is true;
+        return isPreviewMode || !isSelected;
+    }
+}
+
 /// <summary>Converts minimap visibility mode string to localized display name.</summary>
 public class MinimapVisibilityToDisplayConverter : IValueConverter
 {

@@ -86,6 +86,26 @@
             <Setter Property="Background" Value="{DynamicResource MindmapToolbarButtonHoverBrush}"/>
             <Setter Property="CornerRadius" Value="8"/>
         </Style>
+        <!-- Mindmap mode switcher (Edit | Preview) - theme brushes only -->
+        <Style Selector="Button.mode-switcher-segment">
+            <Setter Property="Background" Value="{DynamicResource MindmapModeSwitcherInactiveBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource MindmapModeSwitcherInactiveForegroundBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.mode-switcher-segment.mode-switcher-first">
+            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource MindmapModeSwitcherBorderBrush}"/>
+        </Style>
+        <Style Selector="Button.mode-switcher-segment.selected">
+            <Setter Property="Background" Value="{DynamicResource MindmapModeSwitcherActiveBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource MindmapModeSwitcherActiveForegroundBrush}"/>
+        </Style>
+        <Style Selector="Button.mode-switcher-segment .mode-switcher-icon" x:SetterTargetType="controls:SvgIcon">
+            <Setter Property="Color" Value="{DynamicResource MindmapModeSwitcherInactiveForegroundBrush}"/>
+        </Style>
+        <Style Selector="Button.mode-switcher-segment.selected .mode-switcher-icon" x:SetterTargetType="controls:SvgIcon">
+            <Setter Property="Color" Value="{DynamicResource MindmapModeSwitcherActiveForegroundBrush}"/>
+        </Style>
     </UserControl.Styles>
 
     <UserControl.Resources>
@@ -103,6 +123,7 @@
         <local:EdgeKindToDisplayNameConverter x:Key="EdgeKindToDisplayNameConverter"/>
         <local:MinimapVisibilityToDisplayConverter x:Key="MinimapVisibilityToDisplayConverter"/>
         <local:BoolAndConverter x:Key="BoolAndConverter"/>
+        <local:PreviewOrUnselectedConverter x:Key="PreviewOrUnselectedConverter"/>
         <local:NotNullToBoolConverter x:Key="NotNullToBoolConverter"/>
         <local:SelectedEdgeToTooltipConverter x:Key="SelectedEdgeToTooltipConverter"/>
         <converters:BoolToDoubleConverter x:Key="BoolToDoubleConverter"/>
@@ -142,7 +163,6 @@
                 </Border.Styles>
                 <TextBox Text="{Binding Text}"
                          Classes="node-editor"
-                         IsReadOnly="{Binding IsSelected, Converter={StaticResource BoolNegationConverter}}"
                          BorderThickness="0"
                          Background="Transparent"
                          Foreground="{DynamicResource TextPrimaryBrush}"
@@ -154,7 +174,14 @@
                          FontWeight="Medium"
                          LostFocus="OnNodeTextBoxLostFocus"
                          TextChanged="OnNodeTextBoxTextChanged"
-                         IsHitTestVisible="{Binding IsSelected}"/>
+                         IsHitTestVisible="{Binding IsSelected}">
+                    <TextBox.IsReadOnly>
+                        <MultiBinding Converter="{StaticResource PreviewOrUnselectedConverter}">
+                            <Binding ElementName="MindmapViewControl" Path="DataContext.IsPreviewMode"/>
+                            <Binding Path="IsSelected"/>
+                        </MultiBinding>
+                    </TextBox.IsReadOnly>
+                </TextBox>
             </Border>
         </DataTemplate>
     </UserControl.Resources>
@@ -230,7 +257,8 @@
                     </ItemsControl>
 
                     <!-- Edge hit areas and labels (under nodes so nodes remain draggable) -->
-                    <ItemsControl Name="EdgeHitLayer" ItemsSource="{Binding Edges}" ClipToBounds="False">
+                    <ItemsControl Name="EdgeHitLayer" ItemsSource="{Binding Edges}" ClipToBounds="False"
+                                 IsHitTestVisible="{Binding IsEditingEnabled}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <Canvas Background="Transparent" ClipToBounds="False"/>
@@ -290,7 +318,8 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <ItemsControl ItemsSource="{Binding Nodes}" ClipToBounds="False">
+                    <ItemsControl ItemsSource="{Binding Nodes}" ClipToBounds="False"
+                                 IsHitTestVisible="{Binding IsEditingEnabled}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <Canvas Background="Transparent" ClipToBounds="False"/>
@@ -344,8 +373,40 @@
                 </Panel>
             </Panel>
 
+            <!-- Mode switcher: Edit | Preview (top right), theme brushes only -->
+            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="16"
+                    Background="Transparent"
+                    BorderBrush="{DynamicResource MindmapModeSwitcherBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="4">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button Command="{Binding SetMindmapModeCommand}" CommandParameter="Edit"
+                            Classes="mode-switcher-segment mode-switcher-first"
+                            Classes.selected="{Binding IsEditMode}"
+                            Padding="8,4" CornerRadius="6" MinWidth="0"
+                            ToolTip.Tip="{markup:T Ns=Mindmap, Key=Edit}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <controls:SvgIcon Classes="mode-switcher-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapModeSwitcher/pencil.svg" Width="16" Height="16"/>
+                            <TextBlock Text="{markup:T Ns=Mindmap, Key=Edit}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding SetMindmapModeCommand}" CommandParameter="Preview"
+                            Classes="mode-switcher-segment"
+                            Classes.selected="{Binding IsPreviewMode}"
+                            Padding="8,4" CornerRadius="6" MinWidth="0"
+                            ToolTip.Tip="{markup:T Ns=Mindmap, Key=Preview}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <controls:SvgIcon Classes="mode-switcher-icon" SvgPath="avares://Mnemo.UI/Icons/MindmapModeSwitcher/eye.svg" Width="16" Height="16"/>
+                            <TextBlock Text="{markup:T Ns=Mindmap, Key=Preview}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+
             <!-- Unified Toolbar: Edit | Style | View -->
             <Border Name="UnifiedToolbar" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="16"
+                    IsVisible="{Binding IsToolbarVisible}"
                     Background="{DynamicResource MindmapToolbarPanelBackgroundBrush}"
                     BorderBrush="{DynamicResource MindmapToolbarBorderBrush}"
                     BorderThickness="1"

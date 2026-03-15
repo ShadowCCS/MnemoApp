@@ -417,6 +417,12 @@
     <Color x:Key="MindmapToolbarNodeColorSwatchFour">#6DA861</Color>
     <Color x:Key="MindmapToolbarNodeColorSwatchFive">#EAB308</Color>
     <Color x:Key="MindmapToolbarNodeColorSwatchSix">#886ce4</Color>
+    <!-- Mindmap mode switcher (Edit | Preview bar) - aligned with ViewSwitchButtonActive / app accent -->
+    <Color x:Key="MindmapModeSwitcherBorder">#E2E1E0</Color>
+    <Color x:Key="MindmapModeSwitcherInactiveBackground">#EBEAE9</Color>
+    <Color x:Key="MindmapModeSwitcherActiveBackground">#e95b45</Color>
+    <Color x:Key="MindmapModeSwitcherActiveForeground">#FFFFFF</Color>
+    <Color x:Key="MindmapModeSwitcherInactiveForeground">#5C5B5A</Color>
 
     <!-- Color Swatches -->
     <Color x:Key="ColorSwatch1">#F5F5F5</Color>
