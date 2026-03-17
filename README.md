@@ -33,14 +33,14 @@ We’ve built Mnemo to be:
 
 **Overview**
 
-![Overview-Edit](https://i.postimg.cc/gjzydrR6/overview_edit.png)
+![Overview-Edit](https://www.mnemo.one/images/overview.png)
 
 </td>
 <td width="50%">
 
 **Unit View**
 
-![Unit-View](https://i.postimg.cc/BbS5stDF/path.png)
+![Unit-View](https://www.mnemo.one/images/path.png)
 
 </td>
 </tr>
@@ -49,14 +49,14 @@ We’ve built Mnemo to be:
 
 **Notes Editor**
 
-![NotesEditor](https://i.postimg.cc/5t9rRytC/notes-editor.png)
+![NotesEditor](https://www.mnemo.one/images/notes-editor.png)
 
 </td>
 <td width="50%">
 
 **Mindmap**
 
-![Account Settings](https://i.postimg.cc/nrFKZM7s/mindmap.png)
+![Account Settings](https://www.mnemo.one/images/mindmap.png)
 
 </td>
 </tr>
