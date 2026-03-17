@@ -46,14 +46,13 @@ public partial class MindmapView : UserControl
     private double _lastMinimapWidth;
     private double _lastMinimapHeight;
     private double _lastMainCanvasWidth;
-    private double _minimapContentMinX, _minimapContentMaxX, _minimapContentMinY, _minimapContentMaxY;
-    private bool _minimapContentBoundsInitialized;
     private double _lastMainCanvasHeight;
     private bool _isDragging;
     private bool _isPanning;
     private bool _isSelecting;
     private bool _addToSelectionOnBoxSelect;
     private bool _hasMovedSignificantly;
+    private bool _hasMovedNodeDuringDrag;
     private Point _selectionStart;
     private Point _selectionStartInCanvas; // content-space start, fixed at press so zoom doesn't break hit-test
     private Point _selectionCurrentInCanvas; // content-space current position, updated as mouse moves
@@ -71,10 +70,13 @@ public partial class MindmapView : UserControl
     private const double EdgeDoubleClickMs = 400;
     private const double EdgeDoubleClickDist = 15;
     private const double EdgeHitThreshold = 20;
+    private const int EdgeHoverThrottleMs = 32; // ~30fps max for expensive GetDistanceToCurve loop
 
     private DateTime _lastEdgeClickTime = DateTime.MinValue;
     private Point? _lastEdgeClickContentPoint;
     private string? _lastEdgeClickEdgeId;
+    private DispatcherTimer? _easeTimer;
+    private long _lastEdgeHoverUpdateTicks = 0;
 
     public MindmapView()
     {
@@ -92,6 +94,7 @@ public partial class MindmapView : UserControl
         DataContextChanged += OnDataContextChanged;
 
         Loaded += OnViewLoaded;
+        Unloaded += OnViewUnloaded;
 
         // Try to get settings service from global locator or wait for DataContext
         if (Application.Current is Mnemo.UI.App mnemoApp && mnemoApp.Services != null)
@@ -111,6 +114,12 @@ public partial class MindmapView : UserControl
         UpdateMinimap();
         UpdateMinimapVisibility();
         Loaded -= OnViewLoaded;
+    }
+
+    private void OnViewUnloaded(object? sender, RoutedEventArgs e)
+    {
+        _easeTimer?.Stop();
+        _easeTimer = null;
     }
 
     private void OnSettingChanged(object? sender, string key)
@@ -247,11 +256,13 @@ public partial class MindmapView : UserControl
     private void OnNodePropertyChangedForMinimap(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(NodeViewModel.X) or nameof(NodeViewModel.Y)
-                            or nameof(NodeViewModel.Width) or nameof(NodeViewModel.Height))
+                            or nameof(NodeViewModel.Width) or nameof(NodeViewModel.Height)
+                            or nameof(NodeViewModel.ActualWidth) or nameof(NodeViewModel.ActualHeight))
         {
             UpdateMinimap();
         }
     }
+
 
     private void OnRecenterRequested(object? sender, EventArgs e)
     {
@@ -274,8 +285,8 @@ public partial class MindmapView : UserControl
 
         var nodes = vm.Nodes;
 
-        double centerX = (nodes.Min(n => n.X) + nodes.Max(n => n.X + (n.Width ?? 120))) / 2;
-        double centerY = (nodes.Min(n => n.Y) + nodes.Max(n => n.Y + (n.Height ?? 40))) / 2;
+        double centerX = (nodes.Min(n => n.X) + nodes.Max(n => n.X + n.ActualWidth)) / 2;
+        double centerY = (nodes.Min(n => n.Y) + nodes.Max(n => n.Y + n.ActualHeight)) / 2;
 
         var mainCanvas = this.FindControl<Panel>("MainCanvas");
         if (mainCanvas == null) return;
@@ -580,6 +591,7 @@ public partial class MindmapView : UserControl
             }
 
             _isDragging = true;
+            _hasMovedNodeDuringDrag = false;
             _isPanning = false;
             _draggedNode = node;
             _lastPointerPosition = e.GetPosition(this);
@@ -600,8 +612,9 @@ public partial class MindmapView : UserControl
             var dx = delta.X / scale;
             var dy = delta.Y / scale;
 
-            if (DataContext is MindmapViewModel vm)
+            if ((Math.Abs(dx) > 1e-6 || Math.Abs(dy) > 1e-6) && DataContext is MindmapViewModel vm)
             {
+                _hasMovedNodeDuringDrag = true;
                 var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
                 if (selectedNodes.Contains(_draggedNode))
                 {
@@ -619,7 +632,8 @@ public partial class MindmapView : UserControl
             }
             
             _lastPointerPosition = currentPosition;
-            UpdateMinimap();
+            if (_hasMovedNodeDuringDrag)
+                UpdateMinimap();
             e.Handled = true;
         }
         else if (_isPanning)
@@ -675,15 +689,19 @@ public partial class MindmapView : UserControl
 
         foreach (var node in vm.Nodes)
         {
-            var w = node.Width ?? 120;
-            var h = node.Height ?? 40;
-            if (contentPoint.X >= node.X && contentPoint.X <= node.X + w && contentPoint.Y >= node.Y && contentPoint.Y <= node.Y + h)
+            if (contentPoint.X >= node.X && contentPoint.X <= node.X + node.ActualWidth &&
+                contentPoint.Y >= node.Y && contentPoint.Y <= node.Y + node.ActualHeight)
             {
                 mainCanvas.Cursor = null;
                 vm.SetHoveredEdge(null);
                 return;
             }
         }
+
+        long now = Environment.TickCount64;
+        if (now - _lastEdgeHoverUpdateTicks < EdgeHoverThrottleMs)
+            return;
+        _lastEdgeHoverUpdateTicks = now;
 
         const double labelHalfW = 30;
         const double labelHalfH = 11;
@@ -733,7 +751,7 @@ public partial class MindmapView : UserControl
         
         foreach (var node in vm.Nodes)
         {
-            var nodeRect = new Rect(node.X, node.Y, node.Width ?? 0, node.Height ?? 0);
+            var nodeRect = new Rect(node.X, node.Y, node.ActualWidth, node.ActualHeight);
             bool inBox = contentRect.Intersects(nodeRect);
             node.IsSelected = _addToSelectionOnBoxSelect ? (node.IsSelected || inBox) : inBox;
         }
@@ -750,29 +768,33 @@ public partial class MindmapView : UserControl
 
     private async void OnNodePointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        try
+        {
         if (_isDragging && _draggedNode != null && DataContext is MindmapViewModel vm)
         {
-            if (_moveBeforeSnapshot != null)
+            if (_hasMovedNodeDuringDrag)
             {
-                var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
-                var moves = selectedNodes.Contains(_draggedNode)
-                    ? selectedNodes.Select(n => (n, n.X, n.Y)).ToList()
-                    : new List<(NodeViewModel node, double x, double y)> { (_draggedNode, _draggedNode.X, _draggedNode.Y) };
-                await vm.UpdateNodesPositionAsync(_moveBeforeSnapshot, moves);
-                _moveBeforeSnapshot = null;
-            }
-            else
-            {
-                var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
-                if (selectedNodes.Contains(_draggedNode))
+                if (_moveBeforeSnapshot != null)
                 {
-                    foreach (var node in selectedNodes)
-                        await vm.UpdateNodePositionAsync(node, node.X, node.Y);
+                    var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
+                    var moves = selectedNodes.Contains(_draggedNode)
+                        ? selectedNodes.Select(n => (n, n.X, n.Y)).ToList()
+                        : new List<(NodeViewModel node, double x, double y)> { (_draggedNode, _draggedNode.X, _draggedNode.Y) };
+                    await vm.UpdateNodesPositionAsync(_moveBeforeSnapshot, moves);
                 }
                 else
-                    await vm.UpdateNodePositionAsync(_draggedNode, _draggedNode.X, _draggedNode.Y);
+                {
+                    var selectedNodes = vm.Nodes.Where(n => n.IsSelected).ToList();
+                    if (selectedNodes.Contains(_draggedNode))
+                    {
+                        foreach (var node in selectedNodes)
+                            await vm.UpdateNodePositionAsync(node, node.X, node.Y);
+                    }
+                    else
+                        await vm.UpdateNodePositionAsync(_draggedNode, _draggedNode.X, _draggedNode.Y);
+                }
             }
-
+            _moveBeforeSnapshot = null;
             _isDragging = false;
             _draggedNode = null;
             e.Handled = true;
@@ -845,6 +867,12 @@ public partial class MindmapView : UserControl
             _isPanning = false;
             e.Handled = true;
         }
+        }
+        catch (Exception ex)
+        {
+            var logger = (Application.Current as App)?.Services?.GetService(typeof(ILoggerService)) as ILoggerService;
+            logger?.Error(nameof(MindmapView), "Error in pointer released handler", ex);
+        }
     }
 
     private void FocusEdgeLabelBox(EdgeViewModel edge)
@@ -866,9 +894,17 @@ public partial class MindmapView : UserControl
 
     private async void OnNodeTextBoxLostFocus(object? sender, RoutedEventArgs e)
     {
-        if (sender is TextBox textBox && textBox.DataContext is NodeViewModel node && DataContext is MindmapViewModel vm)
+        try
         {
-            await vm.UpdateNodeTextAsync(node, textBox.Text ?? string.Empty);
+            if (sender is TextBox textBox && textBox.DataContext is NodeViewModel node && DataContext is MindmapViewModel vm)
+            {
+                await vm.UpdateNodeTextAsync(node, textBox.Text ?? string.Empty);
+            }
+        }
+        catch (Exception ex)
+        {
+            var logger = (Application.Current as App)?.Services?.GetService(typeof(ILoggerService)) as ILoggerService;
+            logger?.Error(nameof(MindmapView), "Failed to save node text", ex);
         }
     }
 
@@ -975,32 +1011,42 @@ public partial class MindmapView : UserControl
     {
         if (sender is not Control control || control.DataContext is not NodeViewModel node)
             return;
+        HandleNodeSizeChanged(control, node, e.NewSize.Width, e.NewSize.Height);
+    }
 
-        double w = e.NewSize.Width;
-        double h = e.NewSize.Height;
+    private void HandleNodeSizeChanged(Control _, NodeViewModel node, double w, double h)
+    {
         if (node.Shape == "circle")
         {
             double side = Math.Max(w, h);
-            control.Width = side;
-            control.Height = side;
+            // Enforce equal width and height via the ViewModel so the binding keeps it square.
+            // Guard against feedback: only write if the stored value differs meaningfully.
+            if (Math.Abs((node.Width ?? 0) - side) > 0.5 || Math.Abs((node.Height ?? 0) - side) > 0.5)
+            {
+                node.Width = side;
+                node.Height = side;
+                // SizeChanged will fire again once the binding applies the new size.
+                return;
+            }
             w = side;
             h = side;
         }
-        node.Width = w;
-        node.Height = h;
+
+        if (Math.Abs(node.ActualWidth - w) > 0.5 || Math.Abs(node.ActualHeight - h) > 0.5)
+        {
+            node.ActualWidth = w;
+            node.ActualHeight = h;
+        }
     }
 
     private void OnNodeTextBoxTextChanged(object? sender, TextChangedEventArgs e)
     {
-        // When text changes, clear circle node's fixed size so it can re-measure and grow
+        // When text changes on a circle node, release the fixed size so it can re-measure and grow,
+        // then OnNodeSizeChanged will re-apply the square constraint at the new content size.
         if (sender is not Control textBox || textBox.DataContext is not NodeViewModel node || node.Shape != "circle")
             return;
-        var contentControl = textBox.Parent?.Parent as Control;
-        if (contentControl != null)
-        {
-            contentControl.Width = double.NaN;
-            contentControl.Height = double.NaN;
-        }
+        node.Width = null;
+        node.Height = null;
     }
 
     private void UpdateMinimap()
@@ -1015,7 +1061,6 @@ public partial class MindmapView : UserControl
         if (DataContext is not MindmapViewModel vm || !vm.Nodes.Any())
         {
             minimapViewportBox.IsVisible = false;
-            _minimapContentBoundsInitialized = false;
             return;
         }
 
@@ -1031,9 +1076,9 @@ public partial class MindmapView : UserControl
         // --- Fit all nodes into the minimap and center on them ---
         var nodes = vm.Nodes;
         double minX = nodes.Min(n => n.X);
-        double maxX = nodes.Max(n => n.X + (n.Width ?? 120));
+        double maxX = nodes.Max(n => n.X + n.ActualWidth);
         double minY = nodes.Min(n => n.Y);
-        double maxY = nodes.Max(n => n.Y + (n.Height ?? 40));
+        double maxY = nodes.Max(n => n.Y + n.ActualHeight);
         double contentWidth  = maxX - minX;
         double contentHeight = maxY - minY;
 
@@ -1229,32 +1274,33 @@ public partial class MindmapView : UserControl
         double targetOffsetY = vpH / 2.0 - contentPoint.Y * scale;
         var targetMatrix = Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(targetOffsetX, targetOffsetY);
 
+        // Stop any in-progress ease animation before starting a new one
+        _easeTimer?.Stop();
+        _easeTimer = null;
+
         var startMatrix = _transformMatrix;
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var timer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(16)
-        };
+        _easeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         void Tick(object? s, EventArgs args)
         {
-            double t = sw.ElapsedMilliseconds / (double)MinimapEaseMs;
-            if (t >= 1)
+            double elapsed = sw.ElapsedMilliseconds / (double)MinimapEaseMs;
+            if (elapsed >= 1)
             {
                 _transformMatrix = targetMatrix;
                 UpdateTransform();
-                timer.Stop();
-                timer.Tick -= Tick;
+                _easeTimer?.Stop();
+                _easeTimer = null;
                 return;
             }
-            double u = 1 - t;
-            double e = 1 - (u * u * u); // ease-out cubic
-            double m31 = startMatrix.M31 + (targetMatrix.M31 - startMatrix.M31) * e;
-            double m32 = startMatrix.M32 + (targetMatrix.M32 - startMatrix.M32) * e;
+            double invElapsed = 1 - elapsed;
+            double eased = 1 - (invElapsed * invElapsed * invElapsed); // ease-out cubic
+            double m31 = startMatrix.M31 + (targetMatrix.M31 - startMatrix.M31) * eased;
+            double m32 = startMatrix.M32 + (targetMatrix.M32 - startMatrix.M32) * eased;
             _transformMatrix = new Matrix(scale, 0, 0, scale, m31, m32);
             UpdateTransform();
         }
-        timer.Tick += Tick;
-        timer.Start();
+        _easeTimer.Tick += Tick;
+        _easeTimer.Start();
     }
 
     private const double ExportScale = 2.0; // PNG at 2× for sharpness
@@ -1340,7 +1386,7 @@ public partial class MindmapView : UserControl
         };
     }
 
-    /// <summary>Measures node label text with same font as view (14pt Medium) for export sizing when Width/Height are null.</summary>
+    /// <summary>Measures node label text with same font as export (ExportFontSize Medium) for sizing when Width/Height are null.</summary>
     private static (double Width, double Height) MeasureNodeText(string? text)
     {
         if (string.IsNullOrEmpty(text)) return (0, 0);
@@ -1349,12 +1395,16 @@ public partial class MindmapView : UserControl
             CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight,
             new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Medium),
-            14,
+            ExportFontSize,
             Brushes.Black);
         return (ft.Width, ft.Height);
     }
 
     private const double ExportSelectionPadding = 24;
+    private const double ExportNodeWidthPadding = 24;
+    private const double ExportNodeHeightPadding = 12;
+    private const double ExportStrokeThickness = 1.5;
+    private const double ExportFontSize = 14;
 
     /// <summary>Screen-capture the mindmap (grid + nodes + edges), or only the selected subgraph when selectedNodeIds is set.</summary>
     /// <param name="transparentBackground">When true, background is transparent (PNG alpha); otherwise uses workspace background.</param>
@@ -1388,8 +1438,8 @@ public partial class MindmapView : UserControl
             foreach (var node in nodesInScope)
             {
                 var (mw, mh) = MeasureNodeText(node.Text);
-                double nw = node.Width ?? Math.Max(120, mw + 24);
-                double nh = node.Height ?? Math.Max(40, mh + 12);
+                double nw = node.Width ?? Math.Max(NodeViewModel.DefaultWidth, mw + ExportNodeWidthPadding);
+                double nh = node.Height ?? Math.Max(NodeViewModel.DefaultHeight, mh + ExportNodeHeightPadding);
                 var tl = matrix.Transform(new Point(node.X, node.Y));
                 var br = matrix.Transform(new Point(node.X + nw, node.Y + nh));
                 minX = Math.Min(minX, tl.X);
@@ -1454,7 +1504,7 @@ public partial class MindmapView : UserControl
             {
                 Data = pathGeometry,
                 Stroke = strokeBrush,
-                StrokeThickness = 1.5,
+                StrokeThickness = ExportStrokeThickness,
                 StrokeDashArray = dashArray,
                 IsHitTestVisible = false
             };
@@ -1474,7 +1524,7 @@ public partial class MindmapView : UserControl
                 {
                     Data = ogeom,
                     Stroke = strokeBrush,
-                    StrokeThickness = 1.5,
+                    StrokeThickness = ExportStrokeThickness,
                     StrokeDashArray = dashArray,
                     IsHitTestVisible = false
                 });
@@ -1505,8 +1555,8 @@ public partial class MindmapView : UserControl
         foreach (var node in nodesInScope)
         {
             var (mw, mh) = MeasureNodeText(node.Text);
-            double nw = node.Width ?? Math.Max(120, mw + 24);
-            double nh = node.Height ?? Math.Max(40, mh + 12);
+            double nw = node.Width ?? Math.Max(NodeViewModel.DefaultWidth, mw + ExportNodeWidthPadding);
+            double nh = node.Height ?? Math.Max(NodeViewModel.DefaultHeight, mh + ExportNodeHeightPadding);
             var topLeft = ToPanel(matrix.Transform(new Point(node.X, node.Y)));
             var bottomRight = ToPanel(matrix.Transform(new Point(node.X + nw, node.Y + nh)));
             double screenW = Math.Max(1, bottomRight.X - topLeft.X);
@@ -1521,14 +1571,14 @@ public partial class MindmapView : UserControl
                 Height = screenH,
                 Background = nodeBgBrush,
                 BorderBrush = borderBrush,
-                BorderThickness = new Thickness(1.5),
+                BorderThickness = new Thickness(ExportStrokeThickness),
                 CornerRadius = new CornerRadius(radius > 100 ? screenH / 2 : Math.Min(radius, screenH / 2)),
                 Padding = new Thickness(12, 6),
                 Child = new TextBlock
                 {
                     Text = node.Text ?? "",
                     Foreground = textBrush,
-                    FontSize = 14,
+                    FontSize = ExportFontSize,
                     FontWeight = FontWeight.Medium,
                     TextAlignment = TextAlignment.Center,
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,

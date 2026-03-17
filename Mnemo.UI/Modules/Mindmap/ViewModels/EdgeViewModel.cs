@@ -98,7 +98,9 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
         if (e.PropertyName == nameof(NodeViewModel.X) ||
             e.PropertyName == nameof(NodeViewModel.Y) ||
             e.PropertyName == nameof(NodeViewModel.Width) ||
-            e.PropertyName == nameof(NodeViewModel.Height))
+            e.PropertyName == nameof(NodeViewModel.Height) ||
+            e.PropertyName == nameof(NodeViewModel.ActualWidth) ||
+            e.PropertyName == nameof(NodeViewModel.ActualHeight))
         {
             UpdatePoints();
         }
@@ -115,12 +117,20 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
         GC.SuppressFinalize(this);
     }
 
+    private const double BezierPullFraction = 0.4;
+    private const double BezierPullMin = 30;
+    private const double BezierPullMax = 200;
+    private const double DoubleLineOffset = 2.0;
+    private const double ArrowLength = 10;
+    private const double ArrowHalfWidth = 4;
+    private const int BezierSampleSteps = 32;
+
     private void UpdatePoints()
     {
-        double fromWidth  = _from.Width  ?? 120;
-        double fromHeight = _from.Height ?? 40;
-        double toWidth    = _to.Width    ?? 120;
-        double toHeight   = _to.Height   ?? 40;
+        double fromWidth  = _from.ActualWidth;
+        double fromHeight = _from.ActualHeight;
+        double toWidth    = _to.ActualWidth;
+        double toHeight   = _to.ActualHeight;
 
         double fromCx = _from.X + fromWidth  / 2;
         double fromCy = _from.Y + fromHeight / 2;
@@ -138,7 +148,7 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
             double segDx   = EndPoint.X - StartPoint.X;
             double segDy   = EndPoint.Y - StartPoint.Y;
             double dist    = Math.Sqrt(segDx * segDx + segDy * segDy);
-            double pull    = Math.Clamp(dist * 0.4, 30, 200);
+            double pull    = Math.Clamp(dist * BezierPullFraction, BezierPullMin, BezierPullMax);
 
             // Exit direction = the side the start-attach point sits on.
             Point exitDir  = GetAttachNormal(_from.X, _from.Y, fromWidth, fromHeight, dx, dy);
@@ -159,52 +169,69 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
             ControlPoint2 = EndPoint;
         }
 
-        // Cubic Bezier at t=0.5 for label placement
+        // Cubic Bezier at t=0.5 for label placement (always needed for label hit-test and display)
         double t = 0.5, u = 1 - t;
         double cx = u * u * u * StartPoint.X + 3 * u * u * t * ControlPoint1.X + 3 * u * t * t * ControlPoint2.X + t * t * t * EndPoint.X;
         double cy = u * u * u * StartPoint.Y + 3 * u * u * t * ControlPoint1.Y + 3 * u * t * t * ControlPoint2.Y + t * t * t * EndPoint.Y;
         CenterPoint = new Point(cx, cy);
 
-        // Tangent at t=0.5 for double-line perpendicular offset: B'(0.5) = 3u²(P1-P0)+6u*t(P2-P1)+3t²(P3-P2)
-        double tx = 3 * u * u * (ControlPoint1.X - StartPoint.X) + 6 * u * t * (ControlPoint2.X - ControlPoint1.X) + 3 * t * t * (EndPoint.X - ControlPoint2.X);
-        double ty = 3 * u * u * (ControlPoint1.Y - StartPoint.Y) + 6 * u * t * (ControlPoint2.Y - ControlPoint1.Y) + 3 * t * t * (EndPoint.Y - ControlPoint2.Y);
-        double len = Math.Sqrt(tx * tx + ty * ty);
-        if (len < 1e-6) len = 1;
-        double nx = -ty / len, ny = tx / len;
-        const double doubleOffset = 2.0;
-        OffsetStartPoint = new Point(StartPoint.X + nx * doubleOffset, StartPoint.Y + ny * doubleOffset);
-        OffsetEndPoint = new Point(EndPoint.X + nx * doubleOffset, EndPoint.Y + ny * doubleOffset);
-        OffsetControlPoint1 = new Point(ControlPoint1.X + nx * doubleOffset, ControlPoint1.Y + ny * doubleOffset);
-        OffsetControlPoint2 = new Point(ControlPoint2.X + nx * doubleOffset, ControlPoint2.Y + ny * doubleOffset);
+        if (Type == EdgeTypes.Double)
+        {
+            double tx = 3 * u * u * (ControlPoint1.X - StartPoint.X) + 6 * u * t * (ControlPoint2.X - ControlPoint1.X) + 3 * t * t * (EndPoint.X - ControlPoint2.X);
+            double ty = 3 * u * u * (ControlPoint1.Y - StartPoint.Y) + 6 * u * t * (ControlPoint2.Y - ControlPoint1.Y) + 3 * t * t * (EndPoint.Y - ControlPoint2.Y);
+            double len = Math.Sqrt(tx * tx + ty * ty);
+            if (len < 1e-6) len = 1;
+            double nx = -ty / len, ny = tx / len;
+            OffsetStartPoint = new Point(StartPoint.X + nx * DoubleLineOffset, StartPoint.Y + ny * DoubleLineOffset);
+            OffsetEndPoint = new Point(EndPoint.X + nx * DoubleLineOffset, EndPoint.Y + ny * DoubleLineOffset);
+            OffsetControlPoint1 = new Point(ControlPoint1.X + nx * DoubleLineOffset, ControlPoint1.Y + ny * DoubleLineOffset);
+            OffsetControlPoint2 = new Point(ControlPoint2.X + nx * DoubleLineOffset, ControlPoint2.Y + ny * DoubleLineOffset);
+        }
+        else
+        {
+            OffsetStartPoint = StartPoint;
+            OffsetEndPoint = EndPoint;
+            OffsetControlPoint1 = ControlPoint1;
+            OffsetControlPoint2 = ControlPoint2;
+        }
 
-        // Arrow heads for bidirect: tangent at start/end, triangle (left, tip, right)
-        const double arrowLen = 10, arrowHalf = 4;
-        // End arrow: tip = EndPoint, tangent toward EndPoint
-        double ex = EndPoint.X - ControlPoint2.X, ey = EndPoint.Y - ControlPoint2.Y;
-        double elen = Math.Sqrt(ex * ex + ey * ey);
-        if (elen < 1e-6) { ex = 1; ey = 0; elen = 1; }
-        ex /= elen; ey /= elen;
-        Point endBase = new Point(EndPoint.X - ex * arrowLen, EndPoint.Y - ey * arrowLen);
-        double px = -ey, py = ex;
-        ArrowEndPoints = new AvaloniaList<Point>
+        if (Type == EdgeTypes.Arrow || Type == EdgeTypes.Bidirect)
         {
-            new Point(endBase.X + px * arrowHalf, endBase.Y + py * arrowHalf),
-            EndPoint,
-            new Point(endBase.X - px * arrowHalf, endBase.Y - py * arrowHalf)
-        };
-        // Start arrow: tip = startBase (along curve), base at StartPoint so arrow points out of node
-        double sx = ControlPoint1.X - StartPoint.X, sy = ControlPoint1.Y - StartPoint.Y;
-        double slen = Math.Sqrt(sx * sx + sy * sy);
-        if (slen < 1e-6) { sx = 1; sy = 0; slen = 1; }
-        sx /= slen; sy /= slen;
-        Point startBase = new Point(StartPoint.X + sx * arrowLen, StartPoint.Y + sy * arrowLen);
-        double qx = -sy, qy = sx;
-        ArrowStartPoints = new AvaloniaList<Point>
+            double ex = EndPoint.X - ControlPoint2.X, ey = EndPoint.Y - ControlPoint2.Y;
+            double elen = Math.Sqrt(ex * ex + ey * ey);
+            if (elen < 1e-6) { ex = 1; ey = 0; elen = 1; }
+            ex /= elen; ey /= elen;
+            Point endBase = new Point(EndPoint.X - ex * ArrowLength, EndPoint.Y - ey * ArrowLength);
+            double px = -ey, py = ex;
+            ArrowEndPoints = new AvaloniaList<Point>
+            {
+                new Point(endBase.X + px * ArrowHalfWidth, endBase.Y + py * ArrowHalfWidth),
+                EndPoint,
+                new Point(endBase.X - px * ArrowHalfWidth, endBase.Y - py * ArrowHalfWidth)
+            };
+            if (Type == EdgeTypes.Bidirect)
+            {
+                double sx = ControlPoint1.X - StartPoint.X, sy = ControlPoint1.Y - StartPoint.Y;
+                double slen = Math.Sqrt(sx * sx + sy * sy);
+                if (slen < 1e-6) { sx = 1; sy = 0; slen = 1; }
+                sx /= slen; sy /= slen;
+                Point startBase = new Point(StartPoint.X + sx * ArrowLength, StartPoint.Y + sy * ArrowLength);
+                double qx = -sy, qy = sx;
+                ArrowStartPoints = new AvaloniaList<Point>
+                {
+                    new Point(StartPoint.X + qx * ArrowHalfWidth, StartPoint.Y + qy * ArrowHalfWidth),
+                    startBase,
+                    new Point(StartPoint.X - qx * ArrowHalfWidth, StartPoint.Y - qy * ArrowHalfWidth)
+                };
+            }
+            else
+                ArrowStartPoints = [];
+        }
+        else
         {
-            new Point(StartPoint.X + qx * arrowHalf, StartPoint.Y + qy * arrowHalf),
-            startBase,
-            new Point(StartPoint.X - qx * arrowHalf, StartPoint.Y - qy * arrowHalf)
-        };
+            ArrowStartPoints = [];
+            ArrowEndPoints = [];
+        }
     }
 
     /// <summary>Unit outward normal for the attach side. Same dominant-direction logic as GetAttachPoint.</summary>
@@ -231,7 +258,7 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
     /// <summary>Minimum distance from point to the cubic bezier (approximate by sampling).</summary>
     public double GetDistanceToCurve(Point p)
     {
-        const int steps = 32;
+        const int steps = BezierSampleSteps;
         double min = double.MaxValue;
         double px = p.X, py = p.Y;
         for (int i = 0; i <= steps; i++)

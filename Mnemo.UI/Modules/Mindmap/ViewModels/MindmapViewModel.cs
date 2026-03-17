@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Enums;
 using Mnemo.Core.History;
 using Mnemo.Core.Models.Mindmap;
 using Mnemo.Core.Services;
@@ -19,9 +20,19 @@ namespace Mnemo.UI.Modules.Mindmap.ViewModels;
 
 public partial class MindmapViewModel : ViewModelBase, INavigationAware
 {
+    private const double NewNodeXOffset = 200;
+    private const double LayoutTreeVerticalHSpacing = 250;
+    private const double LayoutTreeVerticalVSpacing = 80;
+    private const double LayoutTreeHorizontalVSpacing = 200;
+    private const double LayoutTreeHorizontalHSpacing = 120;
+    private const double LayoutRadialCenterX = 400;
+    private const double LayoutRadialCenterY = 300;
+    private const double LayoutRadialRadiusStep = 180;
+
     private readonly IMindmapService _mindmapService;
     private readonly IHistoryManager _historyManager;
     private readonly ISettingsService? _settingsService;
+    private readonly ILoggerService? _logger;
     private MindmapModel? _currentMindmap;
 
     [ObservableProperty]
@@ -196,11 +207,12 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     public event EventHandler? RecenterRequested;
 
-    public MindmapViewModel(IMindmapService mindmapService, IHistoryManager historyManager, ISettingsService? settingsService = null)
+    public MindmapViewModel(IMindmapService mindmapService, IHistoryManager historyManager, ISettingsService? settingsService = null, ILoggerService? logger = null)
     {
         _mindmapService = mindmapService;
         _historyManager = historyManager;
         _settingsService = settingsService;
+        _logger = logger;
         AddNodeCommand = new AsyncRelayCommand(AddNodeAsync);
         DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync);
         ConnectSelectedCommand = new AsyncRelayCommand(ConnectSelectedAsync);
@@ -345,13 +357,8 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         OnPropertyChanged(nameof(IsViewTab));
     }
 
-    partial void OnMindmapModeChanged(string value)
-    {
-        OnPropertyChanged(nameof(IsEditMode));
-        OnPropertyChanged(nameof(IsPreviewMode));
-        OnPropertyChanged(nameof(IsToolbarVisible));
-        OnPropertyChanged(nameof(IsEditingEnabled));
-    }
+    // IsEditMode/IsPreviewMode/IsToolbarVisible/IsEditingEnabled are already notified
+    // by the [NotifyPropertyChangedFor] attributes on _mindmapMode; no manual notifications needed.
 
     private void SetMinimapVisibility(string? mode)
     {
@@ -394,48 +401,62 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     private async void SetSelectedEdgeKind(MindmapEdgeKind? kind)
     {
-        if (kind == null) return;
-        if (SelectedEdge != null && _currentMindmap != null)
+        try
         {
-            var edge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == SelectedEdge.Id);
-            if (edge != null && kind == MindmapEdgeKind.Hierarchy && WouldCreateCycle(_currentMindmap, edge.FromId, edge.ToId))
-                return;
-            SelectedEdge.Kind = kind.Value;
-            if (edge != null)
+            if (kind == null) return;
+            if (SelectedEdge != null && _currentMindmap != null)
             {
-                edge.Kind = kind.Value;
-                await _mindmapService.UpdateEdgeKindAsync(_currentMindmap.Id, edge.Id, kind.Value);
+                var edge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == SelectedEdge.Id);
+                if (edge != null && kind == MindmapEdgeKind.Hierarchy && WouldCreateCycle(_currentMindmap, edge.FromId, edge.ToId))
+                    return;
+                SelectedEdge.Kind = kind.Value;
+                if (edge != null)
+                {
+                    edge.Kind = kind.Value;
+                    await _mindmapService.UpdateEdgeKindAsync(_currentMindmap.Id, edge.Id, kind.Value);
+                }
+                OnPropertyChanged(nameof(EffectiveEdgeKind));
+                OnPropertyChanged(nameof(StyleEdgeKindSelected));
             }
-            OnPropertyChanged(nameof(EffectiveEdgeKind));
-            OnPropertyChanged(nameof(StyleEdgeKindSelected));
+            else
+            {
+                DefaultEdgeKind = kind.Value;
+            }
         }
-        else
+        catch (Exception ex)
         {
-            DefaultEdgeKind = kind.Value;
+            _logger?.Error(nameof(MindmapViewModel), "Failed to set edge kind", ex);
         }
     }
 
     private async void SetSelectedEdgeType(string? type)
     {
-        if (string.IsNullOrEmpty(type) || !EdgeTypeIds.Contains(type)) return;
-        if (SelectedEdge != null && _currentMindmap != null)
+        try
         {
-            var edge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == SelectedEdge.Id);
-            if (edge != null)
+            if (string.IsNullOrEmpty(type) || !EdgeTypeIds.Contains(type)) return;
+            if (SelectedEdge != null && _currentMindmap != null)
             {
-                var before = MindmapSnapshotHelper.Clone(_currentMindmap);
-                SelectedEdge.Type = type;
-                edge.Type = type;
-                var after = MindmapSnapshotHelper.Clone(_currentMindmap);
-                _historyManager.Push(new MindmapStateOperation("Change edge type", before, after, RestoreMindmapStateAsync));
-                await _mindmapService.UpdateEdgeTypeAsync(_currentMindmap.Id, edge.Id, type);
+                var edge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == SelectedEdge.Id);
+                if (edge != null)
+                {
+                    var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+                    SelectedEdge.Type = type;
+                    edge.Type = type;
+                    var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+                    _historyManager.Push(new MindmapStateOperation("Change edge type", before, after, RestoreMindmapStateAsync));
+                    await _mindmapService.UpdateEdgeTypeAsync(_currentMindmap.Id, edge.Id, type);
+                }
+                NotifyEffectiveEdgeTypeChanged();
             }
-            NotifyEffectiveEdgeTypeChanged();
+            else
+            {
+                DefaultEdgeType = type;
+                NotifyEffectiveEdgeTypeChanged();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            DefaultEdgeType = type;
-            NotifyEffectiveEdgeTypeChanged();
+            _logger?.Error(nameof(MindmapViewModel), "Failed to set edge type", ex);
         }
     }
 
@@ -446,49 +467,63 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     public async void EdgeClicked(EdgeViewModel edge)
     {
-        if (_currentMindmap == null) return;
-        if (edge.Label == null)
+        try
         {
-            var modelEdge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == edge.Id);
-            if (modelEdge != null)
+            if (_currentMindmap == null) return;
+            if (edge.Label == null)
             {
-                var before = MindmapSnapshotHelper.Clone(_currentMindmap);
-                modelEdge.Label = "";
-                edge.Label = "";
-                var after = MindmapSnapshotHelper.Clone(_currentMindmap);
-                _historyManager.Push(new MindmapStateOperation("Add edge label", before, after, RestoreMindmapStateAsync));
-                await _mindmapService.UpdateEdgeLabelAsync(_currentMindmap.Id, edge.Id, "").ConfigureAwait(false);
+                var modelEdge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == edge.Id);
+                if (modelEdge != null)
+                {
+                    var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+                    modelEdge.Label = "";
+                    edge.Label = "";
+                    var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+                    _historyManager.Push(new MindmapStateOperation("Add edge label", before, after, RestoreMindmapStateAsync));
+                    await _mindmapService.UpdateEdgeLabelAsync(_currentMindmap.Id, edge.Id, "").ConfigureAwait(false);
+                }
             }
+            SelectedEdge = edge;
         }
-        SelectedEdge = edge;
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to process edge click", ex);
+        }
     }
 
     public async void CommitEdgeLabel(EdgeViewModel edge)
     {
-        if (_currentMindmap == null) return;
-        var mindmapId = _currentMindmap.Id;
-        var edgeId = edge.Id;
-        var labelToSave = edge.Label;
-        var modelEdge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == edgeId);
-        if (modelEdge == null) return;
-
-        var before = MindmapSnapshotHelper.Clone(_currentMindmap);
-        if (string.IsNullOrWhiteSpace(labelToSave))
+        try
         {
-            modelEdge.Label = null;
-            edge.Label = null;
-        }
-        else
-        {
-            modelEdge.Label = labelToSave;
-        }
-        var after = MindmapSnapshotHelper.Clone(_currentMindmap);
-        _historyManager.Push(new MindmapStateOperation("Edit edge label", before, after, RestoreMindmapStateAsync));
+            if (_currentMindmap == null) return;
+            var mindmapId = _currentMindmap.Id;
+            var edgeId = edge.Id;
+            var labelToSave = edge.Label;
+            var modelEdge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == edgeId);
+            if (modelEdge == null) return;
 
-        if (string.IsNullOrWhiteSpace(labelToSave))
-            await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, null).ConfigureAwait(false);
-        else
-            await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, labelToSave).ConfigureAwait(false);
+            var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+            if (string.IsNullOrWhiteSpace(labelToSave))
+            {
+                modelEdge.Label = null;
+                edge.Label = null;
+            }
+            else
+            {
+                modelEdge.Label = labelToSave;
+            }
+            var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+            _historyManager.Push(new MindmapStateOperation("Edit edge label", before, after, RestoreMindmapStateAsync));
+
+            if (string.IsNullOrWhiteSpace(labelToSave))
+                await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, null).ConfigureAwait(false);
+            else
+                await _mindmapService.UpdateEdgeLabelAsync(mindmapId, edgeId, labelToSave).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to commit edge label", ex);
+        }
     }
 
     public void SetHoveredEdge(string? edgeId)
@@ -544,41 +579,54 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     private async void SetSelectedNodesColor(string? color)
     {
-        if (!HasSelectedNodes)
+        try
         {
-            DefaultNodeColor = color;
-            return;
+            if (!HasSelectedNodes)
+            {
+                DefaultNodeColor = color;
+                return;
+            }
+            if (_currentMindmap == null) return;
+            var selected = Nodes.Where(n => n.IsSelected).ToList();
+            foreach (var node in selected)
+            {
+                node.Color = color;
+                SyncNodeStyleToModel(node);
+                await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, node.Id, BuildStyleDict(node));
+            }
         }
-        if (_currentMindmap == null) return;
-        var selected = Nodes.Where(n => n.IsSelected).ToList();
-        foreach (var node in selected)
+        catch (Exception ex)
         {
-            node.Color = color;
-            SyncNodeStyleToModel(node);
-            await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, node.Id, BuildStyleDict(node));
+            _logger?.Error(nameof(MindmapViewModel), "Failed to set node color", ex);
         }
     }
 
     private async void SetSelectedNodesShape(string? shape)
     {
-        if (string.IsNullOrEmpty(shape)) return;
-        if (!HasSelectedNodes)
+        try
         {
-            DefaultNodeShape = shape;
-            return;
-        }
-        if (_currentMindmap == null) return;
-        var selected = Nodes.Where(n => n.IsSelected).ToList();
-        foreach (var node in selected)
-        {
-            node.Shape = shape;
-            if (shape != "circle")
+            if (string.IsNullOrEmpty(shape)) return;
+            if (!HasSelectedNodes)
             {
+                DefaultNodeShape = shape;
+                return;
+            }
+            if (_currentMindmap == null) return;
+            var selected = Nodes.Where(n => n.IsSelected).ToList();
+            foreach (var node in selected)
+            {
+                node.Shape = shape;
+                // Clear persisted size for all shape changes so the node re-measures with
+                // the new shape constraints instead of being stuck at the old fixed size.
                 node.Width = null;
                 node.Height = null;
+                SyncNodeStyleToModel(node);
+                await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, node.Id, BuildStyleDict(node));
             }
-            SyncNodeStyleToModel(node);
-            await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, node.Id, BuildStyleDict(node));
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to set node shape", ex);
         }
     }
 
@@ -657,9 +705,11 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         var result = await _mindmapService.GetMindmapAsync(id);
         if (result.IsSuccess && result.Value != null)
         {
+            bool isNewMindmap = _currentMindmap?.Id != id;
             _currentMindmap = result.Value;
             Title = _currentMindmap.Title;
-            _historyManager.Clear();
+            if (isNewMindmap)
+                _historyManager.Clear();
             if (_settingsService != null)
             {
                 var overrides = await _settingsService.GetAsync(MinimapOverridesKey, new Dictionary<string, string>()).ConfigureAwait(false)
@@ -740,11 +790,11 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
         var before = MindmapSnapshotHelper.Clone(_currentMindmap);
         var selectedNodes = Nodes.Where(n => n.IsSelected).ToList();
-        double x = 400, y = 300;
+        double x = LayoutRadialCenterX, y = LayoutRadialCenterY;
         if (selectedNodes.Any())
         {
             var last = selectedNodes.Last();
-            x = last.X + 200;
+            x = last.X + NewNodeXOffset;
             y = last.Y;
         }
 
@@ -857,7 +907,13 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         if (_currentMindmap == null) return;
         var before = MindmapSnapshotHelper.Clone(_currentMindmap);
         var mn = _currentMindmap.Nodes.FirstOrDefault(n => n.Id == node.Id);
-        if (mn != null) mn.Content = new TextNodeContent { Text = text };
+        if (mn != null)
+        {
+            if (mn.Content is TextNodeContent existingContent)
+                existingContent.Text = text;
+            else
+                mn.Content = new TextNodeContent { Text = text };
+        }
         var after = MindmapSnapshotHelper.Clone(_currentMindmap);
         _historyManager.Push(new MindmapStateOperation("Edit node", before, after, RestoreMindmapStateAsync));
         node.Text = text;
@@ -893,18 +949,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     {
         if (_currentMindmap == null) return;
         var before = MindmapSnapshotHelper.Clone(_currentMindmap);
-        if (!_currentMindmap.Layout.Nodes.TryGetValue(node.Id, out var layout))
-        {
-            layout = new NodeLayout();
-            _currentMindmap.Layout.Nodes[node.Id] = layout;
-        }
-        layout.X = x;
-        layout.Y = y;
-        node.X = x;
-        node.Y = y;
-        var after = MindmapSnapshotHelper.Clone(_currentMindmap);
-        _historyManager.Push(new MindmapStateOperation("Move node", before, after, RestoreMindmapStateAsync));
-        await _mindmapService.UpdateNodeLayoutAsync(_currentMindmap.Id, node.Id, x, y);
+        await UpdateNodesPositionAsync(before, new[] { (node, x, y) });
     }
 
     private async Task SetLayoutAlgorithmAsync(string? algorithmId)
@@ -944,9 +989,8 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
                 }
                 break;
             case LayoutAlgorithms.Radial:
-                const double cx = 400, cy = 300, radiusStep = 180;
                 foreach (var root in roots)
-                    LayoutRadial(root, cx, cy, 0, radiusStep, 0, Math.Tau, hierarchyOutgoing, visited);
+                    LayoutRadial(root, LayoutRadialCenterX, LayoutRadialCenterY, 0, LayoutRadialRadiusStep, 0, Math.Tau, hierarchyOutgoing, visited);
                 break;
         }
 
@@ -957,22 +1001,17 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             await _mindmapService.UpdateNodeLayoutAsync(_currentMindmap.Id, node.Id, node.X, node.Y);
     }
 
-    private static Dictionary<string, List<NodeViewModel>> GetHierarchyChildrenFromMindmap(MindmapModel mindmap, IList<NodeViewModel> nodes)
+    private Dictionary<string, List<NodeViewModel>> GetHierarchyChildren()
     {
-        var nodeById = nodes.ToDictionary(n => n.Id);
+        var nodeById = Nodes.ToDictionary(n => n.Id);
         var children = new Dictionary<string, List<NodeViewModel>>();
-        foreach (var e in mindmap.Edges.Where(x => x.Kind == MindmapEdgeKind.Hierarchy))
+        foreach (var e in _currentMindmap!.Edges.Where(x => x.Kind == MindmapEdgeKind.Hierarchy))
         {
             if (!nodeById.TryGetValue(e.FromId, out var from) || !nodeById.TryGetValue(e.ToId, out var to)) continue;
             if (!children.ContainsKey(from.Id)) children[from.Id] = new List<NodeViewModel>();
             children[from.Id].Add(to);
         }
         return children;
-    }
-
-    private Dictionary<string, List<NodeViewModel>> GetHierarchyChildren()
-    {
-        return GetHierarchyChildrenFromMindmap(_currentMindmap!, Nodes);
     }
 
     private static double LayoutTreeVertical(NodeViewModel node, double x, double y, IReadOnlyDictionary<string, List<NodeViewModel>> children, HashSet<string> visited)
@@ -982,13 +1021,13 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         node.X = x;
         node.Y = y;
         if (!children.TryGetValue(node.Id, out var childList) || childList.Count == 0)
-            return y + 80;
-        double childX = x + 250;
+            return y + LayoutTreeVerticalVSpacing;
+        double childX = x + LayoutTreeVerticalHSpacing;
         double childY = y;
         double firstChildY = y;
         foreach (var child in childList)
             childY = LayoutTreeVertical(child, childX, childY, children, visited);
-        double lastChildBottom = childY - 80;
+        double lastChildBottom = childY - LayoutTreeVerticalVSpacing;
         node.Y = (firstChildY + lastChildBottom) / 2;
         return childY;
     }
@@ -1000,13 +1039,13 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         node.X = x;
         node.Y = y;
         if (!children.TryGetValue(node.Id, out var childList) || childList.Count == 0)
-            return x + 120;
-        double childY = y + 200;
+            return x + LayoutTreeHorizontalHSpacing;
+        double childY = y + LayoutTreeHorizontalVSpacing;
         double childX = x;
         double firstChildX = x;
         foreach (var child in childList)
             childX = LayoutTreeHorizontal(child, childX, childY, children, visited);
-        double midX = (firstChildX + (childX - 120)) / 2;
+        double midX = (firstChildX + (childX - LayoutTreeHorizontalHSpacing)) / 2;
         node.X = midX;
         return childX;
     }

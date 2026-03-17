@@ -7,6 +7,12 @@ namespace Mnemo.UI.Modules.Mindmap.ViewModels;
 
 public partial class NodeViewModel : ViewModelBase
 {
+    /// <summary>Fallback width used when actual layout width is not yet known.</summary>
+    public const double DefaultWidth = 120;
+
+    /// <summary>Fallback height used when actual layout height is not yet known.</summary>
+    public const double DefaultHeight = 40;
+
     private readonly MindmapNode _node;
     private readonly NodeLayout _layout;
 
@@ -31,6 +37,14 @@ public partial class NodeViewModel : ViewModelBase
     [ObservableProperty]
     private double? _height;
 
+    /// <summary>Last measured rendered width (updated from SizeChanged in view). Used for edge attach points and minimap; never persisted.</summary>
+    [ObservableProperty]
+    private double _actualWidth = DefaultWidth;
+
+    /// <summary>Last measured rendered height (updated from SizeChanged in view). Used for edge attach points and minimap; never persisted.</summary>
+    [ObservableProperty]
+    private double _actualHeight = DefaultHeight;
+
     [ObservableProperty]
     private bool _isSelected;
 
@@ -53,14 +67,20 @@ public partial class NodeViewModel : ViewModelBase
         _content = node.Content;
         _x = layout.X;
         _y = layout.Y;
-        _width = layout.Width;
-        _height = layout.Height;
+        // Only restore a saved size for circle nodes (where width == height enforces the square).
+        // Non-circle shapes auto-size from content, so persisted sizes are discarded on load
+        // to avoid pinning the ContentControl at a stale size that won't grow with text.
+        bool isCircle = (node.Style.TryGetValue("shape", out var shapeForSize) && shapeForSize == "circle");
+        _width = isCircle ? layout.Width : null;
+        _height = isCircle ? layout.Height : null;
+        _actualWidth = layout.Width ?? DefaultWidth;
+        _actualHeight = layout.Height ?? DefaultHeight;
         _text = (node.Content as TextNodeContent)?.Text ?? "";
         _color = node.Style.TryGetValue("color", out var color) ? color : null;
         _shape = node.Style.TryGetValue("shape", out var shape) && !string.IsNullOrEmpty(shape) ? shape : "pill";
         PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(Width) or nameof(Height))
+            if (e.PropertyName is nameof(Width) or nameof(Height) or nameof(ActualWidth) or nameof(ActualHeight))
                 NotifyShapeDependent();
         };
     }

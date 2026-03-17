@@ -29,13 +29,7 @@ public class NodeToCenterPointConverter : IValueConverter
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is NodeViewModel node)
-        {
-            // Approximate center based on current position and typical node size
-            // Real implementation would use actual bounds if available
-            double width = node.Width ?? 120;
-            double height = node.Height ?? 40;
-            return new Point(node.X + width / 2, node.Y + height / 2);
-        }
+            return new Point(node.X + node.ActualWidth / 2, node.Y + node.ActualHeight / 2);
         return new Point(0, 0);
     }
 
