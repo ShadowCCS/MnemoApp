@@ -818,61 +818,6 @@ public partial class MindmapView : UserControl
         
         if (_isPanning)
         {
-            // If we're panning and didn't move significantly, it was a click on empty space
-            if (!_hasMovedSignificantly && DataContext is MindmapViewModel viewModel)
-            {
-                foreach (var node in viewModel.Nodes) node.IsSelected = false;
-                viewModel.SelectedEdge = null; // Clear edge selection; sidebar shows no selection
-                if (!viewModel.IsEditingEnabled)
-                {
-                    _lastEdgeClickEdgeId = null;
-                    _lastEdgeClickContentPoint = null;
-                }
-                else
-                {
-                    // Nodes are on top so edge hit Path never gets the click; hit-test edges in code
-                    var mainCanvas = this.FindControl<Panel>("MainCanvas");
-                    if (mainCanvas != null)
-                    {
-                        var pos = e.GetPosition(mainCanvas);
-                        var contentPoint = pos * _transformMatrix.Invert();
-                        EdgeViewModel? nearest = null;
-                        double nearestDist = EdgeHitThreshold;
-                        foreach (var edge in viewModel.Edges)
-                        {
-                            var d = edge.GetDistanceToCurve(contentPoint);
-                            if (d < nearestDist) { nearestDist = d; nearest = edge; }
-                        }
-                        if (nearest != null)
-                        {
-                            var now = DateTime.UtcNow;
-                            var prev = _lastEdgeClickContentPoint;
-                            bool isDoubleClick = _lastEdgeClickEdgeId == nearest.Id
-                                && prev is { } p
-                                && (contentPoint.X - p.X) * (contentPoint.X - p.X) + (contentPoint.Y - p.Y) * (contentPoint.Y - p.Y) < EdgeDoubleClickDist * EdgeDoubleClickDist
-                                && (now - _lastEdgeClickTime).TotalMilliseconds < EdgeDoubleClickMs;
-                            if (isDoubleClick)
-                            {
-                                viewModel.EdgeClicked(nearest);
-                                FocusEdgeLabelBox(nearest);
-                                _lastEdgeClickEdgeId = null;
-                                _lastEdgeClickContentPoint = null;
-                            }
-                            else
-                            {
-                                _lastEdgeClickTime = now;
-                                _lastEdgeClickContentPoint = contentPoint;
-                                _lastEdgeClickEdgeId = nearest.Id;
-                            }
-                        }
-                        else
-                        {
-                            _lastEdgeClickEdgeId = null;
-                            _lastEdgeClickContentPoint = null;
-                        }
-                    }
-                }
-            }
             _isPanning = false;
             e.Handled = true;
         }
@@ -937,7 +882,17 @@ public partial class MindmapView : UserControl
 
     private async void OnMindmapKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MindmapViewModel vm || !vm.IsEditingEnabled) return;
+        if (DataContext is not MindmapViewModel vm) return;
+
+        if ((e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control &&
+            (e.Key == Key.D0 || e.Key == Key.NumPad0))
+        {
+            e.Handled = true;
+            vm.RecenterCommand.Execute(null);
+            return;
+        }
+
+        if (!vm.IsEditingEnabled) return;
 
         if (e.Key == Key.Z && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
         {
@@ -949,6 +904,59 @@ public partial class MindmapView : UserControl
         {
             e.Handled = true;
             await vm.RedoAsync();
+            return;
+        }
+
+        if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
+        {
+            e.Handled = true;
+            foreach (var node in vm.Nodes)
+                node.IsSelected = false;
+            vm.SelectedEdge = null;
+            vm.ClearHoverState();
+            return;
+        }
+
+        if ((e.Key == Key.Delete || e.Key == Key.Back) && e.KeyModifiers == KeyModifiers.None)
+        {
+            e.Handled = true;
+            if (vm.DeleteSelectedCommand.CanExecute(null))
+                vm.DeleteSelectedCommand.Execute(null);
+            return;
+        }
+
+        if (e.Key == Key.C && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            vm.CopySelection();
+            return;
+        }
+
+        if (e.Key == Key.V && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            await vm.PasteAsync();
+            return;
+        }
+
+        if (e.Key == Key.D && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            await vm.DuplicateSelectionAsync();
+            return;
+        }
+
+        if (e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.None)
+        {
+            e.Handled = true;
+            await vm.AddChildNodeAsync();
+            return;
+        }
+
+        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None && vm.SelectedEdge == null)
+        {
+            e.Handled = true;
+            await vm.AddSiblingNodeAsync();
             return;
         }
 

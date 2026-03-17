@@ -220,6 +220,28 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     public event EventHandler? RecenterRequested;
 
+    private sealed class CopiedNodeData
+    {
+        public string OriginalId { get; init; } = string.Empty;
+        public string Text { get; init; } = string.Empty;
+        public string? Color { get; init; }
+        public string Shape { get; init; } = "pill";
+        public double OffsetX { get; init; }
+        public double OffsetY { get; init; }
+    }
+
+    private sealed class CopiedEdgeData
+    {
+        public string FromId { get; init; } = string.Empty;
+        public string ToId { get; init; } = string.Empty;
+        public MindmapEdgeKind Kind { get; init; }
+        public string? Label { get; init; }
+        public string Type { get; init; } = EdgeTypes.Solid;
+    }
+
+    private List<CopiedNodeData>? _copiedNodes;
+    private List<CopiedEdgeData>? _copiedEdges;
+
     public MindmapViewModel(IMindmapService mindmapService, IHistoryManager historyManager, ISettingsService? settingsService = null, ILoggerService? logger = null)
     {
         _mindmapService = mindmapService;
@@ -972,7 +994,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         }
     }
 
-    private async Task DeleteSelectedAsync()
+    public async Task DeleteSelectedAsync()
     {
         if (_currentMindmap == null) return;
         var selectedNodes = Nodes.Where(n => n.IsSelected).ToList();
@@ -985,6 +1007,270 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         await LoadMindmapAsync(_currentMindmap.Id);
         var after = MindmapSnapshotHelper.Clone(_currentMindmap!);
         _historyManager.Push(new MindmapStateOperation("Delete nodes", before, after, RestoreMindmapStateAsync));
+    }
+
+    public void CopySelection()
+    {
+        try
+        {
+            if (_currentMindmap == null) return;
+            var selected = Nodes.Where(n => n.IsSelected).ToList();
+            if (selected.Count == 0) return;
+
+            var origin = selected[0];
+            double originX = origin.X;
+            double originY = origin.Y;
+
+            var copied = new List<CopiedNodeData>(selected.Count);
+            foreach (var node in selected)
+            {
+                copied.Add(new CopiedNodeData
+                {
+                    OriginalId = node.Id,
+                    Text = node.Text,
+                    Color = node.Color,
+                    Shape = node.Shape,
+                    OffsetX = node.X - originX,
+                    OffsetY = node.Y - originY
+                });
+            }
+
+            var selectedIds = new HashSet<string>(selected.Select(n => n.Id));
+            var copiedEdges = _currentMindmap.Edges
+                .Where(e => selectedIds.Contains(e.FromId) && selectedIds.Contains(e.ToId))
+                .Select(e => new CopiedEdgeData
+                {
+                    FromId = e.FromId,
+                    ToId = e.ToId,
+                    Kind = e.Kind,
+                    Label = e.Label,
+                    Type = string.IsNullOrWhiteSpace(e.Type) ? EdgeTypes.Solid : e.Type
+                })
+                .ToList();
+
+            _copiedNodes = copied;
+            _copiedEdges = copiedEdges;
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to copy selection", ex);
+        }
+    }
+
+    public async Task PasteAsync()
+    {
+        try
+        {
+            if (_currentMindmap == null || _copiedNodes == null || _copiedNodes.Count == 0) return;
+            var target = FirstSelectedNode ?? Nodes.FirstOrDefault();
+            if (target == null) return;
+
+            var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+
+            double baseX = target.X + NewNodeXOffset;
+            double baseY = target.Y;
+
+            var idMap = new Dictionary<string, string>(_copiedNodes.Count);
+            var newIds = new List<string>(_copiedNodes.Count);
+
+            foreach (var copied in _copiedNodes)
+            {
+                var result = await _mindmapService.AddNodeAsync(
+                    _currentMindmap.Id,
+                    "text",
+                    new TextNodeContent { Text = copied.Text },
+                    baseX + copied.OffsetX,
+                    baseY + copied.OffsetY);
+
+                if (!result.IsSuccess || result.Value == null) continue;
+
+                var newNode = result.Value;
+                idMap[copied.OriginalId] = newNode.Id;
+                newIds.Add(newNode.Id);
+
+                var style = new Dictionary<string, string?>();
+                if (!string.IsNullOrWhiteSpace(copied.Color))
+                    style["color"] = copied.Color;
+                style["shape"] = string.IsNullOrWhiteSpace(copied.Shape) ? DefaultNodeShape : copied.Shape;
+
+                if (style.Count > 0)
+                    await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, newNode.Id, style);
+            }
+
+            if (_copiedEdges != null && idMap.Count > 0)
+            {
+                foreach (var edge in _copiedEdges)
+                {
+                    if (!idMap.TryGetValue(edge.FromId, out var newFrom) ||
+                        !idMap.TryGetValue(edge.ToId, out var newTo))
+                        continue;
+
+                    await _mindmapService.AddEdgeAsync(
+                        _currentMindmap.Id,
+                        newFrom,
+                        newTo,
+                        edge.Kind,
+                        edge.Label,
+                        edge.Type);
+                }
+            }
+
+            await LoadMindmapAsync(_currentMindmap.Id);
+
+            if (newIds.Count > 0)
+            {
+                foreach (var node in Nodes)
+                    node.IsSelected = newIds.Contains(node.Id);
+            }
+
+            var after = MindmapSnapshotHelper.Clone(_currentMindmap!);
+            _historyManager.Push(new MindmapStateOperation("Paste nodes", before, after, RestoreMindmapStateAsync));
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to paste nodes", ex);
+        }
+    }
+
+    public async Task DuplicateSelectionAsync()
+    {
+        try
+        {
+            if (_currentMindmap == null) return;
+            var selected = Nodes.Where(n => n.IsSelected).ToList();
+            if (selected.Count == 0) return;
+
+            CopySelection();
+
+            if (_copiedNodes == null || _copiedNodes.Count == 0) return;
+
+            var origin = selected[0];
+            double originX = origin.X;
+
+            // Shift the copied cluster one offset to the right of the current selection.
+            // PasteAsync will place the group based on the first selected node position plus NewNodeXOffset.
+            // By shifting all offsets by NewNodeXOffset again, the duplicate ends up to the right of the original.
+            var shifted = _copiedNodes
+                .Select(c => new CopiedNodeData
+                {
+                    OriginalId = c.OriginalId,
+                    Text = c.Text,
+                    Color = c.Color,
+                    Shape = c.Shape,
+                    OffsetX = c.OffsetX + NewNodeXOffset,
+                    OffsetY = c.OffsetY
+                })
+                .ToList();
+
+            _copiedNodes = shifted;
+
+            await PasteAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to duplicate nodes", ex);
+        }
+    }
+
+    public async Task AddChildNodeAsync()
+    {
+        try
+        {
+            if (_currentMindmap == null) return;
+            var parent = FirstSelectedNode;
+            if (parent == null) return;
+
+            var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+
+            double x = parent.X + NewNodeXOffset;
+            double y = parent.Y;
+
+            var result = await _mindmapService.AddNodeAsync(
+                _currentMindmap.Id,
+                "text",
+                new TextNodeContent { Text = "New Node" },
+                x,
+                y);
+
+            if (!result.IsSuccess || result.Value == null) return;
+
+            var newNode = result.Value;
+            var style = new Dictionary<string, string?>();
+            if (DefaultNodeColor != null) style["color"] = DefaultNodeColor;
+            style["shape"] = DefaultNodeShape;
+            if (style.Count > 0)
+                await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, newNode.Id, style);
+
+            await _mindmapService.AddEdgeAsync(_currentMindmap.Id, parent.Id, newNode.Id, DefaultEdgeKind, null, DefaultEdgeType);
+
+            await LoadMindmapAsync(_currentMindmap.Id);
+            var after = MindmapSnapshotHelper.Clone(_currentMindmap!);
+            _historyManager.Push(new MindmapStateOperation("Add child node", before, after, RestoreMindmapStateAsync));
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to add child node", ex);
+        }
+    }
+
+    public async Task AddSiblingNodeAsync()
+    {
+        try
+        {
+            if (_currentMindmap == null) return;
+            var node = FirstSelectedNode;
+            if (node == null) return;
+
+            var parentEdge = _currentMindmap.Edges
+                .FirstOrDefault(e => e.Kind == MindmapEdgeKind.Hierarchy && e.ToId == node.Id);
+
+            var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+
+            double x;
+            double y;
+            string? parentId = null;
+
+            if (parentEdge != null)
+            {
+                parentId = parentEdge.FromId;
+                x = node.X;
+                y = node.Y + LayoutTreeVerticalVSpacing;
+            }
+            else
+            {
+                x = node.X + NewNodeXOffset;
+                y = node.Y;
+            }
+
+            var result = await _mindmapService.AddNodeAsync(
+                _currentMindmap.Id,
+                "text",
+                new TextNodeContent { Text = "New Node" },
+                x,
+                y);
+
+            if (!result.IsSuccess || result.Value == null) return;
+
+            var newNode = result.Value;
+            var style = new Dictionary<string, string?>();
+            if (DefaultNodeColor != null) style["color"] = DefaultNodeColor;
+            style["shape"] = DefaultNodeShape;
+            if (style.Count > 0)
+                await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, newNode.Id, style);
+
+            if (parentId != null)
+            {
+                await _mindmapService.AddEdgeAsync(_currentMindmap.Id, parentId, newNode.Id, DefaultEdgeKind, null, DefaultEdgeType);
+            }
+
+            await LoadMindmapAsync(_currentMindmap.Id);
+            var after = MindmapSnapshotHelper.Clone(_currentMindmap!);
+            _historyManager.Push(new MindmapStateOperation("Add sibling node", before, after, RestoreMindmapStateAsync));
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to add sibling node", ex);
+        }
     }
 
     public async Task UpdateNodeTextAsync(NodeViewModel node, string text)
