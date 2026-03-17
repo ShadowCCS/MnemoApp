@@ -7,6 +7,9 @@ namespace Mnemo.UI.Modules.Mindmap.ViewModels;
 
 public partial class NodeViewModel : ViewModelBase
 {
+    /// <summary>Max outer width when the node auto-sizes from text (word wrap).</summary>
+    public const double DefaultMaxOuterWidth = 280;
+
     /// <summary>Fallback width used when actual layout width is not yet known.</summary>
     public const double DefaultWidth = 120;
 
@@ -98,6 +101,9 @@ public partial class NodeViewModel : ViewModelBase
         };
     }
 
+    /// <summary>Outer max width: fixed <see cref="Width"/> when set, otherwise <see cref="DefaultMaxOuterWidth"/> for wrap.</summary>
+    public double NodeMaxOuterWidth => Width ?? DefaultMaxOuterWidth;
+
     /// <summary>Corner radius for the node border. Rectangle=0, pill/circle=999.</summary>
     public double CornerRadius => Shape switch { "rectangle" => 0, "circle" => 999, "pill" => 999, _ => 20 };
 
@@ -122,7 +128,11 @@ public partial class NodeViewModel : ViewModelBase
 
     partial void OnXChanged(double value) => _layout.X = value;
     partial void OnYChanged(double value) => _layout.Y = value;
-    partial void OnWidthChanged(double? value) => _layout.Width = value;
+    partial void OnWidthChanged(double? value)
+    {
+        _layout.Width = value;
+        OnPropertyChanged(nameof(NodeMaxOuterWidth));
+    }
     partial void OnHeightChanged(double? value) => _layout.Height = value;
 
     partial void OnIsCollapsedChanged(bool value)

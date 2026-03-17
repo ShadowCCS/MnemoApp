@@ -74,6 +74,17 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     private string _globalMinimapDefault = "Auto";
     private string? _localMinimapOverride;
 
+    private const string MinimapShowCollapsedKey = "Mindmap.MinimapShowCollapsedNodes";
+
+    [ObservableProperty]
+    private bool _showCollapsedNodesOnMinimap;
+
+    partial void OnShowCollapsedNodesOnMinimapChanged(bool value)
+    {
+        if (_settingsService == null) return;
+        _ = _settingsService.SetAsync(MinimapShowCollapsedKey, value);
+    }
+
     /// <summary>Effective minimap mode: local override for this mindmap, or global default from settings.</summary>
     public string MinimapVisibilityMode
     {
@@ -727,6 +738,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         if (_settingsService == null) return;
         var mode = await _settingsService.GetAsync("Mindmap.MinimapVisibility", "Auto").ConfigureAwait(false);
         if (mode != null) _globalMinimapDefault = mode;
+        ShowCollapsedNodesOnMinimap = await _settingsService.GetAsync(MinimapShowCollapsedKey, false).ConfigureAwait(false);
         if (_currentMindmap == null && _localMinimapOverride == null)
         {
             OnPropertyChanged(nameof(MinimapVisibilityMode));
@@ -734,6 +746,12 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
             OnPropertyChanged(nameof(IsMinimapAuto));
             OnPropertyChanged(nameof(IsMinimapOn));
         }
+    }
+
+    public async Task RefreshGlobalMinimapShowCollapsedNodesSettingAsync()
+    {
+        if (_settingsService == null) return;
+        ShowCollapsedNodesOnMinimap = await _settingsService.GetAsync(MinimapShowCollapsedKey, false).ConfigureAwait(false);
     }
 
     private async Task LoadInitialMindmapAsync()

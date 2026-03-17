@@ -145,6 +145,15 @@ public partial class MindmapView : UserControl
                 UpdateMinimapVisibility();
             });
         }
+        else if (key == "Mindmap.MinimapShowCollapsedNodes")
+        {
+            Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (DataContext is MindmapViewModel vm)
+                    await vm.RefreshGlobalMinimapShowCollapsedNodesSettingAsync();
+                UpdateMinimap();
+            });
+        }
     }
 
     private async Task LoadSettingsAsync()
@@ -1074,7 +1083,11 @@ public partial class MindmapView : UserControl
         _lastMinimapHeight = minimapHeight;
 
         // --- Fit all nodes into the minimap and center on them ---
-        var nodes = vm.Nodes;
+        // By default, exclude nodes hidden by collapsed ancestors; optional setting can include them.
+        var nodes = vm.ShowCollapsedNodesOnMinimap
+            ? vm.Nodes.ToList()
+            : vm.Nodes.Where(n => !n.IsHidden).ToList();
+        if (nodes.Count == 0) nodes = vm.Nodes.ToList();
         double minX = nodes.Min(n => n.X);
         double maxX = nodes.Max(n => n.X + n.ActualWidth);
         double minY = nodes.Min(n => n.Y);
@@ -1386,17 +1399,29 @@ public partial class MindmapView : UserControl
         };
     }
 
-    /// <summary>Measures node label text with same font as export (ExportFontSize Medium) for sizing when Width/Height are null.</summary>
-    private static (double Width, double Height) MeasureNodeText(string? text)
+    /// <summary>Inner width for label text (matches node template: padding + optional collapse column).</summary>
+    private static double GetExportNodeInnerTextMaxWidth(NodeViewModel node)
+    {
+        double outer = node.Width ?? NodeViewModel.DefaultMaxOuterWidth;
+        double collapseReserve = node.HasChildren ? 28.0 : 0.0;
+        return Math.Max(40, outer - ExportNodeHorizontalPaddingTotal - collapseReserve);
+    }
+
+    private const double ExportNodeHorizontalPaddingTotal = 24; // 12+12 Border padding
+
+    /// <summary>Measures node label with wrap at the same width as on-screen nodes.</summary>
+    private static (double Width, double Height) MeasureNodeText(string? text, double maxTextWidth)
     {
         if (string.IsNullOrEmpty(text)) return (0, 0);
         var ft = new FormattedText(
-            text,
+            text.Replace("\r\n", "\n"),
             CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight,
             new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Medium),
             ExportFontSize,
             Brushes.Black);
+        ft.TextAlignment = TextAlignment.Center;
+        ft.MaxTextWidth = maxTextWidth;
         return (ft.Width, ft.Height);
     }
 
@@ -1437,8 +1462,10 @@ public partial class MindmapView : UserControl
             double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
             foreach (var node in nodesInScope)
             {
-                var (mw, mh) = MeasureNodeText(node.Text);
-                double nw = node.Width ?? Math.Max(NodeViewModel.DefaultWidth, mw + ExportNodeWidthPadding);
+                double innerW = GetExportNodeInnerTextMaxWidth(node);
+                var (mw, mh) = MeasureNodeText(node.Text, innerW);
+                double collapseW = node.HasChildren ? 28.0 : 0.0;
+                double nw = node.Width ?? Math.Max(NodeViewModel.DefaultWidth, mw + ExportNodeWidthPadding + collapseW);
                 double nh = node.Height ?? Math.Max(NodeViewModel.DefaultHeight, mh + ExportNodeHeightPadding);
                 var tl = matrix.Transform(new Point(node.X, node.Y));
                 var br = matrix.Transform(new Point(node.X + nw, node.Y + nh));
@@ -1554,8 +1581,10 @@ public partial class MindmapView : UserControl
 
         foreach (var node in nodesInScope)
         {
-            var (mw, mh) = MeasureNodeText(node.Text);
-            double nw = node.Width ?? Math.Max(NodeViewModel.DefaultWidth, mw + ExportNodeWidthPadding);
+            double innerW = GetExportNodeInnerTextMaxWidth(node);
+            var (mw, mh) = MeasureNodeText(node.Text, innerW);
+            double collapseW = node.HasChildren ? 28.0 : 0.0;
+            double nw = node.Width ?? Math.Max(NodeViewModel.DefaultWidth, mw + ExportNodeWidthPadding + collapseW);
             double nh = node.Height ?? Math.Max(NodeViewModel.DefaultHeight, mh + ExportNodeHeightPadding);
             var topLeft = ToPanel(matrix.Transform(new Point(node.X, node.Y)));
             var bottomRight = ToPanel(matrix.Transform(new Point(node.X + nw, node.Y + nh)));
@@ -1576,14 +1605,15 @@ public partial class MindmapView : UserControl
                 Padding = new Thickness(12, 6),
                 Child = new TextBlock
                 {
-                    Text = node.Text ?? "",
+                    Text = (node.Text ?? "").Replace("\r\n", "\n"),
                     Foreground = textBrush,
                     FontSize = ExportFontSize,
                     FontWeight = FontWeight.Medium,
                     TextAlignment = TextAlignment.Center,
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                     HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    TextWrapping = TextWrapping.NoWrap
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = Math.Max(40, nw - ExportNodeHorizontalPaddingTotal - collapseW)
                 },
                 IsHitTestVisible = false
             };

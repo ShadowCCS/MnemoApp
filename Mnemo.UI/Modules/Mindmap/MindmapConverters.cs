@@ -197,6 +197,21 @@ public class BoolAndConverter : IMultiValueConverter
     }
 }
 
+/// <summary>
+/// Multi-value converter for minimap visibility: Visible when (ShowCollapsedNodesOnMinimap || !IsHidden).
+/// Expected values: [0]=IsHidden (bool), [1]=ShowCollapsedNodesOnMinimap (bool).
+/// </summary>
+public class MinimapHiddenVisibilityConverter : IMultiValueConverter
+{
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values == null || values.Count < 2) return true;
+        bool isHidden = values[0] is true;
+        bool showCollapsed = values[1] is true;
+        return showCollapsed || !isHidden;
+    }
+}
+
 /// <summary>Multi-value converter: returns true when (IsPreviewMode || !IsSelected) for node editor read-only.</summary>
 public class PreviewOrUnselectedConverter : IMultiValueConverter
 {

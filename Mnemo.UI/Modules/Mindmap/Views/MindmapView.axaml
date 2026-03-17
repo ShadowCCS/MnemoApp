@@ -21,6 +21,7 @@
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <!-- Keep centered so nodes can auto-size up to MaxWidth, instead of always stretching to MaxWidth -->
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
         <Style Selector="TextBox.node-editor:focus /template/ Border#PART_BorderElement">
@@ -127,6 +128,7 @@
         <local:EdgeKindToDisplayNameConverter x:Key="EdgeKindToDisplayNameConverter"/>
         <local:MinimapVisibilityToDisplayConverter x:Key="MinimapVisibilityToDisplayConverter"/>
         <local:BoolAndConverter x:Key="BoolAndConverter"/>
+        <local:MinimapHiddenVisibilityConverter x:Key="MinimapHiddenVisibilityConverter"/>
         <local:PreviewOrUnselectedConverter x:Key="PreviewOrUnselectedConverter"/>
         <local:NotNullToBoolConverter x:Key="NotNullToBoolConverter"/>
         <local:SelectedEdgeToTooltipConverter x:Key="SelectedEdgeToTooltipConverter"/>
@@ -143,6 +145,7 @@
                     Background="{DynamicResource CardBackgroundSecondaryBrush}"
                     BorderThickness="1.5"
                     CornerRadius="{Binding CornerRadius, Converter={StaticResource DoubleToCornerRadiusConverter}}"
+                    MaxWidth="{Binding NodeMaxOuterWidth}"
                     MinWidth="{Binding EffectiveMinSize, Converter={StaticResource MindmapMinSizeConverter}, ConverterParameter=80}"
                     MinHeight="{Binding EffectiveMinSize, Converter={StaticResource MindmapMinSizeConverter}, ConverterParameter=40}"
                     Padding="12,6"
@@ -174,10 +177,9 @@
                              Background="Transparent"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              Grid.Column="0"
-                             HorizontalAlignment="Center"
                              VerticalAlignment="Center"
-                             TextWrapping="NoWrap"
-                             AcceptsReturn="False"
+                             TextWrapping="WrapWithOverflow"
+                             AcceptsReturn="True"
                              FontSize="14"
                              FontWeight="Medium"
                              LostFocus="OnNodeTextBoxLostFocus"
@@ -672,6 +674,12 @@
                             </StackPanel>
                         </Border>
                         <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,0" Padding="8,6" CornerRadius="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Text="Show collapsed nodes" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource MindmapToolbarLabelBrush}"/>
+                                <ToggleSwitch IsChecked="{Binding ShowCollapsedNodesOnMinimap}" OffContent="{x:Null}" OnContent="{x:Null}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="{DynamicResource MindmapToolbarSectionBackgroundBrush}" Margin="8,8,8,0" Padding="8,6" CornerRadius="8">
                             <StackPanel Spacing="6">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="{markup:T Ns=Mindmap, Key=ExportMap}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource MindmapToolbarLabelBrush}" LetterSpacing="0.5"
@@ -764,6 +772,12 @@
                                           Opacity="{Binding Type, Converter={StaticResource EdgeTypeToOpacityConverter}}"
                                           StrokeDashArray="{Binding Type, Converter={StaticResource EdgeTypeToStrokeDashArrayConverter}}"
                                           IsHitTestVisible="False">
+                                        <Path.IsVisible>
+                                            <MultiBinding Converter="{StaticResource MinimapHiddenVisibilityConverter}">
+                                                <Binding Path="IsHidden"/>
+                                                <Binding ElementName="MindmapViewControl" Path="DataContext.ShowCollapsedNodesOnMinimap"/>
+                                            </MultiBinding>
+                                        </Path.IsVisible>
                                         <Path.Data>
                                             <PathGeometry>
                                                 <PathFigure StartPoint="{Binding VisualStartPoint}" IsClosed="False">
@@ -793,12 +807,19 @@
                             </ItemsControl.Styles>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:NodeViewModel">
-                                    <Border Width="{Binding Width, TargetNullValue=100}"
-                                            Height="{Binding Height, TargetNullValue=40}"
+                                    <Border Width="{Binding ActualWidth}"
+                                            Height="{Binding ActualHeight}"
                                             Background="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapToolbarNodeColorSwatchOneBrush}"
                                             CornerRadius="{Binding CornerRadius, Converter={StaticResource DoubleToCornerRadiusConverter}}"
                                             Opacity="0.85"
-                                            IsHitTestVisible="False"/>
+                                            IsHitTestVisible="False">
+                                        <Border.IsVisible>
+                                            <MultiBinding Converter="{StaticResource MinimapHiddenVisibilityConverter}">
+                                                <Binding Path="IsHidden"/>
+                                                <Binding ElementName="MindmapViewControl" Path="DataContext.ShowCollapsedNodesOnMinimap"/>
+                                            </MultiBinding>
+                                        </Border.IsVisible>
+                                    </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

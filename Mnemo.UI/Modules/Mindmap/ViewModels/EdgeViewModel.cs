@@ -200,19 +200,15 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
             ControlPoint2 = EndPoint;
         }
 
-        // Cubic Bezier at t=0.5 for label placement (always needed for label hit-test and display)
-        double t = 0.5, u = 1 - t;
-        double cx = u * u * u * StartPoint.X + 3 * u * u * t * ControlPoint1.X + 3 * u * t * t * ControlPoint2.X + t * t * t * EndPoint.X;
-        double cy = u * u * u * StartPoint.Y + 3 * u * u * t * ControlPoint1.Y + 3 * u * t * t * ControlPoint2.Y + t * t * t * EndPoint.Y;
-        CenterPoint = new Point(cx, cy);
-
         if (Type == EdgeTypes.Double)
         {
-            double tx = 3 * u * u * (ControlPoint1.X - StartPoint.X) + 6 * u * t * (ControlPoint2.X - ControlPoint1.X) + 3 * t * t * (EndPoint.X - ControlPoint2.X);
-            double ty = 3 * u * u * (ControlPoint1.Y - StartPoint.Y) + 6 * u * t * (ControlPoint2.Y - ControlPoint1.Y) + 3 * t * t * (EndPoint.Y - ControlPoint2.Y);
-            double len = Math.Sqrt(tx * tx + ty * ty);
-            if (len < 1e-6) len = 1;
-            double nx = -ty / len, ny = tx / len;
+            // Offset using a normal derived from endpoint tangents. Using only t=0.5 tangent makes the
+            // offset direction swing as the curve changes and can align with the curve at the ends
+            // (both strokes overlap at the nodes). Averaging left-normals at t=0 and t=1 keeps the
+            // second line parallel to the main stroke at attach points and stable when dragging.
+            GetDoubleLineOffsetNormal(
+                StartPoint, ControlPoint1, ControlPoint2, EndPoint,
+                out double nx, out double ny);
             OffsetStartPoint = new Point(StartPoint.X + nx * DoubleLineOffset, StartPoint.Y + ny * DoubleLineOffset);
             OffsetEndPoint   = new Point(EndPoint.X + nx * DoubleLineOffset, EndPoint.Y + ny * DoubleLineOffset);
             OffsetControlPoint1 = new Point(ControlPoint1.X + nx * DoubleLineOffset, ControlPoint1.Y + ny * DoubleLineOffset);
@@ -246,6 +242,9 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
 
             // Shorten rendered main line so it ends at the base of the arrow head.
             VisualEndPoint = endBase;
+            // Keep curve shape consistent when shortening endpoints by shifting control points too.
+            var endDelta = new Point(VisualEndPoint.X - EndPoint.X, VisualEndPoint.Y - EndPoint.Y);
+            ControlPoint2 = new Point(ControlPoint2.X + endDelta.X, ControlPoint2.Y + endDelta.Y);
 
             // And adjust the offset (double) line similarly when present.
             double oex = OffsetEndPoint.X - OffsetControlPoint2.X;
@@ -255,6 +254,8 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
             oex /= oelen; oey /= oelen;
             Point offsetEndBase = new Point(OffsetEndPoint.X - oex * ArrowLength, OffsetEndPoint.Y - oey * ArrowLength);
             VisualOffsetEndPoint = offsetEndBase;
+            var offsetEndDelta = new Point(VisualOffsetEndPoint.X - OffsetEndPoint.X, VisualOffsetEndPoint.Y - OffsetEndPoint.Y);
+            OffsetControlPoint2 = new Point(OffsetControlPoint2.X + offsetEndDelta.X, OffsetControlPoint2.Y + offsetEndDelta.Y);
 
             if (Type == EdgeTypes.Bidirect)
             {
@@ -277,6 +278,8 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
                 // Shorten the rendered start of the line so it meets the
                 // base of the arrow head instead of running underneath it.
                 VisualStartPoint = startBase;
+                var startDelta = new Point(VisualStartPoint.X - StartPoint.X, VisualStartPoint.Y - StartPoint.Y);
+                ControlPoint1 = new Point(ControlPoint1.X + startDelta.X, ControlPoint1.Y + startDelta.Y);
 
                 double osx = OffsetStartPoint.X - OffsetControlPoint1.X;
                 double osy = OffsetStartPoint.Y - OffsetControlPoint1.Y;
@@ -285,6 +288,8 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
                 osx /= oslen; osy /= oslen;
                 Point offsetStartBase = new Point(OffsetStartPoint.X - osx * ArrowLength, OffsetStartPoint.Y - osy * ArrowLength);
                 VisualOffsetStartPoint = offsetStartBase;
+                var offsetStartDelta = new Point(VisualOffsetStartPoint.X - OffsetStartPoint.X, VisualOffsetStartPoint.Y - OffsetStartPoint.Y);
+                OffsetControlPoint1 = new Point(OffsetControlPoint1.X + offsetStartDelta.X, OffsetControlPoint1.Y + offsetStartDelta.Y);
             }
             else
                 ArrowStartPoints = [];
@@ -294,6 +299,90 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
             ArrowStartPoints = [];
             ArrowEndPoints = [];
         }
+
+        // Cubic Bezier at t=0.5 for label placement (match rendered endpoints).
+        double t = 0.5, u = 1 - t;
+        double cx = u * u * u * VisualStartPoint.X
+                    + 3 * u * u * t * ControlPoint1.X
+                    + 3 * u * t * t * ControlPoint2.X
+                    + t * t * t * VisualEndPoint.X;
+        double cy = u * u * u * VisualStartPoint.Y
+                    + 3 * u * u * t * ControlPoint1.Y
+                    + 3 * u * t * t * ControlPoint2.Y
+                    + t * t * t * VisualEndPoint.Y;
+        CenterPoint = new Point(cx, cy);
+    }
+
+    /// <summary>
+    /// Unit normal for double-line offset: average of left-normals at Bezier t=0 and t=1 so the offset
+    /// stays perpendicular to the curve at both ends. Falls back to chord perpendicular when needed.
+    /// </summary>
+    private static void GetDoubleLineOffsetNormal(
+        Point p0, Point p1, Point p2, Point p3,
+        out double nx, out double ny)
+    {
+        // B'(t) for cubic Bezier
+        static void TangentAt(Point a, Point b, Point c, Point d, double t, out double tx, out double ty)
+        {
+            double u = 1 - t;
+            tx = 3 * u * u * (b.X - a.X) + 6 * u * t * (c.X - b.X) + 3 * t * t * (d.X - c.X);
+            ty = 3 * u * u * (b.Y - a.Y) + 6 * u * t * (c.Y - b.Y) + 3 * t * t * (d.Y - c.Y);
+        }
+
+        TangentAt(p0, p1, p2, p3, 0, out double t0x, out double t0y);
+        TangentAt(p0, p1, p2, p3, 1, out double t1x, out double t1y);
+
+        double l0 = Math.Sqrt(t0x * t0x + t0y * t0y);
+        double l1 = Math.Sqrt(t1x * t1x + t1y * t1y);
+
+        double n0x, n0y, n1x, n1y;
+        if (l0 < 1e-9)
+        {
+            double cdx = p3.X - p0.X, cdy = p3.Y - p0.Y;
+            double cl = Math.Sqrt(cdx * cdx + cdy * cdy);
+            if (cl < 1e-9) { nx = 0; ny = 1; return; }
+            n0x = -cdy / cl;
+            n0y = cdx / cl;
+        }
+        else
+        {
+            n0x = -t0y / l0;
+            n0y = t0x / l0;
+        }
+
+        if (l1 < 1e-9)
+        {
+            n1x = n0x;
+            n1y = n0y;
+        }
+        else
+        {
+            n1x = -t1y / l1;
+            n1y = t1x / l1;
+        }
+
+        // Same side of the curve: flip n1 if it points opposite to n0
+        if (n0x * n1x + n0y * n1y < 0)
+        {
+            n1x = -n1x;
+            n1y = -n1y;
+        }
+
+        nx = n0x + n1x;
+        ny = n0y + n1y;
+        double nlen = Math.Sqrt(nx * nx + ny * ny);
+        if (nlen < 1e-9)
+        {
+            double cdx = p3.X - p0.X, cdy = p3.Y - p0.Y;
+            double cl = Math.Sqrt(cdx * cdx + cdy * cdy);
+            if (cl < 1e-9) { nx = 0; ny = 1; return; }
+            nx = -cdy / cl;
+            ny = cdx / cl;
+            return;
+        }
+
+        nx /= nlen;
+        ny /= nlen;
     }
 
     /// <summary>Unit outward normal for the attach side. Same dominant-direction logic as GetAttachPoint.</summary>
