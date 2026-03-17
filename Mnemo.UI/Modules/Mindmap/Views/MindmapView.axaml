@@ -132,6 +132,8 @@
         <local:SelectedEdgeToTooltipConverter x:Key="SelectedEdgeToTooltipConverter"/>
         <converters:BoolToDoubleConverter x:Key="BoolToDoubleConverter"/>
         <converters:NullableDoubleToNaNConverter x:Key="NullableDoubleToNaNConverter"/>
+        <local:CollapseChevronConverter x:Key="CollapseChevronConverter"/>
+        <local:CollapseTooltipConverter x:Key="CollapseTooltipConverter"/>
 
         <!-- Node Templates -->
         <DataTemplate x:Key="TextNodeTemplate" DataType="vm:NodeViewModel">
@@ -165,27 +167,50 @@
                         <Setter Property="BorderBrush" Value="{DynamicResource MindmapNodeBorderSelectedBrush}"/>
                     </Style>
                 </Border.Styles>
-                <TextBox Text="{Binding Text}"
-                         Classes="node-editor"
-                         BorderThickness="0"
-                         Background="Transparent"
-                         Foreground="{DynamicResource TextPrimaryBrush}"
-                         HorizontalAlignment="Center"
-                         VerticalAlignment="Center"
-                         TextWrapping="NoWrap"
-                         AcceptsReturn="False"
-                         FontSize="14"
-                         FontWeight="Medium"
-                         LostFocus="OnNodeTextBoxLostFocus"
-                         TextChanged="OnNodeTextBoxTextChanged"
-                         IsHitTestVisible="{Binding IsSelected}">
-                    <TextBox.IsReadOnly>
-                        <MultiBinding Converter="{StaticResource PreviewOrUnselectedConverter}">
-                            <Binding ElementName="MindmapViewControl" Path="DataContext.IsPreviewMode"/>
-                            <Binding Path="IsSelected"/>
-                        </MultiBinding>
-                    </TextBox.IsReadOnly>
-                </TextBox>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Text="{Binding Text}"
+                             Classes="node-editor"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             Grid.Column="0"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             TextWrapping="NoWrap"
+                             AcceptsReturn="False"
+                             FontSize="14"
+                             FontWeight="Medium"
+                             LostFocus="OnNodeTextBoxLostFocus"
+                             TextChanged="OnNodeTextBoxTextChanged"
+                             IsHitTestVisible="{Binding IsSelected}">
+                        <TextBox.IsReadOnly>
+                            <MultiBinding Converter="{StaticResource PreviewOrUnselectedConverter}">
+                                <Binding ElementName="MindmapViewControl" Path="DataContext.IsPreviewMode"/>
+                                <Binding Path="IsSelected"/>
+                            </MultiBinding>
+                        </TextBox.IsReadOnly>
+                    </TextBox>
+                    <!-- Collapse/expand toggle — only visible when this node has hierarchy children -->
+                    <Button Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Margin="2,0,4,2"
+                            Width="18" Height="18"
+                            Padding="0"
+                            CornerRadius="9"
+                            Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            IsVisible="{Binding HasChildren}"
+                            Command="{Binding $parent[UserControl].DataContext.ToggleCollapseCommand}"
+                            CommandParameter="{Binding}"
+                            Cursor="Hand"
+                            ToolTip.Tip="{Binding IsCollapsed, Converter={StaticResource CollapseTooltipConverter}}">
+                        <controls:SvgIcon Width="11" Height="11"
+                                          Color="{DynamicResource TextSecondaryBrush}"
+                                          SvgPath="{Binding IsCollapsed, Converter={StaticResource CollapseChevronConverter}}"/>
+                    </Button>
+                </Grid>
             </Border>
         </DataTemplate>
     </UserControl.Resources>
@@ -226,7 +251,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:EdgeViewModel">
-                                <Canvas>
+                                <Canvas IsVisible="{Binding IsHidden, Converter={StaticResource BoolNegationConverter}}">
                                     <!-- Main stroke -->
                                     <Path Stroke="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
                                           StrokeThickness="1.5"
@@ -234,10 +259,10 @@
                                           StrokeDashArray="{Binding Type, Converter={StaticResource EdgeTypeToStrokeDashArrayConverter}}">
                                         <Path.Data>
                                             <PathGeometry>
-                                                <PathFigure StartPoint="{Binding StartPoint}" IsClosed="False">
+                                                <PathFigure StartPoint="{Binding VisualStartPoint}" IsClosed="False">
                                                     <BezierSegment Point1="{Binding ControlPoint1}"
                                                                    Point2="{Binding ControlPoint2}"
-                                                                   Point3="{Binding EndPoint}"/>
+                                                                   Point3="{Binding VisualEndPoint}"/>
                                                 </PathFigure>
                                             </PathGeometry>
                                         </Path.Data>
@@ -249,10 +274,10 @@
                                           IsVisible="{Binding Type, Converter={StaticResource EdgeTypeEqualsConverter}, ConverterParameter=double}">
                                         <Path.Data>
                                             <PathGeometry>
-                                                <PathFigure StartPoint="{Binding OffsetStartPoint}" IsClosed="False">
+                                                <PathFigure StartPoint="{Binding VisualOffsetStartPoint}" IsClosed="False">
                                                     <BezierSegment Point1="{Binding OffsetControlPoint1}"
                                                                    Point2="{Binding OffsetControlPoint2}"
-                                                                   Point3="{Binding OffsetEndPoint}"/>
+                                                                   Point3="{Binding VisualOffsetEndPoint}"/>
                                                 </PathFigure>
                                             </PathGeometry>
                                         </Path.Data>
@@ -272,7 +297,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:EdgeViewModel">
-                                <Canvas>
+                                <Canvas IsVisible="{Binding IsHidden, Converter={StaticResource BoolNegationConverter}}">
                                     <Path Stroke="Transparent" StrokeThickness="12" IsHitTestVisible="True"
                                           Cursor="Hand" PointerEntered="OnEdgePointerEnter" PointerExited="OnEdgePointerLeave"
                                           PointerPressed="OnEdgeHitPathPointerPressed">
@@ -343,6 +368,7 @@
                                                 ContentTemplate="{StaticResource TextNodeTemplate}"
                                                 Width="{Binding Width, Converter={StaticResource NullableDoubleToNaNConverter}}"
                                                 Height="{Binding Height, Converter={StaticResource NullableDoubleToNaNConverter}}"
+                                                IsVisible="{Binding IsHidden, Converter={StaticResource BoolNegationConverter}}"
                                                 PointerPressed="OnNodePointerPressed"
                                                 PointerMoved="OnNodePointerMoved"
                                                 PointerReleased="OnNodePointerReleased"
@@ -363,7 +389,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:EdgeViewModel">
-                                <Canvas>
+                                <Canvas IsVisible="{Binding IsHidden, Converter={StaticResource BoolNegationConverter}}">
                                     <Polygon Points="{Binding ArrowStartPoints}"
                                              Fill="{Binding Color, Converter={StaticResource MindmapColorToBrushConverter}, ConverterParameter=MindmapEdgeStrokeBrush}"
                                              Opacity="{Binding Type, Converter={StaticResource EdgeTypeToOpacityConverter}}"
@@ -740,10 +766,10 @@
                                           IsHitTestVisible="False">
                                         <Path.Data>
                                             <PathGeometry>
-                                                <PathFigure StartPoint="{Binding StartPoint}" IsClosed="False">
+                                                <PathFigure StartPoint="{Binding VisualStartPoint}" IsClosed="False">
                                                     <BezierSegment Point1="{Binding ControlPoint1}"
                                                                    Point2="{Binding ControlPoint2}"
-                                                                   Point3="{Binding EndPoint}"/>
+                                                                   Point3="{Binding VisualEndPoint}"/>
                                                 </PathFigure>
                                             </PathGeometry>
                                         </Path.Data>

@@ -48,6 +48,18 @@ public partial class NodeViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isSelected;
 
+    /// <summary>When true, this node's descendant subtree is hidden. Persisted in Style["collapsed"].</summary>
+    [ObservableProperty]
+    private bool _isCollapsed;
+
+    /// <summary>Set by the ViewModel when a collapsed ancestor hides this node. Not persisted.</summary>
+    [ObservableProperty]
+    private bool _isHidden;
+
+    /// <summary>True when this node has at least one outgoing hierarchy edge. Set by the ViewModel after graph build. Not persisted.</summary>
+    [ObservableProperty]
+    private bool _hasChildren;
+
     [ObservableProperty]
     private string _text;
 
@@ -78,6 +90,7 @@ public partial class NodeViewModel : ViewModelBase
         _text = (node.Content as TextNodeContent)?.Text ?? "";
         _color = node.Style.TryGetValue("color", out var color) ? color : null;
         _shape = node.Style.TryGetValue("shape", out var shape) && !string.IsNullOrEmpty(shape) ? shape : "pill";
+        _isCollapsed = node.Style.TryGetValue("collapsed", out var collapsed) && collapsed == "true";
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(Width) or nameof(Height) or nameof(ActualWidth) or nameof(ActualHeight))
@@ -111,4 +124,12 @@ public partial class NodeViewModel : ViewModelBase
     partial void OnYChanged(double value) => _layout.Y = value;
     partial void OnWidthChanged(double? value) => _layout.Width = value;
     partial void OnHeightChanged(double? value) => _layout.Height = value;
+
+    partial void OnIsCollapsedChanged(bool value)
+    {
+        if (value)
+            _node.Style["collapsed"] = "true";
+        else
+            _node.Style.Remove("collapsed");
+    }
 }

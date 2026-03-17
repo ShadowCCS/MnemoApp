@@ -121,6 +121,8 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
     public ICommand ExportAsPngCommand { get; }
     public ICommand UndoCommand { get; }
     public ICommand RedoCommand { get; }
+    /// <summary>Command to toggle the collapsed state of a node. Parameter must be the <see cref="NodeViewModel"/> to toggle.</summary>
+    public ICommand ToggleCollapseCommand { get; }
 
     public bool CanUndo => _historyManager.CanUndo;
     public bool CanRedo => _historyManager.CanRedo;
@@ -229,6 +231,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         ExportAsPngCommand = new RelayCommand(OnExportAsPng);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => CanUndo);
         RedoCommand = new AsyncRelayCommand(RedoAsync, () => CanRedo);
+        ToggleCollapseCommand = new AsyncRelayCommand<NodeViewModel?>(ToggleCollapseAsync);
         _historyManager.StateChanged += OnHistoryStateChanged;
     }
 
@@ -635,7 +638,63 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         var d = new Dictionary<string, string?>();
         d["color"] = node.Color;
         d["shape"] = node.Shape;
+        d["collapsed"] = node.IsCollapsed ? "true" : null;
         return d;
+    }
+
+    private async Task ToggleCollapseAsync(NodeViewModel? node)
+    {
+        try
+        {
+            if (node == null || _currentMindmap == null) return;
+            var before = MindmapSnapshotHelper.Clone(_currentMindmap);
+            node.IsCollapsed = !node.IsCollapsed;
+            SyncNodeStyleToModel(node);
+            ComputeNodeVisibility();
+            var after = MindmapSnapshotHelper.Clone(_currentMindmap);
+            _historyManager.Push(new MindmapStateOperation(
+                node.IsCollapsed ? "Collapse node" : "Expand node",
+                before, after, RestoreMindmapStateAsync));
+            await _mindmapService.UpdateNodeStyleAsync(_currentMindmap.Id, node.Id, BuildStyleDict(node));
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(nameof(MindmapViewModel), "Failed to toggle node collapse", ex);
+        }
+    }
+
+    /// <summary>
+    /// Recomputes <see cref="NodeViewModel.IsHidden"/> for every node and
+    /// <see cref="EdgeViewModel.IsHidden"/> for every edge by performing a DFS
+    /// from each collapsed node through its hierarchy children.
+    /// </summary>
+    private void ComputeNodeVisibility()
+    {
+        var hiddenIds = new HashSet<string>();
+
+        foreach (var node in Nodes)
+        {
+            if (!node.IsCollapsed) continue;
+            CollectHiddenDescendants(node.Id, hiddenIds);
+        }
+
+        foreach (var node in Nodes)
+            node.IsHidden = hiddenIds.Contains(node.Id);
+
+        foreach (var edge in Edges)
+            edge.IsHidden = hiddenIds.Contains(edge.From.Id) || hiddenIds.Contains(edge.To.Id);
+    }
+
+    private void CollectHiddenDescendants(string nodeId, HashSet<string> hiddenIds)
+    {
+        if (!_outgoing.TryGetValue(nodeId, out var outEdges)) return;
+        foreach (var edge in outEdges)
+        {
+            if (edge.Kind != MindmapEdgeKind.Hierarchy) continue;
+            var childId = edge.To.Id;
+            if (hiddenIds.Add(childId))
+                CollectHiddenDescendants(childId, hiddenIds);
+        }
     }
 
     private void SyncNodeStyleToModel(NodeViewModel nodeVm)
@@ -645,6 +704,8 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         if (nodeVm.Color != null) node.Style["color"] = nodeVm.Color;
         else node.Style.Remove("color");
         node.Style["shape"] = nodeVm.Shape;
+        if (nodeVm.IsCollapsed) node.Style["collapsed"] = "true";
+        else node.Style.Remove("collapsed");
     }
 
     public void OnNavigatedTo(object? parameter)
@@ -773,6 +834,12 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
                 AddToAdjacency(edgeVm);
             }
         }
+
+        foreach (var node in Nodes)
+            node.HasChildren = _outgoing.TryGetValue(node.Id, out var outEdges)
+                && outEdges.Any(e => e.Kind == MindmapEdgeKind.Hierarchy);
+
+        ComputeNodeVisibility();
     }
 
     private void AddToAdjacency(EdgeViewModel edge)

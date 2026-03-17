@@ -34,6 +34,17 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private Point _endPoint;
 
+    /// <summary>
+    /// Actual rendered endpoints of the main line. These may be pulled back
+    /// from the node boundary when an arrow head is present so that the tip
+    /// of the arrow remains thin and is not drawn on top of the line.
+    /// </summary>
+    [ObservableProperty]
+    private Point _visualStartPoint;
+
+    [ObservableProperty]
+    private Point _visualEndPoint;
+
     [ObservableProperty]
     private Point _controlPoint1;
 
@@ -49,6 +60,13 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private Point _offsetEndPoint;
+
+    /// <summary>Rendered endpoints for the second line (double edges).</summary>
+    [ObservableProperty]
+    private Point _visualOffsetStartPoint;
+
+    [ObservableProperty]
+    private Point _visualOffsetEndPoint;
 
     [ObservableProperty]
     private Point _offsetControlPoint1;
@@ -66,6 +84,10 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
     /// <summary>View state: true when this edge or its endpoints are hovered (label at full opacity).</summary>
     [ObservableProperty]
     private bool _isLabelHighlighted = false;
+
+    /// <summary>Set by the ViewModel when either endpoint node is hidden due to a collapsed ancestor. Not persisted.</summary>
+    [ObservableProperty]
+    private bool _isHidden;
 
     public NodeViewModel From => _from;
     public NodeViewModel To => _to;
@@ -91,6 +113,9 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
     partial void OnTypeChanged(string value)
     {
         _edge.Type = value;
+        // Geometry (double offset line, arrow heads, shortened endpoints) depends on Type;
+        // without this, only dash style updates when switching solid→arrow etc.
+        UpdatePoints();
     }
 
     private void OnNodePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -142,6 +167,12 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
         StartPoint = GetAttachPoint(_from.X, _from.Y, fromWidth,  fromHeight,  dx,  dy);
         EndPoint   = GetAttachPoint(_to.X,   _to.Y,   toWidth,    toHeight,   -dx, -dy);
 
+        // Defaults for rendered endpoints: full segment between node attach points.
+        VisualStartPoint       = StartPoint;
+        VisualEndPoint         = EndPoint;
+        VisualOffsetStartPoint = StartPoint;
+        VisualOffsetEndPoint   = EndPoint;
+
         if (Kind == MindmapEdgeKind.Hierarchy)
         {
             // Tangent pull distance: proportional to segment length, clamped.
@@ -183,9 +214,12 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
             if (len < 1e-6) len = 1;
             double nx = -ty / len, ny = tx / len;
             OffsetStartPoint = new Point(StartPoint.X + nx * DoubleLineOffset, StartPoint.Y + ny * DoubleLineOffset);
-            OffsetEndPoint = new Point(EndPoint.X + nx * DoubleLineOffset, EndPoint.Y + ny * DoubleLineOffset);
+            OffsetEndPoint   = new Point(EndPoint.X + nx * DoubleLineOffset, EndPoint.Y + ny * DoubleLineOffset);
             OffsetControlPoint1 = new Point(ControlPoint1.X + nx * DoubleLineOffset, ControlPoint1.Y + ny * DoubleLineOffset);
             OffsetControlPoint2 = new Point(ControlPoint2.X + nx * DoubleLineOffset, ControlPoint2.Y + ny * DoubleLineOffset);
+
+            VisualOffsetStartPoint = OffsetStartPoint;
+            VisualOffsetEndPoint   = OffsetEndPoint;
         }
         else
         {
@@ -209,20 +243,48 @@ public partial class EdgeViewModel : ViewModelBase, IDisposable
                 EndPoint,
                 new Point(endBase.X - px * ArrowHalfWidth, endBase.Y - py * ArrowHalfWidth)
             };
+
+            // Shorten rendered main line so it ends at the base of the arrow head.
+            VisualEndPoint = endBase;
+
+            // And adjust the offset (double) line similarly when present.
+            double oex = OffsetEndPoint.X - OffsetControlPoint2.X;
+            double oey = OffsetEndPoint.Y - OffsetControlPoint2.Y;
+            double oelen = Math.Sqrt(oex * oex + oey * oey);
+            if (oelen < 1e-6) { oex = ex; oey = ey; oelen = 1; }
+            oex /= oelen; oey /= oelen;
+            Point offsetEndBase = new Point(OffsetEndPoint.X - oex * ArrowLength, OffsetEndPoint.Y - oey * ArrowLength);
+            VisualOffsetEndPoint = offsetEndBase;
+
             if (Type == EdgeTypes.Bidirect)
             {
-                double sx = ControlPoint1.X - StartPoint.X, sy = ControlPoint1.Y - StartPoint.Y;
+                // For the start arrow we want the tip pointing back toward the
+                // "from" node, so the triangle tip is at StartPoint and the
+                // base is pulled inwards along the curve direction.
+                double sx = StartPoint.X - ControlPoint1.X, sy = StartPoint.Y - ControlPoint1.Y;
                 double slen = Math.Sqrt(sx * sx + sy * sy);
                 if (slen < 1e-6) { sx = 1; sy = 0; slen = 1; }
                 sx /= slen; sy /= slen;
-                Point startBase = new Point(StartPoint.X + sx * ArrowLength, StartPoint.Y + sy * ArrowLength);
+                Point startBase = new Point(StartPoint.X - sx * ArrowLength, StartPoint.Y - sy * ArrowLength);
                 double qx = -sy, qy = sx;
                 ArrowStartPoints = new AvaloniaList<Point>
                 {
-                    new Point(StartPoint.X + qx * ArrowHalfWidth, StartPoint.Y + qy * ArrowHalfWidth),
-                    startBase,
-                    new Point(StartPoint.X - qx * ArrowHalfWidth, StartPoint.Y - qy * ArrowHalfWidth)
+                    new Point(startBase.X + qx * ArrowHalfWidth, startBase.Y + qy * ArrowHalfWidth),
+                    StartPoint,
+                    new Point(startBase.X - qx * ArrowHalfWidth, startBase.Y - qy * ArrowHalfWidth)
                 };
+
+                // Shorten the rendered start of the line so it meets the
+                // base of the arrow head instead of running underneath it.
+                VisualStartPoint = startBase;
+
+                double osx = OffsetStartPoint.X - OffsetControlPoint1.X;
+                double osy = OffsetStartPoint.Y - OffsetControlPoint1.Y;
+                double oslen = Math.Sqrt(osx * osx + osy * osy);
+                if (oslen < 1e-6) { osx = sx; osy = sy; oslen = 1; }
+                osx /= oslen; osy /= oslen;
+                Point offsetStartBase = new Point(OffsetStartPoint.X - osx * ArrowLength, OffsetStartPoint.Y - osy * ArrowLength);
+                VisualOffsetStartPoint = offsetStartBase;
             }
             else
                 ArrowStartPoints = [];

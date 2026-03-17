@@ -222,3 +222,28 @@ public class MinimapVisibilityToDisplayConverter : IValueConverter
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
 }
+
+/// <summary>Converts node IsCollapsed bool to the appropriate chevron SVG path.</summary>
+public class CollapseChevronConverter : IValueConverter
+{
+    private const string ChevronRight = "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg";
+    private const string ChevronDown = "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-down.svg";
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? ChevronRight : ChevronDown;
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
+/// <summary>Converts node IsCollapsed bool to a tooltip string.</summary>
+public class CollapseTooltipConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+        var key = value is true ? "ExpandNode" : "CollapseNode";
+        return loc?.T(key, "Mindmap") ?? (value is true ? "Expand" : "Collapse");
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
