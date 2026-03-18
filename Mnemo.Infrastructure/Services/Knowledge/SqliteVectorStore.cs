@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using Mnemo.Infrastructure.Common;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 
@@ -20,7 +21,12 @@ public class SqliteVectorStore : IVectorStore
     public SqliteVectorStore(ILoggerService logger)
     {
         _logger = logger;
-        var dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "knowledge.db");
+        var dbPath = MnemoAppPaths.GetLocalUserDataFile("knowledge.db");
+        var dbDir = Path.GetDirectoryName(dbPath);
+        if (!string.IsNullOrWhiteSpace(dbDir))
+        {
+            Directory.CreateDirectory(dbDir);
+        }
         _connectionString = $"Data Source={dbPath}";
     }
 
