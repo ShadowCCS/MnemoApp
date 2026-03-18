@@ -1340,6 +1340,10 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         var roots = Nodes.Where(n => !_currentMindmap!.Edges.Any(e => e.ToId == n.Id && e.Kind == MindmapEdgeKind.Hierarchy)).ToList();
         if (!roots.Any()) roots.Add(Nodes.First());
         var visited = new HashSet<string>();
+        // Use node measurements (after Avalonia layout) to avoid "dense" layouts when text expands nodes.
+        // Keep defaults stable so the layout doesn't change dramatically when measurements are still default-sized.
+        double maxOuter = Nodes.Max(n => Math.Max(n.ActualWidth, n.ActualHeight));
+        double radialRadiusStep = LayoutRadialRadiusStep + Math.Max(0, maxOuter - NodeViewModel.DefaultWidth);
 
         switch (algorithm)
         {
@@ -1361,7 +1365,7 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
                 break;
             case LayoutAlgorithms.Radial:
                 foreach (var root in roots)
-                    LayoutRadial(root, LayoutRadialCenterX, LayoutRadialCenterY, 0, LayoutRadialRadiusStep, 0, Math.Tau, hierarchyOutgoing, visited);
+                    LayoutRadial(root, LayoutRadialCenterX, LayoutRadialCenterY, 0, radialRadiusStep, 0, Math.Tau, hierarchyOutgoing, visited);
                 break;
         }
 
@@ -1392,14 +1396,24 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         node.X = x;
         node.Y = y;
         if (!children.TryGetValue(node.Id, out var childList) || childList.Count == 0)
-            return y + LayoutTreeVerticalVSpacing;
-        double childX = x + LayoutTreeVerticalHSpacing;
+            return y + LayoutTreeVerticalVSpacing + Math.Max(0, node.ActualHeight - NodeViewModel.DefaultHeight);
+
+        // Children are laid out "to the right", stacked vertically.
+        // Make the vertical gap between sibling subtrees respect measured node height.
+        double childX = x + LayoutTreeVerticalHSpacing + Math.Max(0, node.ActualWidth - NodeViewModel.DefaultWidth);
+
         double childY = y;
         double firstChildY = y;
+        double lastChildY = y;
         foreach (var child in childList)
+        {
+            lastChildY = childY; // remember where this child's subtree starts
             childY = LayoutTreeVertical(child, childX, childY, children, visited);
-        double lastChildBottom = childY - LayoutTreeVerticalVSpacing;
-        node.Y = (firstChildY + lastChildBottom) / 2;
+        }
+
+        // Keep parent aligned to the middle of the first/last child subtrees.
+        // We intentionally don't try to be "pixel-perfect" here; the primary goal is to prevent sibling crowding.
+        node.Y = (firstChildY + lastChildY) / 2;
         return childY;
     }
 
@@ -1410,14 +1424,22 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         node.X = x;
         node.Y = y;
         if (!children.TryGetValue(node.Id, out var childList) || childList.Count == 0)
-            return x + LayoutTreeHorizontalHSpacing;
-        double childY = y + LayoutTreeHorizontalVSpacing;
+            return x + LayoutTreeHorizontalHSpacing + Math.Max(0, node.ActualWidth - NodeViewModel.DefaultWidth);
+
+        // Children are laid out "below", spread horizontally.
+        // Make the vertical gap between parent/child rows respect measured node height.
+        double childY = y + LayoutTreeHorizontalVSpacing + Math.Max(0, node.ActualHeight - NodeViewModel.DefaultHeight);
+
         double childX = x;
         double firstChildX = x;
+        double lastChildX = x;
         foreach (var child in childList)
+        {
+            lastChildX = childX; // remember where this child's subtree starts
             childX = LayoutTreeHorizontal(child, childX, childY, children, visited);
-        double midX = (firstChildX + (childX - LayoutTreeHorizontalHSpacing)) / 2;
-        node.X = midX;
+        }
+
+        node.X = (firstChildX + lastChildX) / 2;
         return childX;
     }
 
