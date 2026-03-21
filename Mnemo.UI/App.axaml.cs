@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -8,7 +9,9 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.AI;
 using Mnemo.UI.Modules.Onboarding.Views;
 using Mnemo.UI.ViewModels;
 using Mnemo.UI.Views;
@@ -91,8 +94,66 @@ public partial class App : Application
         navService.NavigateTo("overview");
 
         _ = ShowOnboardingIfNeededAsync();
+        _ = RunHardwareInstallMismatchCheckAsync();
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private async Task RunHardwareInstallMismatchCheckAsync()
+    {
+        await Task.Delay(1500).ConfigureAwait(false);
+        if (Services == null)
+        {
+            return;
+        }
+
+        var settings = Services.GetRequiredService<ISettingsService>();
+        var onboardingDone = await settings.GetAsync("Onboarding.Completed", false).ConfigureAwait(false);
+        var registry = Services.GetRequiredService<IAIModelRegistry>();
+        await registry.RefreshAsync().ConfigureAwait(false);
+
+        var models = await registry.GetAvailableModelsAsync().ConfigureAwait(false);
+        var hasMid = models.Any(m => m.Type == AIModelType.Text && m.Role == AIModelRoles.Mid);
+        var hasHigh = models.Any(m => m.Type == AIModelType.Text && m.Role == AIModelRoles.High);
+
+        var detector = Services.GetRequiredService<HardwareDetector>();
+        var hardware = detector.Detect();
+        var tierEval = Services.GetRequiredService<IHardwareTierEvaluator>();
+        var tier = tierEval.EvaluateTier(hardware);
+
+        var mismatch =
+            (tier == HardwarePerformanceTier.Low && (hasMid || hasHigh)) ||
+            (tier == HardwarePerformanceTier.Mid && hasHigh);
+
+        if (!mismatch)
+        {
+            return;
+        }
+
+        var logger = Services.GetRequiredService<ILoggerService>();
+        logger.Warning(
+            "Hardware",
+            $"Detected hardware tier ({tier}) is below installed text model tiers. Mid installed: {hasMid}, High installed: {hasHigh}. VRAM reported: {hardware.TotalVramBytes / 1024 / 1024} MB.");
+
+        if (!onboardingDone)
+        {
+            return;
+        }
+
+        var loc = Services.GetRequiredService<ILocalizationService>();
+        var title = loc.T("ModelTierMismatchTitle", "Hardware");
+        var message = loc.T("ModelTierMismatchMessage", "Hardware");
+
+        await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            if (Services == null)
+            {
+                return;
+            }
+
+            var overlay = Services.GetRequiredService<IOverlayService>();
+            await overlay.CreateDialogAsync(title, message, loc.T("OK", "Common"), "").ConfigureAwait(false);
+        });
     }
 
     private async Task ShowOnboardingIfNeededAsync()

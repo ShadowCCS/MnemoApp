@@ -7,6 +7,6 @@ namespace Mnemo.Core.Models;
 /// </summary>
 public class AIModelsSetupResult
 {
-    /// <summary>Names of items that were installed (e.g. "router", "fast", "bge-small", "server").</summary>
+    /// <summary>Names of items that were installed (e.g. "manager", "low", "bge-small", "server").</summary>
     public IReadOnlyList<string> Installed { get; init; } = [];
 }

@@ -60,6 +60,20 @@ public class ChatMessage : ViewModelBase
 
     public bool IsThinking => !string.IsNullOrEmpty(Thoughts);
 
+    private string? _pipelineStatusText;
+    /// <summary>Localized pipeline label while routing or loading the model (cleared when reply text appears).</summary>
+    public string? PipelineStatusText
+    {
+        get => _pipelineStatusText;
+        set
+        {
+            if (SetProperty(ref _pipelineStatusText, value))
+                OnPropertyChanged(nameof(HasPipelineStatus));
+        }
+    }
+
+    public bool HasPipelineStatus => !string.IsNullOrEmpty(_pipelineStatusText);
+
     private bool _isStreaming;
     /// <summary>True while the assistant message is still being generated.</summary>
     public bool IsStreaming

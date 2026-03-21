@@ -25,8 +25,8 @@ public partial class MarkdownView : UserControl
         AvaloniaProperty.Register<MarkdownView, string?>(nameof(Source));
 
     /// <summary>
-    /// When &gt; 0, Source changes are throttled: a re-render is scheduled after this many ms.
-    /// Further changes within that window reschedule, so you get at most one render per interval with the latest content.
+    /// When &gt; 0, Source changes use a repeating render timer so the UI keeps up with streaming without
+    /// restarting the timer on every change (which would otherwise never elapse during continuous updates).
     /// Use for live streaming (e.g. 150–200). When 0 (default), every change triggers an immediate render.
     /// </summary>
     public static readonly StyledProperty<int> StreamingUpdateIntervalMsProperty =
@@ -79,8 +79,7 @@ public partial class MarkdownView : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        _streamingThrottleTimer?.Stop();
-        _streamingThrottleTimer = null;
+        StopStreamingTimer();
         var sp = ((App)Application.Current!).Services!;
         var settings = sp.GetRequiredService<ISettingsService>();
         settings.SettingChanged -= OnSettingChanged;
@@ -103,43 +102,54 @@ public partial class MarkdownView : UserControl
         }
         else if (change.Property == StreamingUpdateIntervalMsProperty)
         {
-            _streamingThrottleTimer?.Stop();
-            _streamingThrottleTimer = null;
+            StopStreamingTimer();
             if (StreamingUpdateIntervalMs <= 0)
                 _ = RenderAsync();
+            else
+                ScheduleRender();
         }
     }
 
     /// <summary>
-    /// Schedules a render: immediately if not throttled, or after <see cref="StreamingUpdateIntervalMs"/> if in streaming mode.
+    /// Renders immediately when throttling is off; when throttled, starts a repeating timer once per
+    /// streaming session so ticks fire on schedule even if Source changes continuously (e.g. token streaming).
     /// </summary>
     private void ScheduleRender()
     {
         var intervalMs = StreamingUpdateIntervalMs;
         if (intervalMs <= 0)
         {
-            _streamingThrottleTimer?.Stop();
-            _streamingThrottleTimer = null;
+            StopStreamingTimer();
             _ = RenderAsync();
             return;
         }
 
-        _streamingThrottleTimer?.Stop();
+        if (_streamingThrottleTimer != null)
+            return;
+
         _streamingThrottleTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(intervalMs)
         };
         _streamingThrottleTimer.Tick += OnStreamingThrottleTick;
         _streamingThrottleTimer.Start();
+        _ = RenderAsync();
+    }
+
+    private void StopStreamingTimer()
+    {
+        if (_streamingThrottleTimer != null)
+        {
+            _streamingThrottleTimer.Tick -= OnStreamingThrottleTick;
+            _streamingThrottleTimer.Stop();
+            _streamingThrottleTimer = null;
+        }
     }
 
     private void OnStreamingThrottleTick(object? sender, EventArgs e)
     {
-        var t = _streamingThrottleTimer;
-        _streamingThrottleTimer = null;
-        t?.Stop();
-        if (t != null)
-            t.Tick -= OnStreamingThrottleTick;
+        if (StreamingUpdateIntervalMs <= 0)
+            return;
         _ = RenderAsync();
     }
 

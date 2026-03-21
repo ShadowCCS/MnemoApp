@@ -24,6 +24,7 @@ public partial class RightSidebarViewModel : ViewModelBase
     private readonly IAIOrchestrator _orchestrator;
     private readonly ILoggerService _logger;
     private readonly ILocalizationService _localizationService;
+    private readonly ChatTypingPrefetchHelper _typingPrefetch;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveWidth))]
@@ -67,11 +68,12 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
 
-    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService)
+    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, ChatPauseToSendEstimator pauseToSendEstimator)
     {
         _orchestrator = orchestrator;
         _logger = logger;
         _localizationService = localizationService;
+        _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
 
         ToggleCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
         SendCommand = new AsyncRelayCommand(SendAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy);
@@ -101,6 +103,7 @@ public partial class RightSidebarViewModel : ViewModelBase
     {
         if (!string.IsNullOrWhiteSpace(value))
             WarmUpSafe();
+        _typingPrefetch.NotifyInputChanged(IsBusy, isRecording: false);
     }
 
     private void WarmUpSafe()
@@ -112,7 +115,7 @@ public partial class RightSidebarViewModel : ViewModelBase
     {
         try
         {
-            await _orchestrator.WarmUpFastModelAsync();
+            await _orchestrator.WarmUpLowTierModelAsync();
         }
         catch (Exception ex)
         {
@@ -140,6 +143,8 @@ public partial class RightSidebarViewModel : ViewModelBase
     private async Task SendAsync()
     {
         if (string.IsNullOrWhiteSpace(InputText) || IsBusy) return;
+
+        await _typingPrefetch.RecordSendPauseAsync().ConfigureAwait(false);
 
         var userMessage = InputText;
         InputText = string.Empty;
@@ -170,19 +175,31 @@ public partial class RightSidebarViewModel : ViewModelBase
                 ? userMessage
                 : $"{context}\nUser: {userMessage}";
 
+            var pipelineProgress = new Progress<string>(key =>
+                Dispatcher.UIThread.Post(() => aiMessage.PipelineStatusText = _localizationService.T(key, "Chat")));
+
             void UpdateContent(string content) =>
-                Dispatcher.UIThread.Post(() => aiMessage.Content = content);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    aiMessage.Content = content;
+                    if (!string.IsNullOrEmpty(content))
+                        aiMessage.PipelineStatusText = null;
+                });
 
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingAsync(
                 _orchestrator,
                 ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
                 fullPrompt,
                 _cts.Token,
-                UpdateContent);
+                UpdateContent,
+                imageBase64Contents: null,
+                routingUserMessage: userMessage,
+                pipelineStatus: pipelineProgress);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 aiMessage.Content = finalContent;
+                aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
 
@@ -198,6 +215,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             {
                 if (string.IsNullOrEmpty(aiMessage.Content))
                     aiMessage.Content = _localizationService.T("GenerationStopped", "Chat");
+                aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
         }
@@ -207,6 +225,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
+                aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
         }

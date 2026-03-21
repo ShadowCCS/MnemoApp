@@ -14,7 +14,7 @@ public interface IAIModelsSetupService
     /// Use this to show "finished" when all are installed, or to download only missing components.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Status with Installed and Missing lists (e.g. "bge-small", "server", "router", "fast").</returns>
+    /// <returns>Installed on-disk components; Missing lists only tier-required components that are absent (mid chat bundle vs high chat + vision zips per <see cref="HardwarePerformanceTier"/>).</returns>
     Task<AIModelsSetupStatus> GetSetupStatusAsync(CancellationToken cancellationToken = default);
 
     /// <summary>

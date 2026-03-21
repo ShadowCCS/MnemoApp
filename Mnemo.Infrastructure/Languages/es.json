@@ -1,4 +1,8 @@
 {
+  "Hardware": {
+    "ModelTierMismatchTitle": "Hardware frente a modelos instalados",
+    "ModelTierMismatchMessage": "La VRAM detectada sugiere un nivel inferior al de algunos modelos instalados. El enrutamiento puede preferir modelos más pequeños hasta que la memoria de la GPU se lea bien. Tras cambiar GPU o controladores, reinicia la aplicación."
+  },
   "Common": {
     "OK": "Aceptar",
     "Cancel": "Cancelar",
@@ -76,12 +80,10 @@
     "EnableAIAssistantDescription": "Usa IA para ayudarte a escribir, resumir y organizar.",
     "WipeInputForDictation": "Borrar entrada al dictar",
     "WipeInputForDictationDescription": "Si está activado, la entrada por voz reemplaza el texto actual. Si está desactivado, la entrada por voz se añade al texto existente.",
-    "SmartSwitch": "Cambio Inteligente",
-    "SmartSwitchDescription": "Usa el modelo más inteligente (pero más lento) para tareas complejas automáticamente.",
     "SmartUnitGeneration": "Generación Unitaria Inteligente",
     "SmartUnitGenerationDescription": "Genera solo la primera unidad al crear, luego las demás a demanda.",
     "GpuAcceleration": "Aceleración de GPU",
-    "GpuAccelerationDescription": "Usa tu tarjeta gráfica para acelerar inferencias de IA. Requiere GPU NVIDIA con CUDA.",
+    "GpuAccelerationDescription": "Sin configurar: los modelos de chat usan GPU si hay NVIDIA (el backend depende del build de llama-server: CUDA, Vulkan o Metal). El modelo de orquestación pequeño usa CPU por defecto. Desactívalo para forzar CPU en todos. PreferCpu/ForceGpu en metadata por modelo.",
     "UnloadTimeout": "Tiempo de Descarte",
     "UnloadTimeoutDescription": "Libera memoria cuando los modelos de IA no estén en uso.",
     "EnableRAG": "Activar RAG",
@@ -128,25 +130,25 @@
     "WelcomeTitle": "Bienvenido a Mnemo",
     "WelcomeDescription": "Esta aplicación está en desarrollo activo. Las características pueden cambiar y los formatos de datos aún no están definidos. Usa esto bajo tu propio riesgo.",
     "PersonalizeTitle": "Personaliza tu experiencia",
-    "PersonalizeDescription": "Elige tu nombre de display, tema, ícono de la app y foto de perfil. Puedes cambiarlos después en Configuración.",
+    "PersonalizeDescription": "Elige un nombre, colores y una foto de perfil para que Mnemo se sienta tuyo. Puedes cambiarlo cuando quieras en Ajustes.",
     "LanguageTitle": "Selecciona Idioma",
-    "LanguageDescription": "Elige el idioma para la interfaz de la aplicación.",
+    "LanguageDescription": "Elige el idioma en el que quieres usar Mnemo.",
     "AISetupTitle": "Configura Atlas AI",
-    "AISetupDescription": "Descarga los archivos del modelo de IA necesarios (embedding, servidor, router y rápido) para habilitar características locales de IA. Los componentes ya instalados se saltan; solo descargas los que falten.",
+    "AISetupDescription": "Descargaremos Atlas AI para que el asistente de estudio funcione bien en tu equipo. No tienes que configurar nada: nosotros elegimos lo que encaja con tu ordenador. Si ya está instalado, saltamos este paso.",
     "YourName": "Tu nombre",
     "EnterYourName": "Ingresa tu nombre",
-    "DownloadModels": "Descargar modelos",
+    "DownloadModels": "Descargar Atlas AI",
     "Starting": "Iniciando...",
     "Cancelled": "Cancelado",
     "DownloadFailed": "La descarga falló.",
     "Ready": "Listo",
-    "AllModelsInstalled": "Todos los modelos ya están instalados.",
+    "AllModelsInstalled": "Atlas AI ya está listo en este equipo.",
     "Theme": "Tema",
-    "ThemeDescription": "Selecciona el estilo visual.",
+    "ThemeDescription": "Elige cómo quieres que se vea Mnemo.",
     "AppIconLabel": "Ícono de la app",
-    "AppIconDescription": "Ícono mostrado en la barra de tareas.",
+    "AppIconDescription": "La imagen pequeña de Mnemo en la barra de tareas.",
     "ProfilePictureLabel": "Foto de perfil",
-    "ProfilePictureDescription": "Tu avatar en la aplicación.",
+    "ProfilePictureDescription": "Tu foto en la app.",
     "VersionFormat": "Versión {0}"
   },
   "Sidebar": {
@@ -223,7 +225,9 @@
     "SuggestionSummarize": "Resumen",
     "ErrorSorry": "Lo siento, no pude generar una respuesta.",
     "GenerationStopped": "Generación detenida.",
-    "ErrorUnexpected": "Ocurrió un error inesperado. Intenta de nuevo más tarde."
+    "ErrorUnexpected": "Ocurrió un error inesperado. Intenta de nuevo más tarde.",
+    "PipelineStatusRouting": "Enrutando solicitud",
+    "PipelineStatusProcessing": "Procesando"
   },
   "Notes": {
     "NewNote": "Nueva Nota",

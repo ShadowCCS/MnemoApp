@@ -3,6 +3,7 @@ using Mnemo.UI.ViewModels;
 using Mnemo.UI.Components.Sidebar;
 using Mnemo.UI.Components.RightSidebar;
 using Mnemo.UI.Components;
+using Mnemo.UI.Services;
 
 namespace Mnemo.UI.Modules;
 
@@ -10,6 +11,7 @@ public class CoreUIModule : IModule
 {
     public void ConfigureServices(IServiceRegistrar services)
     {
+        services.AddSingleton<ChatPauseToSendEstimator>();
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<SidebarViewModel>();
         services.AddTransient<RightSidebarViewModel>();

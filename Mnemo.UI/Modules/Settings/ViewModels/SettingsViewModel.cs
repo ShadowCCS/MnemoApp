@@ -121,7 +121,6 @@ public partial class SettingsViewModel : ViewModelBase
         var aiGroup = new SettingsGroupViewModel(T("Intelligence"));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", T("EnableAIAssistant"), T("EnableAIAssistantDescription"), true));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Chat.WipeInputForDictation", T("WipeInputForDictation"), T("WipeInputForDictationDescription"), false));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartSwitch", T("SmartSwitch"), T("SmartSwitchDescription")));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartUnitGeneration", T("SmartUnitGeneration"), T("SmartUnitGenerationDescription")));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", T("GpuAcceleration"), T("GpuAccelerationDescription")));
         aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.UnloadTimeout", T("UnloadTimeout"), T("UnloadTimeoutDescription"), new[] { T("Never"), T("FiveMinutes"), T("FifteenMinutes"), T("OneHour") }));

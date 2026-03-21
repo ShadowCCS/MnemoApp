@@ -18,6 +18,17 @@ public class ModelRegistry : IAIModelRegistry
         Converters = { new JsonStringEnumConverter() }
     };
 
+    /// <summary>
+    /// Canonical layout: <c>text/manager</c> port 8000, <c>text/low</c> 8001, <c>text/mid</c> 8002, <c>text/high</c> 8003 (GGUF + optional mmproj in the same folder).
+    /// </summary>
+    private static readonly (string Folder, string Role, int Port)[] TextModelLoadOrder =
+    {
+        ("manager", AIModelRoles.Manager, 8000),
+        ("low", AIModelRoles.Low, 8001),
+        ("mid", AIModelRoles.Mid, 8002),
+        ("high", AIModelRoles.High, 8003)
+    };
+
     private readonly string _modelsPath;
     private readonly Dictionary<string, AIModelManifest> _models = new();
 
@@ -27,7 +38,7 @@ public class ModelRegistry : IAIModelRegistry
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "mnemo",
             "models");
-        
+
         if (!Directory.Exists(_modelsPath))
         {
             Directory.CreateDirectory(_modelsPath);
@@ -37,62 +48,55 @@ public class ModelRegistry : IAIModelRegistry
     public async Task RefreshAsync()
     {
         _models.Clear();
-        
-        // Load text models from specific folders: router, fast, smart
+
         var textModelsPath = Path.Combine(_modelsPath, "text");
-        var textModelRoles = new[] { "router", "fast", "smart" };
-        var textModelPorts = new Dictionary<string, int>
-        {
-            { "router", 8081 },
-            { "fast", 8080 },
-            { "smart", 8082 }
-        };
+        var filledRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var role in textModelRoles)
+        foreach (var (folder, role, port) in TextModelLoadOrder)
         {
-            var rolePath = Path.Combine(textModelsPath, role);
+            if (filledRoles.Contains(role))
+                continue;
+
+            var rolePath = Path.Combine(textModelsPath, folder);
             var manifestPath = Path.Combine(rolePath, "manifest.json");
-            
-            if (File.Exists(manifestPath))
+            if (!File.Exists(manifestPath))
+                continue;
+
+            try
             {
-                try
-                {
-                    var json = await File.ReadAllTextAsync(manifestPath).ConfigureAwait(false);
-                    var manifest = JsonSerializer.Deserialize<AIModelManifest>(json, _jsonOptions);
+                var json = await File.ReadAllTextAsync(manifestPath).ConfigureAwait(false);
+                var manifest = JsonSerializer.Deserialize<AIModelManifest>(json, _jsonOptions);
 
-                    if (manifest != null)
+                if (manifest != null)
+                {
+                    manifest.LocalPath = rolePath;
+                    manifest.Role = role;
+
+                    if (string.IsNullOrWhiteSpace(manifest.DisplayName))
+                        manifest.DisplayName = DefaultDisplayNameForRole(role);
+
+                    manifest.Endpoint = $"http://127.0.0.1:{port}";
+
+                    if (string.IsNullOrEmpty(manifest.PromptTemplate) || manifest.PromptTemplate == "ChatML")
                     {
-                        manifest.LocalPath = rolePath;
-                        manifest.Role = role;
-                        
-                        // Default endpoint by role if not specified
-                        if (string.IsNullOrEmpty(manifest.Endpoint))
-                        {
-                            manifest.Endpoint = $"http://127.0.0.1:{textModelPorts[role]}";
-                        }
-                        
-                        // Set default prompt template if missing
-                        if (string.IsNullOrEmpty(manifest.PromptTemplate) || manifest.PromptTemplate == "ChatML")
-                        {
-                            var name = manifest.DisplayName.ToLowerInvariant();
-                            if (name.Contains("llama-3") || name.Contains("llama3")) manifest.PromptTemplate = "LLAMA3";
-                            else if (name.Contains("alpaca")) manifest.PromptTemplate = "ALPACA";
-                            else if (name.Contains("vicuna")) manifest.PromptTemplate = "VICUNA";
-                            else if (name.Contains("qwen") || name.Contains("phi-3") || name.Contains("ministral") || name.Contains("chatml")) manifest.PromptTemplate = "CHATML";
-                        }
-
-                        _models[manifest.Id] = manifest;
+                        var name = manifest.DisplayName.ToLowerInvariant();
+                        if (name.Contains("llama-3") || name.Contains("llama3")) manifest.PromptTemplate = "LLAMA3";
+                        else if (name.Contains("alpaca")) manifest.PromptTemplate = "ALPACA";
+                        else if (name.Contains("vicuna")) manifest.PromptTemplate = "VICUNA";
+                        else if (name.Contains("qwen") || name.Contains("phi-3") || name.Contains("ministral") || name.Contains("chatml")) manifest.PromptTemplate = "CHATML";
                     }
-                }
-                catch (Exception)
-                {
-                    // Log error but continue
+
+                    _models[manifest.Id] = manifest;
+                    filledRoles.Add(role);
                 }
             }
+            catch (Exception)
+            {
+                // Log error but continue
+            }
         }
-        
-        // Also load other model types (embedding, etc.) from their directories
-        var otherModelDirs = Directory.Exists(_modelsPath) 
+
+        var otherModelDirs = Directory.Exists(_modelsPath)
             ? Directory.GetDirectories(_modelsPath, "*", SearchOption.AllDirectories)
                 .Where(d => !d.StartsWith(textModelsPath, StringComparison.OrdinalIgnoreCase))
             : Array.Empty<string>();
@@ -131,5 +135,14 @@ public class ModelRegistry : IAIModelRegistry
         _models.TryGetValue(modelId, out var manifest);
         return Task.FromResult(manifest);
     }
-}
 
+    private static string DefaultDisplayNameForRole(string role) =>
+        role switch
+        {
+            AIModelRoles.Manager => "Manager (orchestration)",
+            AIModelRoles.Low => "Low tier",
+            AIModelRoles.Mid => "Mid tier",
+            AIModelRoles.High => "High tier",
+            _ => role
+        };
+}

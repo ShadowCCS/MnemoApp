@@ -1,112 +1,62 @@
 using System;
-using System.Linq;
-using System.Management;
-using System.Runtime.InteropServices;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 
 namespace Mnemo.Infrastructure.Services.AI;
 
-public class HardwareDetector
+/// <summary>Aggregates CPU/OS facts with <see cref="IPlatformHardwareGpuProvider"/> for <see cref="HardwareInfo"/>.</summary>
+public sealed class HardwareDetector
 {
     private readonly ILoggerService _logger;
+    private readonly IPlatformHardwareGpuProvider _platformGpu;
+    private readonly object _lock = new();
+    private HardwareInfo? _cached;
 
-    public HardwareDetector(ILoggerService logger)
+    public HardwareDetector(ILoggerService logger, IPlatformHardwareGpuProvider platformGpu)
     {
         _logger = logger;
+        _platformGpu = platformGpu;
     }
 
+    /// <summary>Loads and caches hardware once (call from app startup). Subsequent <see cref="Detect"/> calls reuse the snapshot.</summary>
+    public HardwareInfo Initialize() => Detect();
+
+    /// <summary>Clears the cache so the next <see cref="Detect"/> re-queries the OS (e.g. before model downloads).</summary>
+    public void Refresh()
+    {
+        lock (_lock)
+        {
+            _cached = null;
+        }
+    }
+
+    /// <summary>Returns the cached <see cref="HardwareInfo"/> when available; otherwise samples the OS once and logs.</summary>
     public HardwareInfo Detect()
     {
-        var info = new HardwareInfo
+        lock (_lock)
         {
-            HasNvidiaGpu = IsNvidiaGpuPresent(),
-            HasAmdGpu = IsAmdGpuPresent(),
-            TotalVramBytes = GetTotalVram(),
-            CpuCores = Environment.ProcessorCount,
-            Is64Bit = Environment.Is64BitOperatingSystem
-        };
-
-        _logger.Info("HardwareDetector", $"Detected Hardware: GPU: {(info.HasNvidiaGpu ? "NVIDIA" : info.HasAmdGpu ? "AMD" : "None")}, VRAM: {info.TotalVramBytes / 1024 / 1024}MB, CPU Cores: {info.CpuCores}");
-        
-        return info;
-    }
-
-    private bool IsNvidiaGpuPresent()
-    {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
-
-        try
-        {
-            using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController");
-            foreach (var mo in searcher.Get().Cast<ManagementObject>())
+            if (_cached != null)
             {
-                var name = mo["Name"]?.ToString()?.ToLowerInvariant() ?? "";
-                if (name.Contains("nvidia") || name.Contains("geforce") || name.Contains("quadro") || name.Contains("tesla"))
-                {
-                    return true;
-                }
+                return _cached;
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning("HardwareDetector", $"Failed to detect NVIDIA GPU via WMI: {ex.Message}");
-        }
-        return false;
-    }
 
-    private bool IsAmdGpuPresent()
-    {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
-
-        try
-        {
-            using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController");
-            foreach (var mo in searcher.Get().Cast<ManagementObject>())
+            var gpu = _platformGpu.GetGpuSnapshot();
+            var info = new HardwareInfo
             {
-                var name = mo["Name"]?.ToString()?.ToLowerInvariant() ?? "";
-                if (name.Contains("amd") || name.Contains("radeon"))
-                {
-                    return true;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning("HardwareDetector", $"Failed to detect AMD GPU via WMI: {ex.Message}");
-        }
-        return false;
-    }
+                HasNvidiaGpu = gpu.HasNvidiaGpu,
+                HasAmdGpu = gpu.HasAmdGpu,
+                TotalVramBytes = gpu.TotalDedicatedVideoMemoryBytes,
+                CpuCores = Environment.ProcessorCount,
+                Is64Bit = Environment.Is64BitOperatingSystem
+            };
 
-    private long GetTotalVram()
-    {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return 0;
+            _cached = info;
 
-        try
-        {
-            using var searcher = new ManagementObjectSearcher("SELECT AdapterRAM FROM Win32_VideoController");
-            long maxRam = 0;
-            foreach (var mo in searcher.Get().Cast<ManagementObject>())
-            {
-                if (long.TryParse(mo["AdapterRAM"]?.ToString(), out var ram))
-                {
-                    if (ram > maxRam) maxRam = ram;
-                }
-            }
-            return maxRam;
-        }
-        catch
-        {
-            return 0;
+            _logger.Info(
+                "HardwareDetector",
+                $"Detected Hardware: GPU: {(info.HasNvidiaGpu ? "NVIDIA" : info.HasAmdGpu ? "AMD" : "None")}, VRAM: {info.TotalVramBytes / 1024 / 1024}MB, CPU Cores: {info.CpuCores}");
+
+            return info;
         }
     }
-}
-
-public class HardwareInfo
-{
-    public bool HasNvidiaGpu { get; set; }
-    public bool HasAmdGpu { get; set; }
-    public long TotalVramBytes { get; set; }
-    public int CpuCores { get; set; }
-    public bool Is64Bit { get; set; }
-    public bool SupportsAvx2 => true; // Assume true for most modern CPUs
 }

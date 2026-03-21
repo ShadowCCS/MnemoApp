@@ -44,8 +44,11 @@ When answering:
             : GeneralSystemPrompt;
     }
 
-    /// <summary>Max UI updates per second when streaming; throttle interval in ms.</summary>
-    public const int StreamingThrottleMs = 200;
+    /// <summary>Delay between UI reveal steps while streaming (smooth display, not network pacing).</summary>
+    public const int StreamingDisplayTickMs = 40;
+
+    /// <summary>Maximum characters revealed per tick toward the buffered response (~40 chars/s at default tick).</summary>
+    public const int StreamingCharsPerTick = 3;
 
     /// <summary>Max number of recent messages to include in context (conversation window).</summary>
     public const int MaxContextMessageCount = 11;
@@ -77,10 +80,13 @@ When answering:
     }
 
     /// <summary>
-    /// Runs the streaming prompt loop off the UI thread and reports content via callbacks.
+    /// Runs the streaming prompt loop and reports content via callbacks. Incoming tokens are buffered
+    /// and revealed at a capped rate so the UI does not jump ahead of a comfortable reading pace.
     /// Callbacks may be invoked from a background thread; caller must marshal to UI for updates.
     /// </summary>
     /// <param name="imageBase64Contents">Optional. For vision: list of image base64 strings to send with the prompt.</param>
+    /// <param name="routingUserMessage">Optional. Latest user message only; forwarded for orchestration routing so it does not grow with conversation history.</param>
+    /// <param name="pipelineStatus">Optional. Receives <c>Mnemo.Core.Models.ChatPipelineStatusKeys</c> for UI pipeline labels while routing or before the first token.</param>
     /// <returns>True if at least one token was received; false if empty response.</returns>
     public static async Task<(bool FoundResponse, string FinalContent)> RunStreamingAsync(
         IAIOrchestrator orchestrator,
@@ -88,30 +94,85 @@ When answering:
         string fullPrompt,
         CancellationToken cancellationToken,
         Action<string> onContentUpdate,
-        IReadOnlyList<string>? imageBase64Contents = null)
+        IReadOnlyList<string>? imageBase64Contents = null,
+        string? routingUserMessage = null,
+        IProgress<string>? pipelineStatus = null)
     {
         var buffer = new StringBuilder();
-        var lastUiUpdate = DateTime.UtcNow;
+        var lockObj = new object();
+        var streamComplete = false;
+        var revealedLength = 0;
         var foundResponse = false;
 
-        await Task.Run(async () =>
+        async Task ProducerAsync()
         {
-            await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents))
+            try
             {
-                buffer.Append(token);
-                foundResponse = true;
-
-                var now = DateTime.UtcNow;
-                var content = buffer.ToString();
-                if ((now - lastUiUpdate).TotalMilliseconds >= StreamingThrottleMs || token.Contains('\n'))
+                await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus)
+                    .ConfigureAwait(false))
                 {
-                    lastUiUpdate = now;
-                    onContentUpdate(content);
+                    lock (lockObj)
+                    {
+                        buffer.Append(token);
+                        foundResponse = true;
+                    }
                 }
             }
-        }, cancellationToken).ConfigureAwait(false);
+            finally
+            {
+                lock (lockObj)
+                {
+                    streamComplete = true;
+                }
+            }
+        }
+
+        async Task ConsumerAsync()
+        {
+            while (true)
+            {
+                await Task.Delay(StreamingDisplayTickMs, cancellationToken).ConfigureAwait(false);
+
+                string slice;
+                bool done;
+                lock (lockObj)
+                {
+                    var len = buffer.Length;
+                    if (len == 0 && !streamComplete)
+                        continue;
+
+                    if (len > 0)
+                        revealedLength = Math.Min(len, revealedLength + StreamingCharsPerTick);
+
+                    slice = revealedLength == 0 ? string.Empty : buffer.ToString(0, revealedLength);
+                    done = streamComplete && revealedLength >= len;
+                }
+
+                onContentUpdate(slice);
+                if (done)
+                    break;
+            }
+        }
+
+        try
+        {
+            await Task.WhenAll(ProducerAsync(), ConsumerAsync()).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            lock (lockObj)
+            {
+                onContentUpdate(buffer.ToString());
+            }
+            throw;
+        }
 
         var finalContent = buffer.ToString();
-        return (foundResponse, finalContent);
+        bool found;
+        lock (lockObj)
+        {
+            found = foundResponse;
+        }
+        return (found, finalContent);
     }
 }

@@ -5,13 +5,13 @@ using Avalonia.Data.Converters;
 namespace Mnemo.UI.Converters;
 
 /// <summary>
-/// Converts bool to int for MarkdownView.StreamingUpdateIntervalMs: true -> 150 (live updates), false -> 0 (immediate).
+/// Converts bool to int for MarkdownView.StreamingUpdateIntervalMs: true -> throttled markdown re-render while streaming, false -> 0 (immediate).
 /// </summary>
 public class BoolToStreamingIntervalConverter : IValueConverter
 {
     public static readonly BoolToStreamingIntervalConverter Instance = new();
 
-    public int StreamingIntervalMs { get; set; } = 150;
+    public int StreamingIntervalMs { get; set; } = 200;
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {

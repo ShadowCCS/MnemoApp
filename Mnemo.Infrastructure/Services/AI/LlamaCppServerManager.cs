@@ -24,6 +24,9 @@ public class LlamaCppServerManager : IAIServerManager
     private const int HardKillWaitSeconds = 5;
     private static readonly TimeSpan StartupGracePeriod = TimeSpan.FromSeconds(60);
 
+    /// <summary>Serializes llama-server process startup so multiple models do not load on the GPU simultaneously.</summary>
+    private static readonly SemaphoreSlim ServerStartupGate = new(1, 1);
+
     private readonly ILoggerService _logger;
     private readonly ISettingsService _settings;
     private readonly HardwareDetector _hardware;
@@ -84,9 +87,10 @@ public class LlamaCppServerManager : IAIServerManager
         var mmprojFile = ResolveMmprojPath(manifest);
         var uri = new Uri(manifest.Endpoint);
         var port = uri.Port;
+        // Tri-state setting: null = auto (NVIDIA GPU for chat tiers; orchestration manager stays on CPU unless overridden).
         var useGpuSetting = await _settings.GetAsync<bool?>("AI.GpuAcceleration").ConfigureAwait(false);
         var hardwareInfo = _hardware.Detect();
-        var useGpu = useGpuSetting ?? hardwareInfo.HasNvidiaGpu;
+        var useGpu = ResolveUseGpu(manifest, useGpuSetting, hardwareInfo);
         var serverKey = ComputeServerKey(manifest, modelFile, port, useGpu, mmprojFile);
 
         _lastUsed[manifest.Id] = DateTime.UtcNow;
@@ -107,14 +111,26 @@ public class LlamaCppServerManager : IAIServerManager
                 RemoveAndDisposeServer(serverKey, existing);
             }
 
-            if (manifest.Role == "smart")
+            var registered = await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false);
+            var lowModel = registered.FirstOrDefault(m => m.Role == AIModelRoles.Low);
+            var midModel = registered.FirstOrDefault(m => m.Role == AIModelRoles.Mid);
+            var highModel = registered.FirstOrDefault(m => m.Role == AIModelRoles.High);
+
+            if (manifest.Role is AIModelRoles.Mid or AIModelRoles.High)
             {
-                var fastModel = (await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false))
-                    .FirstOrDefault(m => m.Role == "fast");
-                if (fastModel != null)
-                {
-                    await StopServerAsync(fastModel.Id).ConfigureAwait(false);
-                }
+                if (lowModel != null)
+                    await StopServerAsync(lowModel.Id).ConfigureAwait(false);
+            }
+
+            if (manifest.Role == AIModelRoles.High && midModel != null)
+                await StopServerAsync(midModel.Id).ConfigureAwait(false);
+
+            if (manifest.Role == AIModelRoles.Low)
+            {
+                if (midModel != null)
+                    await StopServerAsync(midModel.Id).ConfigureAwait(false);
+                if (highModel != null)
+                    await StopServerAsync(highModel.Id).ConfigureAwait(false);
             }
 
             await StartServerAsync(manifest, modelFile, mmprojFile, port, useGpu, serverKey, ct).ConfigureAwait(false);
@@ -200,6 +216,39 @@ public class LlamaCppServerManager : IAIServerManager
         var payload = $"{modelPath}|{port}|{contextSize}|{gpuLayers}|{flashAttn}|{mmprojPath ?? ""}";
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
         return hash;
+    }
+
+    /// <summary>
+    /// Per-manifest GPU policy: global setting, auto tier rules, and Metadata PreferCpu / ForceGpu.
+    /// When <paramref name="gpuAccelerationSetting"/> is null, the orchestration <see cref="AIModelRoles.Manager"/> model uses CPU so chat models can use the GPU.
+    /// </summary>
+    private static bool ResolveUseGpu(AIModelManifest manifest, bool? gpuAccelerationSetting, HardwareInfo hardware)
+    {
+        bool useGpu;
+        if (gpuAccelerationSetting.HasValue)
+        {
+            useGpu = gpuAccelerationSetting.Value;
+        }
+        else if (string.Equals(manifest.Role, AIModelRoles.Manager, StringComparison.OrdinalIgnoreCase))
+        {
+            useGpu = false;
+        }
+        else
+        {
+            useGpu = hardware.HasNvidiaGpu;
+        }
+
+        if (manifest.Metadata.TryGetValue("PreferCpu", out var prefer) && bool.TryParse(prefer, out var preferCpu) && preferCpu)
+        {
+            useGpu = false;
+        }
+
+        if (manifest.Metadata.TryGetValue("ForceGpu", out var force) && bool.TryParse(force, out var forceGpu) && forceGpu)
+        {
+            useGpu = true;
+        }
+
+        return useGpu;
     }
 
     private void KillLeftoversOnStartup()
@@ -401,75 +450,83 @@ public class LlamaCppServerManager : IAIServerManager
 
     private async Task StartServerAsync(AIModelManifest manifest, string modelFile, string? mmprojFile, int port, bool useGpu, string serverKey, CancellationToken ct)
     {
-        var serverPath = await _settings.GetAsync<string>("AI.LlamaCpp.ServerPath").ConfigureAwait(false);
-
-        if (string.IsNullOrEmpty(serverPath) || !File.Exists(serverPath))
+        await ServerStartupGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            throw new FileNotFoundException(
-                $"llama.cpp server executable not found. Please set AI.LlamaCpp.ServerPath in settings. Current path: {serverPath}");
+            var serverPath = await _settings.GetAsync<string>("AI.LlamaCpp.ServerPath").ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(serverPath) || !File.Exists(serverPath))
+            {
+                throw new FileNotFoundException(
+                    $"llama.cpp server executable not found. Please set AI.LlamaCpp.ServerPath in settings. Current path: {serverPath}");
+            }
+
+            var args = BuildServerArgs(manifest, modelFile, mmprojFile, port, useGpu);
+
+            _logger.Info("LlamaCppServerManager", $"Starting llama.cpp server for {manifest.DisplayName} on port {port}");
+            _logger.Info("LlamaCppServerManager", $"Command: {serverPath} {args}");
+
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = serverPath,
+                    Arguments = args,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    WorkingDirectory = Path.GetDirectoryName(serverPath)
+                }
+            };
+
+            process.OutputDataReceived += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                {
+                    _logger.Info($"llama.cpp[{manifest.Role}]", e.Data);
+                }
+            };
+
+            process.ErrorDataReceived += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                {
+                    _logger.Warning($"llama.cpp[{manifest.Role}]", e.Data);
+                }
+            };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            var startedAt = DateTime.UtcNow;
+            _runningServers[serverKey] = new ServerProcess
+            {
+                Process = process,
+                Manifest = manifest,
+                Port = port,
+                ModelKey = serverKey,
+                StartedAt = startedAt,
+                ServerPath = serverPath
+            };
+            _modelIdToKey[manifest.Id] = serverKey;
+
+            PersistRegistry();
+
+            _logger.Info("LlamaCppServerManager", $"Server started with PID {process.Id}, waiting for health check...");
+
+            if (!string.IsNullOrEmpty(manifest.Endpoint))
+            {
+                await WaitForHealthAsync(manifest.Endpoint, ct).ConfigureAwait(false);
+            }
+
+            _logger.Info("LlamaCppServerManager", $"Server for {manifest.DisplayName} is ready!");
         }
-
-        var args = BuildServerArgs(manifest, modelFile, mmprojFile, port, useGpu);
-
-        _logger.Info("LlamaCppServerManager", $"Starting llama.cpp server for {manifest.DisplayName} on port {port}");
-        _logger.Info("LlamaCppServerManager", $"Command: {serverPath} {args}");
-
-        var process = new Process
+        finally
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = serverPath,
-                Arguments = args,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                WorkingDirectory = Path.GetDirectoryName(serverPath)
-            }
-        };
-
-        process.OutputDataReceived += (s, e) =>
-        {
-            if (!string.IsNullOrEmpty(e.Data))
-            {
-                _logger.Info($"llama.cpp[{manifest.Role}]", e.Data);
-            }
-        };
-
-        process.ErrorDataReceived += (s, e) =>
-        {
-            if (!string.IsNullOrEmpty(e.Data))
-            {
-                _logger.Warning($"llama.cpp[{manifest.Role}]", e.Data);
-            }
-        };
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-
-        var startedAt = DateTime.UtcNow;
-        _runningServers[serverKey] = new ServerProcess
-        {
-            Process = process,
-            Manifest = manifest,
-            Port = port,
-            ModelKey = serverKey,
-            StartedAt = startedAt,
-            ServerPath = serverPath
-        };
-        _modelIdToKey[manifest.Id] = serverKey;
-
-        PersistRegistry();
-
-        _logger.Info("LlamaCppServerManager", $"Server started with PID {process.Id}, waiting for health check...");
-
-        if (!string.IsNullOrEmpty(manifest.Endpoint))
-        {
-            await WaitForHealthAsync(manifest.Endpoint, ct).ConfigureAwait(false);
+            ServerStartupGate.Release();
         }
-
-        _logger.Info("LlamaCppServerManager", $"Server for {manifest.DisplayName} is ready!");
     }
 
     private string BuildServerArgs(AIModelManifest manifest, string modelPath, string? mmprojPath, int port, bool useGpu)
@@ -490,27 +547,37 @@ public class LlamaCppServerManager : IAIServerManager
             }
         }
 
-        var args = $"-m \"{modelPath}\" " +
-                   $"-c {contextSize} " +
-                   $"-ngl {gpuLayers} " +
-                   $"--host 127.0.0.1 " +
-                   $"--port {port} " +
-                   $"--cache-reuse 0 " +
-                   $"--cont-batching " +
-                   $"--metrics " +
-                   $"--mlock";
+        var sb = new StringBuilder();
+        sb.Append($"-m \"{modelPath}\" ");
+        sb.Append($"-c {contextSize} ");
+        sb.Append($"-ngl {gpuLayers} ");
+        sb.Append("--host 127.0.0.1 ");
+        sb.Append($"--port {port} ");
+        sb.Append("--cache-reuse 0 ");
+        sb.Append("--cont-batching ");
+        sb.Append("--metrics ");
+
+        if (useGpu)
+        {
+            sb.Append("--mlock ");
+        }
+        else
+        {
+            var cpuThreads = Environment.ProcessorCount > 0 ? Environment.ProcessorCount : 4;
+            sb.Append($"-t {cpuThreads} -tb {cpuThreads} ");
+        }
 
         if (!string.IsNullOrEmpty(mmprojPath))
         {
-            args += $" --mmproj \"{mmprojPath}\"";
+            sb.Append($"--mmproj \"{mmprojPath}\" ");
         }
 
         if (useGpu && manifest.Metadata.TryGetValue("FlashAttn", out var flashStr) && bool.TryParse(flashStr, out var flash) && flash)
         {
-            args += " --flash-attn";
+            sb.Append("--flash-attn ");
         }
 
-        return args;
+        return sb.ToString().TrimEnd();
     }
 
     private string ResolveModelPath(AIModelManifest manifest)
@@ -760,15 +827,15 @@ public class LlamaCppServerManager : IAIServerManager
             var manifest = serverProcess.Manifest;
             var idle = now - lastUsed;
 
-            if (manifest.Role == "router")
+            if (manifest.Role == AIModelRoles.Manager)
             {
                 continue;
             }
 
             var shouldUnload = manifest.Role switch
             {
-                "fast" => idle > _fastIdleTimeout,
-                "smart" => idle > _smartIdleTimeout,
+                AIModelRoles.Low => idle > _fastIdleTimeout,
+                AIModelRoles.Mid or AIModelRoles.High => idle > _smartIdleTimeout,
                 _ => false
             };
 

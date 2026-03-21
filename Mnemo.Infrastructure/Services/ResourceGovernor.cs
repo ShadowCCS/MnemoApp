@@ -30,12 +30,12 @@ public class ResourceGovernor : IResourceGovernor
     {
         _lastAccess[manifest.Id] = DateTime.UtcNow;
 
-        // Models with significant VRAM usage require a lock to prevent VRAM explosion
-        if (manifest.EstimatedVramUsageBytes > 500 * 1024 * 1024) // > 500MB
+        // Mid/high tier text models are treated as exclusive (one at a time) to avoid VRAM spikes; layout role encodes tier.
+        if (RequiresExclusiveResourceSlot(manifest))
         {
             await _heavyModelLock.WaitAsync(ct).ConfigureAwait(false);
             _loadedModels.TryAdd(manifest.Id, true);
-            _logger.Info("ResourceGovernor", $"Acquired heavy model: {manifest.DisplayName}");
+            _logger.Info("ResourceGovernor", $"Acquired exclusive-slot model: {manifest.DisplayName}");
             return true;
         }
 
@@ -44,13 +44,13 @@ public class ResourceGovernor : IResourceGovernor
 
     public void ReleaseModel(AIModelManifest manifest)
     {
-        if (manifest.EstimatedVramUsageBytes > 500 * 1024 * 1024)
+        if (RequiresExclusiveResourceSlot(manifest))
         {
             if (_loadedModels.TryRemove(manifest.Id, out _))
             {
                 _lastAccess[manifest.Id] = DateTime.UtcNow;
                 _heavyModelLock.Release();
-                _logger.Info("ResourceGovernor", $"Released heavy model: {manifest.DisplayName}");
+                _logger.Info("ResourceGovernor", $"Released exclusive-slot model: {manifest.DisplayName}");
             }
             else
             {
@@ -88,4 +88,8 @@ public class ResourceGovernor : IResourceGovernor
         _cleanupTimer.Dispose();
         _heavyModelLock.Dispose();
     }
+
+    private static bool RequiresExclusiveResourceSlot(AIModelManifest manifest) =>
+        manifest.Type == AIModelType.Text &&
+        manifest.Role is AIModelRoles.Mid or AIModelRoles.High;
 }

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.AI;
 
 namespace Mnemo.Infrastructure.Services;
 
@@ -15,25 +16,45 @@ public class AIModelsSetupService : IAIModelsSetupService
 {
     private const string ReleaseBaseUrl = "https://github.com/ShadowCCS/MnemoApp/releases/download/Models/";
     private const int DownloadRetryCount = 2;
+    /// <summary>Max concurrent HTTP downloads (batch) to avoid saturating the link or the host.</summary>
+    private const int MaxConcurrentDownloads = 6;
+    /// <summary>Share of overall progress [0,1] used for the download phase; the rest is extraction + registry.</summary>
+    private const double DownloadPhaseProgressWeight = 0.65;
 
+    /// <summary>
+    /// Release zips: <c>manager.zip</c>, <c>low.zip</c>, <c>middle.zip</c>, <c>high.zip</c>, <c>high-image.zip</c>.
+    /// <c>high</c> / <c>high-image</c> both extract into <c>text/high</c> (GGUF vs mmproj for vision); see <see cref="ModelRegistry"/>.
+    /// Text bundles per hardware tier: Low → manager + low; Mid → + middle; High → + high + high-image (not middle).
+    /// </summary>
     private static readonly (string Name, string FileName, string RelativePath)[] Entries =
     {
         ("bge-small", "bge-small.zip", Path.Combine("embedding", "bge-small")),
         ("server", "server.zip", "llamaServer"),
-        ("router", "router.zip", Path.Combine("text", "router")),
-        ("fast", "fast.zip", Path.Combine("text", "fast")),
+        ("manager", "manager.zip", Path.Combine("text", "manager")),
+        ("low", "low.zip", Path.Combine("text", "low")),
+        ("mid", "middle.zip", Path.Combine("text", "mid")),
+        ("high", "high.zip", Path.Combine("text", "high")),
+        ("high-image", "high-image.zip", Path.Combine("text", "high")),
         ("stt", "stt.zip", Path.Combine("audio", "STT")),
     };
 
     private readonly string _modelsPath;
     private readonly IAIModelRegistry _modelRegistry;
     private readonly ISettingsService _settingsService;
+    private readonly HardwareDetector _hardwareDetector;
+    private readonly IHardwareTierEvaluator _hardwareTierEvaluator;
     private readonly HttpClient _httpClient;
 
-    public AIModelsSetupService(IAIModelRegistry modelRegistry, ISettingsService settingsService)
+    public AIModelsSetupService(
+        IAIModelRegistry modelRegistry,
+        ISettingsService settingsService,
+        HardwareDetector hardwareDetector,
+        IHardwareTierEvaluator hardwareTierEvaluator)
     {
         _modelRegistry = modelRegistry;
         _settingsService = settingsService;
+        _hardwareDetector = hardwareDetector;
+        _hardwareTierEvaluator = hardwareTierEvaluator;
         _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
         _modelsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -43,6 +64,9 @@ public class AIModelsSetupService : IAIModelsSetupService
 
     public Task<AIModelsSetupStatus> GetSetupStatusAsync(CancellationToken cancellationToken = default)
     {
+        _hardwareDetector.Refresh();
+        var tier = _hardwareTierEvaluator.EvaluateTier(_hardwareDetector.Detect());
+
         var installed = new List<string>();
         var missing = new List<string>();
 
@@ -51,12 +75,27 @@ public class AIModelsSetupService : IAIModelsSetupService
             var targetDir = Path.Combine(_modelsPath, relativePath);
             if (IsComponentInstalled(name, targetDir))
                 installed.Add(name);
-            else
+            else if (IsRequiredForTier(name, tier))
                 missing.Add(name);
         }
 
         var status = new AIModelsSetupStatus { Installed = installed, Missing = missing };
         return Task.FromResult(status);
+    }
+
+    /// <summary>
+    /// Embedding, server, manager, STT, and <c>low</c> chat are always required.
+    /// <c>middle.zip</c> only for <see cref="HardwarePerformanceTier.Mid"/>.
+    /// <c>high.zip</c> / <c>high-image.zip</c> only for <see cref="HardwarePerformanceTier.High"/>.
+    /// </summary>
+    private static bool IsRequiredForTier(string name, HardwarePerformanceTier tier)
+    {
+        return name switch
+        {
+            "mid" => tier == HardwarePerformanceTier.Mid,
+            "high" or "high-image" => tier == HardwarePerformanceTier.High,
+            _ => true
+        };
     }
 
     /// <summary>
@@ -80,6 +119,14 @@ public class AIModelsSetupService : IAIModelsSetupService
             return File.Exists(modelPath);
         }
 
+        if (string.Equals(name, "high", StringComparison.OrdinalIgnoreCase))
+            return Directory.Exists(targetDir) &&
+                   Directory.EnumerateFiles(targetDir, "*.gguf", SearchOption.AllDirectories).Any();
+
+        if (string.Equals(name, "high-image", StringComparison.OrdinalIgnoreCase))
+            return Directory.Exists(targetDir) &&
+                   Directory.EnumerateFiles(targetDir, "*.mmproj", SearchOption.AllDirectories).Any();
+
         return Directory.EnumerateFileSystemEntries(targetDir, "*", SearchOption.AllDirectories).Any();
     }
 
@@ -96,33 +143,118 @@ public class AIModelsSetupService : IAIModelsSetupService
 
         var toInstall = Entries.Where(e => status.Missing.Contains(e.Name)).ToArray();
         var installed = new List<string>();
-        var totalSteps = toInstall.Length;
+        var n = toInstall.Length;
 
-        for (var i = 0; i < toInstall.Length; i++)
+        progress?.Report(new AIModelsSetupProgress
+        {
+            Progress = 0,
+            Message = $"Downloading {n} file(s)..."
+        });
+
+        var read = new long[n];
+        var totalExpected = new long[n];
+        var downloadDone = new bool[n];
+        var progressLock = new object();
+
+        void ReportDownloadProgress()
+        {
+            double sum = 0;
+            lock (progressLock)
+            {
+                for (var i = 0; i < n; i++)
+                {
+                    if (downloadDone[i])
+                        sum += 1;
+                    else if (totalExpected[i] > 0)
+                        sum += (double)read[i] / totalExpected[i];
+                }
+            }
+
+            var frac = n > 0 ? sum / n : 1;
+            progress?.Report(new AIModelsSetupProgress
+            {
+                Progress = DownloadPhaseProgressWeight * frac,
+                Message = null
+            });
+        }
+
+        using var downloadLimiter = new SemaphoreSlim(MaxConcurrentDownloads, MaxConcurrentDownloads);
+        var downloadTasks = new Task<Result<string>>[n];
+
+        async Task<Result<string>> DownloadSlotAsync(int slotIndex, string downloadUrl)
+        {
+            await downloadLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await DownloadWithRetryAsync(
+                    downloadUrl,
+                    slotIndex,
+                    (idx, byteRead, total) =>
+                    {
+                        lock (progressLock)
+                        {
+                            read[idx] = byteRead;
+                            if (total > 0)
+                                totalExpected[idx] = total;
+                        }
+
+                        ReportDownloadProgress();
+                    },
+                    () =>
+                    {
+                        lock (progressLock)
+                        {
+                            downloadDone[slotIndex] = true;
+                            if (totalExpected[slotIndex] > 0)
+                                read[slotIndex] = totalExpected[slotIndex];
+                        }
+
+                        ReportDownloadProgress();
+                    },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                downloadLimiter.Release();
+            }
+        }
+
+        for (var i = 0; i < n; i++)
+            downloadTasks[i] = DownloadSlotAsync(i, ReleaseBaseUrl + toInstall[i].FileName);
+
+        Result<string>[] downloadResults;
+        try
+        {
+            downloadResults = await Task.WhenAll(downloadTasks).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+
+        foreach (var r in downloadResults)
+        {
+            if (!r.IsSuccess)
+                return Result<AIModelsSetupResult>.Failure(r.ErrorMessage!, r.Exception);
+        }
+
+        var extractBase = DownloadPhaseProgressWeight;
+        var extractSpan = 1.0 - extractBase - 0.02;
+        for (var i = 0; i < n; i++)
         {
             var (name, fileName, relativePath) = toInstall[i];
-            var url = ReleaseBaseUrl + fileName;
+            var tempPath = downloadResults[i].Value!;
             var targetDir = Path.Combine(_modelsPath, relativePath);
 
             progress?.Report(new AIModelsSetupProgress
             {
-                Progress = (double)i / totalSteps,
-                Message = $"Downloading {fileName}..."
-            });
-
-            var downloadResult = await DownloadWithRetryAsync(url, progress, (double)i / totalSteps, 1.0 / totalSteps, cancellationToken).ConfigureAwait(false);
-            if (!downloadResult.IsSuccess)
-                return Result<AIModelsSetupResult>.Failure(downloadResult.ErrorMessage!, downloadResult.Exception);
-
-            progress?.Report(new AIModelsSetupProgress
-            {
-                Progress = (double)(i + 1) / totalSteps - 0.01,
+                Progress = extractBase + extractSpan * (i / (double)n),
                 Message = $"Extracting {fileName}..."
             });
 
             try
             {
-                ExtractZipToDirectory(downloadResult.Value!, targetDir);
+                ExtractZipToDirectory(tempPath, targetDir);
             }
             catch (Exception ex)
             {
@@ -130,13 +262,19 @@ public class AIModelsSetupService : IAIModelsSetupService
             }
             finally
             {
-                try { File.Delete(downloadResult.Value!); } catch { /* ignore */ }
+                try { File.Delete(tempPath); } catch { /* ignore */ }
             }
 
             installed.Add(name);
+
+            progress?.Report(new AIModelsSetupProgress
+            {
+                Progress = extractBase + extractSpan * ((i + 1) / (double)n),
+                Message = null
+            });
         }
 
-        progress?.Report(new AIModelsSetupProgress { Progress = 1.0, Message = "Refreshing model registry..." });
+        progress?.Report(new AIModelsSetupProgress { Progress = 0.98, Message = "Refreshing model registry..." });
 
         await _modelRegistry.RefreshAsync().ConfigureAwait(false);
 
@@ -147,14 +285,15 @@ public class AIModelsSetupService : IAIModelsSetupService
             await _settingsService.SetAsync("AI.LlamaCpp.ServerPath", defaultPath).ConfigureAwait(false);
         }
 
+        progress?.Report(new AIModelsSetupProgress { Progress = 1.0, Message = null });
         return Result<AIModelsSetupResult>.Success(new AIModelsSetupResult { Installed = installed });
     }
 
     private async Task<Result<string>> DownloadWithRetryAsync(
         string url,
-        IProgress<AIModelsSetupProgress>? progress,
-        double progressStart,
-        double progressSpan,
+        int slotIndex,
+        Action<int, long, long>? onChunkProgress,
+        Action? onDownloadComplete,
         CancellationToken cancellationToken)
     {
         Exception? lastEx = null;
@@ -176,13 +315,11 @@ public class AIModelsSetupService : IAIModelsSetupService
                     {
                         await fileStream.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
                         read += count;
-                        if (total > 0)
-                        {
-                            var p = progressStart + progressSpan * (read / (double)total);
-                            progress?.Report(new AIModelsSetupProgress { Progress = p, Message = null });
-                        }
+                        onChunkProgress?.Invoke(slotIndex, read, total);
                     }
                 }
+
+                onDownloadComplete?.Invoke();
                 return Result<string>.Success(tempPath);
             }
             catch (Exception ex)
@@ -192,6 +329,7 @@ public class AIModelsSetupService : IAIModelsSetupService
                     await Task.Delay(500 * (attempt + 1), cancellationToken).ConfigureAwait(false);
             }
         }
+
         return Result<string>.Failure($"Download failed: {lastEx?.Message ?? "Unknown error"}", lastEx);
     }
 

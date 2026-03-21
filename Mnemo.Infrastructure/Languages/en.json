@@ -1,4 +1,8 @@
 {
+  "Hardware": {
+    "ModelTierMismatchTitle": "Hardware vs installed models",
+    "ModelTierMismatchMessage": "Detected VRAM suggests a lower tier than some models you have installed. Routing may prefer smaller models until GPU memory is read correctly. If you recently changed GPUs or drivers, restart the app."
+  },
   "Common": {
     "OK": "OK",
     "Cancel": "Cancel",
@@ -76,12 +80,10 @@
     "EnableAIAssistantDescription": "Use AI to help you write, summarize, and organize.",
     "WipeInputForDictation": "Wipe input for dictation",
     "WipeInputForDictationDescription": "When enabled, voice input replaces the current text. When disabled, voice input is appended to existing text.",
-    "SmartSwitch": "Smart Switch",
-    "SmartSwitchDescription": "Automatically use the smarter (but slower) model for complex tasks.",
     "SmartUnitGeneration": "Smart Unit Generation",
     "SmartUnitGenerationDescription": "Generate only the first unit on creation, then others on-demand.",
     "GpuAcceleration": "GPU Acceleration",
-    "GpuAccelerationDescription": "Use your graphics card to speed up AI inference. Requires NVIDIA GPU with CUDA.",
+    "GpuAccelerationDescription": "When unset, chat models use GPU offload if an NVIDIA GPU is detected (backend depends on your llama-server build: CUDA, Vulkan, or Metal). The small orchestration model uses CPU by default. Turn off to force CPU for all. Metadata PreferCpu / ForceGpu can override per model.",
     "UnloadTimeout": "Unload Timeout",
     "UnloadTimeoutDescription": "Free up memory when AI models are not in use.",
     "EnableRAG": "Enable RAG",
@@ -128,25 +130,25 @@
     "WelcomeTitle": "Welcome to Mnemo",
     "WelcomeDescription": "This application is under active development. Features may change and data formats are not yet final. Use at your own risk.",
     "PersonalizeTitle": "Personalize your experience",
-    "PersonalizeDescription": "Choose your display name, theme, app icon, and profile picture. You can change these later in Settings.",
+    "PersonalizeDescription": "Pick a name, colors, and a profile picture so Mnemo feels like yours. You can change these anytime in Settings.",
     "LanguageTitle": "Select Language",
-    "LanguageDescription": "Choose the language for the application interface.",
+    "LanguageDescription": "Pick the language you want Mnemo to use.",
     "AISetupTitle": "Set up Atlas AI",
-    "AISetupDescription": "Download the required AI model files (embedding, server, router, and fast) to enable local AI features. Already installed components are skipped; only missing ones are downloaded.",
+    "AISetupDescription": "We'll download Atlas AI so the study assistant works on your computer. You don't need to change any settings—we pick a size that fits your machine. If it's already installed, we skip this step.",
     "YourName": "Your name",
     "EnterYourName": "Enter your name",
-    "DownloadModels": "Download models",
+    "DownloadModels": "Download Atlas AI",
     "Starting": "Starting...",
     "Cancelled": "Cancelled",
     "DownloadFailed": "Download failed.",
     "Ready": "Ready",
-    "AllModelsInstalled": "All models already installed.",
+    "AllModelsInstalled": "Atlas AI is already set up on this computer.",
     "Theme": "Theme",
-    "ThemeDescription": "Select the visual style.",
+    "ThemeDescription": "Choose how Mnemo looks.",
     "AppIconLabel": "App icon",
-    "AppIconDescription": "Icon shown in the taskbar.",
+    "AppIconDescription": "The small picture for Mnemo in the taskbar.",
     "ProfilePictureLabel": "Profile picture",
-    "ProfilePictureDescription": "Your avatar in the app.",
+    "ProfilePictureDescription": "Your picture in the app.",
     "VersionFormat": "Version {0}"
   },
   "Sidebar": {
@@ -223,7 +225,9 @@
     "SuggestionSummarize": "Summarize",
     "ErrorSorry": "I'm sorry, I couldn't generate a response.",
     "GenerationStopped": "Generation stopped.",
-    "ErrorUnexpected": "An unexpected error occurred. Please try again later."
+    "ErrorUnexpected": "An unexpected error occurred. Please try again later.",
+    "PipelineStatusRouting": "Routing request",
+    "PipelineStatusProcessing": "Processing"
   },
   "Notes": {
     "NewNote": "New Note",

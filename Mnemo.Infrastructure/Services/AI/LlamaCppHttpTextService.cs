@@ -220,7 +220,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
         _httpClient.Dispose();
     }
 
-    /// <summary>Build request body for chat completions. When responseJsonSchema is set or manifest is a router, adds response_format so the Llama server forces JSON output (same mechanism as routing). When imageBase64Contents is set, builds multimodal user content (OpenAI vision format).</summary>
+    /// <summary>Build request body for chat completions. When responseJsonSchema is set, adds response_format so the Llama server forces JSON output. When imageBase64Contents is set, builds multimodal user content (OpenAI vision format).</summary>
     private static object BuildChatRequest(string prompt, double temperature, int maxTokens, bool stream, AIModelManifest manifest, object? responseJsonSchema = null, IReadOnlyList<string>? imageBase64Contents = null)
     {
         object content;
@@ -244,11 +244,8 @@ public class LlamaCppHttpTextService : ITextGenerationService
 
         if (responseJsonSchema != null)
         {
-            responseFormat = BuildJsonSchemaResponseFormat("learning_path", responseJsonSchema);
-        }
-        else if (manifest.Role == "router")
-        {
-            responseFormat = BuildJsonSchemaResponseFormat("router_response", GetRouterSchema());
+            var schemaName = manifest.Role == AIModelRoles.Manager ? "routing" : "learning_path";
+            responseFormat = BuildJsonSchemaResponseFormat(schemaName, responseJsonSchema);
         }
 
         return responseFormat != null
@@ -256,7 +253,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
             : new { messages, temperature, max_tokens = maxTokens, stream };
     }
 
-    /// <summary>Build response_format for Llama server forced JSON output (OpenAI-compatible json_schema). Same pattern used for router and learning path.</summary>
+    /// <summary>Build response_format for Llama server forced JSON output (OpenAI-compatible json_schema). Same pattern used for manager routing and learning path.</summary>
     private static object BuildJsonSchemaResponseFormat(string schemaName, object schema)
     {
         return new
@@ -271,30 +268,12 @@ public class LlamaCppHttpTextService : ITextGenerationService
         };
     }
 
-    private static readonly object RouterSchema = new
-    {
-        type = "object",
-        properties = new
-        {
-            r = new
-            {
-                type = "integer",
-                @enum = new[] { 0, 1 },
-                description = "0=SMALL fast, 1=LARGE smart"
-            }
-        },
-        required = new[] { "r" },
-        additionalProperties = false
-    };
-
-    private static object GetRouterSchema() => RouterSchema;
-
     private (double temperature, int maxTokens) GetGenerationParams(AIModelManifest manifest)
     {
-        // Router model needs deterministic, short responses
-        if (manifest.Role == "router")
+        // Mini orchestration model: deterministic, bounded JSON
+        if (manifest.Role == AIModelRoles.Manager)
         {
-            return (0.0, 10);
+            return (0.0, 256);
         }
 
         // Try to read from metadata

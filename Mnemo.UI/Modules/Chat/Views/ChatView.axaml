@@ -14,6 +14,7 @@
 
     <UserControl.Resources>
         <converters:BoolToStreamingIntervalConverter x:Key="BoolToStreamingIntervalConverter"/>
+        <converters:NullToBoolConverter x:Key="StringNotEmptyToBoolConverter"/>
         <converters:AssistantModeToLabelConverter x:Key="AssistantModeToLabelConverter"/>
         <converters:LocalPathToBitmapConverter x:Key="LocalPathToBitmapConverter"/>
         <converters:ChatAttachmentKindToBoolConverter x:Key="ChatAttachmentKindToBoolConverter"/>
@@ -143,6 +144,31 @@
                                                        FontSize="{DynamicResource FontSize.Body.Small}"
                                                        FontFamily="{DynamicResource Font.SemiBold}"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+                                            <Border IsVisible="{Binding PipelineStatusText, Converter={StaticResource StringNotEmptyToBoolConverter}}"
+                                                    Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                                    CornerRadius="8" Padding="10,8" Margin="0,4,0,0"
+                                                    BorderBrush="{DynamicResource SidebarBorderBrush}" BorderThickness="1">
+                                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                                    <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource CardAccentBrush}">
+                                                        <Border.Styles>
+                                                            <Style Selector="Border">
+                                                                <Style.Animations>
+                                                                    <Animation Duration="0:0:1.2" IterationCount="Infinite">
+                                                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1.0"/></KeyFrame>
+                                                                        <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.35"/></KeyFrame>
+                                                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1.0"/></KeyFrame>
+                                                                    </Animation>
+                                                                </Style.Animations>
+                                                            </Style>
+                                                        </Border.Styles>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding PipelineStatusText}"
+                                                               FontSize="{DynamicResource FontSize.Body.Caption}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
 
                                             <Expander IsVisible="{Binding IsThinking}"
                                                       Padding="0" MinHeight="0"

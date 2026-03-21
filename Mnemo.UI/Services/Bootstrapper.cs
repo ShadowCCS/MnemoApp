@@ -13,6 +13,7 @@ using Mnemo.Infrastructure.Services;
 using Mnemo.Core.History;
 using Mnemo.Infrastructure.History;
 using Mnemo.Infrastructure.Services.AI;
+using Mnemo.Infrastructure.Services.AI.PlatformHardware;
 using Mnemo.Infrastructure.Services.Knowledge;
 using Mnemo.Infrastructure.Services.Speech;
 
@@ -34,6 +35,8 @@ public static class Bootstrapper
         services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
 
         // AI Services
+        services.AddSingleton<IPlatformHardwareGpuProvider>(sp =>
+            PlatformHardwareGpuProviderFactory.Create(sp.GetRequiredService<ILoggerService>()));
         services.AddSingleton<HardwareDetector>();
         services.AddSingleton<IAIModelRegistry, ModelRegistry>();
         services.AddSingleton<IAIModelsSetupService, AIModelsSetupService>();
@@ -41,6 +44,8 @@ public static class Bootstrapper
         services.AddSingleton<LlamaCppServerManager>();
         services.AddSingleton<IAIServerManager>(sp => sp.GetRequiredService<LlamaCppServerManager>());
         services.AddSingleton<ITextGenerationService, LlamaCppHttpTextService>();
+        services.AddSingleton<IHardwareTierEvaluator, HardwareTierEvaluator>();
+        services.AddSingleton<IOrchestrationLayer, OrchestrationLayerService>();
         services.AddSingleton<IAIOrchestrator, AIOrchestrator>();
         services.AddSingleton<IAITaskManager, AITaskManager>();
 
@@ -90,6 +95,8 @@ public static class Bootstrapper
 
         var serviceProvider = services.BuildServiceProvider();
 
+        serviceProvider.GetRequiredService<HardwareDetector>().Initialize();
+
         // 5. Load saved or default language
         _ = LoadSavedLanguageAsync(serviceProvider);
 
@@ -115,7 +122,7 @@ public static class Bootstrapper
         var modelRegistry = serviceProvider.GetRequiredService<IAIModelRegistry>();
         _ = modelRegistry.RefreshAsync();
 
-        // 7. Auto-start router model server
+        // 7. Auto-start manager (mini orchestration) model server
         var serverManager = serviceProvider.GetRequiredService<LlamaCppServerManager>();
         var logger = serviceProvider.GetRequiredService<ILoggerService>();
         
@@ -127,22 +134,22 @@ public static class Bootstrapper
                 await Task.Delay(500);
                 
                 var models = await modelRegistry.GetAvailableModelsAsync();
-                var routerModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == "router");
+                var managerModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == AIModelRoles.Manager);
                 
-                if (routerModel != null)
+                if (managerModel != null)
                 {
-                    logger.Info("Bootstrapper", "Auto-starting router model server...");
-                    await serverManager.EnsureRunningAsync(routerModel, CancellationToken.None);
-                    logger.Info("Bootstrapper", "Router model server started successfully.");
+                    logger.Info("Bootstrapper", "Auto-starting manager (orchestration) model server...");
+                    await serverManager.EnsureRunningAsync(managerModel, CancellationToken.None);
+                    logger.Info("Bootstrapper", "Manager model server started successfully.");
                 }
                 else
                 {
-                    logger.Warning("Bootstrapper", "No router model found. Router auto-start skipped.");
+                    logger.Warning("Bootstrapper", "No manager model found. Orchestration auto-start skipped.");
                 }
             }
             catch (Exception ex)
             {
-                logger.Error("Bootstrapper", "Failed to auto-start router model", ex);
+                logger.Error("Bootstrapper", "Failed to auto-start manager model", ex);
             }
         });
 

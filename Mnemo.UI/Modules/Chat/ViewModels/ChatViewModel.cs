@@ -37,6 +37,7 @@ public class ChatViewModel : ViewModelBase
     private readonly IOverlayService _overlayService;
     private readonly ISpeechRecognitionService _speechService;
     private readonly ISettingsService _settingsService;
+    private readonly ChatTypingPrefetchHelper _typingPrefetch;
 
     /// <summary>When recording started, if append mode: content that was in the input before dictation.</summary>
     private string _inputTextBeforeRecording = string.Empty;
@@ -54,6 +55,7 @@ public class ChatViewModel : ViewModelBase
                 ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
                 if (wasEmpty && !string.IsNullOrWhiteSpace(value))
                     WarmUpSafe();
+                _typingPrefetch.NotifyInputChanged(IsBusy, IsRecording);
             }
         }
     }
@@ -140,7 +142,7 @@ public class ChatViewModel : ViewModelBase
     private TimeSpan _recordingDuration;
     public string RecordingDurationText => _recordingDuration.ToString(@"mm\:ss");
 
-    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService, ISpeechRecognitionService speechService, ISettingsService settingsService)
+    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService, ISpeechRecognitionService speechService, ISettingsService settingsService, ChatPauseToSendEstimator pauseToSendEstimator)
     {
         _orchestrator = orchestrator;
         _logger = logger;
@@ -148,6 +150,7 @@ public class ChatViewModel : ViewModelBase
         _overlayService = overlayService;
         _speechService = speechService;
         _settingsService = settingsService;
+        _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
@@ -289,7 +292,7 @@ public class ChatViewModel : ViewModelBase
     {
         try
         {
-            await _orchestrator.WarmUpFastModelAsync();
+            await _orchestrator.WarmUpLowTierModelAsync();
         }
         catch (Exception ex)
         {
@@ -425,6 +428,8 @@ public class ChatViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(InputText) || IsBusy) return;
 
+        await _typingPrefetch.RecordSendPauseAsync().ConfigureAwait(false);
+
         var userMessage = InputText;
         InputText = string.Empty;
 
@@ -478,6 +483,7 @@ public class ChatViewModel : ViewModelBase
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
+                    aiMessage.PipelineStatusText = null;
                     aiMessage.IsStreaming = false;
                 });
                 IsBusy = false;
@@ -493,8 +499,16 @@ public class ChatViewModel : ViewModelBase
                 ? userMessage
                 : $"{context}\nUser: {userMessage}";
 
+            var pipelineProgress = new Progress<string>(key =>
+                Dispatcher.UIThread.Post(() => aiMessage.PipelineStatusText = _localizationService.T(key, "Chat")));
+
             void UpdateContent(string content) =>
-                Dispatcher.UIThread.Post(() => aiMessage.Content = content);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    aiMessage.Content = content;
+                    if (!string.IsNullOrEmpty(content))
+                        aiMessage.PipelineStatusText = null;
+                });
 
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingAsync(
                 _orchestrator,
@@ -502,11 +516,14 @@ public class ChatViewModel : ViewModelBase
                 fullPrompt,
                 _cts.Token,
                 UpdateContent,
-                imageBase64);
+                imageBase64,
+                routingUserMessage: userMessage,
+                pipelineProgress);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 aiMessage.Content = finalContent;
+                aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
 
@@ -522,6 +539,7 @@ public class ChatViewModel : ViewModelBase
             {
                 if (string.IsNullOrEmpty(aiMessage.Content))
                     aiMessage.Content = _localizationService.T("GenerationStopped", "Chat");
+                aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
         }
@@ -531,6 +549,7 @@ public class ChatViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
+                aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
         }

@@ -1,4 +1,8 @@
 {
+  "Hardware": {
+    "ModelTierMismatchTitle": "Hardware vs. installierte Modelle",
+    "ModelTierMismatchMessage": "Die erkannte VRAM deutet auf eine niedrigere Stufe als bei einigen installierten Modellen hin. Routing kann kleinere Modelle bevorzugen, bis der GPU-Speicher korrekt erkannt wird. Nach GPU-/Treiberwechsel die App neu starten."
+  },
   "Common": {
     "OK": "OK",
     "Cancel": "Abbrechen",
@@ -76,12 +80,10 @@
     "EnableAIAssistantDescription": "Nutzen Sie KI zur Unterstützung beim Schreiben, Zusammenfassen und Organisieren.",
     "WipeInputForDictation": "Eingabe bei Diktat ersetzen",
     "WipeInputForDictationDescription": "Wenn aktiviert, ersetzt Spracheingabe den aktuellen Text. Wenn deaktiviert, wird die Spracheingabe an den bestehenden Text angehängt.",
-    "SmartSwitch": "Intelligente Umschaltung",
-    "SmartSwitchDescription": "Automatisch den leistungsfähigeren (aber langsameren) Modell für komplexe Aufgaben verwenden.",
     "SmartUnitGeneration": "Intelligentes Einheitengenerieren",
     "SmartUnitGenerationDescription": "Erzeugen Sie nur die erste Einheit bei Erstellung, dann weitere auf Anfrage.",
     "GpuAcceleration": "GPU-Beschleunigung",
-    "GpuAccelerationDescription": "Nutzen Sie Ihre Grafikkarte zur Beschleunigung der KI-Infektion. Benötigt eine NVIDIA-Grafikkarte mit CUDA.",
+    "GpuAccelerationDescription": "Wenn nicht gesetzt: Chat-Modelle nutzen GPU-Offloading bei erkanntem NVIDIA (Backend hängt vom llama-server-Build ab: CUDA, Vulkan, Metal). Das kleine Orchestrierungsmodell nutzt standardmäßig die CPU. Aus = CPU für alle erzwingen. Metadata PreferCpu/ForceGpu pro Modell möglich.",
     "UnloadTimeout": "Zeitlimit zum Löschen",
     "UnloadTimeoutDescription": "Freigeben Sie Speicher, wenn die KI-Modelle nicht genutzt werden.",
     "EnableRAG": "RAG aktivieren",
@@ -127,26 +129,26 @@
   "Onboarding": {
     "WelcomeTitle": "Willkommen bei Mnemo",
     "WelcomeDescription": "Diese Anwendung befindet sich im aktiven Entwicklungsstadium. Funktionen können sich ändern und Datenformate sind noch nicht finalisiert. Nutzen Sie dies auf eigene Gefahr.",
-    "PersonalizeTitle": "Personalisieren Sie Ihre Erfahrung",
-    "PersonalizeDescription": "Wählen Sie Ihren Anzeigenamen, Thema, App-Icon und Profilbild aus. Sie können diese später in den Einstellungen ändern.",
+    "PersonalizeTitle": "Mnemo an dich anpassen",
+    "PersonalizeDescription": "Wähle Name, Farben und ein Profilbild, damit sich Mnemo für dich anfühlt. Du kannst das später jederzeit in den Einstellungen ändern.",
     "LanguageTitle": "Sprache wählen",
-    "LanguageDescription": "Wählen Sie die Sprache für das Benutzeroberflächen der Anwendung.",
+    "LanguageDescription": "Wähle die Sprache, in der Mnemo angezeigt werden soll.",
     "AISetupTitle": "Atlas KI einrichten",
-    "AISetupDescription": "Laden Sie die erforderlichen KI-Modelldateien (Embedding, Server, Router und schnell) herunter, um lokale KI-Funktionen zu aktivieren. Bereits installierte Komponenten werden übersprungen; nur fehlende werden geladen.",
-    "YourName": "Ihr Name",
-    "EnterYourName": "Geben Sie Ihren Namen ein",
-    "DownloadModels": "Modelle herunterladen",
+    "AISetupDescription": "Wir laden Atlas KI herunter, damit der Lernassistent auf deinem Rechner läuft. Du musst nichts einstellen—wir wählen eine passende Größe. Ist schon etwas installiert, überspringen wir diesen Schritt.",
+    "YourName": "Dein Name",
+    "EnterYourName": "Gib deinen Namen ein",
+    "DownloadModels": "Atlas KI herunterladen",
     "Starting": "Startet...",
     "Cancelled": "Abbrochen",
     "DownloadFailed": "Herunterladung fehlgeschlagen.",
     "Ready": "Bereit",
-    "AllModelsInstalled": "Alle Modelle bereits installiert.",
+    "AllModelsInstalled": "Atlas KI ist auf diesem Rechner schon eingerichtet.",
     "Theme": "Thema",
-    "ThemeDescription": "Wählen Sie den visuellen Stil aus.",
+    "ThemeDescription": "Wähle, wie Mnemo aussieht.",
     "AppIconLabel": "App-Icon",
-    "AppIconDescription": "Ikon, das in der Taskleiste angezeigt wird.",
+    "AppIconDescription": "Das kleine Symbol für Mnemo in der Taskleiste.",
     "ProfilePictureLabel": "Profilbild",
-    "ProfilePictureDescription": "Ihr Avatar in der App.",
+    "ProfilePictureDescription": "Dein Bild in der App.",
     "VersionFormat": "Version {0}"
   },
   "Sidebar": {
@@ -223,7 +225,9 @@
     "SuggestionSummarize": "Zusammenfassen",
     "ErrorSorry": "Entschuldigung, ich konnte keine Antwort generieren.",
     "GenerationStopped": "Generierung gestoppt.",
-    "ErrorUnexpected": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut."
+    "ErrorUnexpected": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+    "PipelineStatusRouting": "Anfrage wird geroutet",
+    "PipelineStatusProcessing": "Wird verarbeitet"
   },
   "Notes": {
     "NewNote": "Neue Notiz",
