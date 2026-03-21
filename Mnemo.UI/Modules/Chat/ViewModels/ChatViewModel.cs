@@ -510,6 +510,9 @@ public class ChatViewModel : ViewModelBase
                         aiMessage.PipelineStatusText = null;
                 });
 
+            var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
+            var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);
+
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingAsync(
                 _orchestrator,
                 ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
@@ -518,7 +521,8 @@ public class ChatViewModel : ViewModelBase
                 UpdateContent,
                 imageBase64,
                 routingUserMessage: userMessage,
-                pipelineProgress);
+                pipelineProgress,
+                displayOptions);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {

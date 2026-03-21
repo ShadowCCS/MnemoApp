@@ -24,6 +24,7 @@ public partial class RightSidebarViewModel : ViewModelBase
     private readonly IAIOrchestrator _orchestrator;
     private readonly ILoggerService _logger;
     private readonly ILocalizationService _localizationService;
+    private readonly ISettingsService _settingsService;
     private readonly ChatTypingPrefetchHelper _typingPrefetch;
 
     [ObservableProperty]
@@ -68,11 +69,12 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
 
-    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, ChatPauseToSendEstimator pauseToSendEstimator)
+    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, ISettingsService settingsService, ChatPauseToSendEstimator pauseToSendEstimator)
     {
         _orchestrator = orchestrator;
         _logger = logger;
         _localizationService = localizationService;
+        _settingsService = settingsService;
         _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
 
         ToggleCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
@@ -186,6 +188,9 @@ public partial class RightSidebarViewModel : ViewModelBase
                         aiMessage.PipelineStatusText = null;
                 });
 
+            var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
+            var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);
+
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingAsync(
                 _orchestrator,
                 ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
@@ -194,7 +199,8 @@ public partial class RightSidebarViewModel : ViewModelBase
                 UpdateContent,
                 imageBase64Contents: null,
                 routingUserMessage: userMessage,
-                pipelineStatus: pipelineProgress);
+                pipelineProgress,
+                displayOptions);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {

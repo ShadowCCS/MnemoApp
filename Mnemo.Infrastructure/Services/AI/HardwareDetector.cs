@@ -12,6 +12,9 @@ public sealed class HardwareDetector
     private readonly object _lock = new();
     private HardwareInfo? _cached;
 
+    /// <summary>Raised when <see cref="Refresh"/> clears the hardware snapshot (GPU list and aggregated <see cref="HardwareInfo"/>).</summary>
+    public event Action? SnapshotInvalidated;
+
     public HardwareDetector(ILoggerService logger, IPlatformHardwareGpuProvider platformGpu)
     {
         _logger = logger;
@@ -28,6 +31,9 @@ public sealed class HardwareDetector
         {
             _cached = null;
         }
+
+        _platformGpu.InvalidateCache();
+        SnapshotInvalidated?.Invoke();
     }
 
     /// <summary>Returns the cached <see cref="HardwareInfo"/> when available; otherwise samples the OS once and logs.</summary>

@@ -8,4 +8,8 @@ public sealed class NullHardwareGpuProvider : IPlatformHardwareGpuProvider
 {
     public HardwareGpuSnapshot GetGpuSnapshot() =>
         new(false, false, 0);
+
+    public void InvalidateCache()
+    {
+    }
 }

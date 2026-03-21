@@ -40,8 +40,10 @@ public class LlamaCppServerManager : IAIServerManager
     private readonly Timer _cleanupTimer;
     private readonly string _registryPath;
 
-    private readonly TimeSpan _fastIdleTimeout = TimeSpan.FromMinutes(15);
-    private readonly TimeSpan _smartIdleTimeout = TimeSpan.FromMinutes(7);
+    /// <summary>From <c>AI.UnloadTimeout</c>; <see langword="null"/> means never unload (orchestration manager is always excluded).</summary>
+    private TimeSpan? _idleUnloadAfter;
+
+    private readonly object _idlePolicyLock = new();
 
     private int _disposed;
 
@@ -65,6 +67,31 @@ public class LlamaCppServerManager : IAIServerManager
         KillLeftoversOnStartup();
 
         _cleanupTimer = new Timer(CleanupIdleServers, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+
+        ReloadIdleUnloadPolicy();
+        _settings.SettingChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, string key)
+    {
+        if (key == "AI.UnloadTimeout")
+            ReloadIdleUnloadPolicy();
+    }
+
+    private void ReloadIdleUnloadPolicy()
+    {
+        try
+        {
+            var raw = _settings.GetAsync("AI.UnloadTimeout", "FifteenMinutes").GetAwaiter().GetResult();
+            lock (_idlePolicyLock)
+            {
+                _idleUnloadAfter = UnloadTimeoutPolicy.ParseToIdleSpanOrNull(raw);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning("LlamaCppServerManager", $"Could not read AI.UnloadTimeout: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -812,6 +839,15 @@ public class LlamaCppServerManager : IAIServerManager
             return;
         }
 
+        TimeSpan? idleUnloadAfter;
+        lock (_idlePolicyLock)
+        {
+            idleUnloadAfter = _idleUnloadAfter;
+        }
+
+        if (idleUnloadAfter == null)
+            return;
+
         var now = DateTime.UtcNow;
 
         foreach (var kvp in _lastUsed.ToList())
@@ -832,14 +868,11 @@ public class LlamaCppServerManager : IAIServerManager
                 continue;
             }
 
-            var shouldUnload = manifest.Role switch
-            {
-                AIModelRoles.Low => idle > _fastIdleTimeout,
-                AIModelRoles.Mid or AIModelRoles.High => idle > _smartIdleTimeout,
-                _ => false
-            };
+            var threshold = UnloadTimeoutPolicy.TierAdjustedIdle(
+                idleUnloadAfter.Value,
+                manifest.Role is AIModelRoles.Mid or AIModelRoles.High);
 
-            if (shouldUnload && serverProcess.ActiveRequests == 0)
+            if (idle > threshold && serverProcess.ActiveRequests == 0)
             {
                 _logger.Info("LlamaCppServerManager", $"Model {manifest.DisplayName} idle for {idle.TotalMinutes:F1} minutes, unloading...");
                 _ = StopServerAsync(modelId);
@@ -854,6 +887,7 @@ public class LlamaCppServerManager : IAIServerManager
             return;
         }
 
+        _settings.SettingChanged -= OnSettingsChanged;
         _cleanupTimer.Dispose();
         _httpClient.Dispose();
         foreach (var sem in _locks.Values)

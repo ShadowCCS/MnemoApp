@@ -13,6 +13,8 @@ namespace Mnemo.Infrastructure.Services.AI.PlatformHardware;
 public sealed class WindowsHardwareGpuProvider : IPlatformHardwareGpuProvider
 {
     private readonly ILoggerService _logger;
+    private readonly object _cacheLock = new();
+    private HardwareGpuSnapshot? _cachedSnapshot;
 
     public WindowsHardwareGpuProvider(ILoggerService logger)
     {
@@ -21,6 +23,12 @@ public sealed class WindowsHardwareGpuProvider : IPlatformHardwareGpuProvider
 
     public HardwareGpuSnapshot GetGpuSnapshot()
     {
+        lock (_cacheLock)
+        {
+            if (_cachedSnapshot != null)
+                return _cachedSnapshot;
+        }
+
         var dxgi = DxgiInterop.TryGetGpuInfo();
         var hasNvidia = dxgi.HasNvidia;
         var hasAmd = dxgi.HasAmd;
@@ -35,7 +43,22 @@ public sealed class WindowsHardwareGpuProvider : IPlatformHardwareGpuProvider
         var nvml = NvmlInterop.TryGetMaxTotalVramBytes();
         vram = Math.Max(vram, Math.Max(wmi, nvml));
 
-        return new HardwareGpuSnapshot(hasNvidia, hasAmd, Math.Max(0, vram));
+        var snapshot = new HardwareGpuSnapshot(hasNvidia, hasAmd, Math.Max(0, vram));
+        lock (_cacheLock)
+        {
+            if (_cachedSnapshot != null)
+                return _cachedSnapshot;
+            _cachedSnapshot = snapshot;
+            return _cachedSnapshot;
+        }
+    }
+
+    public void InvalidateCache()
+    {
+        lock (_cacheLock)
+        {
+            _cachedSnapshot = null;
+        }
     }
 
     private void MergeWmiVendorFlags(ref bool hasNvidia, ref bool hasAmd)

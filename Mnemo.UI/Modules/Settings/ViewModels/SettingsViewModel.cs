@@ -3,6 +3,7 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.AI;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules.Settings.ViewModels;
@@ -100,16 +101,15 @@ public partial class SettingsViewModel : ViewModelBase
         var editorGroup = new SettingsGroupViewModel(T("WritingExperience"));
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.AutoSave", T("AutoSave"), T("AutoSaveDescription"), true));
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.SpellCheck", T("SpellCheck"), T("SpellCheckDescription"), true));
-        editorGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Editor.DefaultView", T("DefaultView"), T("DefaultViewDescription"), new[] { T("EditorOnly"), T("PreviewOnly"), T("SplitView") }));
         editorGroup.Items.Add(new StepSliderSettingViewModel(_settingsService, "Editor.Width", T("EditorWidth"), T("EditorWidthDescription"), new[] { T("SuperCompact"), T("Compact"), T("Wide"), T("SuperWide") }, T("Wide")));
 
         var markdownGroup = new SettingsGroupViewModel(T("MarkdownRendering"));
         markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.BlockSpacing", T("BlockSpacing"), T("BlockSpacingDescription"), new[] { T("Normal"), T("Compact"), T("Relaxed") }));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LineHeight", T("LineSpacing"), T("LineSpacingDescription"), new[] { "1.0", "1.2", "1.4", "1.45", "1.5", "1.6", "1.8", "2.0" }, "1.5"));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LetterSpacing", T("LetterSpacing"), T("LetterSpacingDescription"), new[] { "0", "0.2", "0.3", "0.4", "0.5", "0.8", "1.0", "1.5" }, "0.3"));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.FontSize", T("BaseFontSize"), T("BaseFontSizeDescription"), new[] { "12px", "13px", "14px", "15px", "16px", "17px", "18px" }, "16px"));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.CodeFontSize", T("CodeFontSize"), T("CodeFontSizeDescription"), new[] { "12px", "13px", "14px", "15px", "16px" }, "16px"));
-        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.MathFontSize", T("MathFontSize"), T("MathFontSizeDescription"), new[] { "14px", "16px", "18px", "20px" }, "16px"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LineHeight", T("LineSpacing"), T("LineSpacingDescription"), new[] { "1.0", "1.2", "1.4", "1.45", "1.5", "1.6", "1.8", "2.0" }, null, "1.5"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LetterSpacing", T("LetterSpacing"), T("LetterSpacingDescription"), new[] { "0", "0.2", "0.3", "0.4", "0.5", "0.8", "1.0", "1.5" }, null, "0.3"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.FontSize", T("BaseFontSize"), T("BaseFontSizeDescription"), new[] { "12px", "13px", "14px", "15px", "16px", "17px", "18px" }, null, "16px"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.CodeFontSize", T("CodeFontSize"), T("CodeFontSizeDescription"), new[] { "12px", "13px", "14px", "15px", "16px" }, null, "16px"));
+        markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.MathFontSize", T("MathFontSize"), T("MathFontSizeDescription"), new[] { "14px", "16px", "18px", "20px" }, null, "16px"));
         markdownGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Markdown.RenderMath", T("RenderLatexMath"), T("RenderLatexMathDescription"), true));
 
         editor.Groups.Add(editorGroup);
@@ -121,9 +121,25 @@ public partial class SettingsViewModel : ViewModelBase
         var aiGroup = new SettingsGroupViewModel(T("Intelligence"));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", T("EnableAIAssistant"), T("EnableAIAssistantDescription"), true));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Chat.WipeInputForDictation", T("WipeInputForDictation"), T("WipeInputForDictationDescription"), false));
+        aiGroup.Items.Add(new DropdownSettingViewModel(
+            _settingsService,
+            "Chat.StreamingReveal",
+            T("ChatStreamingReveal"),
+            T("ChatStreamingRevealDescription"),
+            new[] { "instant", "balanced", "smooth" },
+            new[] { T("StreamingInstant"), T("StreamingBalanced"), T("StreamingSmooth") },
+            "balanced"));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartUnitGeneration", T("SmartUnitGeneration"), T("SmartUnitGenerationDescription")));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", T("GpuAcceleration"), T("GpuAccelerationDescription")));
-        aiGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.UnloadTimeout", T("UnloadTimeout"), T("UnloadTimeoutDescription"), new[] { T("Never"), T("FiveMinutes"), T("FifteenMinutes"), T("OneHour") }));
+        aiGroup.Items.Add(new DropdownSettingViewModel(
+            _settingsService,
+            "AI.UnloadTimeout",
+            T("UnloadTimeout"),
+            T("UnloadTimeoutDescription"),
+            new[] { UnloadTimeoutPolicy.Never, UnloadTimeoutPolicy.FiveMinutes, UnloadTimeoutPolicy.FifteenMinutes, UnloadTimeoutPolicy.OneHour },
+            new[] { T("Never"), T("FiveMinutes"), T("FifteenMinutes"), T("OneHour") },
+            UnloadTimeoutPolicy.FifteenMinutes,
+            UnloadTimeoutPolicy.TryNormalizeToCanonicalKey));
 
         var ragGroup = new SettingsGroupViewModel(T("LocalKnowledge"));
         ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", T("EnableRAG"), T("EnableRAGDescription"), true));
@@ -145,14 +161,14 @@ public partial class SettingsViewModel : ViewModelBase
         var mindmap = new SettingsCategoryViewModel(T("Mindmap"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Mindmap");
 
         var gridGroup = new SettingsGroupViewModel(T("GridBackground"));
-        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridType", T("GridType"), T("GridTypeDescription"), new[] { "None", "Dotted", "Lines" }, "Dotted"));
-        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridSize", T("GridSize"), T("GridSizeDescription"), new[] { "20", "40", "60", "80", "100" }, "40"));
-        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridDotSize", T("GridDotSize"), T("GridDotSizeDescription"), new[] { "0.5", "1.0", "1.5", "2.0", "2.5", "3.0" }, "1.5"));
-        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridOpacity", T("GridOpacity"), T("GridOpacityDescription"), new[] { "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.8", "1.0" }, "0.2"));
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridType", T("GridType"), T("GridTypeDescription"), new[] { "None", "Dotted", "Lines" }, null, "Dotted"));
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridSize", T("GridSize"), T("GridSizeDescription"), new[] { "20", "40", "60", "80", "100" }, null, "40"));
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridDotSize", T("GridDotSize"), T("GridDotSizeDescription"), new[] { "0.5", "1.0", "1.5", "2.0", "2.5", "3.0" }, null, "1.5"));
+        gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridOpacity", T("GridOpacity"), T("GridOpacityDescription"), new[] { "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.8", "1.0" }, null, "0.2"));
 
         var behaviourGroup = new SettingsGroupViewModel(T("Interaction"));
-        behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.MinimapVisibility", T("ShowMinimap"), T("ShowMinimapDescription"), new[] { "Auto", "On", "Off" }, "Auto"));
-        behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.ModifierBehaviour", T("ShiftBehaviour"), T("ShiftBehaviourDescription"), new[] { T("Selecting"), T("Panning") }, T("Selecting")));
+        behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.MinimapVisibility", T("ShowMinimap"), T("ShowMinimapDescription"), new[] { "Auto", "On", "Off" }, null, "Auto"));
+        behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.ModifierBehaviour", T("ShiftBehaviour"), T("ShiftBehaviourDescription"), new[] { T("Selecting"), T("Panning") }, null, T("Selecting")));
 
         mindmap.Groups.Add(gridGroup);
         mindmap.Groups.Add(behaviourGroup);

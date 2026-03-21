@@ -46,6 +46,8 @@ public class AIOrchestrator : IAIOrchestrator
     private DateTime _lastHeavyChatWarmUtc = DateTime.MinValue;
     private string? _lastHeavyChatWarmModelId;
 
+    private HardwarePerformanceTier? _cachedRoutingTier;
+
     public AIOrchestrator(
         IAIModelRegistry modelRegistry,
         IKnowledgeService knowledgeService,
@@ -68,6 +70,7 @@ public class AIOrchestrator : IAIOrchestrator
         _orchestrationLayer = orchestrationLayer;
         _hardwareTierEvaluator = hardwareTierEvaluator;
         _hardwareDetector = hardwareDetector;
+        _hardwareDetector.SnapshotInvalidated += () => _cachedRoutingTier = null;
     }
 
     public async Task<Result<string>> PromptAsync(string systemPrompt, string userPrompt, CancellationToken ct = default)
@@ -336,7 +339,7 @@ public class AIOrchestrator : IAIOrchestrator
             };
         }
         var hardware = _hardwareDetector.Detect();
-        var tier = _hardwareTierEvaluator.EvaluateTier(hardware);
+        var tier = _cachedRoutingTier ??= _hardwareTierEvaluator.EvaluateTier(hardware);
 
         _logger.Info("AIOrchestrator", $"Orchestration routing: complexity={decision.Complexity}, hardwareTier={tier}, confidence={decision.Confidence}, reason={decision.Reason}");
 

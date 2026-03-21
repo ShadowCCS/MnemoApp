@@ -16,6 +16,8 @@ public sealed class LinuxHardwareGpuProvider : IPlatformHardwareGpuProvider
     private static readonly Regex NvidiaVramMiB = new(@"VRAM\s*:\s*(\d+)\s*MiB", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private readonly ILoggerService _logger;
+    private readonly object _cacheLock = new();
+    private HardwareGpuSnapshot? _cachedSnapshot;
 
     public LinuxHardwareGpuProvider(ILoggerService logger)
     {
@@ -24,6 +26,12 @@ public sealed class LinuxHardwareGpuProvider : IPlatformHardwareGpuProvider
 
     public HardwareGpuSnapshot GetGpuSnapshot()
     {
+        lock (_cacheLock)
+        {
+            if (_cachedSnapshot != null)
+                return _cachedSnapshot;
+        }
+
         long maxVram = 0;
         var hasNvidia = false;
         var hasAmd = false;
@@ -38,7 +46,22 @@ public sealed class LinuxHardwareGpuProvider : IPlatformHardwareGpuProvider
             _logger.Warning("LinuxHardwareGpuProvider", $"GPU detection failed: {ex.Message}");
         }
 
-        return new HardwareGpuSnapshot(hasNvidia, hasAmd, Math.Max(0, maxVram));
+        var snapshot = new HardwareGpuSnapshot(hasNvidia, hasAmd, Math.Max(0, maxVram));
+        lock (_cacheLock)
+        {
+            if (_cachedSnapshot != null)
+                return _cachedSnapshot;
+            _cachedSnapshot = snapshot;
+            return _cachedSnapshot;
+        }
+    }
+
+    public void InvalidateCache()
+    {
+        lock (_cacheLock)
+        {
+            _cachedSnapshot = null;
+        }
     }
 
     private static void TryNvidiaProcDriver(ref long maxVram, ref bool hasNvidia)

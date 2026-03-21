@@ -18,6 +18,8 @@ public sealed class MacOsHardwareGpuProvider : IPlatformHardwareGpuProvider
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private readonly ILoggerService _logger;
+    private readonly object _cacheLock = new();
+    private HardwareGpuSnapshot? _cachedSnapshot;
 
     public MacOsHardwareGpuProvider(ILoggerService logger)
     {
@@ -26,6 +28,12 @@ public sealed class MacOsHardwareGpuProvider : IPlatformHardwareGpuProvider
 
     public HardwareGpuSnapshot GetGpuSnapshot()
     {
+        lock (_cacheLock)
+        {
+            if (_cachedSnapshot != null)
+                return _cachedSnapshot;
+        }
+
         long vram = 0;
         var hasNvidia = false;
         var hasAmd = false;
@@ -52,7 +60,22 @@ public sealed class MacOsHardwareGpuProvider : IPlatformHardwareGpuProvider
             _logger.Warning("MacOsHardwareGpuProvider", $"GPU detection failed: {ex.Message}");
         }
 
-        return new HardwareGpuSnapshot(hasNvidia, hasAmd, Math.Max(0, vram));
+        var snapshot = new HardwareGpuSnapshot(hasNvidia, hasAmd, Math.Max(0, vram));
+        lock (_cacheLock)
+        {
+            if (_cachedSnapshot != null)
+                return _cachedSnapshot;
+            _cachedSnapshot = snapshot;
+            return _cachedSnapshot;
+        }
+    }
+
+    public void InvalidateCache()
+    {
+        lock (_cacheLock)
+        {
+            _cachedSnapshot = null;
+        }
     }
 
     private static string? RunSystemProfiler(bool json)

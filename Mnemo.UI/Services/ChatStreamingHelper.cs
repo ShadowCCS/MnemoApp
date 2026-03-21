@@ -44,10 +44,10 @@ When answering:
             : GeneralSystemPrompt;
     }
 
-    /// <summary>Delay between UI reveal steps while streaming (smooth display, not network pacing).</summary>
+    /// <summary>Delay between UI reveal steps while streaming (smooth display, not network pacing) — balanced preset.</summary>
     public const int StreamingDisplayTickMs = 40;
 
-    /// <summary>Maximum characters revealed per tick toward the buffered response (~40 chars/s at default tick).</summary>
+    /// <summary>Maximum characters revealed per tick toward the buffered response (~40 chars/s at default tick) — balanced preset.</summary>
     public const int StreamingCharsPerTick = 3;
 
     /// <summary>Max number of recent messages to include in context (conversation window).</summary>
@@ -87,6 +87,7 @@ When answering:
     /// <param name="imageBase64Contents">Optional. For vision: list of image base64 strings to send with the prompt.</param>
     /// <param name="routingUserMessage">Optional. Latest user message only; forwarded for orchestration routing so it does not grow with conversation history.</param>
     /// <param name="pipelineStatus">Optional. Receives <c>Mnemo.Core.Models.ChatPipelineStatusKeys</c> for UI pipeline labels while routing or before the first token.</param>
+    /// <param name="displayOptions">Optional. Reveal pacing from <c>Chat.StreamingReveal</c>.</param>
     /// <returns>True if at least one token was received; false if empty response.</returns>
     public static async Task<(bool FoundResponse, string FinalContent)> RunStreamingAsync(
         IAIOrchestrator orchestrator,
@@ -96,13 +97,140 @@ When answering:
         Action<string> onContentUpdate,
         IReadOnlyList<string>? imageBase64Contents = null,
         string? routingUserMessage = null,
-        IProgress<string>? pipelineStatus = null)
+        IProgress<string>? pipelineStatus = null,
+        ChatStreamingDisplayOptions? displayOptions = null)
+    {
+        var options = displayOptions ?? ChatStreamingDisplayOptions.Balanced;
+        var throttledPipeline = ThrottlePipeline(pipelineStatus, minIntervalMs: 80);
+        var emitContent = CreateThrottledContentEmitter(onContentUpdate, ChatStreamingDisplayOptions.DefaultUiThrottleMs);
+
+        if (options.IsInstant)
+            return await RunInstantAsync(
+                orchestrator,
+                systemPrompt,
+                fullPrompt,
+                cancellationToken,
+                emitContent,
+                imageBase64Contents,
+                routingUserMessage,
+                throttledPipeline).ConfigureAwait(false);
+
+        return await RunRevealAsync(
+            orchestrator,
+            systemPrompt,
+            fullPrompt,
+            cancellationToken,
+            emitContent,
+            imageBase64Contents,
+            routingUserMessage,
+            throttledPipeline,
+            options).ConfigureAwait(false);
+    }
+
+    private static IProgress<string>? ThrottlePipeline(IProgress<string>? inner, int minIntervalMs)
+    {
+        if (inner == null)
+            return null;
+
+        var last = DateTime.MinValue;
+        return new Progress<string>(s =>
+        {
+            var now = DateTime.UtcNow;
+            if ((now - last).TotalMilliseconds < minIntervalMs)
+                return;
+            last = now;
+            inner.Report(s);
+        });
+    }
+
+    private static Action<string, bool> CreateThrottledContentEmitter(Action<string> inner, int minIntervalMs)
+    {
+        var last = DateTime.MinValue;
+        return (slice, force) =>
+        {
+            var now = DateTime.UtcNow;
+            if (!force && (now - last).TotalMilliseconds < minIntervalMs)
+                return;
+            last = now;
+            inner(slice);
+        };
+    }
+
+    private static async Task<(bool FoundResponse, string FinalContent)> RunInstantAsync(
+        IAIOrchestrator orchestrator,
+        string systemPrompt,
+        string fullPrompt,
+        CancellationToken cancellationToken,
+        Action<string, bool> emitContent,
+        IReadOnlyList<string>? imageBase64Contents,
+        string? routingUserMessage,
+        IProgress<string>? pipelineStatus)
+    {
+        var buffer = new StringBuilder();
+        var lockObj = new object();
+        var foundResponse = false;
+
+        try
+        {
+            await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus)
+                .ConfigureAwait(false))
+            {
+                lock (lockObj)
+                {
+                    buffer.Append(token);
+                    foundResponse = true;
+                }
+
+                string snapshot;
+                lock (lockObj)
+                {
+                    snapshot = buffer.ToString();
+                }
+
+                emitContent(snapshot, false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            lock (lockObj)
+            {
+                emitContent(buffer.ToString(), true);
+            }
+
+            throw;
+        }
+
+        var finalContent = buffer.ToString();
+        emitContent(finalContent, true);
+
+        bool found;
+        lock (lockObj)
+        {
+            found = foundResponse;
+        }
+
+        return (found, finalContent);
+    }
+
+    private static async Task<(bool FoundResponse, string FinalContent)> RunRevealAsync(
+        IAIOrchestrator orchestrator,
+        string systemPrompt,
+        string fullPrompt,
+        CancellationToken cancellationToken,
+        Action<string, bool> emitContent,
+        IReadOnlyList<string>? imageBase64Contents,
+        string? routingUserMessage,
+        IProgress<string>? pipelineStatus,
+        ChatStreamingDisplayOptions options)
     {
         var buffer = new StringBuilder();
         var lockObj = new object();
         var streamComplete = false;
         var revealedLength = 0;
         var foundResponse = false;
+
+        var tickMs = Math.Max(1, options.TickMs);
+        var charsPerTick = Math.Max(1, options.CharsPerTick);
 
         async Task ProducerAsync()
         {
@@ -131,7 +259,7 @@ When answering:
         {
             while (true)
             {
-                await Task.Delay(StreamingDisplayTickMs, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(tickMs, cancellationToken).ConfigureAwait(false);
 
                 string slice;
                 bool done;
@@ -142,13 +270,13 @@ When answering:
                         continue;
 
                     if (len > 0)
-                        revealedLength = Math.Min(len, revealedLength + StreamingCharsPerTick);
+                        revealedLength = Math.Min(len, revealedLength + charsPerTick);
 
                     slice = revealedLength == 0 ? string.Empty : buffer.ToString(0, revealedLength);
                     done = streamComplete && revealedLength >= len;
                 }
 
-                onContentUpdate(slice);
+                emitContent(slice, done);
                 if (done)
                     break;
             }
@@ -162,8 +290,9 @@ When answering:
         {
             lock (lockObj)
             {
-                onContentUpdate(buffer.ToString());
+                emitContent(buffer.ToString(), true);
             }
+
             throw;
         }
 
@@ -173,6 +302,7 @@ When answering:
         {
             found = foundResponse;
         }
+
         return (found, finalContent);
     }
 }

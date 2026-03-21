@@ -9,4 +9,7 @@ public interface IPlatformHardwareGpuProvider
 {
     /// <summary>Best-effort snapshot; VRAM may be 0 when the OS does not expose it.</summary>
     HardwareGpuSnapshot GetGpuSnapshot();
+
+    /// <summary>Clears any cached snapshot so the next <see cref="GetGpuSnapshot"/> re-queries the OS.</summary>
+    void InvalidateCache();
 }

@@ -6,24 +6,55 @@ using System.Threading;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.AI;
 
 namespace Mnemo.Infrastructure.Services;
 
 public class ResourceGovernor : IResourceGovernor
 {
     private readonly ILoggerService _logger;
+    private readonly ISettingsService _settings;
+    private readonly IAIModelRegistry _modelRegistry;
     private readonly ConcurrentDictionary<string, DateTime> _lastAccess = new();
     private readonly SemaphoreSlim _heavyModelLock = new(1, 1);
     private readonly ConcurrentDictionary<string, bool> _loadedModels = new();
-    private readonly TimeSpan _unloadTimeout = TimeSpan.FromMinutes(5);
+    private readonly object _idlePolicyLock = new();
+    private TimeSpan? _idleUnloadAfter;
     private readonly Timer _cleanupTimer;
 
     public event Action<string>? ModelShouldUnload;
 
-    public ResourceGovernor(ILoggerService logger)
+    public ResourceGovernor(ILoggerService logger, ISettingsService settings, IAIModelRegistry modelRegistry)
     {
         _logger = logger;
+        _settings = settings;
+        _modelRegistry = modelRegistry;
         _cleanupTimer = new Timer(CleanupIdleModels, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+
+        ReloadIdleUnloadPolicy();
+        _settings.SettingChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, string key)
+    {
+        if (key == "AI.UnloadTimeout")
+            ReloadIdleUnloadPolicy();
+    }
+
+    private void ReloadIdleUnloadPolicy()
+    {
+        try
+        {
+            var raw = _settings.GetAsync("AI.UnloadTimeout", "FifteenMinutes").GetAwaiter().GetResult();
+            lock (_idlePolicyLock)
+            {
+                _idleUnloadAfter = UnloadTimeoutPolicy.ParseToIdleSpanOrNull(raw);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning("ResourceGovernor", $"Could not read AI.UnloadTimeout: {ex.Message}");
+        }
     }
 
     public async Task<bool> AcquireModelAsync(AIModelManifest manifest, CancellationToken ct)
@@ -65,26 +96,47 @@ public class ResourceGovernor : IResourceGovernor
 
     private void CleanupIdleModels(object? state)
     {
+        TimeSpan? idleUnloadAfter;
+        lock (_idlePolicyLock)
+        {
+            idleUnloadAfter = _idleUnloadAfter;
+        }
+
+        if (idleUnloadAfter == null)
+            return;
+
         var now = DateTime.UtcNow;
         foreach (var kvp in _lastAccess.ToList())
         {
-            if (now - kvp.Value > _unloadTimeout)
-            {
-                // Never unload a model that is currently acquired/in use
-                if (_loadedModels.ContainsKey(kvp.Key))
-                {
-                    continue;
-                }
+            var manifest = _modelRegistry.GetModelAsync(kvp.Key).GetAwaiter().GetResult();
+            if (manifest == null)
+                continue;
 
-                _logger.Info("ResourceGovernor", $"Model {kvp.Key} idle for too long, marking for unload.");
-                ModelShouldUnload?.Invoke(kvp.Key);
-                _lastAccess.TryRemove(kvp.Key, out _);
+            if (manifest.Role == AIModelRoles.Manager)
+                continue;
+
+            var threshold = UnloadTimeoutPolicy.TierAdjustedIdle(
+                idleUnloadAfter.Value,
+                manifest.Type == AIModelType.Text && manifest.Role is AIModelRoles.Mid or AIModelRoles.High);
+
+            if (now - kvp.Value <= threshold)
+                continue;
+
+            // Never unload a model that is currently acquired/in use
+            if (_loadedModels.ContainsKey(kvp.Key))
+            {
+                continue;
             }
+
+            _logger.Info("ResourceGovernor", $"Model {kvp.Key} idle for too long, marking for unload.");
+            ModelShouldUnload?.Invoke(kvp.Key);
+            _lastAccess.TryRemove(kvp.Key, out _);
         }
     }
 
     public void Dispose()
     {
+        _settings.SettingChanged -= OnSettingsChanged;
         _cleanupTimer.Dispose();
         _heavyModelLock.Dispose();
     }
