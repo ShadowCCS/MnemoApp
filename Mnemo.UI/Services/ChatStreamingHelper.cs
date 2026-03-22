@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 
 namespace Mnemo.UI.Services;
@@ -14,24 +15,39 @@ namespace Mnemo.UI.Services;
 public static class ChatStreamingHelper
 {
     /// <summary>System prompt for General mode: helpful assistant.</summary>
-    public const string GeneralSystemPrompt = @"You are a helpful AI assistant in the Mnemo application.
+    public const string GeneralSystemPrompt = @"You are a helpful AI assistant for the Mnemo application.
 
-When answering:
-- Use Markdown formatting
-- Use tables for comparisons or structured data (regular markdown format is supported, if asked for a table do not make it in a code block)
-- Use LaTeX for equations when appropriate
-- Prefer clarity and structure over prose
-- Your default language is english";
+Primary goal: give accurate, practical help while keeping answers concise and easy to follow.
+
+About Mnemo and the UI:
+- Do not invent menus, settings, shortcuts, features, modules, or behavior.
+- For general study or subject-matter questions (not about the app), answer directly. Do not add in-app verification tips, “check Settings,” or references to app modules.
+- Only when the user is clearly asking about Mnemo (UI, settings, features, or how to use the app): if a product-specific detail is uncertain, say so briefly, then suggest a real place to verify (e.g. Settings) or ask one focused clarifying question—never invent module or screen names.
+- Avoid long questionnaires.
+
+Response style:
+- Match depth to intent: brief for simple questions, deeper only when steps, tradeoffs, or detail are needed.
+- Lead with the direct answer, then add context only if useful.
+- Prefer actionable guidance over theory.
+
+Formatting:
+- Use Markdown.
+- Prefer clear structure and signal over filler.
+- Default language is English unless the user asks otherwise.";
 
     /// <summary>System prompt for Explainer mode: focus on teaching and breaking down concepts.</summary>
     public const string ExplainerSystemPrompt = @"You are an explainer assistant in the Mnemo application. Your role is to teach and clarify.
+
+About Mnemo and the UI: Do not invent app-specific details. If unsure, say so and offer to help once you know their version of the question—or one short clarifying question if needed.
+
+Length: Teach at the depth the question implies—brief summaries when a quick explanation suffices; step-by-step or richer examples when the topic is complex.
 
 When answering:
 - Break complex ideas into simple steps
 - Use examples and analogies where helpful
 - Use Markdown formatting, tables for comparisons, and LaTeX for equations when appropriate
 - Prefer clarity and structure; avoid unnecessary jargon unless the user is clearly familiar with the topic
-- Your default language is english";
+- Your default language is English";
 
     /// <summary>Default system prompt (General). Kept for backward compatibility.</summary>
     public static string DefaultSystemPrompt => GeneralSystemPrompt;
@@ -98,6 +114,7 @@ When answering:
         IReadOnlyList<string>? imageBase64Contents = null,
         string? routingUserMessage = null,
         IProgress<string>? pipelineStatus = null,
+        RoutingAndSkillDecision? precomputedDecision = null,
         ChatStreamingDisplayOptions? displayOptions = null)
     {
         var options = displayOptions ?? ChatStreamingDisplayOptions.Balanced;
@@ -113,7 +130,8 @@ When answering:
                 emitContent,
                 imageBase64Contents,
                 routingUserMessage,
-                throttledPipeline).ConfigureAwait(false);
+                throttledPipeline,
+                precomputedDecision).ConfigureAwait(false);
 
         return await RunRevealAsync(
             orchestrator,
@@ -124,6 +142,7 @@ When answering:
             imageBase64Contents,
             routingUserMessage,
             throttledPipeline,
+            precomputedDecision,
             options).ConfigureAwait(false);
     }
 
@@ -164,7 +183,8 @@ When answering:
         Action<string, bool> emitContent,
         IReadOnlyList<string>? imageBase64Contents,
         string? routingUserMessage,
-        IProgress<string>? pipelineStatus)
+        IProgress<string>? pipelineStatus,
+        RoutingAndSkillDecision? precomputedDecision)
     {
         var buffer = new StringBuilder();
         var lockObj = new object();
@@ -172,7 +192,7 @@ When answering:
 
         try
         {
-            await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus)
+            await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus, precomputedDecision)
                 .ConfigureAwait(false))
             {
                 lock (lockObj)
@@ -221,6 +241,7 @@ When answering:
         IReadOnlyList<string>? imageBase64Contents,
         string? routingUserMessage,
         IProgress<string>? pipelineStatus,
+        RoutingAndSkillDecision? precomputedDecision,
         ChatStreamingDisplayOptions options)
     {
         var buffer = new StringBuilder();
@@ -236,7 +257,7 @@ When answering:
         {
             try
             {
-                await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus)
+                await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus, precomputedDecision)
                     .ConfigureAwait(false))
                 {
                     lock (lockObj)

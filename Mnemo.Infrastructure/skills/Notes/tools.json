@@ -1,0 +1,17 @@
+{
+  "tools": [
+    {
+      "name": "create_note",
+      "description": "Creates a persistent note",
+      "parameters": {
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "enabled": false
+    }
+  ]
+}

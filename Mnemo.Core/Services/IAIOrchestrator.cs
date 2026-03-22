@@ -9,10 +9,12 @@ namespace Mnemo.Core.Services;
 public interface IAIOrchestrator
 {
     Task<Result<string>> PromptAsync(string systemPrompt, string userPrompt, CancellationToken ct = default);
+    Task<Result<RoutingAndSkillDecision>> AnalyzeMessageAsync(string userMessage, CancellationToken ct = default, IProgress<string>? pipelineStatus = null);
     /// <param name="imageBase64Contents">Optional. For vision (e.g. low-tier model): images to send with the user prompt.</param>
     /// <param name="routingUserMessage">Optional. When set, used only for orchestration routing / complexity (not sent as the chat prompt). Use the latest user turn so routing stays fast as history grows.</param>
     /// <param name="pipelineStatus">Optional. Reports <see cref="ChatPipelineStatusKeys"/> localization keys while routing, loading the model, or before the first token.</param>
-    IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, CancellationToken ct = default, IReadOnlyList<string>? imageBase64Contents = null, string? routingUserMessage = null, IProgress<string>? pipelineStatus = null);
+    /// <param name="precomputedDecision">Optional. When provided, avoids an additional manager call and reuses this routing/skill decision for model selection.</param>
+    IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, CancellationToken ct = default, IReadOnlyList<string>? imageBase64Contents = null, string? routingUserMessage = null, IProgress<string>? pipelineStatus = null, RoutingAndSkillDecision? precomputedDecision = null);
     /// <param name="responseJsonSchema">Optional. When set, forwarded to text service so the server forces JSON output (same as mini manager); use e.g. LearningPathJsonSchema.GetSchema().</param>
     Task<Result<string>> PromptWithModelAsync(string modelId, string prompt, CancellationToken ct = default, object? responseJsonSchema = null);
 

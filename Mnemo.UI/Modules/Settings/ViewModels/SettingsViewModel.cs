@@ -10,9 +10,22 @@ namespace Mnemo.UI.Modules.Settings.ViewModels;
 
 public partial class SettingsViewModel : ViewModelBase
 {
+    public const string DeveloperModeKey = "App.DeveloperMode";
+    public const string DeveloperModeGateUnlockedKey = "App.DeveloperModeGateUnlocked";
+
     private readonly ISettingsService _settingsService;
     private readonly IThemeService _themeService;
     private readonly ILocalizationService _localizationService;
+
+    private bool _developerGateUnlocked;
+    private bool _developerMode;
+    private int _secretTitleTapCount;
+    private DateTime _lastSecretTitleTapUtc;
+    private bool _settingsHandlersAttached;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CategorySubtitleText))]
+    private SettingsCategoryViewModel? _selectedCategory;
 
     [ObservableProperty]
     private string _userName = "John Doe";
@@ -20,10 +33,13 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _profilePicturePath = "avares://Mnemo.UI/Assets/ProfilePictures/img2.png";
 
-    [ObservableProperty]
-    private SettingsCategoryViewModel? _selectedCategory;
-
     public ObservableCollection<SettingsCategoryViewModel> Categories { get; } = new();
+
+    /// <summary>Subtitle under the category title; default blurb when the category has no custom subtitle.</summary>
+    public string CategorySubtitleText =>
+        !string.IsNullOrEmpty(SelectedCategory?.Subtitle)
+            ? SelectedCategory!.Subtitle!
+            : T("CategoryDescription");
 
     [RelayCommand]
     private void SelectCategory(SettingsCategoryViewModel category)
@@ -33,55 +49,101 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedCategory.IsSelected = true;
     }
 
+    [RelayCommand]
+    private void SecretSettingsTitleTap()
+    {
+        var now = DateTime.UtcNow;
+        if ((now - _lastSecretTitleTapUtc).TotalSeconds > 2)
+            _secretTitleTapCount = 0;
+        _lastSecretTitleTapUtc = now;
+        _secretTitleTapCount++;
+        if (_secretTitleTapCount < 7)
+            return;
+        _secretTitleTapCount = 0;
+        _ = UnlockDeveloperGateAsync();
+    }
+
+    private async Task UnlockDeveloperGateAsync()
+    {
+        if (_developerGateUnlocked)
+            return;
+        await _settingsService.SetAsync(DeveloperModeGateUnlockedKey, true).ConfigureAwait(false);
+    }
+
     public SettingsViewModel(ISettingsService settingsService, IThemeService themeService, ILocalizationService localizationService)
     {
         _settingsService = settingsService;
         _themeService = themeService;
         _localizationService = localizationService;
-        
-        // Load settings asynchronously
+
+        AttachSettingsHandlers();
         _ = LoadInitialSettingsAsync();
 
-        // Listen for changes to update sidebar profile info
-        _settingsService.SettingChanged += (s, e) =>
-        {
-            if (e == "User.DisplayName" || e == "User.ProfilePicture")
-            {
-                _ = LoadInitialSettingsAsync();
-            }
-        };
-
         _localizationService.LanguageChanged += OnLanguageChanged;
-        InitializeCategories();
+        RebuildCategories();
+    }
+
+    private void AttachSettingsHandlers()
+    {
+        if (_settingsHandlersAttached)
+            return;
+        _settingsHandlersAttached = true;
+        _settingsService.SettingChanged += OnSettingChanged;
+    }
+
+    private async void OnSettingChanged(object? sender, string key)
+    {
+        if (key is "User.DisplayName" or "User.ProfilePicture")
+        {
+            await LoadUserProfileAsync().ConfigureAwait(false);
+            return;
+        }
+
+        if (key is DeveloperModeKey or DeveloperModeGateUnlockedKey)
+        {
+            await RefreshDeveloperFlagsAndRebuildAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task RefreshDeveloperFlagsAndRebuildAsync()
+    {
+        _developerGateUnlocked = await _settingsService.GetAsync(DeveloperModeGateUnlockedKey, false).ConfigureAwait(false);
+        _developerMode = await _settingsService.GetAsync(DeveloperModeKey, false).ConfigureAwait(false);
+        var id = SelectedCategory?.CategoryId;
+        RebuildCategories(id);
     }
 
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
         var selectedId = SelectedCategory?.CategoryId;
-        Categories.Clear();
-        InitializeCategories();
-        if (!string.IsNullOrEmpty(selectedId))
-            SelectedCategory = Categories.FirstOrDefault(c => c.CategoryId == selectedId) ?? Categories.FirstOrDefault();
+        RebuildCategories(selectedId);
+        OnPropertyChanged(nameof(CategorySubtitleText));
     }
 
     private async Task LoadInitialSettingsAsync()
     {
-        UserName = await _settingsService.GetAsync("User.DisplayName", "John Doe");
-        ProfilePicturePath = await _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/ProfilePictures/img2.png");
+        await LoadUserProfileAsync().ConfigureAwait(false);
+        _developerGateUnlocked = await _settingsService.GetAsync(DeveloperModeGateUnlockedKey, false).ConfigureAwait(false);
+        _developerMode = await _settingsService.GetAsync(DeveloperModeKey, false).ConfigureAwait(false);
+        RebuildCategories(SelectedCategory?.CategoryId);
     }
 
-    private void InitializeCategories()
+    private async Task LoadUserProfileAsync()
     {
-        string T(string key) => _localizationService.T(key, "Settings");
+        UserName = await _settingsService.GetAsync("User.DisplayName", "John Doe").ConfigureAwait(false);
+        ProfilePicturePath = await _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/ProfilePictures/img2.png").ConfigureAwait(false);
+    }
 
-        // Account Category
+    private string T(string key) => _localizationService.T(key, "Settings");
+
+    private void RebuildCategories(string? preserveCategoryId = null)
+    {
         var account = new SettingsCategoryViewModel(T("Account"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/user.svg", "Account");
         var profileGroup = new SettingsGroupViewModel(T("Profile"));
         profileGroup.Items.Add(new ProfilePictureSettingViewModel(_settingsService, T("ProfilePicture"), T("ProfilePictureDescription")));
         profileGroup.Items.Add(new NameSettingViewModel(_settingsService, T("DisplayName"), T("DisplayNameDescription")));
         account.Groups.Add(profileGroup);
 
-        // General Category
         var general = new SettingsCategoryViewModel(T("General"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/settings.svg", "General") { IsSelected = true };
 
         var appGroup = new SettingsGroupViewModel(T("Application"));
@@ -91,11 +153,12 @@ public partial class SettingsViewModel : ViewModelBase
 
         var expGroup = new SettingsGroupViewModel(T("Experience"));
         expGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.EnableGamification", T("EnableGamification"), T("EnableGamificationDescription"), true));
+        if (_developerGateUnlocked)
+            expGroup.Items.Add(new ToggleSettingViewModel(_settingsService, DeveloperModeKey, "Developer mode", "Shows a Developer section in Settings. Tap the Settings title seven times within two seconds to reveal this switch."));
 
         general.Groups.Add(appGroup);
         general.Groups.Add(expGroup);
 
-        // Editor Category
         var editor = new SettingsCategoryViewModel(T("Editor"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg", "Editor");
 
         var editorGroup = new SettingsGroupViewModel(T("WritingExperience"));
@@ -115,7 +178,6 @@ public partial class SettingsViewModel : ViewModelBase
         editor.Groups.Add(editorGroup);
         editor.Groups.Add(markdownGroup);
 
-        // AI & Tools Category
         var aiTools = new SettingsCategoryViewModel(T("AITools"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg", "AITools");
 
         var aiGroup = new SettingsGroupViewModel(T("Intelligence"));
@@ -148,7 +210,6 @@ public partial class SettingsViewModel : ViewModelBase
         aiTools.Groups.Add(aiGroup);
         aiTools.Groups.Add(ragGroup);
 
-        // Appearance Category
         var appearance = new SettingsCategoryViewModel(T("Appearance"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg", "Appearance");
 
         var themeGroup = new SettingsGroupViewModel(T("ThemeVisuals"));
@@ -157,7 +218,6 @@ public partial class SettingsViewModel : ViewModelBase
 
         appearance.Groups.Add(themeGroup);
 
-        // Mindmap Category
         var mindmap = new SettingsCategoryViewModel(T("Mindmap"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Mindmap");
 
         var gridGroup = new SettingsGroupViewModel(T("GridBackground"));
@@ -173,13 +233,13 @@ public partial class SettingsViewModel : ViewModelBase
         mindmap.Groups.Add(gridGroup);
         mindmap.Groups.Add(behaviourGroup);
 
-        // Hotkeys Category
         var hotkeys = new SettingsCategoryViewModel(T("Hotkeys"), "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg", "Hotkeys");
         var hotkeysGroup = new SettingsGroupViewModel(T("Shortcuts"));
         hotkeysGroup.Items.Add(new ActionSettingViewModel(T("GlobalQuickActions"), T("GlobalQuickActionsDescription"), T("ChangeBind")));
         hotkeysGroup.Items.Add(new ActionSettingViewModel(T("NewNote"), T("NewNoteDescription"), T("ChangeBind")));
         hotkeys.Groups.Add(hotkeysGroup);
 
+        Categories.Clear();
         Categories.Add(account);
         Categories.Add(general);
         Categories.Add(editor);
@@ -188,6 +248,34 @@ public partial class SettingsViewModel : ViewModelBase
         Categories.Add(appearance);
         Categories.Add(hotkeys);
 
-        SelectedCategory = general;
+        if (_developerMode)
+        {
+            var developer = new SettingsCategoryViewModel("Developer", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout.svg", "Developer")
+            {
+                Subtitle = "Internal tools and experimental options for development builds."
+            };
+            var devGroup = new SettingsGroupViewModel("Developer tools");
+            devGroup.Items.Add(new SettingsNoticeViewModel("Reserved for developers", "This page holds developer-only preferences and diagnostics. More options will appear here over time."));
+            devGroup.Items.Add(new ToggleSettingViewModel(_settingsService, ChatDatasetSettings.LoggingEnabledKey, "Log conversations for dataset", "Append each turn (manager model + chat model request/response) as one JSON object per line to %LocalAppData%\\mnemo\\chat_dataset\\conversations.jsonl. Off by default.", false));
+            developer.Groups.Add(devGroup);
+            Categories.Add(developer);
+        }
+
+        var targetId = preserveCategoryId;
+        if (targetId == "Developer" && !_developerMode)
+            targetId = "General";
+
+        var pick = !string.IsNullOrEmpty(targetId)
+            ? Categories.FirstOrDefault(c => c.CategoryId == targetId)
+            : null;
+        pick ??= Categories.FirstOrDefault(c => c.CategoryId == "General") ?? Categories.FirstOrDefault();
+
+        foreach (var c in Categories)
+            c.IsSelected = false;
+        if (pick != null)
+        {
+            pick.IsSelected = true;
+            SelectedCategory = pick;
+        }
     }
 }

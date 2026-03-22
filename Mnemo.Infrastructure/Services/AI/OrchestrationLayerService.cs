@@ -18,26 +18,48 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
     private readonly ITextGenerationService _textService;
     private readonly IResourceGovernor _governor;
     private readonly ILoggerService _logger;
+    private readonly ISkillRegistry _skillRegistry;
+    private readonly ISettingsService _settings;
+    private readonly IChatDatasetLogger _chatDatasetLogger;
 
     public OrchestrationLayerService(
         IAIModelRegistry modelRegistry,
         ITextGenerationService textService,
         IResourceGovernor governor,
-        ILoggerService logger)
+        ILoggerService logger,
+        ISkillRegistry skillRegistry,
+        ISettingsService settings,
+        IChatDatasetLogger chatDatasetLogger)
     {
         _modelRegistry = modelRegistry;
         _textService = textService;
         _governor = governor;
         _logger = logger;
+        _skillRegistry = skillRegistry;
+        _settings = settings;
+        _chatDatasetLogger = chatDatasetLogger;
     }
 
-    public async Task<Result<RoutingDecision>> RouteUserMessageAsync(string userMessage, CancellationToken ct = default)
+    public async Task<Result<RoutingAndSkillDecision>> RouteAndClassifySkillAsync(string userMessage, CancellationToken ct = default)
     {
         var manager = await GetManagerManifestAsync().ConfigureAwait(false);
         if (manager == null)
-            return Result<RoutingDecision>.Failure("Orchestration model is not available.");
+        {
+            await TryStageManagerDatasetAsync(
+                ct,
+                () => new ChatDatasetManagerSection
+                {
+                    Success = false,
+                    Error = "Orchestration model is not available.",
+                    FullPrompt = ""
+                }).ConfigureAwait(false);
+            return Result<RoutingAndSkillDecision>.Failure("Orchestration model is not available.");
+        }
 
-        var userBlock = BuildTaskUserContent(OrchestrationTaskTypes.Routing, userMessage);
+        await _skillRegistry.LoadAsync(ct).ConfigureAwait(false);
+        var enabledSkills = _skillRegistry.GetEnabledSkills();
+        var skillIds = enabledSkills.Select(s => s.Id).ToList();
+        var userBlock = RoutingAndSkillPromptBuilder.Build(userMessage, enabledSkills);
         var prompt = ChatPromptFormatter.Format(manager.PromptTemplate, string.Empty, userBlock);
 
         await _governor.AcquireModelAsync(manager, ct).ConfigureAwait(false);
@@ -45,25 +67,81 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
         {
             var gen = await _textService.GenerateAsync(manager, prompt, ct).ConfigureAwait(false);
             if (!gen.IsSuccess || gen.Value == null)
-                return Result<RoutingDecision>.Failure(gen.ErrorMessage ?? "Routing generation failed.", gen.Exception);
+            {
+                await TryStageManagerDatasetAsync(
+                    ct,
+                    () => new ChatDatasetManagerSection
+                    {
+                        ModelId = manager.Id,
+                        ModelDisplayName = manager.DisplayName,
+                        EnabledSkillIds = skillIds,
+                        UserBlock = userBlock,
+                        FullPrompt = prompt,
+                        Success = false,
+                        Error = gen.ErrorMessage ?? "Routing and skill generation failed.",
+                        ResponseRaw = null
+                    }).ConfigureAwait(false);
+                return Result<RoutingAndSkillDecision>.Failure(gen.ErrorMessage ?? "Routing and skill generation failed.", gen.Exception);
+            }
 
-            var parsed = RoutingResponseParser.TryParse(gen.Value);
+            var parsed = RoutingAndSkillResponseParser.TryParse(gen.Value);
             if (parsed == null)
             {
-                _logger.Warning("OrchestrationLayer", $"Routing JSON parse failed; raw: {Truncate(gen.Value, 200)}");
-                return Result<RoutingDecision>.Failure("Could not parse routing response.");
+                _logger.Warning("OrchestrationLayer", $"Routing+skill JSON parse failed; raw: {Truncate(gen.Value, 200)}");
+                await TryStageManagerDatasetAsync(
+                    ct,
+                    () => new ChatDatasetManagerSection
+                    {
+                        ModelId = manager.Id,
+                        ModelDisplayName = manager.DisplayName,
+                        EnabledSkillIds = skillIds,
+                        UserBlock = userBlock,
+                        FullPrompt = prompt,
+                        ResponseRaw = gen.Value,
+                        Success = false,
+                        Error = "Could not parse routing and skill response."
+                    }).ConfigureAwait(false);
+                return Result<RoutingAndSkillDecision>.Failure("Could not parse routing and skill response.");
             }
 
             _logger.Debug(
                 "OrchestrationLayer",
-                $"Manager routing decision: complexity={parsed.Complexity}, confidence={parsed.Confidence}, reason={parsed.Reason}");
+                $"Manager routing+skill decision: complexity={parsed.Complexity}, skill={parsed.Skill}, confidence={parsed.Confidence}, reason={parsed.Reason}");
 
-            return Result<RoutingDecision>.Success(parsed);
+            await TryStageManagerDatasetAsync(
+                ct,
+                () => new ChatDatasetManagerSection
+                {
+                    ModelId = manager.Id,
+                    ModelDisplayName = manager.DisplayName,
+                    EnabledSkillIds = skillIds,
+                    UserBlock = userBlock,
+                    FullPrompt = prompt,
+                    ResponseRaw = gen.Value,
+                    Success = true,
+                    ParsedDecision = new ChatDatasetRoutingDecision
+                    {
+                        Complexity = parsed.Complexity.ToString(),
+                        Skill = parsed.Skill,
+                        Confidence = parsed.Confidence,
+                        Reason = parsed.Reason
+                    }
+                }).ConfigureAwait(false);
+
+            return Result<RoutingAndSkillDecision>.Success(parsed);
         }
         finally
         {
             _governor.ReleaseModel(manager);
         }
+    }
+
+    private async Task TryStageManagerDatasetAsync(CancellationToken ct, Func<ChatDatasetManagerSection> build)
+    {
+        var turnId = ChatDatasetLoggingScope.CurrentTurnId;
+        if (string.IsNullOrEmpty(turnId)) return;
+        if (!await _settings.GetAsync(ChatDatasetSettings.LoggingEnabledKey, false).ConfigureAwait(false)) return;
+        await _chatDatasetLogger.StageManagerAsync(turnId, build(), ct).ConfigureAwait(false);
     }
 
     public async Task<Result<IReadOnlyList<OrchestrationTaskResult>>> RunTasksAsync(

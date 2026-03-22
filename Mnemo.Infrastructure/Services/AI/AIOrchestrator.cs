@@ -16,7 +16,7 @@ public class AIOrchestrator : IAIOrchestrator
     private static readonly TimeSpan PrefetchRoutingCacheTtl = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan MinHeavyChatWarmSwitchInterval = TimeSpan.FromSeconds(2.5);
 
-    /// <summary>Attempts for <see cref="IOrchestrationLayer.RouteUserMessageAsync"/> before falling back to the low-tier model.</summary>
+    /// <summary>Attempts for <see cref="IOrchestrationLayer.RouteAndClassifySkillAsync"/> before falling back to the low-tier model.</summary>
     private const int MaxRoutingAttempts = 3;
 
     private const double PrefetchMaxRelativeEditRatio = 0.15;
@@ -31,15 +31,18 @@ public class AIOrchestrator : IAIOrchestrator
     private readonly ITextGenerationService _textService;
     private readonly IAIServerManager _serverManager;
     private readonly IOrchestrationLayer _orchestrationLayer;
+    private readonly ISkillRegistry _skillRegistry;
+    private readonly ISkillSystemPromptComposer _skillSystemPromptComposer;
     private readonly IHardwareTierEvaluator _hardwareTierEvaluator;
     private readonly HardwareDetector _hardwareDetector;
+    private readonly IChatDatasetLogger _chatDatasetLogger;
 
     private readonly object _selectModelLock = new();
     private List<AIModelManifest>? _cachedModels;
     private DateTime _modelsCacheExpiry = DateTime.MinValue;
 
     private string? _prefetchRoutingKey;
-    private AIModelManifest? _prefetchModel;
+    private RoutingResolution? _prefetchResolution;
     private DateTime _prefetchUtc = DateTime.MinValue;
 
     private readonly object _prefetchWarmupThrottleLock = new();
@@ -57,8 +60,11 @@ public class AIOrchestrator : IAIOrchestrator
         ITextGenerationService textService,
         IAIServerManager serverManager,
         IOrchestrationLayer orchestrationLayer,
+        ISkillRegistry skillRegistry,
+        ISkillSystemPromptComposer skillSystemPromptComposer,
         IHardwareTierEvaluator hardwareTierEvaluator,
-        HardwareDetector hardwareDetector)
+        HardwareDetector hardwareDetector,
+        IChatDatasetLogger chatDatasetLogger)
     {
         _modelRegistry = modelRegistry;
         _knowledgeService = knowledgeService;
@@ -68,8 +74,11 @@ public class AIOrchestrator : IAIOrchestrator
         _textService = textService;
         _serverManager = serverManager;
         _orchestrationLayer = orchestrationLayer;
+        _skillRegistry = skillRegistry;
+        _skillSystemPromptComposer = skillSystemPromptComposer;
         _hardwareTierEvaluator = hardwareTierEvaluator;
         _hardwareDetector = hardwareDetector;
+        _chatDatasetLogger = chatDatasetLogger;
         _hardwareDetector.SnapshotInvalidated += () => _cachedRoutingTier = null;
     }
 
@@ -170,37 +179,105 @@ public class AIOrchestrator : IAIOrchestrator
         }
     }
 
-    public async IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default, IReadOnlyList<string>? imageBase64Contents = null, string? routingUserMessage = null, IProgress<string>? pipelineStatus = null)
+    public async Task<Result<RoutingAndSkillDecision>> AnalyzeMessageAsync(string userMessage, CancellationToken ct = default, IProgress<string>? pipelineStatus = null)
     {
-        var targetModel = (imageBase64Contents != null && imageBase64Contents.Count > 0)
+        pipelineStatus?.Report(ChatPipelineStatusKeys.LoadingSkills);
+        await _skillRegistry.LoadAsync(ct).ConfigureAwait(false);
+        pipelineStatus?.Report(ChatPipelineStatusKeys.Classifying);
+
+        var routed = await _orchestrationLayer.RouteAndClassifySkillAsync(userMessage, ct).ConfigureAwait(false);
+        if (routed.IsSuccess && routed.Value != null)
+            return routed;
+
+        _logger.Warning("AIOrchestrator", $"AnalyzeMessageAsync failed: {routed.ErrorMessage ?? "unknown error"}");
+        return Result<RoutingAndSkillDecision>.Success(new RoutingAndSkillDecision
+        {
+            Complexity = RoutingComplexity.Simple,
+            Skill = "NONE",
+            Confidence = null
+        });
+    }
+
+    public async IAsyncEnumerable<string> PromptStreamingAsync(string systemPrompt, string userPrompt, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default, IReadOnlyList<string>? imageBase64Contents = null, string? routingUserMessage = null, IProgress<string>? pipelineStatus = null, RoutingAndSkillDecision? precomputedDecision = null)
+    {
+        var targetResolution = (imageBase64Contents != null && imageBase64Contents.Count > 0)
             ? await SelectVisionModelWithProgressAsync(ct, pipelineStatus).ConfigureAwait(false)
-            : await SelectModelAsync(userPrompt, ct, routingUserMessage, pipelineStatus).ConfigureAwait(false);
-        if (targetModel == null) yield break;
+            : await SelectModelAsync(userPrompt, ct, routingUserMessage, pipelineStatus, precomputedDecision).ConfigureAwait(false);
+        if (targetResolution.Model == null) yield break;
 
         var finalSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
             ? "You are Mnemo, a helpful and concise AI assistant."
             : systemPrompt;
 
-        var formattedPrompt = ChatPromptFormatter.Format(targetModel.PromptTemplate, finalSystemPrompt, userPrompt);
+        var formattedPrompt = ChatPromptFormatter.Format(targetResolution.Model.PromptTemplate, finalSystemPrompt, userPrompt);
 
-        await _governor.AcquireModelAsync(targetModel, ct).ConfigureAwait(false);
+        pipelineStatus?.Report(ChatPipelineStatusKeys.PreparingModel);
+        var sb = new StringBuilder();
+        await _governor.AcquireModelAsync(targetResolution.Model, ct).ConfigureAwait(false);
         try
         {
-            await foreach (var token in _textService.GenerateStreamingAsync(targetModel, formattedPrompt, ct, imageBase64Contents).ConfigureAwait(false))
+            await foreach (var token in _textService.GenerateStreamingAsync(targetResolution.Model, formattedPrompt, ct, imageBase64Contents).ConfigureAwait(false))
             {
+                sb.Append(token);
                 yield return token;
             }
         }
         finally
         {
-            _governor.ReleaseModel(targetModel);
+            _governor.ReleaseModel(targetResolution.Model);
+            await TryStageChatDatasetAsync(ct, targetResolution, finalSystemPrompt, userPrompt, formattedPrompt, imageBase64Contents, sb.ToString()).ConfigureAwait(false);
         }
     }
 
-    private async Task<AIModelManifest?> SelectVisionModelWithProgressAsync(CancellationToken ct, IProgress<string>? pipelineStatus)
+    private async Task TryStageChatDatasetAsync(
+        CancellationToken ct,
+        RoutingResolution resolution,
+        string finalSystemPrompt,
+        string userPromptFull,
+        string formattedPrompt,
+        IReadOnlyList<string>? imageBase64Contents,
+        string assistantResponse)
     {
-        pipelineStatus?.Report(ChatPipelineStatusKeys.Processing);
-        return await SelectVisionModelAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var turnId = ChatDatasetLoggingScope.CurrentTurnId;
+            if (string.IsNullOrEmpty(turnId)) return;
+            if (!await _settings.GetAsync(ChatDatasetSettings.LoggingEnabledKey, false).ConfigureAwait(false)) return;
+
+            var m = resolution.Model!;
+            var section = new ChatDatasetChatSection
+            {
+                ModelId = m.Id,
+                ModelDisplayName = m.DisplayName,
+                PromptTemplate = m.PromptTemplate,
+                SystemPrompt = finalSystemPrompt,
+                UserPromptFull = userPromptFull,
+                FormattedPrompt = formattedPrompt,
+                ImageAttachmentCount = imageBase64Contents?.Count ?? 0,
+                RoutingComplexity = resolution.RoutingComplexity.ToString(),
+                SkillId = resolution.SkillId,
+                ManagerConfidence = resolution.ManagerConfidence,
+                AssistantResponse = assistantResponse
+            };
+            await _chatDatasetLogger.StageChatAsync(turnId, section, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning("AIOrchestrator", $"Chat dataset staging failed: {ex.Message}");
+        }
+    }
+
+    private async Task<RoutingResolution> SelectVisionModelWithProgressAsync(CancellationToken ct, IProgress<string>? pipelineStatus)
+    {
+        pipelineStatus?.Report(ChatPipelineStatusKeys.PreparingModel);
+        var model = await SelectVisionModelAsync(ct).ConfigureAwait(false);
+        return new RoutingResolution
+        {
+            Model = model,
+            RoutingComplexity = RoutingComplexity.Simple,
+            SkillId = "NONE",
+            ManagerConfidence = null
+        };
     }
 
     private async Task<AIModelManifest?> SelectVisionModelAsync(CancellationToken ct)
@@ -211,33 +288,32 @@ public class AIOrchestrator : IAIOrchestrator
     }
 
     /// <param name="routingUserMessage">When non-null, used for routing and simple-prompt detection only; <paramref name="userPrompt"/> is still the full prompt for generation elsewhere.</param>
-    private async Task<AIModelManifest?> SelectModelAsync(string userPrompt, CancellationToken ct, string? routingUserMessage = null, IProgress<string>? pipelineStatus = null)
+    private async Task<RoutingResolution> SelectModelAsync(string userPrompt, CancellationToken ct, string? routingUserMessage = null, IProgress<string>? pipelineStatus = null, RoutingAndSkillDecision? precomputedDecision = null)
     {
         var routingInput = string.IsNullOrEmpty(routingUserMessage) ? userPrompt : routingUserMessage;
 
         if (TryConsumePrefetchRoutingCache(routingInput, out var cached))
         {
             _logger.Debug("AIOrchestrator", "Using cached prefetch routing result.");
-            pipelineStatus?.Report(ChatPipelineStatusKeys.Processing);
+            pipelineStatus?.Report(ChatPipelineStatusKeys.PreparingModel);
             return cached;
         }
 
-        var resolution = await ResolveRoutingTargetModelAsync(routingInput, ct, pipelineStatus).ConfigureAwait(false);
-        return resolution.Model;
+        return await ResolveRoutingTargetModelAsync(routingInput, ct, pipelineStatus, precomputedDecision).ConfigureAwait(false);
     }
 
-    private bool TryConsumePrefetchRoutingCache(string routingInput, out AIModelManifest? model)
+    private bool TryConsumePrefetchRoutingCache(string routingInput, out RoutingResolution model)
     {
         lock (_selectModelLock)
         {
-            model = null;
-            if (_prefetchModel == null || _prefetchRoutingKey == null)
+            model = default;
+            if (_prefetchResolution == null || _prefetchRoutingKey == null)
                 return false;
             if (DateTime.UtcNow - _prefetchUtc > PrefetchRoutingCacheTtl)
                 return false;
             if (!IsPrefetchRoutingKeyCompatible(routingInput, _prefetchRoutingKey))
                 return false;
-            model = _prefetchModel;
+            model = _prefetchResolution.Value;
             return true;
         }
     }
@@ -259,17 +335,17 @@ public class AIOrchestrator : IAIOrchestrator
         return TextEditDistance.IsWithinRelativeEditDistance(a, b, PrefetchMaxRelativeEditRatio, PrefetchMaxAbsoluteEditDistance);
     }
 
-    private void SetPrefetchRoutingCache(string routingInput, AIModelManifest? model)
+    private void SetPrefetchRoutingCache(string routingInput, RoutingResolution resolution)
     {
         lock (_selectModelLock)
         {
             _prefetchRoutingKey = routingInput;
-            _prefetchModel = model;
+            _prefetchResolution = resolution;
             _prefetchUtc = DateTime.UtcNow;
         }
     }
 
-    private async Task<RoutingResolution> ResolveRoutingTargetModelAsync(string routingInput, CancellationToken ct, IProgress<string>? pipelineStatus)
+    private async Task<RoutingResolution> ResolveRoutingTargetModelAsync(string routingInput, CancellationToken ct, IProgress<string>? pipelineStatus, RoutingAndSkillDecision? precomputedDecision = null)
     {
         var now = DateTime.UtcNow;
 
@@ -299,29 +375,35 @@ public class AIOrchestrator : IAIOrchestrator
             return new RoutingResolution
             {
                 Model = models?.FirstOrDefault(m => m.Type == AIModelType.Text),
-                RoutingComplexity = RoutingComplexity.Simple
+                RoutingComplexity = RoutingComplexity.Simple,
+                SkillId = precomputedDecision?.Skill ?? "NONE"
             };
         }
 
-        pipelineStatus?.Report(ChatPipelineStatusKeys.Routing);
-        RoutingDecision? decision = null;
+        RoutingAndSkillDecision? decision = precomputedDecision;
         string? lastRoutingError = null;
-        for (var attempt = 1; attempt <= MaxRoutingAttempts; attempt++)
+        if (decision == null)
         {
-            ct.ThrowIfCancellationRequested();
-            var routeResult = await _orchestrationLayer.RouteUserMessageAsync(routingInput, ct).ConfigureAwait(false);
-            if (routeResult.IsSuccess && routeResult.Value != null)
+            pipelineStatus?.Report(ChatPipelineStatusKeys.LoadingSkills);
+            await _skillRegistry.LoadAsync(ct).ConfigureAwait(false);
+            pipelineStatus?.Report(ChatPipelineStatusKeys.Classifying);
+            for (var attempt = 1; attempt <= MaxRoutingAttempts; attempt++)
             {
-                decision = routeResult.Value;
-                break;
-            }
+                ct.ThrowIfCancellationRequested();
+                var routeResult = await _orchestrationLayer.RouteAndClassifySkillAsync(routingInput, ct).ConfigureAwait(false);
+                if (routeResult.IsSuccess && routeResult.Value != null)
+                {
+                    decision = routeResult.Value;
+                    break;
+                }
 
-            lastRoutingError = routeResult.ErrorMessage;
-            if (attempt < MaxRoutingAttempts)
-            {
-                _logger.Warning(
-                    "AIOrchestrator",
-                    $"Routing attempt {attempt}/{MaxRoutingAttempts} failed ({routeResult.ErrorMessage}); retrying.");
+                lastRoutingError = routeResult.ErrorMessage;
+                if (attempt < MaxRoutingAttempts)
+                {
+                    _logger.Warning(
+                        "AIOrchestrator",
+                        $"Routing attempt {attempt}/{MaxRoutingAttempts} failed ({routeResult.ErrorMessage}); retrying.");
+                }
             }
         }
 
@@ -330,20 +412,20 @@ public class AIOrchestrator : IAIOrchestrator
             _logger.Error(
                 "AIOrchestrator",
                 $"Routing failed after {MaxRoutingAttempts} attempts: {lastRoutingError ?? "unknown error"}; using low-tier model.");
-            pipelineStatus?.Report(ChatPipelineStatusKeys.Processing);
+            pipelineStatus?.Report(ChatPipelineStatusKeys.PreparingModel);
             return new RoutingResolution
             {
                 Model = lowModel,
                 RoutingComplexity = RoutingComplexity.Simple,
+                SkillId = "NONE",
                 ManagerConfidence = null
             };
         }
         var hardware = _hardwareDetector.Detect();
         var tier = _cachedRoutingTier ??= _hardwareTierEvaluator.EvaluateTier(hardware);
 
-        _logger.Info("AIOrchestrator", $"Orchestration routing: complexity={decision.Complexity}, hardwareTier={tier}, confidence={decision.Confidence}, reason={decision.Reason}");
-
-        pipelineStatus?.Report(ChatPipelineStatusKeys.Processing);
+        _logger.Info("AIOrchestrator", $"Orchestration routing: complexity={decision.Complexity}, skill={decision.Skill}, hardwareTier={tier}, confidence={decision.Confidence}, reason={decision.Reason}");
+        pipelineStatus?.Report(ChatPipelineStatusKeys.PreparingModel);
 
         if (decision.Complexity == RoutingComplexity.Simple)
         {
@@ -351,6 +433,7 @@ public class AIOrchestrator : IAIOrchestrator
             {
                 Model = lowModel,
                 RoutingComplexity = RoutingComplexity.Simple,
+                SkillId = decision.Skill,
                 ManagerConfidence = decision.Confidence
             };
         }
@@ -367,6 +450,7 @@ public class AIOrchestrator : IAIOrchestrator
         {
             Model = target,
             RoutingComplexity = RoutingComplexity.Reasoning,
+            SkillId = decision.Skill,
             ManagerConfidence = decision.Confidence
         };
     }
@@ -388,7 +472,7 @@ public class AIOrchestrator : IAIOrchestrator
             return;
         }
 
-        SetPrefetchRoutingCache(routingUserMessage, resolution.Model);
+        SetPrefetchRoutingCache(routingUserMessage, resolution);
 
         if (ShouldThrottleHeavyPrefetchWarm(resolution.Model))
         {
@@ -449,6 +533,7 @@ public class AIOrchestrator : IAIOrchestrator
     {
         public AIModelManifest? Model { get; init; }
         public RoutingComplexity RoutingComplexity { get; init; }
+        public string SkillId { get; init; }
         public string? ManagerConfidence { get; init; }
     }
 
@@ -487,14 +572,17 @@ public class AIOrchestrator : IAIOrchestrator
 
     private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct, object? responseJsonSchema = null)
     {
-        var targetModel = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
-        if (targetModel == null) return Result<string>.Failure("No suitable text model found.");
+        var targetResolution = await SelectModelAsync(userPrompt, ct).ConfigureAwait(false);
+        if (targetResolution.Model == null) return Result<string>.Failure("No suitable text model found.");
 
         var effectiveSystemPrompt = string.IsNullOrWhiteSpace(systemPrompt)
             ? "You are Mnemo, a helpful AI assistant."
             : systemPrompt;
 
-        var formattedPrompt = ChatPromptFormatter.Format(targetModel.PromptTemplate, effectiveSystemPrompt, userPrompt);
-        return await PromptWithModelAsync(targetModel.Id, formattedPrompt, ct, responseJsonSchema).ConfigureAwait(false);
+        var finalSystemPrompt = _skillSystemPromptComposer.Compose(effectiveSystemPrompt, targetResolution.SkillId);
+        var formattedPrompt = ChatPromptFormatter.Format(targetResolution.Model.PromptTemplate, finalSystemPrompt, userPrompt);
+        return await PromptWithModelAsync(targetResolution.Model.Id, formattedPrompt, ct, responseJsonSchema).ConfigureAwait(false);
     }
 }
+
+

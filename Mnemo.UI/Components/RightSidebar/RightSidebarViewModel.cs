@@ -7,6 +7,7 @@ using System.Windows.Input;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.UI.Services;
 using Mnemo.UI.ViewModels;
@@ -25,7 +26,11 @@ public partial class RightSidebarViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly ILocalizationService _localizationService;
     private readonly ISettingsService _settingsService;
+    private readonly ISkillSystemPromptComposer _skillSystemPromptComposer;
     private readonly ChatTypingPrefetchHelper _typingPrefetch;
+    private readonly IChatDatasetLogger _chatDatasetLogger;
+
+    private string _conversationId = Guid.NewGuid().ToString("N");
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveWidth))]
@@ -69,12 +74,14 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
 
-    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, ISettingsService settingsService, ChatPauseToSendEstimator pauseToSendEstimator)
+    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, ISettingsService settingsService, ISkillSystemPromptComposer skillSystemPromptComposer, ChatPauseToSendEstimator pauseToSendEstimator, IChatDatasetLogger chatDatasetLogger)
     {
         _orchestrator = orchestrator;
         _logger = logger;
         _localizationService = localizationService;
         _settingsService = settingsService;
+        _skillSystemPromptComposer = skillSystemPromptComposer;
+        _chatDatasetLogger = chatDatasetLogger;
         _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
 
         ToggleCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
@@ -132,6 +139,7 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private void NewChat()
     {
+        _conversationId = Guid.NewGuid().ToString("N");
         Messages.Clear();
         Messages.Add(CreateWelcomeMessage());
     }
@@ -169,15 +177,26 @@ public partial class RightSidebarViewModel : ViewModelBase
 
         _cts = new CancellationTokenSource();
 
+        var logDataset = await _settingsService.GetAsync(ChatDatasetSettings.LoggingEnabledKey, false).ConfigureAwait(false);
+        IDisposable? datasetScope = null;
+        string? datasetTurnId = null;
+        if (logDataset)
+            datasetScope = ChatDatasetLoggingScope.BeginTurn(out datasetTurnId);
+
+        var turnContext = ChatStreamingHelper.BuildContextFromMessages(
+            Messages, aiMessage, m => m.IsUser, m => m.Content);
+        var fullPrompt = string.IsNullOrEmpty(turnContext)
+            ? userMessage
+            : $"{turnContext}\nUser: {userMessage}";
+
+        var foundForDataset = false;
+        var cancelledForDataset = false;
+        string? errorForDataset = null;
+        var composedSystemForDataset = string.Empty;
+
         try
         {
-            var context = ChatStreamingHelper.BuildContextFromMessages(
-                Messages, aiMessage, m => m.IsUser, m => m.Content);
-            var fullPrompt = string.IsNullOrEmpty(context)
-                ? userMessage
-                : $"{context}\nUser: {userMessage}";
-
-            var pipelineProgress = new Progress<string>(key =>
+            IProgress<string> pipelineProgress = new Progress<string>(key =>
                 Dispatcher.UIThread.Post(() => aiMessage.PipelineStatusText = _localizationService.T(key, "Chat")));
 
             void UpdateContent(string content) =>
@@ -188,19 +207,32 @@ public partial class RightSidebarViewModel : ViewModelBase
                         aiMessage.PipelineStatusText = null;
                 });
 
+            var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress).ConfigureAwait(false);
+            var decision = analyzed.IsSuccess && analyzed.Value != null
+                ? analyzed.Value
+                : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skill = "NONE" };
+            pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
+            var systemPrompt = _skillSystemPromptComposer.Compose(
+                ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
+                decision.Skill);
+            composedSystemForDataset = systemPrompt;
+
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
             var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);
 
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingAsync(
                 _orchestrator,
-                ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
+                systemPrompt,
                 fullPrompt,
                 _cts.Token,
                 UpdateContent,
                 imageBase64Contents: null,
                 routingUserMessage: userMessage,
                 pipelineProgress,
+                precomputedDecision: decision,
                 displayOptions);
+
+            foundForDataset = foundResponse;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -217,6 +249,7 @@ public partial class RightSidebarViewModel : ViewModelBase
         }
         catch (OperationCanceledException)
         {
+            cancelledForDataset = true;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (string.IsNullOrEmpty(aiMessage.Content))
@@ -227,6 +260,7 @@ public partial class RightSidebarViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            errorForDataset = ex.Message;
             _logger.Error("RightSidebar", $"Send failed: {ex}");
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -237,6 +271,35 @@ public partial class RightSidebarViewModel : ViewModelBase
         }
         finally
         {
+            try
+            {
+                if (!string.IsNullOrEmpty(datasetTurnId))
+                {
+                    await _chatDatasetLogger.CommitTurnAsync(new ChatDatasetCommitRequest
+                    {
+                        TurnId = datasetTurnId,
+                        ConversationId = _conversationId,
+                        Source = "right_sidebar",
+                        AssistantMode = SelectedAssistantMode,
+                        LatestUserMessage = userMessage,
+                        ConversationContext = string.IsNullOrEmpty(turnContext) ? null : turnContext,
+                        ComposedSystemPrompt = composedSystemForDataset,
+                        Outcome = new ChatDatasetOutcomeSection
+                        {
+                            FoundResponse = foundForDataset,
+                            Cancelled = cancelledForDataset,
+                            Error = errorForDataset
+                        }
+                    }).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("RightSidebar", $"Dataset log commit failed: {ex}");
+            }
+
+            datasetScope?.Dispose();
+
             var cts = _cts;
             _cts = null;
             cts?.Dispose();

@@ -30,6 +30,7 @@ public static class Bootstrapper
         services.AddSingleton<ILoggerService, LoggerService>();
         services.AddSingleton<IStorageProvider, SqliteStorageProvider>();
         services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IChatDatasetLogger, ChatDatasetLogger>();
         services.AddSingleton<ILaTeXEngine, LaTeXEngine>();
         services.AddSingleton<IMarkdownProcessor, MarkdownProcessor>();
         services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
@@ -45,6 +46,8 @@ public static class Bootstrapper
         services.AddSingleton<IAIServerManager>(sp => sp.GetRequiredService<LlamaCppServerManager>());
         services.AddSingleton<ITextGenerationService, LlamaCppHttpTextService>();
         services.AddSingleton<IHardwareTierEvaluator, HardwareTierEvaluator>();
+        services.AddSingleton<ISkillRegistry, SkillRegistry>();
+        services.AddSingleton<ISkillSystemPromptComposer, SkillSystemPromptComposer>();
         services.AddSingleton<IOrchestrationLayer, OrchestrationLayerService>();
         services.AddSingleton<IAIOrchestrator, AIOrchestrator>();
         services.AddSingleton<IAITaskManager, AITaskManager>();
@@ -119,12 +122,24 @@ public static class Bootstrapper
             }
         });
 
+        var logger = serviceProvider.GetRequiredService<ILoggerService>();
         var modelRegistry = serviceProvider.GetRequiredService<IAIModelRegistry>();
         _ = modelRegistry.RefreshAsync();
+        var skillRegistry = serviceProvider.GetRequiredService<ISkillRegistry>();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await skillRegistry.LoadAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.Warning("Bootstrapper", $"Failed to load skill registry: {ex.Message}");
+            }
+        });
 
         // 7. Auto-start manager (mini orchestration) model server
         var serverManager = serviceProvider.GetRequiredService<LlamaCppServerManager>();
-        var logger = serviceProvider.GetRequiredService<ILoggerService>();
         
         _ = Task.Run(async () =>
         {

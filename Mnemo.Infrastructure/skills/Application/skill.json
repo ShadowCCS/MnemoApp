@@ -1,0 +1,11 @@
+{
+  "id": "Application",
+  "version": "1.0.0",
+  "enabled": true,
+  "description": "App-wide chrome: settings, top bar, exit, global sidebar behavior, themes, account—not step-by-step use of a specific module (Notes, Flashcards, Path, etc. use those skills).",
+  "detection_hint": "Settings, help, navigation, about, documentation, app capabilities, theme, language",
+  "injection": {
+    "system_prompt_fragment": "Application skill scope: app-wide UI, settings, top bar, sidebar behavior, themes, language, and account options. Use the facts below as internal reference knowledge. Only surface details relevant to the user question; do not enumerate unrelated settings unless explicitly asked for a full overview. App facts: local study suite with modules including Notes (block editor), Mindmaps, and Learning Path; integrated local AI assistant. Navigation facts: sidebar can be collapsed/expanded via top chevron; exit is in the top-right of the top bar. Settings facts by section: Account -> profile picture, display name. General -> language, enable gamification, clear cache. Editor -> auto save, spellcheck, notes editor width, block spacing, line spacing, font size, code font size, math font size, render math toggle. AI Tools -> enable AI, GPU acceleration, AI chat streaming response time. Mindmap -> grid type (None/Dotted/Lines), grid size, grid dot size, grid opacity, minimap (Off/On/Auto), Shift+drag behavior (select or panning). Appearance -> app theme (Dusk/Dawn), app icon (3 dark variants, 3 light variants).",
+    "include_tools": true
+   }
+}

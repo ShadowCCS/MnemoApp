@@ -37,7 +37,11 @@ public class ChatViewModel : ViewModelBase
     private readonly IOverlayService _overlayService;
     private readonly ISpeechRecognitionService _speechService;
     private readonly ISettingsService _settingsService;
+    private readonly ISkillSystemPromptComposer _skillSystemPromptComposer;
     private readonly ChatTypingPrefetchHelper _typingPrefetch;
+    private readonly IChatDatasetLogger _chatDatasetLogger;
+
+    private string _conversationId = Guid.NewGuid().ToString("N");
 
     /// <summary>When recording started, if append mode: content that was in the input before dictation.</summary>
     private string _inputTextBeforeRecording = string.Empty;
@@ -142,7 +146,7 @@ public class ChatViewModel : ViewModelBase
     private TimeSpan _recordingDuration;
     public string RecordingDurationText => _recordingDuration.ToString(@"mm\:ss");
 
-    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService, ISpeechRecognitionService speechService, ISettingsService settingsService, ChatPauseToSendEstimator pauseToSendEstimator)
+    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService, ISpeechRecognitionService speechService, ISettingsService settingsService, ISkillSystemPromptComposer skillSystemPromptComposer, ChatPauseToSendEstimator pauseToSendEstimator, IChatDatasetLogger chatDatasetLogger)
     {
         _orchestrator = orchestrator;
         _logger = logger;
@@ -150,6 +154,8 @@ public class ChatViewModel : ViewModelBase
         _overlayService = overlayService;
         _speechService = speechService;
         _settingsService = settingsService;
+        _skillSystemPromptComposer = skillSystemPromptComposer;
+        _chatDatasetLogger = chatDatasetLogger;
         _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording);
@@ -397,6 +403,7 @@ public class ChatViewModel : ViewModelBase
 
     private void NewChat()
     {
+        _conversationId = Guid.NewGuid().ToString("N");
         Messages.CollectionChanged -= OnMessagesCollectionChanged;
         if (_lastMessageSubscribed != null)
         {
@@ -491,15 +498,26 @@ public class ChatViewModel : ViewModelBase
             }
         }
 
+        var logDataset = await _settingsService.GetAsync(ChatDatasetSettings.LoggingEnabledKey, false).ConfigureAwait(false);
+        IDisposable? datasetScope = null;
+        string? datasetTurnId = null;
+        if (logDataset)
+            datasetScope = ChatDatasetLoggingScope.BeginTurn(out datasetTurnId);
+
+        var turnContext = ChatStreamingHelper.BuildContextFromMessages(
+            Messages, aiMessage, m => m.IsUser, m => m.Content);
+        var fullPrompt = string.IsNullOrEmpty(turnContext)
+            ? userMessage
+            : $"{turnContext}\nUser: {userMessage}";
+
+        var foundForDataset = false;
+        var cancelledForDataset = false;
+        string? errorForDataset = null;
+        var composedSystemForDataset = string.Empty;
+
         try
         {
-            var context = ChatStreamingHelper.BuildContextFromMessages(
-                Messages, aiMessage, m => m.IsUser, m => m.Content);
-            var fullPrompt = string.IsNullOrEmpty(context)
-                ? userMessage
-                : $"{context}\nUser: {userMessage}";
-
-            var pipelineProgress = new Progress<string>(key =>
+            IProgress<string> pipelineProgress = new Progress<string>(key =>
                 Dispatcher.UIThread.Post(() => aiMessage.PipelineStatusText = _localizationService.T(key, "Chat")));
 
             void UpdateContent(string content) =>
@@ -510,19 +528,32 @@ public class ChatViewModel : ViewModelBase
                         aiMessage.PipelineStatusText = null;
                 });
 
+            var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress).ConfigureAwait(false);
+            var decision = analyzed.IsSuccess && analyzed.Value != null
+                ? analyzed.Value
+                : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skill = "NONE" };
+            pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
+            var systemPrompt = _skillSystemPromptComposer.Compose(
+                ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
+                decision.Skill);
+            composedSystemForDataset = systemPrompt;
+
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
             var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);
 
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingAsync(
                 _orchestrator,
-                ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
+                systemPrompt,
                 fullPrompt,
                 _cts.Token,
                 UpdateContent,
                 imageBase64,
                 routingUserMessage: userMessage,
                 pipelineProgress,
+                precomputedDecision: decision,
                 displayOptions);
+
+            foundForDataset = foundResponse;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -539,6 +570,7 @@ public class ChatViewModel : ViewModelBase
         }
         catch (OperationCanceledException)
         {
+            cancelledForDataset = true;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (string.IsNullOrEmpty(aiMessage.Content))
@@ -549,6 +581,7 @@ public class ChatViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            errorForDataset = ex.Message;
             _logger.Error("Chat", $"SendMessage failed: {ex}");
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -559,10 +592,62 @@ public class ChatViewModel : ViewModelBase
         }
         finally
         {
+            try
+            {
+                await TryCommitDatasetLogAsync(
+                    datasetTurnId,
+                    _conversationId,
+                    "chat_module",
+                    SelectedAssistantMode,
+                    userMessage,
+                    string.IsNullOrEmpty(turnContext) ? null : turnContext,
+                    composedSystemForDataset,
+                    foundForDataset,
+                    cancelledForDataset,
+                    errorForDataset).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("Chat", $"Dataset log commit failed: {ex}");
+            }
+
+            datasetScope?.Dispose();
+
             var cts = _cts;
             _cts = null;
             cts?.Dispose();
             Dispatcher.UIThread.Post(() => IsBusy = false);
         }
+    }
+
+    private async Task TryCommitDatasetLogAsync(
+        string? turnId,
+        string conversationId,
+        string source,
+        string assistantMode,
+        string userMessage,
+        string? conversationContext,
+        string composedSystemPrompt,
+        bool foundResponse,
+        bool cancelled,
+        string? error)
+    {
+        if (string.IsNullOrEmpty(turnId)) return;
+        await _chatDatasetLogger.CommitTurnAsync(new ChatDatasetCommitRequest
+        {
+            TurnId = turnId,
+            ConversationId = conversationId,
+            Source = source,
+            AssistantMode = assistantMode,
+            LatestUserMessage = userMessage,
+            ConversationContext = conversationContext,
+            ComposedSystemPrompt = composedSystemPrompt,
+            Outcome = new ChatDatasetOutcomeSection
+            {
+                FoundResponse = foundResponse,
+                Cancelled = cancelled,
+                Error = error
+            }
+        }).ConfigureAwait(false);
     }
 }

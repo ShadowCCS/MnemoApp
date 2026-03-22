@@ -1,0 +1,21 @@
+{
+  "tools": [
+    {
+      "name": "open_settings",
+      "description": "Opens the application settings menu",
+      "parameters": {},
+      "enabled": false
+    },
+    {
+      "name": "navigate_to",
+      "description": "Navigate to a specific section of the app",
+      "parameters": {
+        "section": {
+          "type": "string",
+          "enum": ["flashcards", "quiz", "notes", "path", "settings", "chat"]
+        }
+      },
+      "enabled": false
+    }
+  ]
+}

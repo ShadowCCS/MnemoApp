@@ -227,7 +227,11 @@
     "GenerationStopped": "Generierung gestoppt.",
     "ErrorUnexpected": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
     "PipelineStatusRouting": "Anfrage wird geroutet",
-    "PipelineStatusProcessing": "Wird verarbeitet"
+    "PipelineStatusProcessing": "Wird verarbeitet",
+    "PipelineStatusLoadingSkills": "Skills werden geladen",
+    "PipelineStatusClassifying": "Anfrage wird verstanden",
+    "PipelineStatusReadingSkill": "Skill wird gelesen",
+    "PipelineStatusPreparingModel": "Modell wird gewechselt"
   },
   "Notes": {
     "NewNote": "Neue Notiz",

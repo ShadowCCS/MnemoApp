@@ -226,7 +226,11 @@
       "GenerationStopped": "生成が停止しました。",
       "ErrorUnexpected": "予期せぬエラーが発生しました。再度試してください。",
       "PipelineStatusRouting": "ルーティング中",
-      "PipelineStatusProcessing": "処理中"
+      "PipelineStatusProcessing": "処理中",
+      "PipelineStatusLoadingSkills": "スキルを取得中",
+      "PipelineStatusClassifying": "リクエストを解析中",
+      "PipelineStatusReadingSkill": "スキルを読み込み中",
+      "PipelineStatusPreparingModel": "モデルを切り替え中"
     },
     "Notes": {
       "NewNote": "新しいノート",

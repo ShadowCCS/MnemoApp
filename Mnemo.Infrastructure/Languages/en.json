@@ -227,7 +227,11 @@
     "GenerationStopped": "Generation stopped.",
     "ErrorUnexpected": "An unexpected error occurred. Please try again later.",
     "PipelineStatusRouting": "Routing request",
-    "PipelineStatusProcessing": "Processing"
+    "PipelineStatusProcessing": "Processing",
+    "PipelineStatusLoadingSkills": "Fetching skills",
+    "PipelineStatusClassifying": "Understanding your request",
+    "PipelineStatusReadingSkill": "Reading skill",
+    "PipelineStatusPreparingModel": "Switching model"
   },
   "Notes": {
     "NewNote": "New Note",

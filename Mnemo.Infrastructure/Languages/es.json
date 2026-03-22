@@ -227,7 +227,11 @@
     "GenerationStopped": "Generación detenida.",
     "ErrorUnexpected": "Ocurrió un error inesperado. Intenta de nuevo más tarde.",
     "PipelineStatusRouting": "Enrutando solicitud",
-    "PipelineStatusProcessing": "Procesando"
+    "PipelineStatusProcessing": "Procesando",
+    "PipelineStatusLoadingSkills": "Obteniendo habilidades",
+    "PipelineStatusClassifying": "Entendiendo tu solicitud",
+    "PipelineStatusReadingSkill": "Leyendo habilidad",
+    "PipelineStatusPreparingModel": "Cambiando modelo"
   },
   "Notes": {
     "NewNote": "Nueva Nota",

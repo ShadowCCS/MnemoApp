@@ -1,0 +1,11 @@
+{
+  "id": "Notes",
+  "version": "1.0.0",
+  "enabled": true,
+  "description": "Anything about the Notes module: how to use it (sidebar, favorites, folders, tree, breadcrumb, star, editor, blocks) or creating/editing/summarizing note content.",
+  "detection_hint": "notes module, how do I in notes, favorite, star, sidebar, folder, tree, create note, edit note, save note, block editor",
+  "injection": {
+    "system_prompt_fragment": "Mnemo Notes are local, persistent documents stored on the user's device. Each note has a title, a stable id, optional placement in nested folders (shown as a tree and breadcrumb in the Notes module), and can be marked as a favorite in the sidebar by clicking the star icon at the top of the document on the right side of the title. Editing is block-based (Notion-style): text, headings (H1–H3), bullet and numbered lists, checklists, quotes, code blocks, and dividers; content is saved as ordered blocks. When you produce note body text via tools, plain structured text is fine—the user can adjust blocks and formatting in the app. Help the user draft, organize, rename, and summarize material; when note-related tools are available, prefer them to persist new or updated notes instead of only describing what to write. The user can access collaps the sidebar via the chevron icon at the top and set the width of the notes editor in the settings under Editor -> Editor width. If the user types '/' in an empty block it will show a list of blocks the user can choose from. They can also create block types using markdown syntax and then press space '## + space' = heading 2.",
+    "include_tools": true
+  }
+}

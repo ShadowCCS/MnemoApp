@@ -23,6 +23,9 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Languages\*.json" />
+    <Content Include="skills\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

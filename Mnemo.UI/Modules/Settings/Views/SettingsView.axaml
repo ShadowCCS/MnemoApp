@@ -168,6 +168,11 @@
             </components:SettingsCard>
         </DataTemplate>
 
+        <!-- Notice (read-only) Setting Template -->
+        <DataTemplate x:Key="NoticeSettingTemplate" x:DataType="vm:SettingsNoticeViewModel">
+            <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8"/>
+        </DataTemplate>
+
         <!-- Theme Setting Template -->
         <DataTemplate x:Key="ThemeSettingTemplate" x:DataType="vm:ThemeSettingViewModel">
             <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
@@ -399,10 +404,25 @@
                 <!-- Sidebar Header/Profile -->
                 <Border Grid.Row="0" Padding="24,32,24,16">
                     <StackPanel Spacing="16">
-                        <TextBlock Text="{markup:T Ns=Settings, Key=Title}" 
-                                   FontSize="24" 
-                                   FontFamily="{DynamicResource Font.Bold}" 
-                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <Button Background="Transparent"
+                                BorderThickness="0"
+                                Padding="0"
+                                HorizontalAlignment="Left"
+                                Cursor="Arrow"
+                                Command="{Binding SecretSettingsTitleTapCommand}">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                </Style>
+                                <Style Selector="Button:focus /template/ ContentPresenter#PART_ContentPresenter">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                </Style>
+                            </Button.Styles>
+                            <TextBlock Text="{markup:T Ns=Settings, Key=Title}"
+                                       FontSize="24"
+                                       FontFamily="{DynamicResource Font.Bold}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        </Button>
                         
                         <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
                                 CornerRadius="12"
@@ -482,7 +502,7 @@
                                        FontSize="32" 
                                        FontFamily="{DynamicResource Font.Bold}" 
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="{markup:T Ns=Settings, Key=CategoryDescription}"
+                            <TextBlock Text="{Binding CategorySubtitleText}"
                                        FontSize="14"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
@@ -516,6 +536,7 @@
                                                             <StaticResource ResourceKey="NameSettingTemplate"/>
                                                             <StaticResource ResourceKey="TextSettingTemplate"/>
                                                             <StaticResource ResourceKey="StepSliderSettingTemplate"/>
+                                                            <StaticResource ResourceKey="NoticeSettingTemplate"/>
                                                         </ContentControl.DataTemplates>
                                                     </ContentControl>
                                                 </DataTemplate>
