@@ -29,7 +29,7 @@ public class MindmapModule : IModule
         sidebarService.RegisterItem("Mindmap", "mindmap", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Library", 1, int.MaxValue);
     }
 
-    public void RegisterTools(IFunctionRegistry registry)
+    public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
     {
         // No tools for overview yet
     }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Components.RightSidebar;
@@ -12,6 +13,11 @@ public enum MessageRole
 
 public class ChatMessage : ViewModelBase
 {
+    public ChatMessage()
+    {
+        ProcessSteps.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasProcessThread));
+    }
+
     private MessageRole _role;
     public MessageRole Role
     {
@@ -73,6 +79,10 @@ public class ChatMessage : ViewModelBase
     }
 
     public bool HasPipelineStatus => !string.IsNullOrEmpty(_pipelineStatusText);
+
+    public ObservableCollection<ChatProcessStepViewModel> ProcessSteps { get; } = new();
+
+    public bool HasProcessThread => ProcessSteps.Count > 0;
 
     private bool _isStreaming;
     /// <summary>True while the assistant message is still being generated.</summary>

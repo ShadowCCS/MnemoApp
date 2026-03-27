@@ -80,15 +80,17 @@ public sealed class ChatDatasetLogger : IChatDatasetLogger
 
         var record = new ChatDatasetTurnRecord
         {
-            SchemaVersion = 1,
+            SchemaVersion = 5,
             RecordedAtUtc = DateTime.UtcNow.ToString("O"),
             TurnId = request.TurnId,
             ConversationId = request.ConversationId,
+            TurnIndex = request.TurnIndex,
             Source = request.Source,
             AssistantMode = request.AssistantMode,
             LatestUserMessage = request.LatestUserMessage,
             ConversationContext = request.ConversationContext,
             ComposedSystemPrompt = request.ComposedSystemPrompt,
+            FinalAssistantResponse = request.FinalAssistantResponse,
             Manager = staged.Manager,
             Chat = staged.Chat,
             Outcome = request.Outcome

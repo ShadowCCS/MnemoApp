@@ -21,6 +21,7 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
     private readonly ISkillRegistry _skillRegistry;
     private readonly ISettingsService _settings;
     private readonly IChatDatasetLogger _chatDatasetLogger;
+    private readonly ITeacherModelClient _teacherClient;
 
     public OrchestrationLayerService(
         IAIModelRegistry modelRegistry,
@@ -29,7 +30,8 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
         ILoggerService logger,
         ISkillRegistry skillRegistry,
         ISettingsService settings,
-        IChatDatasetLogger chatDatasetLogger)
+        IChatDatasetLogger chatDatasetLogger,
+        ITeacherModelClient teacherClient)
     {
         _modelRegistry = modelRegistry;
         _textService = textService;
@@ -38,10 +40,66 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
         _skillRegistry = skillRegistry;
         _settings = settings;
         _chatDatasetLogger = chatDatasetLogger;
+        _teacherClient = teacherClient;
     }
 
-    public async Task<Result<RoutingAndSkillDecision>> RouteAndClassifySkillAsync(string userMessage, CancellationToken ct = default)
+    public async Task<Result<RoutingAndSkillDecision>> RouteAndClassifySkillAsync(
+        string userMessage,
+        RoutingToolHint? recentToolHint = null,
+        CancellationToken ct = default)
     {
+        await _skillRegistry.LoadAsync(ct).ConfigureAwait(false);
+        var enabledSkillsEarly = _skillRegistry.GetEnabledSkills();
+        var skillIdsEarly = enabledSkillsEarly.Select(s => s.Id).ToList();
+        var userBlockEarly = RoutingAndSkillPromptBuilder.Build(userMessage, enabledSkillsEarly, recentToolHint);
+
+        if (await _settings.GetAsync(TeacherModelSettings.UseTeacherRoutingKey, false).ConfigureAwait(false)
+            && await _teacherClient.IsConfiguredAsync(ct).ConfigureAwait(false))
+        {
+            var teacherGen = await _teacherClient.GenerateRoutingDecisionJsonAsync(userBlockEarly, ct).ConfigureAwait(false);
+            if (teacherGen.IsSuccess && teacherGen.Value != null)
+            {
+                var parsedTeacher = RoutingAndSkillResponseParser.TryParse(teacherGen.Value);
+                if (parsedTeacher != null)
+                {
+                    _logger.Debug(
+                        "OrchestrationLayer",
+                        $"Teacher routing+skill decision: complexity={parsedTeacher.Complexity}, skill={parsedTeacher.Skill}, confidence={parsedTeacher.Confidence}, reason={parsedTeacher.Reason}");
+
+                    await TryStageManagerDatasetAsync(
+                        ct,
+                        () => new ChatDatasetManagerSection
+                        {
+                            ModelId = TeacherSyntheticManifest.ChatModelId,
+                            ModelDisplayName = "Gemini 2.5 Flash (teacher)",
+                            EnabledSkillIds = skillIdsEarly,
+                            RoutingModelInput = RoutingModelInputSnapshot(
+                                userBlockEarly,
+                                "vertex_teacher",
+                                TeacherRoutingPrompts.SystemInstruction,
+                                localManagerFullPrompt: null),
+                            UserBlock = userBlockEarly,
+                            RoutingProvider = "vertex_teacher",
+                            RoutingSystemInstruction = TeacherRoutingPrompts.SystemInstruction,
+                            FullPrompt = "",
+                            ResponseRaw = teacherGen.Value,
+                            Success = true,
+                            ParsedDecision = new ChatDatasetRoutingDecision
+                            {
+                                Complexity = parsedTeacher.Complexity.ToString(),
+                                Skill = parsedTeacher.Skill,
+                                Confidence = parsedTeacher.Confidence,
+                                Reason = parsedTeacher.Reason
+                            }
+                        }).ConfigureAwait(false);
+
+                    return Result<RoutingAndSkillDecision>.Success(parsedTeacher);
+                }
+            }
+
+            _logger.Warning("OrchestrationLayer", "Teacher routing failed or produced invalid JSON; falling back to local manager model.");
+        }
+
         var manager = await GetManagerManifestAsync().ConfigureAwait(false);
         if (manager == null)
         {
@@ -49,17 +107,22 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
                 ct,
                 () => new ChatDatasetManagerSection
                 {
+                    RoutingModelInput = RoutingModelInputSnapshot(
+                        userBlockEarly,
+                        "local_manager",
+                        vertexSystemInstruction: null,
+                        localManagerFullPrompt: null),
+                    UserBlock = userBlockEarly,
                     Success = false,
                     Error = "Orchestration model is not available.",
-                    FullPrompt = ""
+                    FullPrompt = "",
+                    RoutingProvider = "local_manager"
                 }).ConfigureAwait(false);
             return Result<RoutingAndSkillDecision>.Failure("Orchestration model is not available.");
         }
 
-        await _skillRegistry.LoadAsync(ct).ConfigureAwait(false);
-        var enabledSkills = _skillRegistry.GetEnabledSkills();
-        var skillIds = enabledSkills.Select(s => s.Id).ToList();
-        var userBlock = RoutingAndSkillPromptBuilder.Build(userMessage, enabledSkills);
+        var skillIds = skillIdsEarly;
+        var userBlock = userBlockEarly;
         var prompt = ChatPromptFormatter.Format(manager.PromptTemplate, string.Empty, userBlock);
 
         await _governor.AcquireModelAsync(manager, ct).ConfigureAwait(false);
@@ -75,7 +138,13 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
                         ModelId = manager.Id,
                         ModelDisplayName = manager.DisplayName,
                         EnabledSkillIds = skillIds,
+                        RoutingModelInput = RoutingModelInputSnapshot(
+                            userBlock,
+                            "local_manager",
+                            vertexSystemInstruction: null,
+                            localManagerFullPrompt: prompt),
                         UserBlock = userBlock,
+                        RoutingProvider = "local_manager",
                         FullPrompt = prompt,
                         Success = false,
                         Error = gen.ErrorMessage ?? "Routing and skill generation failed.",
@@ -95,7 +164,13 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
                         ModelId = manager.Id,
                         ModelDisplayName = manager.DisplayName,
                         EnabledSkillIds = skillIds,
+                        RoutingModelInput = RoutingModelInputSnapshot(
+                            userBlock,
+                            "local_manager",
+                            vertexSystemInstruction: null,
+                            localManagerFullPrompt: prompt),
                         UserBlock = userBlock,
+                        RoutingProvider = "local_manager",
                         FullPrompt = prompt,
                         ResponseRaw = gen.Value,
                         Success = false,
@@ -115,7 +190,13 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
                     ModelId = manager.Id,
                     ModelDisplayName = manager.DisplayName,
                     EnabledSkillIds = skillIds,
+                    RoutingModelInput = RoutingModelInputSnapshot(
+                        userBlock,
+                        "local_manager",
+                        vertexSystemInstruction: null,
+                        localManagerFullPrompt: prompt),
                     UserBlock = userBlock,
+                    RoutingProvider = "local_manager",
                     FullPrompt = prompt,
                     ResponseRaw = gen.Value,
                     Success = true,
@@ -223,6 +304,27 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
         sb.Append("TaskType: ").Append(taskType).Append('\n');
         sb.Append("[USER MESSAGE]: ").Append(userMessage);
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Single place describing the routing model input: Vertex = system + user task block; local = full prompt string.
+    /// </summary>
+    private static ChatDatasetRoutingModelInput RoutingModelInputSnapshot(
+        string userTaskBlock,
+        string routingProvider,
+        string? vertexSystemInstruction,
+        string? localManagerFullPrompt)
+    {
+        return new ChatDatasetRoutingModelInput
+        {
+            UserTaskBlock = userTaskBlock,
+            SystemInstruction = string.Equals(routingProvider, "vertex_teacher", StringComparison.Ordinal)
+                ? vertexSystemInstruction
+                : null,
+            LocalManagerFullPrompt = string.Equals(routingProvider, "local_manager", StringComparison.Ordinal)
+                ? localManagerFullPrompt
+                : null
+        };
     }
 
     private static string Truncate(string s, int maxLen) =>

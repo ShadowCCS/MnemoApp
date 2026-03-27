@@ -16,6 +16,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     private const string LastOpenNoteIdKey = "Notes.LastOpenNoteId";
     private const string NotesSidebarOpenKey = "Notes.SidebarOpen";
 
+    /// <summary>
+    /// When navigation passes a note id (e.g. AI <c>open_note</c>), select that note after load instead of the last saved selection.
+    /// </summary>
+    private string? _pendingOpenNoteIdAfterLoad;
+
     private readonly INoteService _noteService;
     private readonly INoteFolderService _folderService;
     private readonly ISettingsService _settingsService;
@@ -126,13 +131,24 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             RefreshAllNotesFlatList(notes);
             RefreshFavouriteNotes();
 
-            // Restore last open note if it still exists (find item in tree so TreeView highlights it)
-            var lastNoteId = await _settingsService.GetAsync<string?>(LastOpenNoteIdKey, null);
-            if (!string.IsNullOrEmpty(lastNoteId))
+            string? noteIdToSelect = null;
+            if (!string.IsNullOrWhiteSpace(_pendingOpenNoteIdAfterLoad))
             {
-                var matchingItem = FindTreeItemByNoteId(RootTreeItems, lastNoteId);
+                noteIdToSelect = _pendingOpenNoteIdAfterLoad.Trim();
+                _pendingOpenNoteIdAfterLoad = null;
+            }
+            else
+            {
+                noteIdToSelect = await _settingsService.GetAsync<string?>(LastOpenNoteIdKey, null);
+            }
+
+            if (!string.IsNullOrEmpty(noteIdToSelect))
+            {
+                var matchingItem = FindTreeItemByNoteId(RootTreeItems, noteIdToSelect);
                 if (matchingItem == null)
-                    matchingItem = FavouriteNotes.FirstOrDefault(i => i.Note?.NoteId == lastNoteId);
+                    matchingItem = FavouriteNotes.FirstOrDefault(i => i.Note?.NoteId == noteIdToSelect);
+                if (matchingItem == null)
+                    matchingItem = AllNotesTreeItems.FirstOrDefault(i => i.Note?.NoteId == noteIdToSelect);
                 if (matchingItem != null)
                     SelectedTreeItem = matchingItem;
             }
@@ -818,6 +834,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
     public void OnNavigatedTo(object? parameter)
     {
+        _pendingOpenNoteIdAfterLoad = parameter switch
+        {
+            string s when !string.IsNullOrWhiteSpace(s) => s.Trim(),
+            _ => null
+        };
         _ = LoadNotesCommand.ExecuteAsync(null);
     }
 

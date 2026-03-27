@@ -230,7 +230,12 @@
       "PipelineStatusLoadingSkills": "スキルを取得中",
       "PipelineStatusClassifying": "リクエストを解析中",
       "PipelineStatusReadingSkill": "スキルを読み込み中",
-      "PipelineStatusPreparingModel": "モデルを切り替え中"
+      "PipelineStatusPreparingModel": "モデルを切り替え中",
+      "PipelineStatusRoutingCombined": "ルーティングとスキル",
+      "PipelineStatusGenerating": "応答を生成中",
+      "PipelineStatusContinuingAfterTool": "応答を続行中",
+      "PipelineStatusRunningTool": "ツール呼び出し",
+      "ProcessThread": "処理"
     },
     "Notes": {
       "NewNote": "新しいノート",

@@ -30,7 +30,7 @@ public class OverviewModule : IModule
         sidebarService.RegisterItem("Overview", "overview", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/home.svg", "MainHub", 0, 0);
     }
 
-    public void RegisterTools(IFunctionRegistry registry)
+    public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
     {
         // No tools for overview yet
     }

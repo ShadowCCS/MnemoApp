@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
@@ -207,6 +208,174 @@ public class LlamaCppHttpTextService : ITextGenerationService
             element = default;
             return false;
         }
+    }
+
+    /// <summary>
+    /// Extracts streaming text fragments from <c>choices[0].delta</c>. Some servers (e.g. llama.cpp) send
+    /// <c>tool_calls</c> as an empty array on the same line as <c>content</c>; we must not skip those lines.
+    /// Thinking-style models may stream assistant text in <c>reasoning_content</c> instead of or in addition to <c>content</c>.
+    /// </summary>
+    private static IEnumerable<string> ExtractStreamingDeltaTextFragments(JsonElement delta)
+    {
+        foreach (var prop in new[] { "content", "reasoning_content" })
+        {
+            if (!delta.TryGetProperty(prop, out var el))
+                continue;
+            if (el.ValueKind != JsonValueKind.String)
+                continue;
+            var text = el.GetString();
+            if (!string.IsNullOrEmpty(text))
+                yield return text;
+        }
+    }
+
+    public async IAsyncEnumerable<StreamChunk> GenerateStreamingWithToolsAsync(
+        AIModelManifest manifest,
+        IReadOnlyList<object> messages,
+        IReadOnlyList<SkillToolDefinition> tools,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(manifest.Endpoint))
+        {
+            _logger.Error("LlamaCppHttpTextService", $"Model {manifest.DisplayName} has no endpoint configured.");
+            yield break;
+        }
+
+        try
+        {
+            await _serverManager.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("LlamaCppHttpTextService", $"Failed to start server for {manifest.DisplayName}", ex);
+            yield break;
+        }
+
+        using (_serverManager.BeginRequest(manifest.Id))
+        {
+            await foreach (var chunk in GetStreamingChunksWithToolsAsync(manifest, messages, tools, ct))
+            {
+                yield return chunk;
+            }
+        }
+    }
+
+    private async IAsyncEnumerable<StreamChunk> GetStreamingChunksWithToolsAsync(
+        AIModelManifest manifest,
+        IReadOnlyList<object> messages,
+        IReadOnlyList<SkillToolDefinition> tools,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var endpoint = $"{manifest.Endpoint!.TrimEnd('/')}/v1/chat/completions";
+        var (temperature, maxTokens) = GetGenerationParams(manifest);
+        var requestBody = BuildToolAwareChatRequest(messages, tools, temperature, maxTokens, stream: true);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(requestBody),
+            Encoding.UTF8,
+            "application/json");
+
+        _logger.Info("LlamaCppHttpTextService", $"Streaming tool-aware request to {endpoint} (tools={tools.Count}, temp={temperature})");
+
+        HttpResponseMessage? response = null;
+        Stream? stream = null;
+        StreamReader? reader = null;
+
+        var toolCallParser = new ToolCallParser();
+        var finishReason = string.Empty;
+
+        try
+        {
+            response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                _logger.Error("LlamaCppHttpTextService", $"Tool-aware streaming failed with status {response.StatusCode}: {errorBody}");
+                yield break;
+            }
+
+            stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 128);
+
+            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (!line.StartsWith("data: ")) continue;
+
+                var jsonData = line["data: ".Length..];
+                if (jsonData.Trim() == "[DONE]") break;
+
+                if (!TryParseJson(jsonData, out var json)) continue;
+
+                if (json.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                {
+                    var choice = choices[0];
+
+                    if (choice.TryGetProperty("finish_reason", out var fr) && fr.ValueKind == JsonValueKind.String)
+                    {
+                        var reason = fr.GetString();
+                        if (!string.IsNullOrEmpty(reason) && reason != "null")
+                            finishReason = reason;
+                    }
+
+                    if (!choice.TryGetProperty("delta", out var delta))
+                        continue;
+
+                    // Accumulate tool call deltas (may appear on the same SSE line as content; do not skip content)
+                    if (delta.TryGetProperty("tool_calls", out var toolCallsEl) && toolCallsEl.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var tcDelta in toolCallsEl.EnumerateArray())
+                        {
+                            toolCallParser.AccumulateDelta(tcDelta);
+                        }
+                    }
+
+                    // Text tokens: llama.cpp often sends "tool_calls": [] together with content; a stray `continue` here drops all reply text.
+                    foreach (var text in ExtractStreamingDeltaTextFragments(delta))
+                        yield return new StreamChunk.Content(text);
+                }
+            }
+        }
+        finally
+        {
+            reader?.Dispose();
+            stream?.Dispose();
+            response?.Dispose();
+        }
+
+        // After stream ends, emit any completed tool calls
+        if (finishReason == "tool_calls" || toolCallParser.HasCalls)
+        {
+            foreach (var toolCall in toolCallParser.BuildCompleted())
+            {
+                yield return new StreamChunk.ToolCall(toolCall);
+            }
+        }
+    }
+
+    /// <summary>Build request body for tool-aware chat completions using an explicit message list.</summary>
+    private static object BuildToolAwareChatRequest(IReadOnlyList<object> messages, IReadOnlyList<SkillToolDefinition> tools, double temperature, int maxTokens, bool stream)
+    {
+        if (tools.Count == 0)
+        {
+            return new { messages, temperature, max_tokens = maxTokens, stream };
+        }
+
+        var toolDefs = tools.Select(t => new
+        {
+            type = "function",
+            function = new
+            {
+                name = t.Name,
+                description = t.Description,
+                parameters = ToolParametersJsonSchema.Normalize(t.Parameters)
+            }
+        }).ToArray();
+
+        return new { messages, tools = toolDefs, tool_choice = "auto", temperature, max_tokens = maxTokens, stream };
     }
 
     public void UnloadModel(string modelId)

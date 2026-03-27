@@ -1,7 +1,10 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services.AI;
 using Mnemo.UI.ViewModels;
@@ -16,6 +19,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly IThemeService _themeService;
     private readonly ILocalizationService _localizationService;
+    private readonly DatasetExporter _datasetExporter;
 
     private bool _developerGateUnlocked;
     private bool _developerMode;
@@ -70,11 +74,12 @@ public partial class SettingsViewModel : ViewModelBase
         await _settingsService.SetAsync(DeveloperModeGateUnlockedKey, true).ConfigureAwait(false);
     }
 
-    public SettingsViewModel(ISettingsService settingsService, IThemeService themeService, ILocalizationService localizationService)
+    public SettingsViewModel(ISettingsService settingsService, IThemeService themeService, ILocalizationService localizationService, DatasetExporter datasetExporter)
     {
         _settingsService = settingsService;
         _themeService = themeService;
         _localizationService = localizationService;
+        _datasetExporter = datasetExporter;
 
         AttachSettingsHandlers();
         _ = LoadInitialSettingsAsync();
@@ -257,6 +262,27 @@ public partial class SettingsViewModel : ViewModelBase
             var devGroup = new SettingsGroupViewModel("Developer tools");
             devGroup.Items.Add(new SettingsNoticeViewModel("Reserved for developers", "This page holds developer-only preferences and diagnostics. More options will appear here over time."));
             devGroup.Items.Add(new ToggleSettingViewModel(_settingsService, ChatDatasetSettings.LoggingEnabledKey, "Log conversations for dataset", "Append each turn (manager model + chat model request/response) as one JSON object per line to %LocalAppData%\\mnemo\\chat_dataset\\conversations.jsonl. Off by default.", false));
+            devGroup.Items.Add(new AsyncActionSettingViewModel(
+                "Export training datasets",
+                "Reads conversations.jsonl and generates manager_dataset.jsonl (routing fine-tune) and main_model_dataset.jsonl (chat fine-tune) in the same folder.",
+                "Export",
+                async vm =>
+                {
+                    var result = await _datasetExporter.ExportAsync(ChatDatasetSettings.LogFilePath);
+                    vm.StatusText = result.IsSuccess
+                        ? $"Done — manager: {result.ManagerRowCount} rows, main model: {result.MainModelRowCount} rows, skipped: {result.SkippedTurnCount}"
+                        : $"Failed: {result.ErrorMessage}";
+                }));
+            devGroup.Items.Add(new ToggleSettingViewModel(_settingsService, TeacherModelSettings.UseTeacherRoutingKey, "Use teacher model for routing", "When on, routing and skill classification use Vertex AI Gemini (see .temp-teacher) instead of the local manager model. Falls back to the local manager if the request fails. Off by default.", false));
+            devGroup.Items.Add(new ToggleSettingViewModel(_settingsService, TeacherModelSettings.UseTeacherMainChatKey, "Use teacher model as main model", "When on, chat generation uses Gemini instead of local low/mid/high tier models. Falls back is not applied mid-stream; turn off to restore local-only behavior. Off by default.", false));
+            devGroup.Items.Add(new TextSettingViewModel(_settingsService, TeacherModelSettings.VertexCredentialsPathKey, "Vertex service account JSON path", "Optional absolute path to a Google Cloud service account key. If empty, the GOOGLE_APPLICATION_CREDENTIALS environment variable is used."));
+            devGroup.Items.Add(new TextSettingViewModel(_settingsService, TeacherModelSettings.ChatTemperatureKey, "Teacher: chat temperature", "Vertex generation temperature for main chat streaming and tools (0–2). Default 0.7.", TeacherModelSettings.DefaultChatTemperatureString));
+            devGroup.Items.Add(new TextSettingViewModel(_settingsService, TeacherModelSettings.ChatMaxOutputTokensKey, "Teacher: chat max output tokens", "Max tokens for chat streaming (typical 1024–65535). Default 65536.", TeacherModelSettings.DefaultChatMaxOutputTokensString));
+            devGroup.Items.Add(new TextSettingViewModel(_settingsService, TeacherModelSettings.RoutingTemperatureKey, "Teacher: routing temperature", "Temperature for routing JSON (often 0 for deterministic skill selection). Default 0.", TeacherModelSettings.DefaultRoutingTemperatureString));
+            devGroup.Items.Add(new TextSettingViewModel(_settingsService, TeacherModelSettings.RoutingMaxOutputTokensKey, "Teacher: routing max output tokens", "Max tokens for routing response. Default 512.", TeacherModelSettings.DefaultRoutingMaxOutputTokensString));
+            devGroup.Items.Add(new TextSettingViewModel(_settingsService, TeacherModelSettings.StructuredTemperatureKey, "Teacher: structured JSON temperature", "Temperature when the app forces JSON (e.g. learning path). Default 0.2.", TeacherModelSettings.DefaultStructuredTemperatureString));
+            devGroup.Items.Add(new TextSettingViewModel(_settingsService, TeacherModelSettings.StructuredMaxOutputTokensKey, "Teacher: structured JSON max output tokens", "Max tokens for forced JSON non-streaming calls. Default 8192.", TeacherModelSettings.DefaultStructuredMaxOutputTokensString));
+            devGroup.Items.Add(new TextSettingViewModel(_settingsService, TeacherModelSettings.ChatStylePromptKey, "Teacher: answer style (system suffix)", "When \"Use teacher model as main model\" is on, this text is appended to the system prompt (after skill context) to steer tone, length, headings, or question-and-answer format for dataset collection. Leave empty for default behavior.", ""));
             developer.Groups.Add(devGroup);
             Categories.Add(developer);
         }

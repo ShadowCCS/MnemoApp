@@ -29,8 +29,10 @@ public partial class RightSidebarViewModel : ViewModelBase
     private readonly ISkillSystemPromptComposer _skillSystemPromptComposer;
     private readonly ChatTypingPrefetchHelper _typingPrefetch;
     private readonly IChatDatasetLogger _chatDatasetLogger;
+    private readonly IRoutingToolHintStore _routingToolHintStore;
 
     private string _conversationId = Guid.NewGuid().ToString("N");
+    private int _turnIndex;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveWidth))]
@@ -74,7 +76,7 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
 
-    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, ISettingsService settingsService, ISkillSystemPromptComposer skillSystemPromptComposer, ChatPauseToSendEstimator pauseToSendEstimator, IChatDatasetLogger chatDatasetLogger)
+    public RightSidebarViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, ISettingsService settingsService, ISkillSystemPromptComposer skillSystemPromptComposer, ChatPauseToSendEstimator pauseToSendEstimator, IChatDatasetLogger chatDatasetLogger, IRoutingToolHintStore routingToolHintStore)
     {
         _orchestrator = orchestrator;
         _logger = logger;
@@ -82,6 +84,7 @@ public partial class RightSidebarViewModel : ViewModelBase
         _settingsService = settingsService;
         _skillSystemPromptComposer = skillSystemPromptComposer;
         _chatDatasetLogger = chatDatasetLogger;
+        _routingToolHintStore = routingToolHintStore;
         _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
 
         ToggleCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
@@ -139,7 +142,9 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private void NewChat()
     {
+        _routingToolHintStore.Clear(_conversationId);
         _conversationId = Guid.NewGuid().ToString("N");
+        _turnIndex = 0;
         Messages.Clear();
         Messages.Add(CreateWelcomeMessage());
     }
@@ -180,63 +185,62 @@ public partial class RightSidebarViewModel : ViewModelBase
         var logDataset = await _settingsService.GetAsync(ChatDatasetSettings.LoggingEnabledKey, false).ConfigureAwait(false);
         IDisposable? datasetScope = null;
         string? datasetTurnId = null;
+        var thisTurnIndex = _turnIndex++;
         if (logDataset)
             datasetScope = ChatDatasetLoggingScope.BeginTurn(out datasetTurnId);
 
-        var turnContext = ChatStreamingHelper.BuildContextFromMessages(
-            Messages, aiMessage, m => m.IsUser, m => m.Content);
-        var fullPrompt = string.IsNullOrEmpty(turnContext)
-            ? userMessage
-            : $"{turnContext}\nUser: {userMessage}";
+        var conversationHistory = ChatStreamingHelper.BuildConversationHistory(
+            Messages, aiMessage, m => m.IsUser, m => m.Content,
+            excludeLastUserTurn: true);
 
         var foundForDataset = false;
         var cancelledForDataset = false;
         string? errorForDataset = null;
         var composedSystemForDataset = string.Empty;
+        string? finalAssistantResponseForDataset = null;
 
+        ChatProcessThreadTracker? processThread = null;
         try
         {
+            processThread = new ChatProcessThreadTracker(aiMessage.ProcessSteps);
             IProgress<string> pipelineProgress = new Progress<string>(key =>
-                Dispatcher.UIThread.Post(() => aiMessage.PipelineStatusText = _localizationService.T(key, "Chat")));
+                Dispatcher.UIThread.Post(() =>
+                    processThread!.OnPipelineKey(key, k => _localizationService.T(k, "Chat"))));
 
             void UpdateContent(string content) =>
-                Dispatcher.UIThread.Post(() =>
-                {
-                    aiMessage.Content = content;
-                    if (!string.IsNullOrEmpty(content))
-                        aiMessage.PipelineStatusText = null;
-                });
+                Dispatcher.UIThread.Post(() => { aiMessage.Content = content; });
 
-            var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress).ConfigureAwait(false);
+            var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, _conversationId).ConfigureAwait(false);
             var decision = analyzed.IsSuccess && analyzed.Value != null
                 ? analyzed.Value
                 : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skill = "NONE" };
             pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
-            var systemPrompt = _skillSystemPromptComposer.Compose(
-                ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode),
-                decision.Skill);
-            composedSystemForDataset = systemPrompt;
+            var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode);
+            composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.Skill);
 
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
             var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);
 
-            var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingAsync(
+            var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingWithHistoryAsync(
                 _orchestrator,
-                systemPrompt,
-                fullPrompt,
+                baseSystemPrompt,
+                conversationHistory,
+                userMessage,
                 _cts.Token,
                 UpdateContent,
                 imageBase64Contents: null,
-                routingUserMessage: userMessage,
                 pipelineProgress,
                 precomputedDecision: decision,
+                conversationRoutingKey: _conversationId,
                 displayOptions);
 
             foundForDataset = foundResponse;
+            finalAssistantResponseForDataset = foundResponse ? finalContent : null;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 aiMessage.Content = finalContent;
+                processThread?.CompleteThread();
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -254,6 +258,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             {
                 if (string.IsNullOrEmpty(aiMessage.Content))
                     aiMessage.Content = _localizationService.T("GenerationStopped", "Chat");
+                processThread?.CompleteThread();
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -265,6 +270,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
+                processThread?.CompleteThread();
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -275,15 +281,21 @@ public partial class RightSidebarViewModel : ViewModelBase
             {
                 if (!string.IsNullOrEmpty(datasetTurnId))
                 {
+                    var contextForDataset = await Dispatcher.UIThread.InvokeAsync(() =>
+                        ChatStreamingHelper.BuildDatasetConversationContextString(
+                            Messages, m => m.IsUser, m => m.Content));
+
                     await _chatDatasetLogger.CommitTurnAsync(new ChatDatasetCommitRequest
                     {
                         TurnId = datasetTurnId,
                         ConversationId = _conversationId,
+                        TurnIndex = thisTurnIndex,
                         Source = "right_sidebar",
                         AssistantMode = SelectedAssistantMode,
                         LatestUserMessage = userMessage,
-                        ConversationContext = string.IsNullOrEmpty(turnContext) ? null : turnContext,
+                        ConversationContext = contextForDataset,
                         ComposedSystemPrompt = composedSystemForDataset,
+                        FinalAssistantResponse = finalAssistantResponseForDataset,
                         Outcome = new ChatDatasetOutcomeSection
                         {
                             FoundResponse = foundForDataset,

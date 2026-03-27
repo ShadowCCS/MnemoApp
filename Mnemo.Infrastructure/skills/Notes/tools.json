@@ -2,16 +2,112 @@
   "tools": [
     {
       "name": "create_note",
-      "description": "Creates a persistent note",
+      "description": "Creates a brand-new note. Only call this when no suitable note already exists. If a note with a similar title already exists, use update_note or append_to_note instead.",
       "parameters": {
-        "title": {
-          "type": "string"
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the new note"
+          },
+          "content": {
+            "type": "string",
+            "description": "Optional body text or markdown for the note"
+          }
         },
-        "content": {
-          "type": "string"
+        "required": ["title"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "list_notes",
+      "description": "Lists notes (newest first). Optionally filter by a search string that matches title or body.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Optional text to match title or body (case-insensitive). Uses the full phrase first; for multi-word queries, notes matching any significant word are included if no exact phrase match (e.g. \"spanish note\" can match title \"Spanish 101\")."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of notes to return (default 30, max 100)"
+          }
         }
       },
-      "enabled": false
+      "enabled": true
+    },
+    {
+      "name": "read_note",
+      "description": "Reads the full title and body of one note by its stable id. Use list_notes to discover ids.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "The note's id"
+          }
+        },
+        "required": ["note_id"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "update_note",
+      "description": "Replaces the body of an existing note (optionally renames it too). Use this to write content into a note that exists but has an empty body, or to fully replace the body. Omit a field to leave it unchanged.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "The note to update"
+          },
+          "title": {
+            "type": "string",
+            "description": "New title (optional)"
+          },
+          "content": {
+            "type": "string",
+            "description": "New body text replacing the whole note (optional). Empty string clears the body."
+          }
+        },
+        "required": ["note_id"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "append_to_note",
+      "description": "Appends text to the end of an existing note's body, preserving existing content. Use this to add to a note that already has content.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "The note to append to"
+          },
+          "text": {
+            "type": "string",
+            "description": "Text or markdown to append"
+          }
+        },
+        "required": ["note_id", "text"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "open_note",
+      "description": "Switches to the Notes module and opens the note in the editor so the user can see and edit it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "The note to open"
+          }
+        },
+        "required": ["note_id"]
+      },
+      "enabled": true
     }
   ]
 }

@@ -25,7 +25,7 @@ public class OnboardingModule : IModule
         // No sidebar entry for onboarding
     }
 
-    public void RegisterTools(IFunctionRegistry registry)
+    public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
     {
         // No tools
     }

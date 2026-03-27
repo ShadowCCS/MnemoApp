@@ -231,7 +231,12 @@
     "PipelineStatusLoadingSkills": "Obteniendo habilidades",
     "PipelineStatusClassifying": "Entendiendo tu solicitud",
     "PipelineStatusReadingSkill": "Leyendo habilidad",
-    "PipelineStatusPreparingModel": "Cambiando modelo"
+    "PipelineStatusPreparingModel": "Cambiando modelo",
+    "PipelineStatusRoutingCombined": "Enrutamiento y habilidades",
+    "PipelineStatusGenerating": "Generando respuesta",
+    "PipelineStatusContinuingAfterTool": "Continuando respuesta",
+    "PipelineStatusRunningTool": "Llamada a herramienta",
+    "ProcessThread": "Proceso"
   },
   "Notes": {
     "NewNote": "Nueva Nota",

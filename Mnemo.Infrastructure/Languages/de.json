@@ -231,7 +231,12 @@
     "PipelineStatusLoadingSkills": "Skills werden geladen",
     "PipelineStatusClassifying": "Anfrage wird verstanden",
     "PipelineStatusReadingSkill": "Skill wird gelesen",
-    "PipelineStatusPreparingModel": "Modell wird gewechselt"
+    "PipelineStatusPreparingModel": "Modell wird gewechselt",
+    "PipelineStatusRoutingCombined": "Routing & Skills",
+    "PipelineStatusGenerating": "Antwort wird erzeugt",
+    "PipelineStatusContinuingAfterTool": "Antwort wird fortgesetzt",
+    "PipelineStatusRunningTool": "Tool-Aufruf",
+    "ProcessThread": "Ablauf"
   },
   "Notes": {
     "NewNote": "Neue Notiz",

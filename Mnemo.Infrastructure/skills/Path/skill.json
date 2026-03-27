@@ -2,10 +2,10 @@
   "id": "Path",
   "version": "1.0.0",
   "enabled": true,
-  "description": "Anything about the Learning Path module: how to use it or creating/managing paths—structured study plans made of ordered units, progress, AI-generated unit content tied to the knowledge base or uploads.",
-  "detection_hint": "learning path, study path, path module, units, roadmap, syllabus, generate path, path progress, knowledge base path, learning plan",
+  "description": "The Learning Path module: study paths, ordered units, progress, AI-generated unit content from the knowledge base or uploads.",
+  "detection_hint": "learning path, study path, path module, units, roadmap, syllabus, generate path, path progress, knowledge base path",
   "injection": {
-    "system_prompt_fragment": "Mnemo Learning Paths are local study artifacts: a path has a title, description, metadata, and an ordered list of units. Each unit has a title, goal, optional AI-generated lesson content, and completion state; overall progress is derived from completed units. Source material is tracked (typically knowledge-base chunks or user-provided documents) so generation stays grounded. Creating or extending a path may run as background AI tasks (task manager) and can build structure first, then fill units. In the UI the user browses paths from the Learning Path area, opens a path to see units in a sidebar, reads unit content, and marks progress. Settings may include smart unit generation (auto-generate when selecting a unit). Help the user plan topics, refine unit goals, interpret path progress, or understand how generation uses their materials; when path-related tools exist, prefer them to persist work instead of only describing steps.",
+    "system_prompt_fragment": "Learning Paths: local artifacts with title, description, ordered units (goals, optional AI lesson text, completion). Progress = completed units. Generation may use knowledge-base or user docs; can run in background. UI: browse paths, open a path, sidebar units, mark progress. Prefer path-related tools when available instead of only describing steps.",
     "include_tools": true
   }
 }

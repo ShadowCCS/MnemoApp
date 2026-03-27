@@ -12,6 +12,13 @@ public interface ITextGenerationService : IDisposable
     Task<Result<string>> GenerateAsync(AIModelManifest manifest, string prompt, CancellationToken ct, object? responseJsonSchema = null);
     /// <param name="imageBase64Contents">Optional. For vision models: list of image bytes as base64 strings (without data URL prefix).</param>
     IAsyncEnumerable<string> GenerateStreamingAsync(AIModelManifest manifest, string prompt, CancellationToken ct, IReadOnlyList<string>? imageBase64Contents = null);
+    /// <summary>
+    /// Tool-aware streaming generation. Yields <see cref="StreamChunk.Content"/> tokens during normal generation
+    /// and <see cref="StreamChunk.ToolCall"/> when the model requests a tool invocation.
+    /// </summary>
+    /// <param name="messages">Full conversation history in OpenAI message format (system, user, assistant, tool).</param>
+    /// <param name="tools">Tool schemas to advertise to the model. Empty list means no tool calling.</param>
+    IAsyncEnumerable<StreamChunk> GenerateStreamingWithToolsAsync(AIModelManifest manifest, IReadOnlyList<object> messages, IReadOnlyList<SkillToolDefinition> tools, CancellationToken ct);
     void UnloadModel(string modelId);
 }
 

@@ -13,7 +13,10 @@ public interface IOrchestrationLayer
     /// <summary>
     /// Classifies the user message for main-model selection (simple vs reasoning) and skill context selection.
     /// </summary>
-    Task<Result<RoutingAndSkillDecision>> RouteAndClassifySkillAsync(string userMessage, CancellationToken ct = default);
+    Task<Result<RoutingAndSkillDecision>> RouteAndClassifySkillAsync(
+        string userMessage,
+        RoutingToolHint? recentToolHint = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Runs one or more orchestration tasks using the universal TaskType prompt format.

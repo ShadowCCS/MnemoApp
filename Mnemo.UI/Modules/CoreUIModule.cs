@@ -33,7 +33,7 @@ public class CoreUIModule : IModule
         // Global sidebar items if any
     }
 
-    public void RegisterTools(IFunctionRegistry registry)
+    public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
     {
         // Global AI tools if any
     }

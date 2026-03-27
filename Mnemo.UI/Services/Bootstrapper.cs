@@ -31,6 +31,7 @@ public static class Bootstrapper
         services.AddSingleton<IStorageProvider, SqliteStorageProvider>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IChatDatasetLogger, ChatDatasetLogger>();
+        services.AddSingleton<DatasetExporter>();
         services.AddSingleton<ILaTeXEngine, LaTeXEngine>();
         services.AddSingleton<IMarkdownProcessor, MarkdownProcessor>();
         services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
@@ -44,11 +45,18 @@ public static class Bootstrapper
         services.AddSingleton<IResourceGovernor, ResourceGovernor>();
         services.AddSingleton<LlamaCppServerManager>();
         services.AddSingleton<IAIServerManager>(sp => sp.GetRequiredService<LlamaCppServerManager>());
-        services.AddSingleton<ITextGenerationService, LlamaCppHttpTextService>();
+        services.AddSingleton<LlamaCppHttpTextService>();
+        services.AddSingleton<ITeacherModelClient, VertexGeminiTeacherClient>();
+        services.AddSingleton<ITextGenerationService>(sp => new DelegatingTextGenerationService(
+            sp.GetRequiredService<LlamaCppHttpTextService>(),
+            sp.GetRequiredService<ITeacherModelClient>(),
+            sp.GetRequiredService<ISettingsService>()));
         services.AddSingleton<IHardwareTierEvaluator, HardwareTierEvaluator>();
         services.AddSingleton<ISkillRegistry, SkillRegistry>();
         services.AddSingleton<ISkillSystemPromptComposer, SkillSystemPromptComposer>();
         services.AddSingleton<IOrchestrationLayer, OrchestrationLayerService>();
+        services.AddSingleton<IToolDispatcher, ToolDispatcher>();
+        services.AddSingleton<IRoutingToolHintStore, RoutingToolHintStore>();
         services.AddSingleton<IAIOrchestrator, AIOrchestrator>();
         services.AddSingleton<IAITaskManager, AITaskManager>();
 
@@ -178,7 +186,7 @@ public static class Bootstrapper
         {
             module.RegisterRoutes(navRegistry);
             module.RegisterSidebarItems(sidebarService);
-            module.RegisterTools(funcRegistry);
+            module.RegisterTools(funcRegistry, serviceProvider);
             module.RegisterWidgets(widgetRegistry);
         }
 

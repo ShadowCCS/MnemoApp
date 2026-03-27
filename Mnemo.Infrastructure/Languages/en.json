@@ -231,7 +231,12 @@
     "PipelineStatusLoadingSkills": "Fetching skills",
     "PipelineStatusClassifying": "Understanding your request",
     "PipelineStatusReadingSkill": "Reading skill",
-    "PipelineStatusPreparingModel": "Switching model"
+    "PipelineStatusPreparingModel": "Switching model",
+    "PipelineStatusRoutingCombined": "Routing & skills",
+    "PipelineStatusGenerating": "Generating response",
+    "PipelineStatusContinuingAfterTool": "Continuing response",
+    "PipelineStatusRunningTool": "Tool call",
+    "ProcessThread": "Process"
   },
   "Notes": {
     "NewNote": "New Note",

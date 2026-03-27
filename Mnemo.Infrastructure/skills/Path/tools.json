@@ -4,12 +4,16 @@
       "name": "create_learning_path",
       "description": "Creates a persistent learning path artifact (topic and optional duration hint for planning).",
       "parameters": {
-        "topic": {
-          "type": "string"
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string"
+          },
+          "duration_weeks": {
+            "type": "integer"
+          }
         },
-        "duration_weeks": {
-          "type": "integer"
-        }
+        "required": ["topic"]
       },
       "enabled": false
     }

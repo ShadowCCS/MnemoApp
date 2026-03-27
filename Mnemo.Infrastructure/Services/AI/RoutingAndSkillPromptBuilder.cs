@@ -6,7 +6,7 @@ namespace Mnemo.Infrastructure.Services.AI;
 
 internal static class RoutingAndSkillPromptBuilder
 {
-    public static string Build(string userMessage, IReadOnlyList<SkillDefinition> enabledSkills)
+    public static string Build(string userMessage, IReadOnlyList<SkillDefinition> enabledSkills, RoutingToolHint? recentToolHint = null)
     {
         var sb = new StringBuilder();
         sb.Append("TaskType: ").Append(OrchestrationTaskTypes.RoutingAndSkillDetection).Append('\n');
@@ -26,7 +26,26 @@ internal static class RoutingAndSkillPromptBuilder
         }
 
         sb.AppendLine(
-            "- NONE: General chat, study help, or topics that do not match any module skill above. Prefer a module skill (e.g. Notes) when the user names that module or its UI (sidebar, favorites, folders, editor).");
+            "- NONE: General study or subject Q&A when the user is not asking about the Mnemo app or a specific module. " +
+            "If they ask about Mnemo overall, settings, navigation, themes, or app-wide \"where do I…\", choose Application—not NONE. " +
+            "If they clearly mean Notes, Mindmap, or Learning Path content/workflow, choose that skill—not NONE.");
+
+        if (recentToolHint != null)
+        {
+            sb.Append("[RECENT TOOL CONTEXT]: In this thread the assistant last ran tool \"")
+                .Append(recentToolHint.ToolName)
+                .Append("\" under skill \"")
+                .Append(recentToolHint.SkillId)
+                .Append("\".");
+            if (!string.IsNullOrWhiteSpace(recentToolHint.Detail))
+            {
+                sb.Append(" Result summary: ").Append(recentToolHint.Detail.Trim());
+            }
+
+            sb.AppendLine();
+            sb.AppendLine(
+                "If the user's message is a short follow-up (e.g. add more, continue, same note) that clearly continues that action, choose the skill above—not NONE.");
+        }
 
         sb.Append("[USER MESSAGE]: ").Append(userMessage);
         return sb.ToString();

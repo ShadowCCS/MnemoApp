@@ -1,11 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules.Chat.ViewModels;
 
 public class ChatMessageViewModel : ViewModelBase
 {
+    public ChatMessageViewModel()
+    {
+        ProcessSteps.CollectionChanged += OnProcessStepsChanged;
+    }
+
+    private void OnProcessStepsChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        OnPropertyChanged(nameof(HasProcessThread));
+
     private string _content = string.Empty;
     public string Content
     {
@@ -78,6 +88,11 @@ public class ChatMessageViewModel : ViewModelBase
     }
 
     public bool HasPipelineStatus => !string.IsNullOrEmpty(_pipelineStatusText);
+
+    /// <summary>Ordered steps (routing, model, tools, …) shown under the assistant title.</summary>
+    public ObservableCollection<ChatProcessStepViewModel> ProcessSteps { get; } = new();
+
+    public bool HasProcessThread => ProcessSteps.Count > 0;
 
     private bool _isStreaming;
     /// <summary>True while the assistant message is still being generated (enables live token display).</summary>

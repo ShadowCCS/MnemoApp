@@ -14,40 +14,20 @@ namespace Mnemo.UI.Services;
 /// </summary>
 public static class ChatStreamingHelper
 {
-    /// <summary>System prompt for General mode: helpful assistant.</summary>
-    public const string GeneralSystemPrompt = @"You are a helpful AI assistant for the Mnemo application.
+    /// <summary>System prompt for General mode: helpful assistant (lean; skill fragments + fine-tuning carry product detail).</summary>
+    public const string GeneralSystemPrompt = @"You are Mnemo's in-app assistant.
 
-Primary goal: give accurate, practical help while keeping answers concise and easy to follow.
+- Answer clearly and concisely. Use Markdown. Default to English unless the user asks otherwise.
+- Do not invent app UI, settings, or features. If something is uncertain, say so briefly or ask one focused question.
+- Pure study or subject questions: answer directly—no need to mention the app unless relevant.
+- When tools are available, use them to read or change user data instead of only describing what you would do.";
 
-About Mnemo and the UI:
-- Do not invent menus, settings, shortcuts, features, modules, or behavior.
-- For general study or subject-matter questions (not about the app), answer directly. Do not add in-app verification tips, “check Settings,” or references to app modules.
-- Only when the user is clearly asking about Mnemo (UI, settings, features, or how to use the app): if a product-specific detail is uncertain, say so briefly, then suggest a real place to verify (e.g. Settings) or ask one focused clarifying question—never invent module or screen names.
-- Avoid long questionnaires.
+    /// <summary>System prompt for Explainer mode: teaching (lean base; same guardrails as General).</summary>
+    public const string ExplainerSystemPrompt = @"You are Mnemo's in-app explainer: teach and clarify.
 
-Response style:
-- Match depth to intent: brief for simple questions, deeper only when steps, tradeoffs, or detail are needed.
-- Lead with the direct answer, then add context only if useful.
-- Prefer actionable guidance over theory.
-
-Formatting:
-- Use Markdown.
-- Prefer clear structure and signal over filler.
-- Default language is English unless the user asks otherwise.";
-
-    /// <summary>System prompt for Explainer mode: focus on teaching and breaking down concepts.</summary>
-    public const string ExplainerSystemPrompt = @"You are an explainer assistant in the Mnemo application. Your role is to teach and clarify.
-
-About Mnemo and the UI: Do not invent app-specific details. If unsure, say so and offer to help once you know their version of the question—or one short clarifying question if needed.
-
-Length: Teach at the depth the question implies—brief summaries when a quick explanation suffices; step-by-step or richer examples when the topic is complex.
-
-When answering:
-- Break complex ideas into simple steps
-- Use examples and analogies where helpful
-- Use Markdown formatting, tables for comparisons, and LaTeX for equations when appropriate
-- Prefer clarity and structure; avoid unnecessary jargon unless the user is clearly familiar with the topic
-- Your default language is English";
+- Match depth to the question (short when enough; steps, examples, or tables when it helps). Markdown; LaTeX for math when useful.
+- Do not invent app-specific details. If unsure, say so or ask one short clarifying question.
+- Default to English unless the user asks otherwise.";
 
     /// <summary>Default system prompt (General). Kept for backward compatibility.</summary>
     public static string DefaultSystemPrompt => GeneralSystemPrompt;
@@ -70,29 +50,55 @@ When answering:
     public const int MaxContextMessageCount = 11;
 
     /// <summary>
-    /// Builds conversation context from recent messages for the prompt.
+    /// Builds a structured conversation history from recent messages for multi-turn prompting.
+    /// Returns turns oldest-first, excluding the current placeholder (empty assistant) message.
     /// </summary>
     /// <param name="messages">All messages (newest at end).</param>
     /// <param name="excludeMessage">Optional message to exclude (e.g. the placeholder AI message being filled).</param>
     /// <param name="isUser">Predicate: true if the message is from the user.</param>
     /// <param name="getContent">Selector for message content.</param>
-    public static string BuildContextFromMessages<T>(
+    /// <param name="excludeLastUserTurn">
+    /// When true, drops the last message if it is a user message. Use with
+    /// <see cref="IAIOrchestrator.PromptStreamingWithHistoryAsync"/> which appends <c>userMessage</c> separately—otherwise the latest user turn appears twice.
+    /// </param>
+    public static IReadOnlyList<ConversationTurn> BuildConversationHistory<T>(
         IList<T> messages,
         T? excludeMessage,
         Func<T, bool> isUser,
-        Func<T, string> getContent)
+        Func<T, string> getContent,
+        bool excludeLastUserTurn = false)
     {
         var recent = messages
             .TakeLast(MaxContextMessageCount)
             .Where(m => !ReferenceEquals(m, excludeMessage))
             .ToList();
-        if (recent.Count <= 1) return string.Empty;
 
-        var sb = new StringBuilder();
-        sb.AppendLine("Previous conversation history:");
-        foreach (var msg in recent)
-            sb.AppendLine($"{(isUser(msg) ? "User" : "Assistant")}: {getContent(msg)}");
-        return sb.ToString();
+        if (excludeLastUserTurn && recent.Count > 0 && isUser(recent[^1]))
+            recent.RemoveAt(recent.Count - 1);
+
+        if (recent.Count == 0) return Array.Empty<ConversationTurn>();
+
+        return recent
+            .Select(m => new ConversationTurn(
+                isUser(m) ? ConversationRole.User : ConversationRole.Assistant,
+                getContent(m)))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Flat transcript for dataset logging after a turn finishes. Includes every message in the window,
+    /// including the assistant reply for the current turn (pass <paramref name="excludeMessage"/> as null).
+    /// </summary>
+    public static string? BuildDatasetConversationContextString<T>(
+        IList<T> messages,
+        Func<T, bool> isUser,
+        Func<T, string> getContent)
+    {
+        // No message instance equals default(T), so nothing is excluded (include full transcript for this turn).
+        var turns = BuildConversationHistory(messages, default!, isUser, getContent);
+        if (turns.Count == 0) return null;
+        return "Conversation transcript:\n" + string.Join("\n",
+            turns.Select(t => $"{(t.Role == ConversationRole.User ? "User" : "Assistant")}: {t.Content}"));
     }
 
     /// <summary>
@@ -146,18 +152,77 @@ When answering:
             options).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Runs the streaming prompt loop using real multi-turn conversation history. History turns are passed
+    /// as proper OpenAI-format messages instead of a flat text blob, improving multi-turn reasoning quality.
+    /// </summary>
+    /// <param name="systemPrompt">Base system prompt only (mode text). Skill injection is applied inside <see cref="IAIOrchestrator.PromptStreamingWithHistoryAsync"/>—do not pre-compose with <see cref="ISkillSystemPromptComposer"/>.</param>
+    /// <param name="history">Prior turns (oldest first, not including the current user message).</param>
+    /// <param name="userMessage">The latest user message.</param>
+    /// <param name="imageBase64Contents">Optional. For vision: list of image base64 strings.</param>
+    /// <param name="pipelineStatus">Optional. Receives pipeline label keys.</param>
+    /// <param name="conversationRoutingKey">Optional. Thread id for last-tool routing hints (same as chat session id).</param>
+    /// <param name="displayOptions">Optional. Reveal pacing.</param>
+    /// <returns>True if at least one token was received; false if empty response.</returns>
+    public static async Task<(bool FoundResponse, string FinalContent)> RunStreamingWithHistoryAsync(
+        IAIOrchestrator orchestrator,
+        string systemPrompt,
+        IReadOnlyList<ConversationTurn> history,
+        string userMessage,
+        CancellationToken cancellationToken,
+        Action<string> onContentUpdate,
+        IReadOnlyList<string>? imageBase64Contents = null,
+        IProgress<string>? pipelineStatus = null,
+        RoutingAndSkillDecision? precomputedDecision = null,
+        string? conversationRoutingKey = null,
+        ChatStreamingDisplayOptions? displayOptions = null)
+    {
+        var options = displayOptions ?? ChatStreamingDisplayOptions.Balanced;
+        var throttledPipeline = ThrottlePipeline(pipelineStatus, minIntervalMs: 80);
+        var emitContent = CreateThrottledContentEmitter(onContentUpdate, ChatStreamingDisplayOptions.DefaultUiThrottleMs);
+
+        if (options.IsInstant)
+            return await RunInstantWithHistoryAsync(
+                orchestrator,
+                systemPrompt,
+                history,
+                userMessage,
+                cancellationToken,
+                emitContent,
+                imageBase64Contents,
+                throttledPipeline,
+                precomputedDecision,
+                conversationRoutingKey).ConfigureAwait(false);
+
+        return await RunRevealWithHistoryAsync(
+            orchestrator,
+            systemPrompt,
+            history,
+            userMessage,
+            cancellationToken,
+            emitContent,
+            imageBase64Contents,
+            throttledPipeline,
+            precomputedDecision,
+            conversationRoutingKey,
+            options).ConfigureAwait(false);
+    }
+
     private static IProgress<string>? ThrottlePipeline(IProgress<string>? inner, int minIntervalMs)
     {
         if (inner == null)
             return null;
 
         var last = DateTime.MinValue;
+        string? lastKey = null;
         return new Progress<string>(s =>
         {
             var now = DateTime.UtcNow;
-            if ((now - last).TotalMilliseconds < minIntervalMs)
+            var sameKey = string.Equals(s, lastKey, StringComparison.Ordinal);
+            if (sameKey && (now - last).TotalMilliseconds < minIntervalMs)
                 return;
             last = now;
+            lastKey = s;
             inner.Report(s);
         });
     }
@@ -223,6 +288,160 @@ When answering:
         var finalContent = buffer.ToString();
         emitContent(finalContent, true);
 
+        bool found;
+        lock (lockObj)
+        {
+            found = foundResponse;
+        }
+
+        return (found, finalContent);
+    }
+
+    private static async Task<(bool FoundResponse, string FinalContent)> RunInstantWithHistoryAsync(
+        IAIOrchestrator orchestrator,
+        string systemPrompt,
+        IReadOnlyList<ConversationTurn> history,
+        string userMessage,
+        CancellationToken cancellationToken,
+        Action<string, bool> emitContent,
+        IReadOnlyList<string>? imageBase64Contents,
+        IProgress<string>? pipelineStatus,
+        RoutingAndSkillDecision? precomputedDecision,
+        string? conversationRoutingKey)
+    {
+        var buffer = new StringBuilder();
+        var lockObj = new object();
+        var foundResponse = false;
+
+        try
+        {
+            await foreach (var token in orchestrator.PromptStreamingWithHistoryAsync(systemPrompt, history, userMessage, cancellationToken, imageBase64Contents, pipelineStatus, precomputedDecision, conversationRoutingKey)
+                .ConfigureAwait(false))
+            {
+                lock (lockObj)
+                {
+                    buffer.Append(token);
+                    foundResponse = true;
+                }
+
+                string snapshot;
+                lock (lockObj)
+                {
+                    snapshot = buffer.ToString();
+                }
+
+                emitContent(snapshot, false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            lock (lockObj)
+            {
+                emitContent(buffer.ToString(), true);
+            }
+
+            throw;
+        }
+
+        var finalContent = buffer.ToString();
+        emitContent(finalContent, true);
+
+        bool found;
+        lock (lockObj)
+        {
+            found = foundResponse;
+        }
+
+        return (found, finalContent);
+    }
+
+    private static async Task<(bool FoundResponse, string FinalContent)> RunRevealWithHistoryAsync(
+        IAIOrchestrator orchestrator,
+        string systemPrompt,
+        IReadOnlyList<ConversationTurn> history,
+        string userMessage,
+        CancellationToken cancellationToken,
+        Action<string, bool> emitContent,
+        IReadOnlyList<string>? imageBase64Contents,
+        IProgress<string>? pipelineStatus,
+        RoutingAndSkillDecision? precomputedDecision,
+        string? conversationRoutingKey,
+        ChatStreamingDisplayOptions options)
+    {
+        var buffer = new StringBuilder();
+        var lockObj = new object();
+        var streamComplete = false;
+        var revealedLength = 0;
+        var foundResponse = false;
+
+        var tickMs = Math.Max(1, options.TickMs);
+        var charsPerTick = Math.Max(1, options.CharsPerTick);
+
+        async Task ProducerAsync()
+        {
+            try
+            {
+                await foreach (var token in orchestrator.PromptStreamingWithHistoryAsync(systemPrompt, history, userMessage, cancellationToken, imageBase64Contents, pipelineStatus, precomputedDecision, conversationRoutingKey)
+                    .ConfigureAwait(false))
+                {
+                    lock (lockObj)
+                    {
+                        buffer.Append(token);
+                        foundResponse = true;
+                    }
+                }
+            }
+            finally
+            {
+                lock (lockObj)
+                {
+                    streamComplete = true;
+                }
+            }
+        }
+
+        async Task ConsumerAsync()
+        {
+            while (true)
+            {
+                await Task.Delay(tickMs, cancellationToken).ConfigureAwait(false);
+
+                string slice;
+                bool done;
+                lock (lockObj)
+                {
+                    var len = buffer.Length;
+                    if (len == 0 && !streamComplete)
+                        continue;
+
+                    if (len > 0)
+                        revealedLength = Math.Min(len, revealedLength + charsPerTick);
+
+                    slice = revealedLength == 0 ? string.Empty : buffer.ToString(0, revealedLength);
+                    done = streamComplete && revealedLength >= len;
+                }
+
+                emitContent(slice, done);
+                if (done)
+                    break;
+            }
+        }
+
+        try
+        {
+            await Task.WhenAll(ProducerAsync(), ConsumerAsync()).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            lock (lockObj)
+            {
+                emitContent(buffer.ToString(), true);
+            }
+
+            throw;
+        }
+
+        var finalContent = buffer.ToString();
         bool found;
         lock (lockObj)
         {

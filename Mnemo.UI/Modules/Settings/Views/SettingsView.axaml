@@ -101,6 +101,41 @@
             </components:SettingsCard>
         </DataTemplate>
 
+        <!-- Async Action Setting Template -->
+        <DataTemplate x:Key="AsyncActionSettingTemplate" x:DataType="vm:AsyncActionSettingViewModel">
+            <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
+                <components:SettingsCard.RightContent>
+                    <StackPanel Spacing="6" HorizontalAlignment="Right">
+                        <Button Content="{Binding ActionText}"
+                                Command="{Binding ActionCommand}"
+                                IsEnabled="{Binding !IsRunning}"
+                                Padding="16,8"
+                                CornerRadius="6"
+                                Background="{DynamicResource SecondaryButtonBackgroundBrush}"
+                                Foreground="{DynamicResource SecondaryButtonTextColorBrush}"
+                                BorderThickness="0"
+                                FontSize="13"
+                                FontFamily="{DynamicResource Font.Medium}">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover">
+                                    <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
+                                </Style>
+                                <Style Selector="Button:pressed">
+                                    <Setter Property="Background" Value="{DynamicResource ListItemActiveBackgroundBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                        <TextBlock Text="{Binding StatusText}"
+                                   IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="260"/>
+                    </StackPanel>
+                </components:SettingsCard.RightContent>
+            </components:SettingsCard>
+        </DataTemplate>
+
         <!-- App Icon Setting Template -->
         <DataTemplate x:Key="AppIconSettingTemplate" x:DataType="vm:AppIconSettingViewModel">
             <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
@@ -530,6 +565,7 @@
                                                             <StaticResource ResourceKey="DropdownSettingTemplate"/>
                                                             <StaticResource ResourceKey="LanguageSettingTemplate"/>
                                                             <StaticResource ResourceKey="ActionSettingTemplate"/>
+                                                            <StaticResource ResourceKey="AsyncActionSettingTemplate"/>
                                                             <StaticResource ResourceKey="AppIconSettingTemplate"/>
                                                             <StaticResource ResourceKey="ThemeSettingTemplate"/>
                                                             <StaticResource ResourceKey="ProfilePictureSettingTemplate"/>

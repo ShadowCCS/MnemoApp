@@ -1,3 +1,5 @@
+using System;
+
 namespace Mnemo.Core.Services;
 
 /// <summary>
@@ -12,7 +14,11 @@ public interface IModule
     void RegisterTranslationSources(ITranslationSourceRegistry registry);
     void RegisterRoutes(INavigationRegistry registry);
     void RegisterSidebarItems(ISidebarService sidebarService);
-    void RegisterTools(IFunctionRegistry registry);
+    /// <summary>
+    /// Registers AI tools. <paramref name="services"/> provides access to resolved services
+    /// (e.g. INoteService) needed to implement tool handlers.
+    /// </summary>
+    void RegisterTools(IFunctionRegistry registry, IServiceProvider services);
     void RegisterWidgets(IWidgetRegistry registry);
 }
 
