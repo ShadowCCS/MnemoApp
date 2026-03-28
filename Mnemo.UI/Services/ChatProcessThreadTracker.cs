@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using Mnemo.Core.Models;
 using Mnemo.UI.ViewModels;
 
@@ -11,6 +12,24 @@ namespace Mnemo.UI.Services;
 public sealed class ChatProcessThreadTracker
 {
     private readonly ObservableCollection<ChatProcessStepViewModel> _steps;
+    private readonly Stopwatch _elapsed = Stopwatch.StartNew();
+
+    /// <summary>Elapsed wall-clock time since this tracker was created (i.e. since the turn started).</summary>
+    public TimeSpan Elapsed => _elapsed.Elapsed;
+
+    /// <summary>Label of the currently active step, or null when all are complete.</summary>
+    public string? ActiveStepLabel
+    {
+        get
+        {
+            for (int i = _steps.Count - 1; i >= 0; i--)
+            {
+                if (_steps[i].IsActive)
+                    return _steps[i].Label;
+            }
+            return null;
+        }
+    }
 
     public ChatProcessThreadTracker(ObservableCollection<ChatProcessStepViewModel> steps) =>
         _steps = steps;
@@ -58,14 +77,52 @@ public sealed class ChatProcessThreadTracker
         }
     }
 
+    public void AddToolCall(ChatDatasetToolCall toolCall, Func<string, string> localize)
+    {
+        if (_steps.Count == 0) return;
+        var last = _steps[^1];
+
+        var summary = BuildToolSummary(toolCall);
+
+        last.ToolCalls.Add(new ChatToolCallViewModel
+        {
+            Name = toolCall.Name,
+            Arguments = toolCall.ArgumentsJson ?? string.Empty,
+            Result = toolCall.ResultContent ?? string.Empty,
+            Summary = summary
+        });
+    }
+
     /// <summary>Marks all steps complete (call when the assistant turn ends).</summary>
     public void CompleteThread()
     {
+        _elapsed.Stop();
         foreach (var s in _steps)
         {
             s.IsActive = false;
             s.IsComplete = true;
         }
+    }
+
+    private static string BuildToolSummary(ChatDatasetToolCall toolCall)
+    {
+        var result = toolCall.ResultContent;
+        if (string.IsNullOrWhiteSpace(result))
+            return "completed";
+
+        var lineCount = 1;
+        foreach (var ch in result)
+        {
+            if (ch == '\n') lineCount++;
+        }
+
+        if (lineCount > 3)
+            return $"{lineCount} lines returned";
+
+        if (result.Length > 80)
+            return $"{result.Length} chars returned";
+
+        return "completed";
     }
 
     private static bool IsRoutingKey(string key) =>

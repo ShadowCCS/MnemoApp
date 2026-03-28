@@ -15,7 +15,11 @@ public class ChatMessage : ViewModelBase
 {
     public ChatMessage()
     {
-        ProcessSteps.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasProcessThread));
+        ProcessSteps.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasProcessThread));
+            OnPropertyChanged(nameof(HasProcessThreadOrThoughts));
+        };
     }
 
     private MessageRole _role;
@@ -46,8 +50,48 @@ public class ChatMessage : ViewModelBase
         set
         {
             if (SetProperty(ref _thoughts, value))
+            {
                 OnPropertyChanged(nameof(IsThinking));
+                OnPropertyChanged(nameof(HasProcessThreadOrThoughts));
+            }
         }
+    }
+
+    private int _thoughtsCount;
+    public int ThoughtsCount
+    {
+        get => _thoughtsCount;
+        set => SetProperty(ref _thoughtsCount, value);
+    }
+
+    private string? _elapsedText;
+    /// <summary>Formatted elapsed time string (e.g. "00:04") updated while streaming.</summary>
+    public string? ElapsedText
+    {
+        get => _elapsedText;
+        set
+        {
+            if (SetProperty(ref _elapsedText, value))
+                OnPropertyChanged(nameof(HasElapsedText));
+        }
+    }
+
+    public bool HasElapsedText => !string.IsNullOrEmpty(_elapsedText);
+
+    private string _processHeaderText = "Thought process";
+    /// <summary>Single header text: active step label while streaming, thought process title when done.</summary>
+    public string ProcessHeaderText
+    {
+        get => _processHeaderText;
+        set => SetProperty(ref _processHeaderText, value);
+    }
+
+    private bool _isProcessThreadExpanded;
+    /// <summary>Controls whether the thought process panel is expanded (auto-expands during streaming).</summary>
+    public bool IsProcessThreadExpanded
+    {
+        get => _isProcessThreadExpanded;
+        set => SetProperty(ref _isProcessThreadExpanded, value);
     }
 
     private List<string>? _sources;
@@ -83,6 +127,8 @@ public class ChatMessage : ViewModelBase
     public ObservableCollection<ChatProcessStepViewModel> ProcessSteps { get; } = new();
 
     public bool HasProcessThread => ProcessSteps.Count > 0;
+
+    public bool HasProcessThreadOrThoughts => HasProcessThread || IsThinking;
 
     private bool _isStreaming;
     /// <summary>True while the assistant message is still being generated.</summary>

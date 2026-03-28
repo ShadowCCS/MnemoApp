@@ -35,6 +35,12 @@
     <Color x:Key="ListItemIconColor">#888888</Color>
     <Color x:Key="AccentButtonIcon">#FFFFFF</Color>
     <Color x:Key="GhostButtonIcon">#888888</Color>
+
+    <!-- Chat: thought-process step state icons -->
+    <Color x:Key="ChatProcessStateDoneFill">#1D9E75</Color>
+    <Color x:Key="ChatProcessStateDoneGlyph">#FFFFFF</Color>
+    <Color x:Key="ChatProcessStateActive">#E85D24</Color>
+    <Color x:Key="ChatProcessStatePending">#797573</Color>
     
     <!-- All other color definitions from theme.axaml -->
     <Color x:Key="Links">#2686C2</Color>

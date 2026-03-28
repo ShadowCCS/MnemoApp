@@ -32,6 +32,7 @@
     <AvaloniaResource Include="Icons\MindmapToolbar\EdgeTypes\*.svg" />
     <AvaloniaResource Include="Icons\MindmapModeSwitcher\*.svg" />
     <AvaloniaResource Include="Assets\ProfilePictures\*.png" />
+    <AvaloniaResource Include="Icons\States\*.svg" />
     <AvaloniaResource Include="Languages\**" />
     <EmbeddedResource Include="Modules\Overview\Widgets\**\Translations\*.json" />
   </ItemGroup>

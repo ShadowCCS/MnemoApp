@@ -32,6 +32,10 @@
     <SolidColorBrush x:Key="ListItemIconColorBrush" Color="{DynamicResource ListItemIconColor}"/>
     <SolidColorBrush x:Key="AccentButtonIconBrush" Color="{DynamicResource AccentButtonIcon}"/>
     <SolidColorBrush x:Key="GhostButtonIconBrush" Color="{DynamicResource GhostButtonIcon}"/>
+    <SolidColorBrush x:Key="ChatProcessStateDoneFillBrush" Color="{DynamicResource ChatProcessStateDoneFill}"/>
+    <SolidColorBrush x:Key="ChatProcessStateDoneGlyphBrush" Color="{DynamicResource ChatProcessStateDoneGlyph}"/>
+    <SolidColorBrush x:Key="ChatProcessStateActiveBrush" Color="{DynamicResource ChatProcessStateActive}"/>
+    <SolidColorBrush x:Key="ChatProcessStatePendingBrush" Color="{DynamicResource ChatProcessStatePending}"/>
     
     <!-- All other brushes from theme.axaml -->
     <SolidColorBrush x:Key="LinksBrush" Color="{DynamicResource Links}"/>

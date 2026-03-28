@@ -27,7 +27,8 @@ public interface IAIOrchestrator
         string? routingUserMessage = null,
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
-        string? conversationRoutingKey = null);
+        string? conversationRoutingKey = null,
+        Action<ChatDatasetToolCall>? onToolCall = null);
 
     /// <summary>
     /// Streaming generation with real multi-turn conversation history. Sends proper OpenAI-format
@@ -48,7 +49,8 @@ public interface IAIOrchestrator
         IReadOnlyList<string>? imageBase64Contents = null,
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
-        string? conversationRoutingKey = null);
+        string? conversationRoutingKey = null,
+        Action<ChatDatasetToolCall>? onToolCall = null);
     /// <param name="responseJsonSchema">Optional. When set, forwarded to text service so the server forces JSON output (same as mini manager); use e.g. LearningPathJsonSchema.GetSchema().</param>
     Task<Result<string>> PromptWithModelAsync(string modelId, string prompt, CancellationToken ct = default, object? responseJsonSchema = null);
 

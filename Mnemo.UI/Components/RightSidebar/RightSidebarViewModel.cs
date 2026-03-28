@@ -203,9 +203,14 @@ public partial class RightSidebarViewModel : ViewModelBase
         try
         {
             processThread = new ChatProcessThreadTracker(aiMessage.ProcessSteps);
+            aiMessage.IsProcessThreadExpanded = true;
+
             IProgress<string> pipelineProgress = new Progress<string>(key =>
                 Dispatcher.UIThread.Post(() =>
-                    processThread!.OnPipelineKey(key, k => _localizationService.T(k, "Chat"))));
+                {
+                    processThread!.OnPipelineKey(key, k => _localizationService.T(k, "Chat"));
+                    UpdateProcessHeader(aiMessage, processThread);
+                }));
 
             void UpdateContent(string content) =>
                 Dispatcher.UIThread.Post(() => { aiMessage.Content = content; });
@@ -221,6 +226,15 @@ public partial class RightSidebarViewModel : ViewModelBase
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
             var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);
 
+            Action<ChatDatasetToolCall> onToolCall = tc =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    processThread?.AddToolCall(tc, k => _localizationService.T(k, "Chat"));
+                    aiMessage.ThoughtsCount += 1;
+                });
+            };
+
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingWithHistoryAsync(
                 _orchestrator,
                 baseSystemPrompt,
@@ -232,7 +246,8 @@ public partial class RightSidebarViewModel : ViewModelBase
                 pipelineProgress,
                 precomputedDecision: decision,
                 conversationRoutingKey: _conversationId,
-                displayOptions);
+                displayOptions,
+                onToolCall);
 
             foundForDataset = foundResponse;
             finalAssistantResponseForDataset = foundResponse ? finalContent : null;
@@ -241,6 +256,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             {
                 aiMessage.Content = finalContent;
                 processThread?.CompleteThread();
+                FinalizeProcessHeader(aiMessage, processThread);
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -259,6 +275,7 @@ public partial class RightSidebarViewModel : ViewModelBase
                 if (string.IsNullOrEmpty(aiMessage.Content))
                     aiMessage.Content = _localizationService.T("GenerationStopped", "Chat");
                 processThread?.CompleteThread();
+                FinalizeProcessHeader(aiMessage, processThread);
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -271,6 +288,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             {
                 aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
                 processThread?.CompleteThread();
+                FinalizeProcessHeader(aiMessage, processThread);
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -317,5 +335,24 @@ public partial class RightSidebarViewModel : ViewModelBase
             cts?.Dispose();
             Dispatcher.UIThread.Post(() => IsBusy = false);
         }
+    }
+
+    private static void UpdateProcessHeader(ChatMessage message, ChatProcessThreadTracker tracker)
+    {
+        var e = tracker.Elapsed;
+        message.ElapsedText = $"{(int)e.TotalMinutes:D2}:{e.Seconds:D2}";
+        message.ProcessHeaderText = tracker.ActiveStepLabel ?? "Thinking…";
+    }
+
+    private static void FinalizeProcessHeader(ChatMessage message, ChatProcessThreadTracker? tracker)
+    {
+        if (tracker == null) return;
+        var e = tracker.Elapsed;
+        message.ElapsedText = $"{(int)e.TotalMinutes:D2}:{e.Seconds:D2}";
+        var steps = message.ThoughtsCount;
+        message.ProcessHeaderText = steps > 0
+            ? $"Thought process ({steps} steps)"
+            : "Thought process";
+        message.IsProcessThreadExpanded = false;
     }
 }

@@ -228,7 +228,8 @@ public class AIOrchestrator : IAIOrchestrator
         string? routingUserMessage = null,
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
-        string? conversationRoutingKey = null)
+        string? conversationRoutingKey = null,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         var targetResolution = (imageBase64Contents != null && imageBase64Contents.Count > 0)
             ? await SelectVisionModelWithProgressAsync(ct, pipelineStatus).ConfigureAwait(false)
@@ -261,7 +262,7 @@ public class AIOrchestrator : IAIOrchestrator
                 new() { Role = "user", Content = userPrompt }
             };
 
-            await foreach (var token in RunToolLoopAsync(targetResolution, finalSystemPrompt, userPrompt, activeTools, conversationRoutingKey, ct, datasetRounds, pipelineStatus).ConfigureAwait(false))
+            await foreach (var token in RunToolLoopAsync(targetResolution, finalSystemPrompt, userPrompt, activeTools, conversationRoutingKey, ct, datasetRounds, pipelineStatus, onToolCall).ConfigureAwait(false))
             {
                 yield return token;
             }
@@ -309,7 +310,8 @@ public class AIOrchestrator : IAIOrchestrator
         IReadOnlyList<string>? imageBase64Contents = null,
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
-        string? conversationRoutingKey = null)
+        string? conversationRoutingKey = null,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         var targetResolution = (imageBase64Contents != null && imageBase64Contents.Count > 0)
             ? await SelectVisionModelWithProgressAsync(ct, pipelineStatus).ConfigureAwait(false)
@@ -368,7 +370,7 @@ public class AIOrchestrator : IAIOrchestrator
             var datasetRounds = new List<ChatDatasetToolRound>();
             var datasetTools = ToDatasetToolDefinitions(activeTools);
 
-            await foreach (var token in RunToolLoopWithMessagesAsync(targetResolution, messages, activeTools, conversationRoutingKey, ct, datasetRounds, pipelineStatus).ConfigureAwait(false))
+            await foreach (var token in RunToolLoopWithMessagesAsync(targetResolution, messages, activeTools, conversationRoutingKey, ct, datasetRounds, pipelineStatus, onToolCall).ConfigureAwait(false))
                 yield return token;
 
             await TryStageChatDatasetAsync(ct, targetResolution, finalSystemPrompt, userMessage,
@@ -413,7 +415,8 @@ public class AIOrchestrator : IAIOrchestrator
         string? conversationRoutingKey,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct,
         List<ChatDatasetToolRound>? datasetRounds = null,
-        IProgress<string>? pipelineStatus = null)
+        IProgress<string>? pipelineStatus = null,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         const int MaxToolRounds = 5;
 
@@ -473,13 +476,16 @@ public class AIOrchestrator : IAIOrchestrator
                 var result = await _toolDispatcher.DispatchAsync(toolCall, ct).ConfigureAwait(false);
                 RecordRoutingToolHint(conversationRoutingKey, resolution.SkillId, toolCall.Name, result.Content);
                 messages.Add(new { role = "tool", tool_call_id = result.ToolCallId, name = result.Name, content = result.Content });
-                datasetCallsThisRound.Add(new ChatDatasetToolCall
+                
+                var dsCall = new ChatDatasetToolCall
                 {
                     ToolCallId = toolCall.Id,
                     Name = toolCall.Name,
                     ArgumentsJson = toolCall.ArgumentsJson,
                     ResultContent = result.Content
-                });
+                };
+                datasetCallsThisRound.Add(dsCall);
+                onToolCall?.Invoke(dsCall);
             }
 
             datasetRounds?.Add(new ChatDatasetToolRound { Round = round + 1, ToolCalls = datasetCallsThisRound });
@@ -518,7 +524,8 @@ public class AIOrchestrator : IAIOrchestrator
         string? conversationRoutingKey,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct,
         List<ChatDatasetToolRound>? datasetRounds = null,
-        IProgress<string>? pipelineStatus = null)
+        IProgress<string>? pipelineStatus = null,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         const int MaxToolRounds = 5;
 
@@ -587,13 +594,16 @@ public class AIOrchestrator : IAIOrchestrator
                 var result = await _toolDispatcher.DispatchAsync(toolCall, ct).ConfigureAwait(false);
                 RecordRoutingToolHint(conversationRoutingKey, resolution.SkillId, toolCall.Name, result.Content);
                 messages.Add(new { role = "tool", tool_call_id = result.ToolCallId, name = result.Name, content = result.Content });
-                datasetCallsThisRound.Add(new ChatDatasetToolCall
+                
+                var dsCall = new ChatDatasetToolCall
                 {
                     ToolCallId = toolCall.Id,
                     Name = toolCall.Name,
                     ArgumentsJson = toolCall.ArgumentsJson,
                     ResultContent = result.Content
-                });
+                };
+                datasetCallsThisRound.Add(dsCall);
+                onToolCall?.Invoke(dsCall);
             }
 
             datasetRounds?.Add(new ChatDatasetToolRound { Round = round + 1, ToolCalls = datasetCallsThisRound });

@@ -121,7 +121,8 @@ public static class ChatStreamingHelper
         string? routingUserMessage = null,
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
-        ChatStreamingDisplayOptions? displayOptions = null)
+        ChatStreamingDisplayOptions? displayOptions = null,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         var options = displayOptions ?? ChatStreamingDisplayOptions.Balanced;
         var throttledPipeline = ThrottlePipeline(pipelineStatus, minIntervalMs: 80);
@@ -137,7 +138,8 @@ public static class ChatStreamingHelper
                 imageBase64Contents,
                 routingUserMessage,
                 throttledPipeline,
-                precomputedDecision).ConfigureAwait(false);
+                precomputedDecision,
+                onToolCall).ConfigureAwait(false);
 
         return await RunRevealAsync(
             orchestrator,
@@ -149,7 +151,8 @@ public static class ChatStreamingHelper
             routingUserMessage,
             throttledPipeline,
             precomputedDecision,
-            options).ConfigureAwait(false);
+            options,
+            onToolCall).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -175,7 +178,8 @@ public static class ChatStreamingHelper
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
         string? conversationRoutingKey = null,
-        ChatStreamingDisplayOptions? displayOptions = null)
+        ChatStreamingDisplayOptions? displayOptions = null,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         var options = displayOptions ?? ChatStreamingDisplayOptions.Balanced;
         var throttledPipeline = ThrottlePipeline(pipelineStatus, minIntervalMs: 80);
@@ -192,7 +196,8 @@ public static class ChatStreamingHelper
                 imageBase64Contents,
                 throttledPipeline,
                 precomputedDecision,
-                conversationRoutingKey).ConfigureAwait(false);
+                conversationRoutingKey,
+                onToolCall).ConfigureAwait(false);
 
         return await RunRevealWithHistoryAsync(
             orchestrator,
@@ -205,7 +210,8 @@ public static class ChatStreamingHelper
             throttledPipeline,
             precomputedDecision,
             conversationRoutingKey,
-            options).ConfigureAwait(false);
+            options,
+            onToolCall).ConfigureAwait(false);
     }
 
     private static IProgress<string>? ThrottlePipeline(IProgress<string>? inner, int minIntervalMs)
@@ -249,7 +255,8 @@ public static class ChatStreamingHelper
         IReadOnlyList<string>? imageBase64Contents,
         string? routingUserMessage,
         IProgress<string>? pipelineStatus,
-        RoutingAndSkillDecision? precomputedDecision)
+        RoutingAndSkillDecision? precomputedDecision,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         var buffer = new StringBuilder();
         var lockObj = new object();
@@ -257,7 +264,7 @@ public static class ChatStreamingHelper
 
         try
         {
-            await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus, precomputedDecision)
+            await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus, precomputedDecision, null, onToolCall)
                 .ConfigureAwait(false))
             {
                 lock (lockObj)
@@ -307,7 +314,8 @@ public static class ChatStreamingHelper
         IReadOnlyList<string>? imageBase64Contents,
         IProgress<string>? pipelineStatus,
         RoutingAndSkillDecision? precomputedDecision,
-        string? conversationRoutingKey)
+        string? conversationRoutingKey,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         var buffer = new StringBuilder();
         var lockObj = new object();
@@ -315,7 +323,7 @@ public static class ChatStreamingHelper
 
         try
         {
-            await foreach (var token in orchestrator.PromptStreamingWithHistoryAsync(systemPrompt, history, userMessage, cancellationToken, imageBase64Contents, pipelineStatus, precomputedDecision, conversationRoutingKey)
+            await foreach (var token in orchestrator.PromptStreamingWithHistoryAsync(systemPrompt, history, userMessage, cancellationToken, imageBase64Contents, pipelineStatus, precomputedDecision, conversationRoutingKey, onToolCall)
                 .ConfigureAwait(false))
             {
                 lock (lockObj)
@@ -366,7 +374,8 @@ public static class ChatStreamingHelper
         IProgress<string>? pipelineStatus,
         RoutingAndSkillDecision? precomputedDecision,
         string? conversationRoutingKey,
-        ChatStreamingDisplayOptions options)
+        ChatStreamingDisplayOptions options,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         var buffer = new StringBuilder();
         var lockObj = new object();
@@ -381,7 +390,7 @@ public static class ChatStreamingHelper
         {
             try
             {
-                await foreach (var token in orchestrator.PromptStreamingWithHistoryAsync(systemPrompt, history, userMessage, cancellationToken, imageBase64Contents, pipelineStatus, precomputedDecision, conversationRoutingKey)
+                await foreach (var token in orchestrator.PromptStreamingWithHistoryAsync(systemPrompt, history, userMessage, cancellationToken, imageBase64Contents, pipelineStatus, precomputedDecision, conversationRoutingKey, onToolCall)
                     .ConfigureAwait(false))
                 {
                     lock (lockObj)
@@ -461,7 +470,8 @@ public static class ChatStreamingHelper
         string? routingUserMessage,
         IProgress<string>? pipelineStatus,
         RoutingAndSkillDecision? precomputedDecision,
-        ChatStreamingDisplayOptions options)
+        ChatStreamingDisplayOptions options,
+        Action<ChatDatasetToolCall>? onToolCall = null)
     {
         var buffer = new StringBuilder();
         var lockObj = new object();
@@ -476,7 +486,7 @@ public static class ChatStreamingHelper
         {
             try
             {
-                await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus, precomputedDecision)
+                await foreach (var token in orchestrator.PromptStreamingAsync(systemPrompt, fullPrompt, cancellationToken, imageBase64Contents, routingUserMessage, pipelineStatus, precomputedDecision, null, onToolCall)
                     .ConfigureAwait(false))
                 {
                     lock (lockObj)

@@ -526,9 +526,14 @@ public class ChatViewModel : ViewModelBase
         try
         {
             processThread = new ChatProcessThreadTracker(aiMessage.ProcessSteps);
+            aiMessage.IsProcessThreadExpanded = true;
+
             IProgress<string> pipelineProgress = new Progress<string>(key =>
                 Dispatcher.UIThread.Post(() =>
-                    processThread!.OnPipelineKey(key, k => _localizationService.T(k, "Chat"))));
+                {
+                    processThread!.OnPipelineKey(key, k => _localizationService.T(k, "Chat"));
+                    UpdateProcessHeader(aiMessage, processThread);
+                }));
 
             void UpdateContent(string content) =>
                 Dispatcher.UIThread.Post(() => { aiMessage.Content = content; });
@@ -544,6 +549,15 @@ public class ChatViewModel : ViewModelBase
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
             var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);
 
+            Action<ChatDatasetToolCall> onToolCall = tc =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    processThread?.AddToolCall(tc, k => _localizationService.T(k, "Chat"));
+                    aiMessage.ThoughtsCount += 1;
+                });
+            };
+
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingWithHistoryAsync(
                 _orchestrator,
                 baseSystemPrompt,
@@ -555,7 +569,8 @@ public class ChatViewModel : ViewModelBase
                 pipelineProgress,
                 precomputedDecision: decision,
                 conversationRoutingKey: _conversationId,
-                displayOptions);
+                displayOptions,
+                onToolCall);
 
             foundForDataset = foundResponse;
             finalAssistantResponseForDataset = foundResponse ? finalContent : null;
@@ -564,6 +579,7 @@ public class ChatViewModel : ViewModelBase
             {
                 aiMessage.Content = finalContent;
                 processThread?.CompleteThread();
+                FinalizeProcessHeader(aiMessage, processThread);
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -582,6 +598,7 @@ public class ChatViewModel : ViewModelBase
                 if (string.IsNullOrEmpty(aiMessage.Content))
                     aiMessage.Content = _localizationService.T("GenerationStopped", "Chat");
                 processThread?.CompleteThread();
+                FinalizeProcessHeader(aiMessage, processThread);
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -594,6 +611,7 @@ public class ChatViewModel : ViewModelBase
             {
                 aiMessage.Content = _localizationService.T("ErrorUnexpected", "Chat");
                 processThread?.CompleteThread();
+                FinalizeProcessHeader(aiMessage, processThread);
                 aiMessage.PipelineStatusText = null;
                 aiMessage.IsStreaming = false;
             });
@@ -671,5 +689,24 @@ public class ChatViewModel : ViewModelBase
                 Error = error
             }
         }).ConfigureAwait(false);
+    }
+
+    private static void UpdateProcessHeader(ChatMessageViewModel message, ChatProcessThreadTracker tracker)
+    {
+        var e = tracker.Elapsed;
+        message.ElapsedText = $"{(int)e.TotalMinutes:D2}:{e.Seconds:D2}";
+        message.ProcessHeaderText = tracker.ActiveStepLabel ?? "Thinking…";
+    }
+
+    private static void FinalizeProcessHeader(ChatMessageViewModel message, ChatProcessThreadTracker? tracker)
+    {
+        if (tracker == null) return;
+        var e = tracker.Elapsed;
+        message.ElapsedText = $"{(int)e.TotalMinutes:D2}:{e.Seconds:D2}";
+        var steps = message.ThoughtsCount;
+        message.ProcessHeaderText = steps > 0
+            ? $"Thought process ({steps} steps)"
+            : "Thought process";
+        message.IsProcessThreadExpanded = false;
     }
 }

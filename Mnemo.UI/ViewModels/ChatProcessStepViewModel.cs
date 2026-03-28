@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Mnemo.UI.ViewModels;
 
 public enum ChatProcessPhaseKind
@@ -7,6 +9,38 @@ public enum ChatProcessPhaseKind
     Generating,
     Tool,
     Continuing
+}
+
+public class ChatToolCallViewModel : ViewModelBase
+{
+    private string _name = string.Empty;
+    public string Name
+    {
+        get => _name;
+        set => SetProperty(ref _name, value);
+    }
+
+    private string _arguments = string.Empty;
+    public string Arguments
+    {
+        get => _arguments;
+        set => SetProperty(ref _arguments, value);
+    }
+
+    private string _result = string.Empty;
+    public string Result
+    {
+        get => _result;
+        set => SetProperty(ref _result, value);
+    }
+
+    private string _summary = string.Empty;
+    /// <summary>Short collapsed-row summary, e.g. "2 documents read".</summary>
+    public string Summary
+    {
+        get => _summary;
+        set => SetProperty(ref _summary, value);
+    }
 }
 
 /// <summary>One line in the assistant message process thread (routing → model → tools → …).</summary>
@@ -20,12 +54,18 @@ public class ChatProcessStepViewModel : ViewModelBase
     }
 
     private string? _detail;
-    /// <summary>Optional sub-label (e.g. tool name).</summary>
+    /// <summary>Optional sub-label shown below the label in secondary color.</summary>
     public string? Detail
     {
         get => _detail;
-        set => SetProperty(ref _detail, value);
+        set
+        {
+            if (SetProperty(ref _detail, value))
+                OnPropertyChanged(nameof(HasDetail));
+        }
     }
+
+    public bool HasDetail => !string.IsNullOrEmpty(_detail);
 
     private bool _isComplete;
     public bool IsComplete
@@ -41,5 +81,24 @@ public class ChatProcessStepViewModel : ViewModelBase
         set => SetProperty(ref _isActive, value);
     }
 
+    private bool _isPending;
+    public bool IsPending
+    {
+        get => _isPending;
+        set => SetProperty(ref _isPending, value);
+    }
+
     public ChatProcessPhaseKind PhaseKind { get; set; }
+
+    public ObservableCollection<ChatToolCallViewModel> ToolCalls { get; } = new();
+
+    public bool HasToolCalls => ToolCalls.Count > 0;
+
+    public ChatProcessStepViewModel()
+    {
+        ToolCalls.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasToolCalls));
+        };
+    }
 }
