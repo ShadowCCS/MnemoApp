@@ -159,9 +159,11 @@ public class LlamaCppHttpTextService : ITextGenerationService
             // Small buffer so we receive SSE lines (and thus tokens) as soon as the server sends them
             reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 128);
 
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            while (!ct.IsCancellationRequested)
             {
                 var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+                if (line is null)
+                    break;
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
                 if (line.StartsWith("data: "))
@@ -303,9 +305,11 @@ public class LlamaCppHttpTextService : ITextGenerationService
             stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 128);
 
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            while (!ct.IsCancellationRequested)
             {
                 var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+                if (line is null)
+                    break;
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 if (!line.StartsWith("data: ")) continue;
 

@@ -1129,20 +1129,19 @@ public partial class EditableBlock : UserControl
         // Clear block selection when user starts dragging to reorder
         FindParentBlockEditor()?.ClearBlockSelection();
 
-        var data = new DataObject();
-        data.Set("BlockViewModel", _viewModel);
-
-        DragDrop.DoDragDrop(e, data, DragDropEffects.Move);
+        var transfer = new DataTransfer();
+        transfer.Add(DataTransferItem.Create(BlockViewModel.BlockDragDataFormat, _viewModel));
+        _ = DragDrop.DoDragDropAsync(e, transfer, DragDropEffects.Move);
     }
 
     private void Block_DragOver(object? sender, DragEventArgs e)
     {
-        if (!e.Data.Contains("BlockViewModel"))
+        if (!e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat))
         {
             e.DragEffects = DragDropEffects.None;
             return;
         }
-        if (e.Data.Get("BlockViewModel") is not BlockViewModel draggedBlock || draggedBlock == _viewModel)
+        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } draggedBlock || draggedBlock == _viewModel)
         {
             e.DragEffects = DragDropEffects.Move;
             return;
@@ -1186,7 +1185,7 @@ public partial class EditableBlock : UserControl
     private void Block_Drop(object? sender, DragEventArgs e)
     {
         if (_viewModel == null) return;
-        if (e.Data.Get("BlockViewModel") is not BlockViewModel draggedBlock) return;
+        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } draggedBlock) return;
 
         var parent = FindParentBlockEditor();
         if (parent == null) return;

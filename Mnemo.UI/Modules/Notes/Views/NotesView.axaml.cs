@@ -195,7 +195,7 @@ public partial class NotesView : UserControl
 
     private void OnMyNotesSectionDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.Data.Contains(NotesViewModel.NoteTreeItemDragKey)
+        e.DragEffects = e.DataTransfer.Contains(NotesViewModel.NoteTreeItemDragDataFormat)
             ? DragDropEffects.Move
             : DragDropEffects.None;
     }
@@ -203,7 +203,7 @@ public partial class NotesView : UserControl
     private async void OnMyNotesSectionDrop(object? sender, DragEventArgs e)
     {
         if (DataContext is not NotesViewModel vm) return;
-        if (e.Data.Get(NotesViewModel.NoteTreeItemDragKey) is not NoteTreeItemViewModel source) return;
+        if (e.DataTransfer.TryGetValue(NotesViewModel.NoteTreeItemDragDataFormat) is not { } source) return;
 
         // When drop target is tree/treeArea, check if we're over a row: if so, perform drop-into-folder or reorder there
         if (sender is Visual dropTarget && (dropTarget is MnemoTreeView || dropTarget is Border))

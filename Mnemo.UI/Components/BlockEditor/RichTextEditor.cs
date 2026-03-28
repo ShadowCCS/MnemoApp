@@ -779,7 +779,7 @@ public class RichTextEditor : Control
     {
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard == null) return;
-        var text = await clipboard.GetTextAsync();
+        var text = await clipboard.TryGetTextAsync();
         if (!string.IsNullOrEmpty(text))
             InsertText(text);
     }

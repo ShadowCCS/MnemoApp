@@ -5,15 +5,21 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Avalonia;
+using Avalonia.Input;
 using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.UI;
+using Mnemo.UI.Input;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
 public class BlockViewModel : INotifyPropertyChanged
 {
+    /// <summary>Drag-and-drop format for reordering blocks in the editor.</summary>
+    public static readonly DataFormat<BlockViewModel> BlockDragDataFormat =
+        AvaloniaDataFormats.CreateApplicationFormat<BlockViewModel>("BlockViewModel");
+
     private string _id;
     private BlockType _type;
     private List<InlineRun> _inlineRuns = new() { InlineRun.Plain(string.Empty) };

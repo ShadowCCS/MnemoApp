@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.UI.Input;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules.Notes.ViewModels;
@@ -662,6 +664,12 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     /// Data key for drag-drop of tree items.
     /// </summary>
     public const string NoteTreeItemDragKey = "NoteTreeItemViewModel";
+
+    /// <summary>
+    /// Typed <see cref="DataFormat{T}"/> for in-app tree drag-drop (see <see cref="AvaloniaDataFormats"/>).
+    /// </summary>
+    public static readonly DataFormat<NoteTreeItemViewModel> NoteTreeItemDragDataFormat =
+        AvaloniaDataFormats.CreateApplicationFormat<NoteTreeItemViewModel>(NoteTreeItemDragKey);
 
     /// <summary>
     /// Moves a tree item to root (parentless). Call when user drops on "My Notes" section background or header.

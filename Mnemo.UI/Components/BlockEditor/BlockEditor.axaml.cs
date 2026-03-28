@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -1174,7 +1175,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var topLevel = TopLevel.GetTopLevel(this);
             if (topLevel?.Clipboard == null) return;
 
-            var text = await topLevel.Clipboard.GetTextAsync();
+            var text = await topLevel.Clipboard.TryGetTextAsync();
             if (string.IsNullOrWhiteSpace(text)) return;
 
             var pasted = BlockMarkdownSerializer.Deserialize(text);

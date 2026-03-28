@@ -163,9 +163,9 @@ public partial class NoteTreeRow : UserControl
         if (Math.Abs(delta.X) <= DragStartThreshold && Math.Abs(delta.Y) <= DragStartThreshold)
             return;
 
-        var data = new DataObject();
-        data.Set(NotesViewModel.NoteTreeItemDragKey, item);
-        _ = Avalonia.Input.DragDrop.DoDragDrop(_pendingDragPress, data, DragDropEffects.Move);
+        var transfer = new DataTransfer();
+        transfer.Add(DataTransferItem.Create(NotesViewModel.NoteTreeItemDragDataFormat, item));
+        _ = DragDrop.DoDragDropAsync(_pendingDragPress, transfer, DragDropEffects.Move);
 
         _pendingDragPress = null;
     }
@@ -188,7 +188,7 @@ public partial class NoteTreeRow : UserControl
 
     private void OnDragOver(object? sender, DragEventArgs e)
     {
-        if (!e.Data.Contains(NotesViewModel.NoteTreeItemDragKey))
+        if (!e.DataTransfer.Contains(NotesViewModel.NoteTreeItemDragDataFormat))
         {
             e.DragEffects = DragDropEffects.None;
             return;
@@ -208,7 +208,7 @@ public partial class NoteTreeRow : UserControl
     private async void OnDrop(object? sender, DragEventArgs e)
     {
         if (DataContext is not NoteTreeItemViewModel target) return;
-        if (e.Data.Get(NotesViewModel.NoteTreeItemDragKey) is not NoteTreeItemViewModel source) return;
+        if (e.DataTransfer.TryGetValue(NotesViewModel.NoteTreeItemDragDataFormat) is not { } source) return;
 
         var vm = FindNotesViewModel();
         if (vm == null) return;
