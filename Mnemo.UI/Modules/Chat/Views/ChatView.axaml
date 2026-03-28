@@ -20,6 +20,10 @@
         <converters:LocalPathToBitmapConverter x:Key="LocalPathToBitmapConverter"/>
         <converters:ChatAttachmentKindToBoolConverter x:Key="ChatAttachmentKindToBoolConverter"/>
         <converters:ChatViewModelDataContextCommandConverter x:Key="ChatViewModelDataContextCommandConverter"/>
+        <converters:BoolToBrushConverter x:Key="ChatHistoryRowHoverBrushConverter"
+                                         TrueBrush="{DynamicResource ListItemHoverBackgroundBrush}"
+                                         FalseBrush="Transparent"/>
+        <converters:BoolToDoubleConverter x:Key="BoolToDoubleConverter"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -127,15 +131,25 @@
             </Style>
         </Style>
 
-        <Style Selector="Button.ChatHistoryRow">
+        <Style Selector="Border.chat-history-row">
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="MinWidth" Value="0"/>
+        </Style>
+
+        <Style Selector="Button.chat-history-row-segment">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="10,8"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Style Selector="^:pointerover">
-                <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+            </Style>
+            <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
             </Style>
         </Style>
 
@@ -150,20 +164,9 @@
             </Style>
         </Style>
 
-        <Style Selector="Panel.chat-history-row:pointerover Button.chat-history-more">
-            <Setter Property="Opacity" Value="1"/>
-        </Style>
         <Style Selector="Button.chat-history-more">
-            <Setter Property="Opacity" Value="0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="4,6"/>
-            <Setter Property="MinWidth" Value="28"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="Button.chat-history-more:pointerover">
-            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="Padding" Value="6,8,10,8"/>
+            <Setter Property="MinWidth" Value="32"/>
         </Style>
 
         <Style Selector="Button.MessageActionIcon">
@@ -269,49 +272,61 @@
                                                 CornerRadius="8"
                                                 Background="{DynamicResource ListItemHoverBackgroundBrush}"
                                                 Opacity="0.65"/>
-                                        <Grid ColumnDefinitions="*,Auto" MinWidth="0" Classes="chat-history-row">
-                                            <Button Grid.Column="0"
-                                                    Classes="ChatHistoryRow"
-                                                    Command="{Binding SelectCommand}">
-                                                <Button.IsEnabled>
-                                                    <Binding ElementName="ChatRoot" Path="HistoryNavigationEnabled"/>
-                                                </Button.IsEnabled>
-                                                <TextBlock Text="{Binding Title}"
-                                                           FontSize="{DynamicResource FontSize.Body.Small}"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                            </Button>
-                                            <Button Grid.Column="1"
-                                                    Classes="chat-history-more"
-                                                    ToolTip.Tip="{markup:T Ns=Chat, Key=MoreChatActions}">
-                                                <Button.IsEnabled>
-                                                    <Binding ElementName="ChatRoot" Path="HistoryNavigationEnabled"/>
-                                                </Button.IsEnabled>
-                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
-                                                                  Width="16" Height="16"
-                                                                  Color="{DynamicResource TextSecondaryBrush}"/>
-                                                <Button.Flyout>
-                                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                                        <MenuItem Header="{markup:T Ns=Notes, Key=Rename}">
-                                                            <MenuItem.Command>
-                                                                <Binding ElementName="ChatRoot" Path="DataContext" Converter="{StaticResource ChatViewModelDataContextCommandConverter}" ConverterParameter="RenameChat"/>
-                                                            </MenuItem.Command>
-                                                            <MenuItem.CommandParameter>
-                                                                <Binding Path="ConversationId"/>
-                                                            </MenuItem.CommandParameter>
-                                                        </MenuItem>
-                                                        <MenuItem Header="{markup:T Ns=Notes, Key=Delete}">
-                                                            <MenuItem.Command>
-                                                                <Binding ElementName="ChatRoot" Path="DataContext" Converter="{StaticResource ChatViewModelDataContextCommandConverter}" ConverterParameter="DeleteChat"/>
-                                                            </MenuItem.Command>
-                                                            <MenuItem.CommandParameter>
-                                                                <Binding Path="ConversationId"/>
-                                                            </MenuItem.CommandParameter>
-                                                        </MenuItem>
-                                                    </MenuFlyout>
-                                                </Button.Flyout>
-                                            </Button>
-                                        </Grid>
+                                        <Border Classes="chat-history-row"
+                                                MinWidth="0"
+                                                Background="{Binding IsRowHovered, Converter={StaticResource ChatHistoryRowHoverBrushConverter}}">
+                                            <Grid ColumnDefinitions="*,Auto" MinWidth="0">
+                                                <Button Grid.Column="0"
+                                                        Classes="chat-history-row-segment"
+                                                        Command="{Binding SelectCommand}"
+                                                        Padding="10,8,4,8"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Left"
+                                                        PointerEntered="ChatHistoryRowSegment_PointerEntered"
+                                                        PointerExited="ChatHistoryRowSegment_PointerExited">
+                                                    <Button.IsEnabled>
+                                                        <Binding ElementName="ChatRoot" Path="HistoryNavigationEnabled"/>
+                                                    </Button.IsEnabled>
+                                                    <TextBlock Text="{Binding Title}"
+                                                               FontSize="{DynamicResource FontSize.Body.Small}"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </Button>
+                                                <Button Grid.Column="1"
+                                                        Classes="chat-history-row-segment chat-history-more"
+                                                        Opacity="{Binding IsRowHovered, Converter={StaticResource BoolToDoubleConverter}, ConverterParameter=1|0}"
+                                                        ToolTip.Tip="{markup:T Ns=Chat, Key=MoreChatActions}"
+                                                        PointerEntered="ChatHistoryRowSegment_PointerEntered"
+                                                        PointerExited="ChatHistoryRowSegment_PointerExited">
+                                                    <Button.IsEnabled>
+                                                        <Binding ElementName="ChatRoot" Path="HistoryNavigationEnabled"/>
+                                                    </Button.IsEnabled>
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
+                                                                      Width="16" Height="16"
+                                                                      Color="{DynamicResource TextSecondaryBrush}"/>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                            <MenuItem Header="{markup:T Ns=Notes, Key=Rename}">
+                                                                <MenuItem.Command>
+                                                                    <Binding ElementName="ChatRoot" Path="DataContext" Converter="{StaticResource ChatViewModelDataContextCommandConverter}" ConverterParameter="RenameChat"/>
+                                                                </MenuItem.Command>
+                                                                <MenuItem.CommandParameter>
+                                                                    <Binding Path="ConversationId"/>
+                                                                </MenuItem.CommandParameter>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{markup:T Ns=Notes, Key=Delete}">
+                                                                <MenuItem.Command>
+                                                                    <Binding ElementName="ChatRoot" Path="DataContext" Converter="{StaticResource ChatViewModelDataContextCommandConverter}" ConverterParameter="DeleteChat"/>
+                                                                </MenuItem.Command>
+                                                                <MenuItem.CommandParameter>
+                                                                    <Binding Path="ConversationId"/>
+                                                                </MenuItem.CommandParameter>
+                                                            </MenuItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
                                     </Panel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

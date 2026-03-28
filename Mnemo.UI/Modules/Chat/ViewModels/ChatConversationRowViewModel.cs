@@ -29,5 +29,12 @@ public sealed class ChatConversationRowViewModel : ViewModelBase
         set => SetProperty(ref _isSelected, value);
     }
 
+    private bool _isRowHovered;
+    public bool IsRowHovered
+    {
+        get => _isRowHovered;
+        set => SetProperty(ref _isRowHovered, value);
+    }
+
     public ICommand SelectCommand { get; }
 }

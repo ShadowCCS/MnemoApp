@@ -6,6 +6,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Mnemo.Core.Models;
 using Mnemo.UI.Modules.Chat.ViewModels;
 using Mnemo.UI.Services;
@@ -197,6 +199,48 @@ public partial class ChatView : UserControl
         if (!string.IsNullOrEmpty(path))
             vm.AddPendingAttachment(path, ChatAttachmentKind.Image, "Screenshot");
     }
+
+    private void ChatHistoryRowSegment_PointerEntered(object? sender, PointerEventArgs e)
+    {
+        if (sender is Control control && control.DataContext is ChatConversationRowViewModel vm)
+            vm.IsRowHovered = true;
+    }
+
+    private void ChatHistoryRowSegment_PointerExited(object? sender, PointerEventArgs e)
+    {
+        if (sender is not Control control || control.DataContext is not ChatConversationRowViewModel vm)
+            return;
+
+        var rowHost = FindChatHistoryRowBorder(control);
+        if (rowHost == null)
+        {
+            vm.IsRowHovered = false;
+            return;
+        }
+
+        // PointerExited + Bounds.Contains is unreliable here (position can still read inside the row).
+        // After input processing, PointerOverElement reflects the actual hit target.
+        Dispatcher.UIThread.Post(() => ClearChatHistoryRowHoverIfPointerLeft(rowHost, vm), DispatcherPriority.Input);
+    }
+
+    private static void ClearChatHistoryRowHoverIfPointerLeft(Border rowHost, ChatConversationRowViewModel vm)
+    {
+        var top = TopLevel.GetTopLevel(rowHost);
+        if (top is not IInputRoot inputRoot || inputRoot.PointerOverElement is not Visual over)
+        {
+            vm.IsRowHovered = false;
+            return;
+        }
+
+        if (!IsVisualUnderChatHistoryRow(over, rowHost))
+            vm.IsRowHovered = false;
+    }
+
+    private static bool IsVisualUnderChatHistoryRow(Visual pointerOver, Border rowHost) =>
+        ReferenceEquals(pointerOver, rowHost) || pointerOver.GetVisualAncestors().Contains(rowHost);
+
+    private static Border? FindChatHistoryRowBorder(Control control) =>
+        control.GetVisualAncestors().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("chat-history-row"));
 
     private void InitializeComponent()
     {
