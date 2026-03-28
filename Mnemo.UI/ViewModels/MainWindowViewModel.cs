@@ -9,6 +9,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ISettingsService _settingsService;
     public INavigationService Navigation { get; }
     public ISidebarService Sidebar { get; }
+    public IOverlayService OverlayService { get; }
     public Components.Sidebar.SidebarViewModel SidebarViewModel { get; }
     public Components.RightSidebar.RightSidebarViewModel RightSidebarViewModel { get; }
     public Components.TopbarViewModel TopbarViewModel { get; }
@@ -24,13 +25,15 @@ public partial class MainWindowViewModel : ViewModelBase
         Components.Sidebar.SidebarViewModel sidebarViewModel, 
         Components.RightSidebar.RightSidebarViewModel rightSidebarViewModel,
         Components.TopbarViewModel topbarViewModel,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        IOverlayService overlayService)
     {
         Navigation = navigation;
         Sidebar = sidebar;
         SidebarViewModel = sidebarViewModel;
         RightSidebarViewModel = rightSidebarViewModel;
         TopbarViewModel = topbarViewModel;
+        OverlayService = overlayService;
         _settingsService = settingsService;
 
         // Load initial app icon asynchronously

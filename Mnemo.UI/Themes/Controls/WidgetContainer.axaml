@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="using:Mnemo.UI.Controls"
                     xmlns:local="using:Mnemo.UI.Modules.Overview.Controls"
                     xmlns:markup="using:Mnemo.UI.Markup"
                     x:ClassModifier="internal"
@@ -35,14 +36,12 @@
               <Grid ColumnDefinitions="Auto, *, Auto">
                 <!-- Left Section: Icon + Title -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                  <Path Data="{Binding Widget.Metadata.Icon, RelativeSource={RelativeSource TemplatedParent}}"
-                        Fill="{DynamicResource AccentPrimaryBrush}"
-                        Width="16" Height="16"
-                        VerticalAlignment="Center"
-                        Stretch="Uniform"
-                        Opacity="1.0"/>
-                  <TextBlock Text="{Binding Widget.Metadata.Title, RelativeSource={RelativeSource TemplatedParent}}"
-                             markup:Localization.Namespace="{Binding Widget.Metadata.TranslationNamespace, RelativeSource={RelativeSource TemplatedParent}}"
+                  <controls:SvgIcon SvgPath="{TemplateBinding WidgetHeaderIconPathMarkup}"
+                                    Width="16" Height="16"
+                                    VerticalAlignment="Center"
+                                    Color="{DynamicResource AccentPrimaryBrush}"/>
+                  <TextBlock Text="{TemplateBinding WidgetHeaderTitle}"
+                             markup:Localization.Namespace="{TemplateBinding WidgetHeaderTranslationNamespace}"
                              markup:Localization.TextKey="Title"
                              FontSize="14"
                              FontFamily="{DynamicResource Font.SemiBold}"

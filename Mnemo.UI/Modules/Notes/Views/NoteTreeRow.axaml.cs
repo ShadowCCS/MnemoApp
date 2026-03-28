@@ -16,7 +16,6 @@ public partial class NoteTreeRow : UserControl
     private const string FolderItemClass = "folder-item";
     private PointerPressedEventArgs? _pendingDragPress;
     private Point _pressPosition;
-    private bool _dragStarted;
     private MnemoTreeViewItem? _treeViewItem;
     private EventHandler<PointerPressedEventArgs>? _folderPointerPressedHandler;
 
@@ -151,7 +150,6 @@ public partial class NoteTreeRow : UserControl
 
         _pendingDragPress = e;
         _pressPosition = e.GetPosition(this);
-        _dragStarted = false;
         e.Handled = true; // Prevent TreeViewItem/PressedMixin from capturing pointer so we receive PointerMoved.
         e.Pointer.Capture(this);
     }
@@ -169,7 +167,6 @@ public partial class NoteTreeRow : UserControl
         data.Set(NotesViewModel.NoteTreeItemDragKey, item);
         _ = Avalonia.Input.DragDrop.DoDragDrop(_pendingDragPress, data, DragDropEffects.Move);
 
-        _dragStarted = true;
         _pendingDragPress = null;
     }
 
@@ -187,7 +184,6 @@ public partial class NoteTreeRow : UserControl
     private void ClearPendingDrag()
     {
         _pendingDragPress = null;
-        _dragStarted = false;
     }
 
     private void OnDragOver(object? sender, DragEventArgs e)

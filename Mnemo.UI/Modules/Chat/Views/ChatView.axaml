@@ -19,6 +19,7 @@
         <converters:AssistantModeToLabelConverter x:Key="AssistantModeToLabelConverter"/>
         <converters:LocalPathToBitmapConverter x:Key="LocalPathToBitmapConverter"/>
         <converters:ChatAttachmentKindToBoolConverter x:Key="ChatAttachmentKindToBoolConverter"/>
+        <converters:ChatViewModelDataContextCommandConverter x:Key="ChatViewModelDataContextCommandConverter"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -273,7 +274,7 @@
                                                     Classes="ChatHistoryRow"
                                                     Command="{Binding SelectCommand}">
                                                 <Button.IsEnabled>
-                                                    <Binding ElementName="ChatRoot" Path="DataContext.CanSwitchChatHistory"/>
+                                                    <Binding ElementName="ChatRoot" Path="HistoryNavigationEnabled"/>
                                                 </Button.IsEnabled>
                                                 <TextBlock Text="{Binding Title}"
                                                            FontSize="{DynamicResource FontSize.Body.Small}"
@@ -284,7 +285,7 @@
                                                     Classes="chat-history-more"
                                                     ToolTip.Tip="{markup:T Ns=Chat, Key=MoreChatActions}">
                                                 <Button.IsEnabled>
-                                                    <Binding ElementName="ChatRoot" Path="DataContext.CanSwitchChatHistory"/>
+                                                    <Binding ElementName="ChatRoot" Path="HistoryNavigationEnabled"/>
                                                 </Button.IsEnabled>
                                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
                                                                   Width="16" Height="16"
@@ -293,7 +294,7 @@
                                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
                                                         <MenuItem Header="{markup:T Ns=Notes, Key=Rename}">
                                                             <MenuItem.Command>
-                                                                <Binding Path="DataContext.RenameChatCommand" ElementName="ChatRoot"/>
+                                                                <Binding ElementName="ChatRoot" Path="DataContext" Converter="{StaticResource ChatViewModelDataContextCommandConverter}" ConverterParameter="RenameChat"/>
                                                             </MenuItem.Command>
                                                             <MenuItem.CommandParameter>
                                                                 <Binding Path="ConversationId"/>
@@ -301,7 +302,7 @@
                                                         </MenuItem>
                                                         <MenuItem Header="{markup:T Ns=Notes, Key=Delete}">
                                                             <MenuItem.Command>
-                                                                <Binding Path="DataContext.DeleteChatCommand" ElementName="ChatRoot"/>
+                                                                <Binding ElementName="ChatRoot" Path="DataContext" Converter="{StaticResource ChatViewModelDataContextCommandConverter}" ConverterParameter="DeleteChat"/>
                                                             </MenuItem.Command>
                                                             <MenuItem.CommandParameter>
                                                                 <Binding Path="ConversationId"/>
@@ -394,7 +395,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Button Classes="SuggestionChip" Margin="0,0,8,8"
-                                            Command="{Binding $parent[UserControl].DataContext.SuggestionSelectedCommand}"
+                                            Command="{Binding #ChatRoot.DataContext, Converter={StaticResource ChatViewModelDataContextCommandConverter}, ConverterParameter=Suggestion}"
                                             CommandParameter="{Binding}">
                                         <TextBlock Text="{Binding}"
                                                    FontSize="{DynamicResource FontSize.Body.Small}"
@@ -636,7 +637,7 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Button Classes="SuggestionChip" Margin="0,0,8,8"
-                                                                Command="{Binding $parent[UserControl].DataContext.SuggestionSelectedCommand}"
+                                                                Command="{Binding #ChatRoot.DataContext, Converter={StaticResource ChatViewModelDataContextCommandConverter}, ConverterParameter=Suggestion}"
                                                                 CommandParameter="{Binding}">
                                                             <TextBlock Text="{Binding}"
                                                                        FontSize="{DynamicResource FontSize.Body.Small}"
@@ -648,7 +649,7 @@
 
                                             <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="0,6,0,0" HorizontalAlignment="Left">
                                                 <Button Classes="MessageActionIcon"
-                                                        Command="{Binding $parent[UserControl].DataContext.RegenerateAssistantMessageCommand}"
+                                                        Command="{Binding #ChatRoot.DataContext, Converter={StaticResource ChatViewModelDataContextCommandConverter}, ConverterParameter=Regenerate}"
                                                         CommandParameter="{Binding}"
                                                         ToolTip.Tip="{markup:T Ns=Chat, Key=Regenerate}">
                                                     <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/refresh.svg"
@@ -656,7 +657,7 @@
                                                                       Color="{DynamicResource TextSecondaryBrush}"/>
                                                 </Button>
                                                 <Button Classes="MessageActionIcon"
-                                                        Command="{Binding $parent[UserControl].DataContext.CopyAssistantMessageCommand}"
+                                                        Command="{Binding #ChatRoot.DataContext, Converter={StaticResource ChatViewModelDataContextCommandConverter}, ConverterParameter=Copy}"
                                                         CommandParameter="{Binding}"
                                                         ToolTip.Tip="{markup:T Ns=Chat, Key=CopyMessage}"
                                                         IsEnabled="{Binding HasCopiableAssistantContent}">
@@ -685,7 +686,7 @@
                                                         <DataTemplate DataType="vm:ChatAttachmentViewModel">
                                                             <Panel Margin="0,0,8,8">
                                                                 <!-- Image Attachment (clickable to open overlay preview) -->
-                                                                <Button Command="{Binding $parent[UserControl].DataContext.OpenImagePreviewCommand}"
+                                                                <Button Command="{Binding #ChatRoot.DataContext, Converter={StaticResource ChatViewModelDataContextCommandConverter}, ConverterParameter=OpenImagePreview}"
                                                                         CommandParameter="{Binding Path}"
                                                                         Background="Transparent"
                                                                         BorderThickness="0"

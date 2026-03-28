@@ -10,7 +10,8 @@
              xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
              x:Class="Mnemo.UI.Modules.Settings.Views.SettingsView"
-             x:DataType="vm:SettingsViewModel">
+             x:DataType="vm:SettingsViewModel"
+             x:Name="SettingsRoot">
 
     <UserControl.Styles>
         <Style Selector="TextBox.SettingsSearch">
@@ -32,6 +33,7 @@
     <UserControl.Resources>
         <converters:PathToImageConverter x:Key="PathToImageConverter"/>
         <converters:BoolToPasswordCharConverter x:Key="BoolToPasswordCharConverter"/>
+        <converters:SettingsViewModelDataContextCommandConverter x:Key="SettingsViewModelDataContextCommandConverter"/>
         <!-- Toggle Setting Template -->
         <DataTemplate x:Key="ToggleSettingTemplate" x:DataType="vm:ToggleSettingViewModel">
             <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
@@ -503,7 +505,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SettingsCategoryViewModel">
                                     <controls:NavigationButton IsSelected="{Binding IsSelected}"
-                                                               Command="{Binding $parent[UserControl].DataContext.SelectCategoryCommand, FallbackValue={x:Null}}"
+                                                               Command="{Binding #SettingsRoot.DataContext, Converter={StaticResource SettingsViewModelDataContextCommandConverter}, ConverterParameter=SelectCategory}"
                                                                CommandParameter="{Binding}"
                                                                HorizontalAlignment="Stretch"
                                                                Margin="12,0,12,4"

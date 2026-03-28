@@ -77,7 +77,8 @@
         </Button>
 
         <!-- Global Overlay Layer -->
-        <components:OverlayPopupHost HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+        <components:OverlayPopupHost HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                     DataContext="{Binding OverlayService}"/>
     </Grid>
 </Border>
 </Window>

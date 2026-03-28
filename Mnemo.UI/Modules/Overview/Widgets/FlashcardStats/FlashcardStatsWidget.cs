@@ -17,7 +17,7 @@ public class FlashcardStatsWidget : IWidget
             title: "Flashcard Stats",
             description: "View your flashcard practice statistics and study streak",
             category: WidgetCategory.Statistics,
-            icon: "avares://Mnemo.UI/Icons/Tabler/Used/Filled/cards.svg",
+            icon: "avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-grid.svg",
             defaultSize: new WidgetSize(colSpan: 2, rowSpan: 2),
             translationNamespace: "FlashcardStats");
     }

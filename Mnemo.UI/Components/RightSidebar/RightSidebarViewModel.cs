@@ -56,10 +56,10 @@ public partial class RightSidebarViewModel : ViewModelBase
     private bool _isBusy;
 
     /// <summary>Available assistant modes for the mode dropdown.</summary>
-    public IReadOnlyList<string> AssistantModes { get; } = new[] { "General", "Explainer" };
+    public IReadOnlyList<string> AssistantModes { get; } = new[] { "Short", "Normal", "Detailed" };
 
     [ObservableProperty]
-    private string _selectedAssistantMode = "General";
+    private string _selectedAssistantMode = "Normal";
 
     public ObservableCollection<ChatMessage> Messages { get; } = new();
 

@@ -507,20 +507,17 @@ public class LlamaCppServerManager : IAIServerManager
                 }
             };
 
-            process.OutputDataReceived += (s, e) =>
+            var logServerOutput = await _settings.GetAsync("AI.LlamaCpp.VerboseServerOutput", false).ConfigureAwait(false);
+            process.OutputDataReceived += (_, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Data))
-                {
-                    _logger.Info($"llama.cpp[{manifest.Role}]", e.Data);
-                }
+                if (!logServerOutput || string.IsNullOrEmpty(e.Data)) return;
+                _logger.Info($"llama.cpp[{manifest.Role}]", e.Data);
             };
 
-            process.ErrorDataReceived += (s, e) =>
+            process.ErrorDataReceived += (_, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Data))
-                {
-                    _logger.Warning($"llama.cpp[{manifest.Role}]", e.Data);
-                }
+                if (!logServerOutput || string.IsNullOrEmpty(e.Data)) return;
+                _logger.Warning($"llama.cpp[{manifest.Role}]", e.Data);
             };
 
             process.Start();

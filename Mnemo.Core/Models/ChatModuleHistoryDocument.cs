@@ -18,7 +18,7 @@ public sealed class ChatModulePersistedConversation
 
     public DateTime LastActivityUtc { get; set; }
 
-    public string AssistantMode { get; set; } = "General";
+    public string AssistantMode { get; set; } = "Normal";
 
     /// <summary>Optional user-defined title for the sidebar; when null, title is derived from the first user message.</summary>
     public string? CustomTitle { get; set; }

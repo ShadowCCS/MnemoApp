@@ -4,11 +4,12 @@ using Avalonia;
 using Avalonia.Data.Converters;
 using Mnemo.Core.Services;
 using Mnemo.UI;
+using Mnemo.UI.Services;
 
 namespace Mnemo.UI.Converters;
 
 /// <summary>
-/// Converts assistant mode id ("General", "Explainer") to localized display label using Chat namespace.
+/// Converts response-length mode id (Short, Normal, Detailed) to localized display label using Chat namespace.
 /// </summary>
 public class AssistantModeToLabelConverter : IValueConverter
 {
@@ -18,10 +19,12 @@ public class AssistantModeToLabelConverter : IValueConverter
             return value;
 
         var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
-        var key = mode switch
+        var normalized = ChatStreamingHelper.NormalizeAssistantMode(mode);
+        var key = normalized switch
         {
-            "Explainer" => "AssistantModeExplainer",
-            _ => "AssistantModeGeneral"
+            "Short" => "AssistantModeShort",
+            "Detailed" => "AssistantModeDetailed",
+            _ => "AssistantModeNormal"
         };
         return loc?.T(key, "Chat") ?? mode;
     }

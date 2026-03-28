@@ -51,7 +51,6 @@ public partial class MindmapView : UserControl
     private bool _isPanning;
     private bool _isSelecting;
     private bool _addToSelectionOnBoxSelect;
-    private bool _hasMovedSignificantly;
     private bool _hasMovedNodeDuringDrag;
     private Point _selectionStart;
     private Point _selectionStartInCanvas; // content-space start, fixed at press so zoom doesn't break hit-test
@@ -67,14 +66,9 @@ public partial class MindmapView : UserControl
     private const double ClickDragThreshold = 5.0; // pixels
     private const double MinimapZoomThreshold = 0.6; // show minimap when scale <= 60%
     private const int MinimapEaseMs = 250;
-    private const double EdgeDoubleClickMs = 400;
-    private const double EdgeDoubleClickDist = 15;
     private const double EdgeHitThreshold = 20;
     private const int EdgeHoverThrottleMs = 32; // ~30fps max for expensive GetDistanceToCurve loop
 
-    private DateTime _lastEdgeClickTime = DateTime.MinValue;
-    private Point? _lastEdgeClickContentPoint;
-    private string? _lastEdgeClickEdgeId;
     private DispatcherTimer? _easeTimer;
     private long _lastEdgeHoverUpdateTicks = 0;
 
@@ -529,8 +523,6 @@ public partial class MindmapView : UserControl
         // Only when click was on empty space (node handler sets e.Handled when clicking a node)
         if (!e.Handled)
         {
-            _hasMovedSignificantly = false; // Reset movement tracking
-
             // Move focus to canvas so the node TextBox loses focus (deselects visually)
             if (sender is Control focusTarget)
                 focusTarget.Focus();
@@ -649,13 +641,7 @@ public partial class MindmapView : UserControl
         {
             var currentPosition = e.GetPosition(this);
             var delta = currentPosition - _lastPointerPosition;
-            
-            // Track if we've moved significantly
-            if (Math.Abs(delta.X) > ClickDragThreshold || Math.Abs(delta.Y) > ClickDragThreshold)
-            {
-                _hasMovedSignificantly = true;
-            }
-            
+
             _transformMatrix = _transformMatrix * Matrix.CreateTranslation(delta.X, delta.Y);
             UpdateTransform();
             
@@ -666,14 +652,7 @@ public partial class MindmapView : UserControl
         {
             var mainCanvas = this.FindControl<Panel>("MainCanvas");
             var currentPosition = mainCanvas != null ? e.GetPosition(mainCanvas) : e.GetPosition(this);
-            
-            // Track if we've moved significantly
-            var delta = currentPosition - _selectionStart;
-            if (Math.Abs(delta.X) > ClickDragThreshold || Math.Abs(delta.Y) > ClickDragThreshold)
-            {
-                _hasMovedSignificantly = true;
-            }
-            
+
             if (DataContext is MindmapViewModel vm)
             {
                 var inv = _transformMatrix.Invert();

@@ -30,8 +30,9 @@ public class LoggerService : ILoggerService
             logMessage += $"{Environment.NewLine}Exception: {exception}";
         }
 
-        // Console Sink
-        Console.WriteLine(logMessage);
+        // Console sink: omit Debug so subprocess/verbose logs stay in the file without flooding the console.
+        if (level != LogLevel.Debug)
+            Console.WriteLine(logMessage);
         
         // File Sink
         lock (_lock)

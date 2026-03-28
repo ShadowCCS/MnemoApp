@@ -24,6 +24,20 @@ public class WidgetContainer : ContentControl
     public static readonly StyledProperty<DashboardWidgetViewModel?> WidgetProperty =
         AvaloniaProperty.Register<WidgetContainer, DashboardWidgetViewModel?>(nameof(Widget));
 
+    public static readonly StyledProperty<string> WidgetHeaderIconPathMarkupProperty =
+        AvaloniaProperty.Register<WidgetContainer, string>(nameof(WidgetHeaderIconPathMarkup), string.Empty);
+
+    public static readonly StyledProperty<string> WidgetHeaderTitleProperty =
+        AvaloniaProperty.Register<WidgetContainer, string>(nameof(WidgetHeaderTitle), string.Empty);
+
+    public static readonly StyledProperty<string> WidgetHeaderTranslationNamespaceProperty =
+        AvaloniaProperty.Register<WidgetContainer, string>(nameof(WidgetHeaderTranslationNamespace), string.Empty);
+
+    static WidgetContainer()
+    {
+        WidgetProperty.Changed.AddClassHandler<WidgetContainer>((c, _) => c.SyncHeaderFromWidget());
+    }
+
     public bool IsEditMode
     {
         get => GetValue(IsEditModeProperty);
@@ -34,6 +48,24 @@ public class WidgetContainer : ContentControl
     {
         get => GetValue(WidgetProperty);
         set => SetValue(WidgetProperty, value);
+    }
+
+    public string WidgetHeaderIconPathMarkup
+    {
+        get => GetValue(WidgetHeaderIconPathMarkupProperty);
+        set => SetValue(WidgetHeaderIconPathMarkupProperty, value);
+    }
+
+    public string WidgetHeaderTitle
+    {
+        get => GetValue(WidgetHeaderTitleProperty);
+        set => SetValue(WidgetHeaderTitleProperty, value);
+    }
+
+    public string WidgetHeaderTranslationNamespace
+    {
+        get => GetValue(WidgetHeaderTranslationNamespaceProperty);
+        set => SetValue(WidgetHeaderTranslationNamespaceProperty, value);
     }
 
     public static readonly RoutedEvent<VectorEventArgs> DragStartedEvent =
@@ -72,9 +104,21 @@ public class WidgetContainer : ContentControl
         remove => RemoveHandler(RemoveRequestedEvent, value);
     }
 
+    private void SyncHeaderFromWidget()
+    {
+        var metadata = Widget?.Metadata;
+        var icon = metadata?.Icon;
+        SetValue(
+            WidgetHeaderIconPathMarkupProperty,
+            string.IsNullOrEmpty(icon) ? string.Empty : icon);
+        SetValue(WidgetHeaderTitleProperty, metadata?.Title ?? string.Empty);
+        SetValue(WidgetHeaderTranslationNamespaceProperty, metadata?.TranslationNamespace ?? string.Empty);
+    }
+
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
+        SyncHeaderFromWidget();
 
         if (_removeButton != null)
         {

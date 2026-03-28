@@ -29,6 +29,9 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private Note? _selectedNote;
 
+    [ObservableProperty]
+    private string _selectedNoteTitle = string.Empty;
+
     /// <summary>
     /// Last selected tree item that was a note (used to keep selection when clicking folders).
     /// </summary>
@@ -278,6 +281,14 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             node.Children.Add(new NoteTreeItemViewModel(n));
     }
 
+    partial void OnSelectedNoteTitleChanged(string value)
+    {
+        if (SelectedNote == null) return;
+        if (SelectedNote.Title == value) return;
+        SelectedNote.Title = value;
+        RefreshBreadcrumbText();
+    }
+
     partial void OnSelectedTreeItemChanged(NoteTreeItemViewModel? value)
     {
         // Folders are not selectable: if TreeView selected a folder, revert to last selected note.
@@ -315,8 +326,13 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             CreatedText = string.Empty;
             ModifiedText = string.Empty;
             IsFavorite = false;
+            SelectedNoteTitle = string.Empty;
             return;
         }
+
+        var title = value.Title ?? string.Empty;
+        if (SelectedNoteTitle != title)
+            SelectedNoteTitle = title;
 
         _ = _settingsService.SetAsync(LastOpenNoteIdKey, value.NoteId);
 
@@ -324,16 +340,16 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
         if (!string.IsNullOrEmpty(value.FolderPath))
         {
-            BreadcrumbText = value.FolderPath.TrimEnd('/').TrimEnd().Replace("/", " / ") + " / " + value.Title;
+            BreadcrumbText = value.FolderPath.TrimEnd('/').TrimEnd().Replace("/", " / ") + " / " + title;
         }
         else if (value.FolderId != null && _foldersById.TryGetValue(value.FolderId, out var folder))
         {
             var path = GetFolderPath(folder);
-            BreadcrumbText = path.Count > 0 ? string.Join(" / ", path) + " / " + value.Title : value.Title;
+            BreadcrumbText = path.Count > 0 ? string.Join(" / ", path) + " / " + title : title;
         }
         else
         {
-            BreadcrumbText = value.Title;
+            BreadcrumbText = title;
         }
 
         CreatedText = FormatRelative(value.CreatedAt, "Created", "Notes");
@@ -344,15 +360,16 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     {
         if (SelectedNote == null) return;
         var value = SelectedNote;
+        var noteTitle = value.Title ?? string.Empty;
         if (!string.IsNullOrEmpty(value.FolderPath))
-            BreadcrumbText = value.FolderPath.TrimEnd('/').TrimEnd().Replace("/", " / ") + " / " + value.Title;
+            BreadcrumbText = value.FolderPath.TrimEnd('/').TrimEnd().Replace("/", " / ") + " / " + noteTitle;
         else if (value.FolderId != null && _foldersById.TryGetValue(value.FolderId, out var folder))
         {
             var path = GetFolderPath(folder);
-            BreadcrumbText = path.Count > 0 ? string.Join(" / ", path) + " / " + value.Title : value.Title;
+            BreadcrumbText = path.Count > 0 ? string.Join(" / ", path) + " / " + noteTitle : noteTitle;
         }
         else
-            BreadcrumbText = value.Title;
+            BreadcrumbText = noteTitle;
         OnPropertyChanged(nameof(BreadcrumbText));
     }
 
@@ -389,7 +406,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             note.Title = title;
             NotifyTreeItemsForNoteTitleChanged(note);
             if (SelectedNote == note)
+            {
+                if (SelectedNoteTitle != note.Title)
+                    SelectedNoteTitle = note.Title;
                 RefreshBreadcrumbText();
+            }
         }
 
         if (blocks != null)

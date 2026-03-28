@@ -14,30 +14,52 @@ namespace Mnemo.UI.Services;
 /// </summary>
 public static class ChatStreamingHelper
 {
-    /// <summary>System prompt for General mode: helpful assistant (lean; skill fragments + fine-tuning carry product detail).</summary>
-    public const string GeneralSystemPrompt = @"You are Mnemo's in-app assistant.
+    private const string AssistantBaseSystemPrompt = @"You are Mnemo's in-app assistant.
 
-- Answer clearly and concisely. Use Markdown. Default to English unless the user asks otherwise.
+- Use Markdown. Default to English unless the user asks otherwise.
 - Do not invent app UI, settings, or features. If something is uncertain, say so briefly or ask one focused question.
 - Pure study or subject questions: answer directly—no need to mention the app unless relevant.
 - When tools are available, use them to read or change user data instead of only describing what you would do.";
 
-    /// <summary>System prompt for Explainer mode: teaching (lean base; same guardrails as General).</summary>
-    public const string ExplainerSystemPrompt = @"You are Mnemo's in-app explainer: teach and clarify.
+    /// <summary>Short answers: minimal length while staying helpful.</summary>
+    public const string ShortSystemPrompt = AssistantBaseSystemPrompt + @"
 
-- Match depth to the question (short when enough; steps, examples, or tables when it helps). Markdown; LaTeX for math when useful.
-- Do not invent app-specific details. If unsure, say so or ask one short clarifying question.
-- Default to English unless the user asks otherwise.";
+Response length: SHORT. Give the briefest answer that still satisfies the question—typically a sentence or two, or a few tight bullets. No preamble, recap, or filler unless the user asks for more.";
 
-    /// <summary>Default system prompt (General). Kept for backward compatibility.</summary>
-    public static string DefaultSystemPrompt => GeneralSystemPrompt;
+    /// <summary>Balanced length (default).</summary>
+    public const string NormalSystemPrompt = AssistantBaseSystemPrompt + @"
 
-    /// <summary>Returns the system prompt for the given assistant mode (e.g. ""General"", ""Explainer"").</summary>
+Response length: NORMAL. Answer clearly and directly. Use short lists or steps when they help; avoid long essays unless the question needs it.";
+
+    /// <summary>Thorough answers with examples and structure when useful.</summary>
+    public const string DetailedSystemPrompt = AssistantBaseSystemPrompt + @"
+
+Response length: DETAILED. Be thorough: explain reasoning, add examples, steps, or tables when they clarify. Use LaTeX for math when useful. Stay focused—no padding.";
+
+    /// <summary>Default system prompt (Normal). Kept for backward compatibility.</summary>
+    public static string DefaultSystemPrompt => NormalSystemPrompt;
+
+    /// <summary>Maps persisted or UI mode ids to Short, Normal, or Detailed (including legacy General / Explainer).</summary>
+    public static string NormalizeAssistantMode(string? mode)
+    {
+        if (string.IsNullOrWhiteSpace(mode)) return "Normal";
+        if (string.Equals(mode, "Short", StringComparison.OrdinalIgnoreCase)) return "Short";
+        if (string.Equals(mode, "Normal", StringComparison.OrdinalIgnoreCase)) return "Normal";
+        if (string.Equals(mode, "Detailed", StringComparison.OrdinalIgnoreCase)) return "Detailed";
+        if (string.Equals(mode, "General", StringComparison.OrdinalIgnoreCase)) return "Normal";
+        if (string.Equals(mode, "Explainer", StringComparison.OrdinalIgnoreCase)) return "Detailed";
+        return "Normal";
+    }
+
+    /// <summary>Returns the system prompt for the given response-length mode (Short, Normal, Detailed).</summary>
     public static string GetSystemPromptForMode(string mode)
     {
-        return string.Equals(mode, "Explainer", StringComparison.OrdinalIgnoreCase)
-            ? ExplainerSystemPrompt
-            : GeneralSystemPrompt;
+        return NormalizeAssistantMode(mode) switch
+        {
+            "Short" => ShortSystemPrompt,
+            "Detailed" => DetailedSystemPrompt,
+            _ => NormalSystemPrompt
+        };
     }
 
     /// <summary>Delay between UI reveal steps while streaming (smooth display, not network pacing) — matches <see cref="ChatStreamingDisplayOptions.Balanced"/>.</summary>

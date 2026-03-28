@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -12,6 +14,15 @@ namespace Mnemo.UI.Modules.Chat.Views;
 
 public partial class ChatView : UserControl
 {
+    public static readonly StyledProperty<bool> HistoryNavigationEnabledProperty =
+        AvaloniaProperty.Register<ChatView, bool>(nameof(HistoryNavigationEnabled));
+
+    public bool HistoryNavigationEnabled
+    {
+        get => GetValue(HistoryNavigationEnabledProperty);
+        private set => SetValue(HistoryNavigationEnabledProperty, value);
+    }
+
     private ScrollViewer? _chatScrollViewer;
     private ChatViewModel? _currentVm;
     private TextBox? _inputBox;
@@ -61,15 +72,33 @@ public partial class ChatView : UserControl
     {
         if (_currentVm != null)
         {
+            _currentVm.PropertyChanged -= OnChatViewModelPropertyChanged;
             _currentVm.RequestScrollToBottom -= OnRequestScrollToBottom;
             _currentVm = null;
         }
+
+        HistoryNavigationEnabled = false;
+
         if (vm != null)
         {
             _currentVm = vm;
+            vm.PropertyChanged += OnChatViewModelPropertyChanged;
             vm.RequestScrollToBottom += OnRequestScrollToBottom;
             OnRequestScrollToBottom(vm, EventArgs.Empty);
+            SyncHistoryNavigationEnabled(vm);
         }
+    }
+
+    private void OnChatViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is not ChatViewModel vm) return;
+        if (e.PropertyName is null || e.PropertyName == nameof(ChatViewModel.CanSwitchChatHistory))
+            SyncHistoryNavigationEnabled(vm);
+    }
+
+    private void SyncHistoryNavigationEnabled(ChatViewModel vm)
+    {
+        HistoryNavigationEnabled = vm.CanSwitchChatHistory;
     }
 
     private void OnRequestScrollToBottom(object? sender, EventArgs e)

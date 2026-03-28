@@ -151,9 +151,9 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     public double ChatHistorySidebarWidth => IsChatHistorySidebarOpen ? 272 : 48;
 
     /// <summary>Available assistant modes for the mode dropdown.</summary>
-    public IReadOnlyList<string> AssistantModes { get; } = new[] { "General", "Explainer" };
+    public IReadOnlyList<string> AssistantModes { get; } = new[] { "Short", "Normal", "Detailed" };
 
-    private string _selectedAssistantMode = "General";
+    private string _selectedAssistantMode = "Normal";
     public string SelectedAssistantMode
     {
         get => ActiveSession?.AssistantMode ?? _selectedAssistantMode;
@@ -729,7 +729,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         var session = new ChatSession
         {
             Id = string.IsNullOrEmpty(c.Id) ? Guid.NewGuid().ToString("N") : c.Id,
-            AssistantMode = string.IsNullOrEmpty(c.AssistantMode) ? "General" : c.AssistantMode,
+            AssistantMode = ChatStreamingHelper.NormalizeAssistantMode(c.AssistantMode),
             LastActivityUtc = c.LastActivityUtc == default ? DateTime.UtcNow : c.LastActivityUtc,
             CustomTitle = string.IsNullOrWhiteSpace(c.CustomTitle) ? null : c.CustomTitle.Trim()
         };
@@ -1423,7 +1423,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
 
         public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
-        public string AssistantMode { get; set; } = "General";
+        public string AssistantMode { get; set; } = "Normal";
 
         public DateTime LastActivityUtc { get; set; }
 
