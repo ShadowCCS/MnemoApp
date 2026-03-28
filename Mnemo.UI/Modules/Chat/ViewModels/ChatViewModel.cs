@@ -8,6 +8,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
@@ -19,7 +21,7 @@ using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules.Chat.ViewModels;
 
-public class ChatViewModel : ViewModelBase
+public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
 {
     /// <summary>Distance from bottom (px) below which we consider "at bottom" for scroll-to-bottom button.</summary>
     public const double ScrollToBottomThreshold = 20;
@@ -41,8 +43,20 @@ public class ChatViewModel : ViewModelBase
     private readonly ChatTypingPrefetchHelper _typingPrefetch;
     private readonly IChatDatasetLogger _chatDatasetLogger;
     private readonly IRoutingToolHintStore _routingToolHintStore;
+    private readonly IChatModuleHistoryService _chatHistoryService;
 
-    private string _conversationId = Guid.NewGuid().ToString("N");
+    private string _conversationId = string.Empty;
+
+    private bool _historyLoadStarted;
+    private bool _isHistoryReady;
+    private bool _isChatHistorySidebarOpen = true;
+    private readonly Dictionary<string, ChatSession> _chatSessions = new();
+    private readonly ObservableCollection<ChatMessageViewModel> _ephemeralMessages = new();
+    private bool _isEphemeralConversation;
+    private ObservableCollection<ChatMessageViewModel>? _messagesSubscriptionTarget;
+    private bool _disposed;
+
+    private string _welcomeIntroText = string.Empty;
 
     /// <summary>Zero-based turn counter within the current conversation, incremented each time a user message is sent.</summary>
     private int _turnIndex;
@@ -79,6 +93,11 @@ public class ChatViewModel : ViewModelBase
                 ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
                 ((RelayCommand)StopCommand).NotifyCanExecuteChanged();
                 ((RelayCommand)NewChatCommand).NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(CanUseChatActions));
+                OnPropertyChanged(nameof(CanSwitchChatHistory));
+                DeleteChatCommand.NotifyCanExecuteChanged();
+                RenameChatCommand.NotifyCanExecuteChanged();
+                RegenerateAssistantMessageCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -94,7 +113,42 @@ public class ChatViewModel : ViewModelBase
     /// <summary>When true, new content (e.g. streaming) will auto-scroll to bottom. Becomes false when user scrolls up; restored when user clicks "Scroll to bottom".</summary>
     private bool _isAutoScrollAttached = true;
 
-    public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
+    private readonly ObservableCollection<ChatMessageViewModel> _emptyMessages = new();
+
+    /// <summary>Messages for the active conversation (empty collection until history has loaded).</summary>
+    public ObservableCollection<ChatMessageViewModel> Messages =>
+        _isEphemeralConversation
+            ? _ephemeralMessages
+            : !string.IsNullOrEmpty(_conversationId) && _chatSessions.TryGetValue(_conversationId, out var session)
+                ? session.Messages
+                : _emptyMessages;
+
+    public ObservableCollection<ChatConversationRowViewModel> ConversationRows { get; } = new();
+
+    /// <summary>Localized welcome copy for the intro panel (not part of <see cref="Messages"/>).</summary>
+    public string WelcomeIntroText
+    {
+        get => _welcomeIntroText;
+        private set => SetProperty(ref _welcomeIntroText, value);
+    }
+
+    /// <summary>Suggestion chips for the welcome intro panel.</summary>
+    public ObservableCollection<string> WelcomeSuggestionList { get; } = new();
+
+    /// <summary>True when the empty-state welcome + suggestions should show (no user messages in the thread yet).</summary>
+    public bool ShowWelcomeIntro => _isHistoryReady && !Messages.Any(m => m.IsUser);
+
+    public bool IsChatHistorySidebarOpen
+    {
+        get => _isChatHistorySidebarOpen;
+        set
+        {
+            if (SetProperty(ref _isChatHistorySidebarOpen, value))
+                OnPropertyChanged(nameof(ChatHistorySidebarWidth));
+        }
+    }
+
+    public double ChatHistorySidebarWidth => IsChatHistorySidebarOpen ? 272 : 48;
 
     /// <summary>Available assistant modes for the mode dropdown.</summary>
     public IReadOnlyList<string> AssistantModes { get; } = new[] { "General", "Explainer" };
@@ -102,8 +156,21 @@ public class ChatViewModel : ViewModelBase
     private string _selectedAssistantMode = "General";
     public string SelectedAssistantMode
     {
-        get => _selectedAssistantMode;
-        set => SetProperty(ref _selectedAssistantMode, value);
+        get => ActiveSession?.AssistantMode ?? _selectedAssistantMode;
+        set
+        {
+            var session = ActiveSession;
+            if (session != null)
+            {
+                if (session.AssistantMode == value) return;
+                session.AssistantMode = value;
+                OnPropertyChanged();
+            }
+            else
+            {
+                SetProperty(ref _selectedAssistantMode, value);
+            }
+        }
     }
 
     public ObservableCollection<ChatAttachmentViewModel> PendingAttachments { get; } = new();
@@ -111,6 +178,7 @@ public class ChatViewModel : ViewModelBase
     public ICommand SendMessageCommand { get; }
     public ICommand StopCommand { get; }
     public ICommand NewChatCommand { get; }
+    public ICommand ToggleChatHistorySidebarCommand { get; }
     public ICommand SuggestionSelectedCommand { get; }
     public ICommand ScrollToBottomCommand { get; }
     public ICommand RemoveAttachmentCommand { get; }
@@ -119,12 +187,26 @@ public class ChatViewModel : ViewModelBase
     public ICommand StopRecordingCommand { get; }
     public ICommand CancelRecordingCommand { get; }
 
+    public AsyncRelayCommand<ChatMessageViewModel> RegenerateAssistantMessageCommand { get; }
+    public AsyncRelayCommand<ChatMessageViewModel> CopyAssistantMessageCommand { get; }
+
+    public IAsyncRelayCommand<string> DeleteChatCommand { get; }
+    public IRelayCommand<string> RenameChatCommand { get; }
+
+    /// <summary>True when chat actions that must not overlap generation (e.g. regenerate) are allowed.</summary>
+    public bool CanUseChatActions => !IsBusy && !IsRecording;
+
+    /// <summary>True when the user can switch threads or start a new chat from the history sidebar.</summary>
+    public bool CanSwitchChatHistory => !IsBusy && !IsRecording && _isHistoryReady;
+
     /// <summary>Raised when the view should scroll to the end (e.g. after new message or user clicked "Scroll to bottom").</summary>
     public event EventHandler? RequestScrollToBottom;
 
     private CancellationTokenSource? _cts;
     private ChatMessageViewModel? _lastMessageSubscribed;
     private CancellationTokenSource? _recordingDurationCts;
+    /// <summary>Coalesces <see cref="RequestScrollToBottom"/> during token streaming so ScrollToEnd/layout does not run on every content tick.</summary>
+    private DispatcherTimer? _scrollToBottomDebounceTimer;
 
     private bool _isRecording;
     public bool IsRecording
@@ -139,6 +221,11 @@ public class ChatViewModel : ViewModelBase
                 ((AsyncRelayCommand)StopRecordingCommand).NotifyCanExecuteChanged();
                 ((AsyncRelayCommand)CancelRecordingCommand).NotifyCanExecuteChanged();
                 ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(CanUseChatActions));
+                OnPropertyChanged(nameof(CanSwitchChatHistory));
+                DeleteChatCommand.NotifyCanExecuteChanged();
+                RenameChatCommand.NotifyCanExecuteChanged();
+                RegenerateAssistantMessageCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -150,7 +237,10 @@ public class ChatViewModel : ViewModelBase
     private TimeSpan _recordingDuration;
     public string RecordingDurationText => _recordingDuration.ToString(@"mm\:ss");
 
-    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService, ISpeechRecognitionService speechService, ISettingsService settingsService, ISkillSystemPromptComposer skillSystemPromptComposer, ChatPauseToSendEstimator pauseToSendEstimator, IChatDatasetLogger chatDatasetLogger, IRoutingToolHintStore routingToolHintStore)
+    private ChatSession? ActiveSession =>
+        !string.IsNullOrEmpty(_conversationId) && _chatSessions.TryGetValue(_conversationId, out var s) ? s : null;
+
+    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService, ISpeechRecognitionService speechService, ISettingsService settingsService, ISkillSystemPromptComposer skillSystemPromptComposer, ChatPauseToSendEstimator pauseToSendEstimator, IChatDatasetLogger chatDatasetLogger, IRoutingToolHintStore routingToolHintStore, IChatModuleHistoryService chatHistoryService)
     {
         _orchestrator = orchestrator;
         _logger = logger;
@@ -161,11 +251,13 @@ public class ChatViewModel : ViewModelBase
         _skillSystemPromptComposer = skillSystemPromptComposer;
         _chatDatasetLogger = chatDatasetLogger;
         _routingToolHintStore = routingToolHintStore;
+        _chatHistoryService = chatHistoryService;
         _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
 
-        SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording);
+        SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording && _isHistoryReady);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
-        NewChatCommand = new RelayCommand(NewChat, () => !IsBusy && !IsRecording);
+        NewChatCommand = new RelayCommand(NewChat, () => !IsBusy && !IsRecording && _isHistoryReady);
+        ToggleChatHistorySidebarCommand = new RelayCommand(() => IsChatHistorySidebarOpen = !IsChatHistorySidebarOpen);
         SuggestionSelectedCommand = new RelayCommand<string>(ApplySuggestion);
         ScrollToBottomCommand = new RelayCommand(OnScrollToBottom);
         RemoveAttachmentCommand = new RelayCommand<ChatAttachmentViewModel>(a =>
@@ -179,10 +271,33 @@ public class ChatViewModel : ViewModelBase
         StopRecordingCommand = new AsyncRelayCommand(StopRecordingAsync, () => IsRecording);
         CancelRecordingCommand = new AsyncRelayCommand(CancelRecordingAsync, () => IsRecording);
 
-        Messages.CollectionChanged += OnMessagesCollectionChanged;
+        RegenerateAssistantMessageCommand = new AsyncRelayCommand<ChatMessageViewModel>(RegenerateAssistantMessageAsync, CanRegenerateAssistantMessage);
+        CopyAssistantMessageCommand = new AsyncRelayCommand<ChatMessageViewModel>(CopyAssistantMessageAsync);
 
-        Messages.Add(CreateWelcomeMessage());
+        DeleteChatCommand = new AsyncRelayCommand<string>(DeleteChatAsync, CanModifyChat);
+        RenameChatCommand = new RelayCommand<string>(BeginRenameChat, CanModifyChat);
+
+        RefreshLocalizedWelcomeUi();
         OnPropertyChanged(nameof(WatermarkText));
+    }
+
+    private void RefreshLocalizedWelcomeUi()
+    {
+        WelcomeIntroText = _localizationService.T("WelcomeMessage", "Chat");
+        WelcomeSuggestionList.Clear();
+        WelcomeSuggestionList.Add(_localizationService.T("SuggestionExplain", "Chat"));
+        WelcomeSuggestionList.Add(_localizationService.T("SuggestionQuiz", "Chat"));
+        WelcomeSuggestionList.Add(_localizationService.T("SuggestionSummarize", "Chat"));
+    }
+
+    private void NotifyShowWelcomeIntroChanged() => OnPropertyChanged(nameof(ShowWelcomeIntro));
+
+    /// <inheritdoc />
+    public void OnNavigatedTo(object? parameter)
+    {
+        if (_historyLoadStarted) return;
+        _historyLoadStarted = true;
+        _ = LoadHistoryAsync();
     }
 
     private void OnPartialTranscript(string text)
@@ -336,10 +451,10 @@ public class ChatViewModel : ViewModelBase
 
     private void OnMessagesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action != NotifyCollectionChangedAction.Add) return;
-        SubscribeToLastMessage();
-        if (_isAutoScrollAttached)
+        NotifyShowWelcomeIntroChanged();
+        if (e.Action == NotifyCollectionChangedAction.Add && _isAutoScrollAttached)
             RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
+        SubscribeToLastMessage();
     }
 
     private void SubscribeToLastMessage()
@@ -358,6 +473,32 @@ public class ChatViewModel : ViewModelBase
     private void OnLastMessageContentChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ChatMessageViewModel.Content) && _isAutoScrollAttached)
+            ScheduleDebouncedScrollToBottom();
+    }
+
+    private void ScheduleDebouncedScrollToBottom()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_isAutoScrollAttached) return;
+            if (_scrollToBottomDebounceTimer == null)
+            {
+                _scrollToBottomDebounceTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(100)
+                };
+                _scrollToBottomDebounceTimer.Tick += OnScrollToBottomDebounceTick;
+            }
+
+            _scrollToBottomDebounceTimer.Stop();
+            _scrollToBottomDebounceTimer.Start();
+        }, DispatcherPriority.Normal);
+    }
+
+    private void OnScrollToBottomDebounceTick(object? sender, EventArgs e)
+    {
+        _scrollToBottomDebounceTimer?.Stop();
+        if (_isAutoScrollAttached)
             RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
     }
 
@@ -408,41 +549,486 @@ public class ChatViewModel : ViewModelBase
 
     private void NewChat()
     {
-        _routingToolHintStore.Clear(_conversationId);
+        if (!_isHistoryReady || IsBusy || IsRecording) return;
+        EnterEphemeralConversation(persistIfLeavingMaterialized: true);
+        PendingAttachments.Clear();
+    }
+
+    private void SelectConversationById(string id, bool persistBookends = true)
+    {
+        if (!_isHistoryReady || IsBusy || IsRecording) return;
+        if (id == _conversationId) return;
+        if (persistBookends && !_isEphemeralConversation && _chatSessions.ContainsKey(_conversationId))
+            PersistFireAndForget();
+        if (_isEphemeralConversation)
+        {
+            _routingToolHintStore.Clear(_conversationId);
+            _ephemeralMessages.Clear();
+            _isEphemeralConversation = false;
+        }
+
+        _conversationId = id;
+        _turnIndex = CountUserTurns(ActiveSession!.Messages);
+        foreach (var r in ConversationRows)
+            r.IsSelected = r.ConversationId == id;
+        ResubscribeActiveMessages();
+        OnPropertyChanged(nameof(Messages));
+        OnPropertyChanged(nameof(SelectedAssistantMode));
+        RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
+        if (persistBookends)
+            PersistFireAndForget();
+        NotifyShowWelcomeIntroChanged();
+    }
+
+    /// <summary>Starts a new thread that only appears in the sidebar and storage after the first user message.</summary>
+    private void EnterEphemeralConversation(bool persistIfLeavingMaterialized)
+    {
+        if (persistIfLeavingMaterialized && !_isEphemeralConversation && _chatSessions.ContainsKey(_conversationId))
+            PersistFireAndForget();
+
+        if (!string.IsNullOrEmpty(_conversationId))
+            _routingToolHintStore.Clear(_conversationId);
+
         _conversationId = Guid.NewGuid().ToString("N");
+        _ephemeralMessages.Clear();
+        _isEphemeralConversation = true;
         _turnIndex = 0;
-        Messages.CollectionChanged -= OnMessagesCollectionChanged;
+        foreach (var r in ConversationRows)
+            r.IsSelected = false;
+        ResubscribeActiveMessages();
+        OnPropertyChanged(nameof(Messages));
+        OnPropertyChanged(nameof(SelectedAssistantMode));
+        NotifyShowWelcomeIntroChanged();
+        RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void MaterializeEphemeralConversation()
+    {
+        if (!_isEphemeralConversation) return;
+        var id = _conversationId;
+        var session = new ChatSession
+        {
+            Id = id,
+            AssistantMode = SelectedAssistantMode,
+            LastActivityUtc = DateTime.UtcNow
+        };
+        _chatSessions[id] = session;
+        _isEphemeralConversation = false;
+        var row = new ChatConversationRowViewModel(id, i => SelectConversationById(i))
+        {
+            Title = _localizationService.T("NewChat", "Chat"),
+            IsSelected = true
+        };
+        foreach (var r in ConversationRows)
+            r.IsSelected = false;
+        ConversationRows.Insert(0, row);
+        ResubscribeActiveMessages();
+        OnPropertyChanged(nameof(Messages));
+        OnPropertyChanged(nameof(SelectedAssistantMode));
+        NotifyShowWelcomeIntroChanged();
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        try
+        {
+            var result = await _chatHistoryService.LoadAsync().ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_disposed) return;
+                if (!result.IsSuccess || result.Value == null)
+                {
+                    _logger.Error("Chat", result.ErrorMessage ?? "History load failed");
+                    ClearSessionsAndRows();
+                    EnterEphemeralConversation(persistIfLeavingMaterialized: false);
+                }
+                else
+                    ApplyDocument(result.Value);
+
+                _isHistoryReady = true;
+                NotifyHistorySensitiveCommands();
+                ResubscribeActiveMessages();
+                NotifyShowWelcomeIntroChanged();
+                PersistFireAndForget();
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Chat", $"History load failed: {ex}");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_disposed) return;
+                ClearSessionsAndRows();
+                EnterEphemeralConversation(persistIfLeavingMaterialized: false);
+                _isHistoryReady = true;
+                NotifyHistorySensitiveCommands();
+                ResubscribeActiveMessages();
+                NotifyShowWelcomeIntroChanged();
+                PersistFireAndForget();
+            });
+        }
+    }
+
+    private void ApplyDocument(ChatModuleHistoryDocument doc)
+    {
+        ClearSessionsAndRows();
+        var ordered = doc.Conversations.OrderByDescending(c => c.LastActivityUtc).ToList();
+        if (ordered.Count == 0)
+        {
+            EnterEphemeralConversation(persistIfLeavingMaterialized: false);
+            return;
+        }
+
+        _isEphemeralConversation = false;
+
+        foreach (var c in ordered)
+        {
+            var session = MapPersistedConversation(c);
+            _chatSessions[session.Id] = session;
+            var row = new ChatConversationRowViewModel(session.Id, id => SelectConversationById(id))
+            {
+                Title = FormatTitleForRow(session),
+                IsSelected = false
+            };
+            ConversationRows.Add(row);
+        }
+
+        var active = ordered[0];
+        _conversationId = active.Id;
+        _turnIndex = CountUserTurns(_chatSessions[active.Id].Messages);
+        foreach (var r in ConversationRows)
+            r.IsSelected = r.ConversationId == _conversationId;
+        OnPropertyChanged(nameof(Messages));
+        OnPropertyChanged(nameof(SelectedAssistantMode));
+        NotifyShowWelcomeIntroChanged();
+        RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ClearSessionsAndRows()
+    {
+        if (_messagesSubscriptionTarget != null)
+        {
+            _messagesSubscriptionTarget.CollectionChanged -= OnMessagesCollectionChanged;
+            _messagesSubscriptionTarget = null;
+        }
+
         if (_lastMessageSubscribed != null)
         {
             _lastMessageSubscribed.PropertyChanged -= OnLastMessageContentChanged;
             _lastMessageSubscribed = null;
         }
-        Messages.Clear();
-        PendingAttachments.Clear();
-        Messages.CollectionChanged += OnMessagesCollectionChanged;
-        Messages.Add(CreateWelcomeMessage());
+
+        _isEphemeralConversation = false;
+        _ephemeralMessages.Clear();
+        _chatSessions.Clear();
+        ConversationRows.Clear();
     }
 
-    private ChatMessageViewModel CreateWelcomeMessage()
+    private ChatSession MapPersistedConversation(ChatModulePersistedConversation c)
     {
+        var session = new ChatSession
+        {
+            Id = string.IsNullOrEmpty(c.Id) ? Guid.NewGuid().ToString("N") : c.Id,
+            AssistantMode = string.IsNullOrEmpty(c.AssistantMode) ? "General" : c.AssistantMode,
+            LastActivityUtc = c.LastActivityUtc == default ? DateTime.UtcNow : c.LastActivityUtc,
+            CustomTitle = string.IsNullOrWhiteSpace(c.CustomTitle) ? null : c.CustomTitle.Trim()
+        };
+        foreach (var m in c.Messages ?? Enumerable.Empty<ChatModulePersistedMessage>())
+            session.Messages.Add(MapFromPersistedMessage(m));
+        StripLegacyWelcomeAssistantMessages(session);
+        return session;
+    }
+
+    /// <summary>Removes persisted assistant-only welcome rows (with suggestion chips) from older saves.</summary>
+    private static void StripLegacyWelcomeAssistantMessages(ChatSession session)
+    {
+        while (session.Messages.Count > 0)
+        {
+            var first = session.Messages[0];
+            if (first.IsUser) break;
+            if (first.Suggestions is { Count: > 0 })
+                session.Messages.RemoveAt(0);
+            else
+                break;
+        }
+    }
+
+    private ChatMessageViewModel MapFromPersistedMessage(ChatModulePersistedMessage m)
+    {
+        List<ChatAttachmentViewModel>? attachments = null;
+        if (m.Attachments is { Count: > 0 })
+        {
+            attachments = new List<ChatAttachmentViewModel>();
+            foreach (var a in m.Attachments)
+            {
+                if (string.IsNullOrWhiteSpace(a.Path)) continue;
+                attachments.Add(new ChatAttachmentViewModel(a.Path, a.Kind, a.DisplayName, NoOpAttachmentCommand));
+            }
+        }
+
         return new ChatMessageViewModel
         {
-            Content = _localizationService.T("WelcomeMessage", "Chat"),
-            IsUser = false,
-            Suggestions = new List<string>
-            {
-                _localizationService.T("SuggestionExplain", "Chat"),
-                _localizationService.T("SuggestionQuiz", "Chat"),
-                _localizationService.T("SuggestionSummarize", "Chat")
-            }
+            Content = m.Content ?? string.Empty,
+            IsUser = m.IsUser,
+            Timestamp = m.TimestampUtc.Kind == DateTimeKind.Utc ? m.TimestampUtc.ToLocalTime() : m.TimestampUtc,
+            Suggestions = m.Suggestions,
+            Sources = m.Sources,
+            Attachments = attachments is { Count: > 0 } ? attachments : null
         };
+    }
+
+    private static ChatModulePersistedMessage MapToPersistedMessage(ChatMessageViewModel m)
+    {
+        List<ChatModulePersistedAttachment>? attachments = null;
+        if (m.Attachments is { Count: > 0 })
+        {
+            attachments = m.Attachments.Select(a => new ChatModulePersistedAttachment
+            {
+                Path = a.Path,
+                Kind = a.Kind,
+                DisplayName = a.DisplayName
+            }).ToList();
+        }
+
+        return new ChatModulePersistedMessage
+        {
+            Content = m.Content,
+            IsUser = m.IsUser,
+            TimestampUtc = m.Timestamp.ToUniversalTime(),
+            Suggestions = m.Suggestions,
+            Sources = m.Sources,
+            Attachments = attachments
+        };
+    }
+
+    private ChatModuleHistoryDocument BuildPersistDocument()
+    {
+        var list = _chatSessions.Values
+            .OrderByDescending(s => s.LastActivityUtc)
+            .Select(s => new ChatModulePersistedConversation
+            {
+                Id = s.Id,
+                LastActivityUtc = s.LastActivityUtc,
+                AssistantMode = s.AssistantMode,
+                CustomTitle = s.CustomTitle,
+                Messages = s.Messages.Select(MapToPersistedMessage).ToList()
+            })
+            .ToList();
+        return new ChatModuleHistoryDocument { Version = 1, Conversations = list };
+    }
+
+    private void PersistFireAndForget()
+    {
+        if (!_isHistoryReady || _disposed) return;
+        _ = PersistHistoryAsync();
+    }
+
+    private async Task PersistHistoryAsync()
+    {
+        try
+        {
+            var doc = BuildPersistDocument();
+            await _chatHistoryService.SaveAsync(doc).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Chat", $"History save failed: {ex}");
+        }
+    }
+
+    private void ResubscribeActiveMessages()
+    {
+        if (_messagesSubscriptionTarget != null)
+            _messagesSubscriptionTarget.CollectionChanged -= OnMessagesCollectionChanged;
+        _messagesSubscriptionTarget = Messages;
+        _messagesSubscriptionTarget.CollectionChanged += OnMessagesCollectionChanged;
+        SubscribeToLastMessage();
+    }
+
+    private void NotifyHistorySensitiveCommands()
+    {
+        ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
+        ((RelayCommand)NewChatCommand).NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanSwitchChatHistory));
+        DeleteChatCommand.NotifyCanExecuteChanged();
+        RenameChatCommand.NotifyCanExecuteChanged();
+    }
+
+    private string FormatTitleForRow(ChatSession session)
+    {
+        if (!string.IsNullOrWhiteSpace(session.CustomTitle))
+        {
+            var t = session.CustomTitle.Trim();
+            if (t.Length > 48)
+                t = t[..45] + "…";
+            return t;
+        }
+
+        return DeriveConversationTitle(session.Messages);
+    }
+
+    private string GetEditableTitle(ChatSession session)
+    {
+        if (!string.IsNullOrWhiteSpace(session.CustomTitle))
+            return session.CustomTitle.Trim();
+        foreach (var m in session.Messages)
+        {
+            if (!m.IsUser || string.IsNullOrWhiteSpace(m.Content)) continue;
+            return m.Content.Trim().Replace("\r", " ").Replace("\n", " ");
+        }
+
+        return _localizationService.T("NewChat", "Chat");
+    }
+
+    private bool CanModifyChat(string? id) =>
+        CanSwitchChatHistory && !string.IsNullOrEmpty(id) && _chatSessions.ContainsKey(id!);
+
+    private void BeginRenameChat(string? conversationId)
+    {
+        if (string.IsNullOrEmpty(conversationId) || !_chatSessions.TryGetValue(conversationId, out var session)) return;
+
+        var overlay = new InputDialogOverlay
+        {
+            Title = _localizationService.T("RenameChat", "Chat"),
+            Placeholder = _localizationService.T("RenameChatPlaceholder", "Chat"),
+            InputValue = GetEditableTitle(session),
+            ConfirmText = _localizationService.T("Save", "Common"),
+            CancelText = _localizationService.T("Cancel", "Common")
+        };
+        var options = new OverlayOptions
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true,
+            CloseOnEscape = true
+        };
+        var overlayInstanceId = _overlayService.CreateOverlay(overlay, options, "RenameChat");
+        overlay.OnResult = result =>
+        {
+            _overlayService.CloseOverlay(overlayInstanceId);
+            if (result == null) return;
+            ApplyCustomTitle(conversationId, string.IsNullOrWhiteSpace(result) ? null : result.Trim());
+        };
+    }
+
+    private void ApplyCustomTitle(string conversationId, string? customTitle)
+    {
+        if (!_chatSessions.TryGetValue(conversationId, out var session)) return;
+        session.CustomTitle = string.IsNullOrWhiteSpace(customTitle) ? null : customTitle;
+        var row = FindRow(conversationId);
+        if (row != null)
+            row.Title = FormatTitleForRow(session);
+        PersistFireAndForget();
+    }
+
+    private async Task DeleteChatAsync(string? conversationId)
+    {
+        if (string.IsNullOrEmpty(conversationId) || !_chatSessions.ContainsKey(conversationId)) return;
+        var deleteLabel = _localizationService.T("Delete", "Notes");
+        var choice = await _overlayService.CreateDialogAsync(
+            _localizationService.T("DeleteChatTitle", "Chat"),
+            _localizationService.T("DeleteChatMessage", "Chat"),
+            deleteLabel,
+            _localizationService.T("Cancel", "Common"));
+        if (choice != deleteLabel) return;
+
+        await Dispatcher.UIThread.InvokeAsync(() => RemoveConversationCore(conversationId));
+    }
+
+    private void RemoveConversationCore(string conversationId)
+    {
+        var wasActive = _conversationId == conversationId;
+        _chatSessions.Remove(conversationId);
+        var row = FindRow(conversationId);
+        if (row != null)
+            ConversationRows.Remove(row);
+        _routingToolHintStore.Clear(conversationId);
+
+        if (!wasActive)
+        {
+            PersistFireAndForget();
+            return;
+        }
+
+        if (ConversationRows.Count > 0)
+            SelectConversationById(ConversationRows[0].ConversationId, persistBookends: false);
+        else
+            EnterEphemeralConversation(persistIfLeavingMaterialized: false);
+        PersistFireAndForget();
+    }
+
+    private string DeriveConversationTitle(IReadOnlyList<ChatMessageViewModel> messages)
+    {
+        foreach (var m in messages)
+        {
+            if (!m.IsUser || string.IsNullOrWhiteSpace(m.Content)) continue;
+            var t = m.Content.Trim().Replace("\r", " ").Replace("\n", " ");
+            if (t.Length > 48)
+                t = t[..45] + "…";
+            return t;
+        }
+
+        return _localizationService.T("NewChat", "Chat");
+    }
+
+    private static int CountUserTurns(ObservableCollection<ChatMessageViewModel> messages)
+    {
+        var n = 0;
+        foreach (var m in messages)
+        {
+            if (m.IsUser && !string.IsNullOrWhiteSpace(m.Content))
+                n++;
+        }
+
+        return n;
+    }
+
+    private ChatConversationRowViewModel? FindRow(string id)
+    {
+        foreach (var r in ConversationRows)
+        {
+            if (r.ConversationId == id)
+                return r;
+        }
+
+        return null;
+    }
+
+    private void MoveActiveRowToTop()
+    {
+        var row = FindRow(_conversationId);
+        if (row == null) return;
+        var idx = ConversationRows.IndexOf(row);
+        if (idx > 0)
+            ConversationRows.Move(idx, 0);
+    }
+
+    private void RefreshActiveRowTitle()
+    {
+        var session = ActiveSession;
+        var row = FindRow(_conversationId);
+        if (session == null || row == null) return;
+        if (!string.IsNullOrWhiteSpace(session.CustomTitle)) return;
+        row.Title = DeriveConversationTitle(session.Messages);
+    }
+
+    private void TouchActiveConversationAfterUserMessage()
+    {
+        var session = ActiveSession;
+        if (session == null) return;
+        session.LastActivityUtc = DateTime.UtcNow;
+        MoveActiveRowToTop();
+        RefreshActiveRowTitle();
     }
 
     private async Task SendMessageAsync()
     {
-        if (string.IsNullOrWhiteSpace(InputText) || IsBusy) return;
+        if (!_isHistoryReady || string.IsNullOrWhiteSpace(InputText) || IsBusy) return;
 
         await _typingPrefetch.RecordSendPauseAsync().ConfigureAwait(false);
+
+        MaterializeEphemeralConversation();
 
         var userMessage = InputText;
         InputText = string.Empty;
@@ -466,6 +1052,7 @@ public class ChatViewModel : ViewModelBase
             IsUser = true,
             Attachments = messageAttachments.Count > 0 ? messageAttachments : null
         });
+        TouchActiveConversationAfterUserMessage();
 
         IsBusy = true;
 
@@ -477,6 +1064,81 @@ public class ChatViewModel : ViewModelBase
         };
         Messages.Add(aiMessage);
 
+        await RunAssistantStreamingTurnCoreAsync(aiMessage, userMessage, imagePaths).ConfigureAwait(false);
+    }
+
+    private async Task RegenerateAssistantMessageAsync(ChatMessageViewModel? assistantMessage)
+    {
+        if (assistantMessage == null || assistantMessage.IsUser || IsBusy || IsRecording) return;
+        var userMessage = FindPreviousUserMessage(assistantMessage);
+        if (userMessage == null || string.IsNullOrWhiteSpace(userMessage.Content)) return;
+
+        var imagePaths = new List<string>();
+        if (userMessage.Attachments != null)
+        {
+            foreach (var a in userMessage.Attachments)
+            {
+                if (a.Kind == ChatAttachmentKind.Image)
+                    imagePaths.Add(a.Path);
+            }
+        }
+
+        var idx = Messages.IndexOf(assistantMessage);
+        if (idx < 0) return;
+
+        Messages.RemoveAt(idx);
+        var newAi = new ChatMessageViewModel
+        {
+            Content = string.Empty,
+            IsUser = false,
+            IsStreaming = true
+        };
+        Messages.Insert(idx, newAi);
+
+        IsBusy = true;
+        await RunAssistantStreamingTurnCoreAsync(newAi, userMessage.Content, imagePaths).ConfigureAwait(false);
+    }
+
+    private async Task CopyAssistantMessageAsync(ChatMessageViewModel? message)
+    {
+        if (message == null || message.IsUser || string.IsNullOrWhiteSpace(message.Content)) return;
+        try
+        {
+            var text = message.Content;
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow: { Clipboard: { } clipboard } })
+                    await clipboard.SetTextAsync(text).ConfigureAwait(true);
+            }).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Chat", $"Copy to clipboard failed: {ex}");
+        }
+    }
+
+    private bool CanRegenerateAssistantMessage(ChatMessageViewModel? m) =>
+        m != null
+        && !m.IsUser
+        && !m.IsStreaming
+        && CanUseChatActions
+        && FindPreviousUserMessage(m) != null;
+
+    private ChatMessageViewModel? FindPreviousUserMessage(ChatMessageViewModel assistantMessage)
+    {
+        var idx = Messages.IndexOf(assistantMessage);
+        if (idx <= 0) return null;
+        for (var i = idx - 1; i >= 0; i--)
+        {
+            if (Messages[i].IsUser)
+                return Messages[i];
+        }
+        return null;
+    }
+
+    /// <summary>Runs orchestration and streaming for an assistant bubble that is already in <see cref="Messages"/>.</summary>
+    private async Task RunAssistantStreamingTurnCoreAsync(ChatMessageViewModel aiMessage, string userMessage, IReadOnlyList<string> imagePaths)
+    {
         _cts = new CancellationTokenSource();
 
         List<string>? imageBase64 = null;
@@ -501,6 +1163,9 @@ public class ChatViewModel : ViewModelBase
                     aiMessage.IsStreaming = false;
                 });
                 IsBusy = false;
+                var ctsEarly = _cts;
+                _cts = null;
+                ctsEarly?.Dispose();
                 return;
             }
         }
@@ -526,17 +1191,22 @@ public class ChatViewModel : ViewModelBase
         try
         {
             processThread = new ChatProcessThreadTracker(aiMessage.ProcessSteps);
-            aiMessage.IsProcessThreadExpanded = true;
 
             IProgress<string> pipelineProgress = new Progress<string>(key =>
                 Dispatcher.UIThread.Post(() =>
                 {
                     processThread!.OnPipelineKey(key, k => _localizationService.T(k, "Chat"));
                     UpdateProcessHeader(aiMessage, processThread);
-                }));
+                }, DispatcherPriority.Background));
 
             void UpdateContent(string content) =>
-                Dispatcher.UIThread.Post(() => { aiMessage.Content = content; });
+                Dispatcher.UIThread.Post(() => { aiMessage.Content = content; }, DispatcherPriority.Background);
+
+            void UpdateReasoning(string reasoning) =>
+                Dispatcher.UIThread.Post(() =>
+                {
+                    aiMessage.Thoughts = string.IsNullOrEmpty(reasoning) ? null : reasoning;
+                }, DispatcherPriority.Background);
 
             var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, _conversationId).ConfigureAwait(false);
             var decision = analyzed.IsSuccess && analyzed.Value != null
@@ -555,7 +1225,7 @@ public class ChatViewModel : ViewModelBase
                 {
                     processThread?.AddToolCall(tc, k => _localizationService.T(k, "Chat"));
                     aiMessage.ThoughtsCount += 1;
-                });
+                }, DispatcherPriority.Background);
             };
 
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingWithHistoryAsync(
@@ -570,7 +1240,8 @@ public class ChatViewModel : ViewModelBase
                 precomputedDecision: decision,
                 conversationRoutingKey: _conversationId,
                 displayOptions,
-                onToolCall);
+                onToolCall,
+                onAssistantReasoningUpdate: UpdateReasoning);
 
             foundForDataset = foundResponse;
             finalAssistantResponseForDataset = foundResponse ? finalContent : null;
@@ -578,6 +1249,8 @@ public class ChatViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 aiMessage.Content = finalContent;
+                if (string.IsNullOrWhiteSpace(aiMessage.Thoughts))
+                    aiMessage.Thoughts = null;
                 processThread?.CompleteThread();
                 FinalizeProcessHeader(aiMessage, processThread);
                 aiMessage.PipelineStatusText = null;
@@ -652,7 +1325,13 @@ public class ChatViewModel : ViewModelBase
             var cts = _cts;
             _cts = null;
             cts?.Dispose();
-            Dispatcher.UIThread.Post(() => IsBusy = false);
+            Dispatcher.UIThread.Post(() =>
+            {
+                IsBusy = false;
+                if (!_disposed && ActiveSession != null)
+                    ActiveSession.LastActivityUtc = DateTime.UtcNow;
+                PersistFireAndForget();
+            });
         }
     }
 
@@ -707,6 +1386,47 @@ public class ChatViewModel : ViewModelBase
         message.ProcessHeaderText = steps > 0
             ? $"Thought process ({steps} steps)"
             : "Thought process";
-        message.IsProcessThreadExpanded = false;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        if (_messagesSubscriptionTarget != null)
+            _messagesSubscriptionTarget.CollectionChanged -= OnMessagesCollectionChanged;
+        if (_lastMessageSubscribed != null)
+            _lastMessageSubscribed.PropertyChanged -= OnLastMessageContentChanged;
+        _scrollToBottomDebounceTimer?.Stop();
+        _scrollToBottomDebounceTimer = null;
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _recordingDurationCts?.Cancel();
+        _recordingDurationCts?.Dispose();
+        try
+        {
+            if (_isHistoryReady && _chatSessions.Count > 0)
+            {
+                var doc = BuildPersistDocument();
+                _chatHistoryService.SaveAsync(doc).ConfigureAwait(false).GetAwaiter().GetResult();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Chat", $"History flush on dispose failed: {ex}");
+        }
+    }
+
+    private sealed class ChatSession
+    {
+        public required string Id { get; init; }
+
+        public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
+
+        public string AssistantMode { get; set; } = "General";
+
+        public DateTime LastActivityUtc { get; set; }
+
+        public string? CustomTitle { get; set; }
     }
 }

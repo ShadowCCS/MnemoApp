@@ -204,6 +204,12 @@
       "Atlas": "アトラス",
       "AskAnything": "コンテンツについて質問できます。",
       "NewChat": "新しいチャット",
+      "ChatHistory": "チャット",
+      "MoreChatActions": "その他の操作",
+      "RenameChat": "チャットの名前を変更",
+      "RenameChatPlaceholder": "チャットのタイトル",
+      "DeleteChatTitle": "チャットを削除",
+      "DeleteChatMessage": "この会話を履歴から削除します。元に戻せません。",
       "CloseAssistant": "アシスタントを閉じる",
       "ThoughtProcess": "思考過程",
       "ScrollToBottom": "下までスクロール",
@@ -216,7 +222,7 @@
       "AssistantModeExplainer": "説明",
       "VoiceInput": "声入力",
       "Listening": "聴いています...",
-      "SendEnter": "送信 (エンター)",
+      "SendEnter": "送信 (Enter · Ctrl+Enter で改行)",
       "Stop": "停止",
       "WelcomeMessage": "こんにちは！私はあなたのMnemoアシスタントです。概念を説明したり、レッスンを要約したり、練習するのを助けてください。",
       "SuggestionExplain": "このページを説明してください",
@@ -235,7 +241,10 @@
       "PipelineStatusGenerating": "応答を生成中",
       "PipelineStatusContinuingAfterTool": "応答を続行中",
       "PipelineStatusRunningTool": "ツール呼び出し",
-      "ProcessThread": "処理"
+      "ProcessThread": "処理",
+      "Disclaimer": "AIは間違いを犯す可能性があります。重要な情報は確認してください。",
+      "Regenerate": "返答を再生成",
+      "CopyMessage": "メッセージをコピー"
     },
     "Notes": {
       "NewNote": "新しいノート",

@@ -205,6 +205,12 @@
     "Atlas": "Atlas",
     "AskAnything": "Fragen Sie alles über Ihren Inhalt.",
     "NewChat": "Neuer Chat",
+    "ChatHistory": "Chats",
+    "MoreChatActions": "Weitere Aktionen",
+    "RenameChat": "Chat umbenennen",
+    "RenameChatPlaceholder": "Chat-Titel",
+    "DeleteChatTitle": "Chat löschen",
+    "DeleteChatMessage": "Diese Unterhaltung wird aus dem Verlauf entfernt. Das kann nicht rückgängig gemacht werden.",
     "CloseAssistant": "Assistent schließen",
     "ThoughtProcess": "Denkprozess",
     "ScrollToBottom": "Nach unten scrollen",
@@ -217,7 +223,7 @@
     "AssistantModeExplainer": "Erklärer",
     "VoiceInput": "Stimmeingabe",
     "Listening": "Hören...",
-    "SendEnter": "Senden (Eingabetaste)",
+    "SendEnter": "Senden (Enter · Strg+Enter Zeilenumbruch)",
     "Stop": "Stoppen",
     "WelcomeMessage": "Hallo, ich bin Ihr Mnemo-Assistent. Frag mich, um ein Konzept zu erklären, einen Lernstoff zusammenzufassen oder zu üben.",
     "SuggestionExplain": "Erkläre diese Seite",
@@ -236,7 +242,10 @@
     "PipelineStatusGenerating": "Antwort wird erzeugt",
     "PipelineStatusContinuingAfterTool": "Antwort wird fortgesetzt",
     "PipelineStatusRunningTool": "Tool-Aufruf",
-    "ProcessThread": "Ablauf"
+    "ProcessThread": "Ablauf",
+    "Disclaimer": "KI kann Fehler machen. Wichtige Informationen überprüfen.",
+    "Regenerate": "Antwort neu erzeugen",
+    "CopyMessage": "Nachricht kopieren"
   },
   "Notes": {
     "NewNote": "Neue Notiz",

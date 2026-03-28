@@ -229,7 +229,8 @@ public class AIOrchestrator : IAIOrchestrator
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
         string? conversationRoutingKey = null,
-        Action<ChatDatasetToolCall>? onToolCall = null)
+        Action<ChatDatasetToolCall>? onToolCall = null,
+        Action<string>? onAssistantReasoningUpdate = null)
     {
         var targetResolution = (imageBase64Contents != null && imageBase64Contents.Count > 0)
             ? await SelectVisionModelWithProgressAsync(ct, pipelineStatus).ConfigureAwait(false)
@@ -262,7 +263,8 @@ public class AIOrchestrator : IAIOrchestrator
                 new() { Role = "user", Content = userPrompt }
             };
 
-            await foreach (var token in RunToolLoopAsync(targetResolution, finalSystemPrompt, userPrompt, activeTools, conversationRoutingKey, ct, datasetRounds, pipelineStatus, onToolCall).ConfigureAwait(false))
+            var reasoningSbTools = new StringBuilder();
+            await foreach (var token in RunToolLoopAsync(targetResolution, finalSystemPrompt, userPrompt, activeTools, conversationRoutingKey, ct, datasetRounds, pipelineStatus, onToolCall, reasoningSbTools, onAssistantReasoningUpdate).ConfigureAwait(false))
             {
                 yield return token;
             }
@@ -280,6 +282,7 @@ public class AIOrchestrator : IAIOrchestrator
 
             pipelineStatus?.Report(ChatPipelineStatusKeys.Generating);
             var sb = new StringBuilder();
+            var reasoningSb = new StringBuilder();
             await _governor.AcquireModelAsync(targetResolution.Model, ct).ConfigureAwait(false);
             try
             {
@@ -288,7 +291,9 @@ public class AIOrchestrator : IAIOrchestrator
                                    finalSystemPrompt,
                                    userPrompt,
                                    imageBase64Contents,
-                                   ct).ConfigureAwait(false))
+                                   ct,
+                                   reasoningSb,
+                                   onAssistantReasoningUpdate).ConfigureAwait(false))
                 {
                     sb.Append(token);
                     yield return token;
@@ -311,7 +316,8 @@ public class AIOrchestrator : IAIOrchestrator
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
         string? conversationRoutingKey = null,
-        Action<ChatDatasetToolCall>? onToolCall = null)
+        Action<ChatDatasetToolCall>? onToolCall = null,
+        Action<string>? onAssistantReasoningUpdate = null)
     {
         var targetResolution = (imageBase64Contents != null && imageBase64Contents.Count > 0)
             ? await SelectVisionModelWithProgressAsync(ct, pipelineStatus).ConfigureAwait(false)
@@ -370,7 +376,8 @@ public class AIOrchestrator : IAIOrchestrator
             var datasetRounds = new List<ChatDatasetToolRound>();
             var datasetTools = ToDatasetToolDefinitions(activeTools);
 
-            await foreach (var token in RunToolLoopWithMessagesAsync(targetResolution, messages, activeTools, conversationRoutingKey, ct, datasetRounds, pipelineStatus, onToolCall).ConfigureAwait(false))
+            var reasoningSbTools = new StringBuilder();
+            await foreach (var token in RunToolLoopWithMessagesAsync(targetResolution, messages, activeTools, conversationRoutingKey, ct, datasetRounds, pipelineStatus, onToolCall, reasoningSbTools, onAssistantReasoningUpdate).ConfigureAwait(false))
                 yield return token;
 
             await TryStageChatDatasetAsync(ct, targetResolution, finalSystemPrompt, userMessage,
@@ -381,15 +388,22 @@ public class AIOrchestrator : IAIOrchestrator
         {
             pipelineStatus?.Report(ChatPipelineStatusKeys.Generating);
             var sb = new StringBuilder();
+            var reasoningSb = new StringBuilder();
             await _governor.AcquireModelAsync(targetResolution.Model, ct).ConfigureAwait(false);
             try
             {
                 await foreach (var token in StreamChatToolChunksAsync(targetResolution.Model, messages, [], ct).ConfigureAwait(false))
                 {
-                    if (token is StreamChunk.Content c)
+                    switch (token)
                     {
-                        sb.Append(c.Token);
-                        yield return c.Token;
+                        case StreamChunk.Content c:
+                            sb.Append(c.Token);
+                            yield return c.Token;
+                            break;
+                        case StreamChunk.Reasoning r:
+                            reasoningSb.Append(r.Token);
+                            onAssistantReasoningUpdate?.Invoke(reasoningSb.ToString());
+                            break;
                     }
                 }
             }
@@ -416,7 +430,9 @@ public class AIOrchestrator : IAIOrchestrator
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct,
         List<ChatDatasetToolRound>? datasetRounds = null,
         IProgress<string>? pipelineStatus = null,
-        Action<ChatDatasetToolCall>? onToolCall = null)
+        Action<ChatDatasetToolCall>? onToolCall = null,
+        StringBuilder? reasoningTurnAccumulator = null,
+        Action<string>? onAssistantReasoningUpdate = null)
     {
         const int MaxToolRounds = 5;
 
@@ -437,6 +453,11 @@ public class AIOrchestrator : IAIOrchestrator
                         case StreamChunk.Content c:
                             contentBuffer.Append(c.Token);
                             yield return c.Token;
+                            break;
+                        case StreamChunk.Reasoning r:
+                            reasoningTurnAccumulator?.Append(r.Token);
+                            if (reasoningTurnAccumulator != null)
+                                onAssistantReasoningUpdate?.Invoke(reasoningTurnAccumulator.ToString());
                             break;
                         case StreamChunk.ToolCall tc:
                             toolCallsThisRound.Add(tc.Request);
@@ -499,8 +520,17 @@ public class AIOrchestrator : IAIOrchestrator
                 {
                     await foreach (var chunk in StreamChatToolChunksAsync(resolution.Model!, messages, [], ct).ConfigureAwait(false))
                     {
-                        if (chunk is StreamChunk.Content c)
-                            yield return c.Token;
+                        switch (chunk)
+                        {
+                            case StreamChunk.Content c:
+                                yield return c.Token;
+                                break;
+                            case StreamChunk.Reasoning r:
+                                reasoningTurnAccumulator?.Append(r.Token);
+                                if (reasoningTurnAccumulator != null)
+                                    onAssistantReasoningUpdate?.Invoke(reasoningTurnAccumulator.ToString());
+                                break;
+                        }
                     }
                 }
                 finally
@@ -525,7 +555,9 @@ public class AIOrchestrator : IAIOrchestrator
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct,
         List<ChatDatasetToolRound>? datasetRounds = null,
         IProgress<string>? pipelineStatus = null,
-        Action<ChatDatasetToolCall>? onToolCall = null)
+        Action<ChatDatasetToolCall>? onToolCall = null,
+        StringBuilder? reasoningTurnAccumulator = null,
+        Action<string>? onAssistantReasoningUpdate = null)
     {
         const int MaxToolRounds = 5;
 
@@ -552,6 +584,11 @@ public class AIOrchestrator : IAIOrchestrator
                         case StreamChunk.Content c:
                             contentBuffer.Append(c.Token);
                             yield return c.Token;
+                            break;
+                        case StreamChunk.Reasoning r:
+                            reasoningTurnAccumulator?.Append(r.Token);
+                            if (reasoningTurnAccumulator != null)
+                                onAssistantReasoningUpdate?.Invoke(reasoningTurnAccumulator.ToString());
                             break;
                         case StreamChunk.ToolCall tc:
                             toolCallsThisRound.Add(tc.Request);
@@ -619,8 +656,17 @@ public class AIOrchestrator : IAIOrchestrator
                 {
                     await foreach (var chunk in StreamChatToolChunksAsync(resolution.Model!, messages, [], ct).ConfigureAwait(false))
                     {
-                        if (chunk is StreamChunk.Content c)
-                            yield return c.Token;
+                        switch (chunk)
+                        {
+                            case StreamChunk.Content c:
+                                yield return c.Token;
+                                break;
+                            case StreamChunk.Reasoning r:
+                                reasoningTurnAccumulator?.Append(r.Token);
+                                if (reasoningTurnAccumulator != null)
+                                    onAssistantReasoningUpdate?.Invoke(reasoningTurnAccumulator.ToString());
+                                break;
+                        }
                     }
                 }
                 finally
@@ -1140,18 +1186,32 @@ public class AIOrchestrator : IAIOrchestrator
         string finalSystemPrompt,
         string userPrompt,
         IReadOnlyList<string>? imageBase64Contents,
-        [EnumeratorCancellation] CancellationToken ct)
+        [EnumeratorCancellation] CancellationToken ct,
+        StringBuilder? reasoningTurnAccumulator = null,
+        Action<string>? onAssistantReasoningUpdate = null)
     {
         if (TeacherSyntheticManifest.IsTeacher(manifest))
         {
-            await foreach (var chunk in _teacherClient.StreamChatAsync(finalSystemPrompt, userPrompt, imageBase64Contents, ct).ConfigureAwait(false))
-                yield return chunk;
+            await foreach (var text in _teacherClient.StreamChatAsync(finalSystemPrompt, userPrompt, imageBase64Contents, ct).ConfigureAwait(false))
+                yield return text;
             yield break;
         }
 
         var formattedPrompt = ChatPromptFormatter.Format(manifest.PromptTemplate, finalSystemPrompt, userPrompt);
         await foreach (var chunk in _textService.GenerateStreamingAsync(manifest, formattedPrompt, ct, imageBase64Contents).ConfigureAwait(false))
-            yield return chunk;
+        {
+            switch (chunk)
+            {
+                case StreamChunk.Content c:
+                    yield return c.Token;
+                    break;
+                case StreamChunk.Reasoning r:
+                    reasoningTurnAccumulator?.Append(r.Token);
+                    if (reasoningTurnAccumulator != null)
+                        onAssistantReasoningUpdate?.Invoke(reasoningTurnAccumulator.ToString());
+                    break;
+            }
+        }
     }
 
     private async IAsyncEnumerable<StreamChunk> StreamChatToolChunksAsync(

@@ -205,7 +205,7 @@
                                                                    VerticalAlignment="Center"
                                                                    TextTrimming="CharacterEllipsis"/>
                                                         <ToggleButton Grid.Column="3"
-                                                                      IsChecked="{Binding IsProcessThreadExpanded}"
+                                                                      IsChecked="{Binding IsProcessThreadExpanded, Mode=TwoWay}"
                                                                       Background="Transparent"
                                                                       BorderThickness="0"
                                                                       Padding="6,2"
@@ -419,14 +419,13 @@
                                  Grid.Row="0" 
                                  Classes="TransparentBackground"
                                  Watermark="{markup:T Ns=Chat, Key=AskPlaceholder}"
-                                 AcceptsReturn="True"
+                                 AcceptsReturn="False"
                                  TextWrapping="Wrap"
                                  MinHeight="40"
                                  MaxHeight="120"
                                  BorderThickness="0"
                                  Background="{DynamicResource TextControlTransparentBackgroundBrush}"
                                  Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
-                                 KeyDown="InputBox_KeyDown"
                                  Padding="4"
                                  Margin="0,0,0,8"/>
 

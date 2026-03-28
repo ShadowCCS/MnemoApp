@@ -205,6 +205,12 @@
     "Atlas": "Atlas",
     "AskAnything": "Ask anything about your content",
     "NewChat": "New Chat",
+    "ChatHistory": "Chats",
+    "MoreChatActions": "More actions",
+    "RenameChat": "Rename chat",
+    "RenameChatPlaceholder": "Chat title",
+    "DeleteChatTitle": "Delete chat",
+    "DeleteChatMessage": "This conversation will be removed from your history. This cannot be undone.",
     "CloseAssistant": "Close assistant",
     "ThoughtProcess": "Thought process",
     "ScrollToBottom": "Scroll to bottom",
@@ -217,7 +223,7 @@
     "AssistantModeExplainer": "Explainer",
     "VoiceInput": "Voice input",
     "Listening": "Listening...",
-    "SendEnter": "Send (Enter)",
+    "SendEnter": "Send (Enter · Ctrl+Enter new line)",
     "Stop": "Stop",
     "WelcomeMessage": "Hi, I'm your Mnemo assistant. Ask me to explain a concept, summarize a lesson, or help you practice.",
     "SuggestionExplain": "Explain this page",
@@ -236,7 +242,10 @@
     "PipelineStatusGenerating": "Generating response",
     "PipelineStatusContinuingAfterTool": "Continuing response",
     "PipelineStatusRunningTool": "Tool call",
-    "ProcessThread": "Process"
+    "ProcessThread": "Process",
+    "Disclaimer": "AI can make mistakes. Verify important information.",
+    "Regenerate": "Regenerate response",
+    "CopyMessage": "Copy message"
   },
   "Notes": {
     "NewNote": "New Note",

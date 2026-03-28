@@ -1,6 +1,7 @@
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Mnemo.Core.Models;
@@ -13,10 +14,13 @@ public partial class ChatView : UserControl
 {
     private ScrollViewer? _chatScrollViewer;
     private ChatViewModel? _currentVm;
+    private TextBox? _inputBox;
+    private readonly EventHandler<KeyEventArgs> _inputBoxKeyDownHandler;
 
     public ChatView()
     {
         InitializeComponent();
+        _inputBoxKeyDownHandler = InputBox_KeyDown;
     }
 
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
@@ -25,6 +29,8 @@ public partial class ChatView : UserControl
         _chatScrollViewer = this.FindControl<ScrollViewer>("ChatScrollViewer");
         if (_chatScrollViewer != null)
             _chatScrollViewer.ScrollChanged += OnScrollChanged;
+        _inputBox = this.FindControl<TextBox>("InputBox");
+        _inputBox?.AddHandler(InputElement.KeyDownEvent, _inputBoxKeyDownHandler, RoutingStrategies.Tunnel);
         DataContextChanged += OnDataContextChanged;
         AttachViewModel(DataContext as ChatViewModel);
     }
@@ -33,6 +39,11 @@ public partial class ChatView : UserControl
     {
         DataContextChanged -= OnDataContextChanged;
         AttachViewModel(null);
+        if (_inputBox != null)
+        {
+            _inputBox.RemoveHandler(InputElement.KeyDownEvent, _inputBoxKeyDownHandler);
+            _inputBox = null;
+        }
         if (_chatScrollViewer != null)
         {
             _chatScrollViewer.ScrollChanged -= OnScrollChanged;
@@ -77,7 +88,21 @@ public partial class ChatView : UserControl
 
     private void InputBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || e.KeyModifiers != KeyModifiers.None) return;
+        if (e.Key != Key.Enter) return;
+        if (sender is not TextBox tb) return;
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            var text = tb.Text ?? string.Empty;
+            var caret = Math.Clamp(tb.CaretIndex, 0, text.Length);
+            tb.Text = text.Insert(caret, "\n");
+            tb.CaretIndex = caret + 1;
+            e.Handled = true;
+            return;
+        }
+
+        if (e.KeyModifiers != KeyModifiers.None) return;
+
         if (DataContext is not ChatViewModel vm) return;
         if (vm.SendMessageCommand.CanExecute(null))
         {

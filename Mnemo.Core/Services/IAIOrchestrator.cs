@@ -19,6 +19,7 @@ public interface IAIOrchestrator
     /// <param name="routingUserMessage">Optional. When set, used only for orchestration routing / complexity (not sent as the chat prompt). Use the latest user turn so routing stays fast as history grows.</param>
     /// <param name="pipelineStatus">Optional. Reports <see cref="ChatPipelineStatusKeys"/> localization keys while routing, loading the model, or before the first token.</param>
     /// <param name="precomputedDecision">Optional. When provided, avoids an additional manager call and reuses this routing/skill decision for model selection.</param>
+    /// <param name="onAssistantReasoningUpdate">When set, receives cumulative reasoning text from thinking models (not mixed into yielded tokens).</param>
     IAsyncEnumerable<string> PromptStreamingAsync(
         string systemPrompt,
         string userPrompt,
@@ -28,7 +29,8 @@ public interface IAIOrchestrator
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
         string? conversationRoutingKey = null,
-        Action<ChatDatasetToolCall>? onToolCall = null);
+        Action<ChatDatasetToolCall>? onToolCall = null,
+        Action<string>? onAssistantReasoningUpdate = null);
 
     /// <summary>
     /// Streaming generation with real multi-turn conversation history. Sends proper OpenAI-format
@@ -41,6 +43,7 @@ public interface IAIOrchestrator
     /// <param name="imageBase64Contents">Optional. For vision: images to send with the user message.</param>
     /// <param name="pipelineStatus">Optional. Reports <see cref="ChatPipelineStatusKeys"/> localization keys while routing or loading.</param>
     /// <param name="precomputedDecision">Optional. Reuses a previously computed routing/skill decision.</param>
+    /// <param name="onAssistantReasoningUpdate">When set, receives cumulative reasoning text from thinking models (not mixed into yielded tokens).</param>
     IAsyncEnumerable<string> PromptStreamingWithHistoryAsync(
         string systemPrompt,
         IReadOnlyList<ConversationTurn> history,
@@ -50,7 +53,8 @@ public interface IAIOrchestrator
         IProgress<string>? pipelineStatus = null,
         RoutingAndSkillDecision? precomputedDecision = null,
         string? conversationRoutingKey = null,
-        Action<ChatDatasetToolCall>? onToolCall = null);
+        Action<ChatDatasetToolCall>? onToolCall = null,
+        Action<string>? onAssistantReasoningUpdate = null);
     /// <param name="responseJsonSchema">Optional. When set, forwarded to text service so the server forces JSON output (same as mini manager); use e.g. LearningPathJsonSchema.GetSchema().</param>
     Task<Result<string>> PromptWithModelAsync(string modelId, string prompt, CancellationToken ct = default, object? responseJsonSchema = null);
 

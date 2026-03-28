@@ -203,17 +203,22 @@ public partial class RightSidebarViewModel : ViewModelBase
         try
         {
             processThread = new ChatProcessThreadTracker(aiMessage.ProcessSteps);
-            aiMessage.IsProcessThreadExpanded = true;
 
             IProgress<string> pipelineProgress = new Progress<string>(key =>
                 Dispatcher.UIThread.Post(() =>
                 {
                     processThread!.OnPipelineKey(key, k => _localizationService.T(k, "Chat"));
                     UpdateProcessHeader(aiMessage, processThread);
-                }));
+                }, DispatcherPriority.Background));
 
             void UpdateContent(string content) =>
-                Dispatcher.UIThread.Post(() => { aiMessage.Content = content; });
+                Dispatcher.UIThread.Post(() => { aiMessage.Content = content; }, DispatcherPriority.Background);
+
+            void UpdateReasoning(string reasoning) =>
+                Dispatcher.UIThread.Post(() =>
+                {
+                    aiMessage.Thoughts = string.IsNullOrEmpty(reasoning) ? null : reasoning;
+                }, DispatcherPriority.Background);
 
             var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, _conversationId).ConfigureAwait(false);
             var decision = analyzed.IsSuccess && analyzed.Value != null
@@ -232,7 +237,7 @@ public partial class RightSidebarViewModel : ViewModelBase
                 {
                     processThread?.AddToolCall(tc, k => _localizationService.T(k, "Chat"));
                     aiMessage.ThoughtsCount += 1;
-                });
+                }, DispatcherPriority.Background);
             };
 
             var (foundResponse, finalContent) = await ChatStreamingHelper.RunStreamingWithHistoryAsync(
@@ -247,7 +252,8 @@ public partial class RightSidebarViewModel : ViewModelBase
                 precomputedDecision: decision,
                 conversationRoutingKey: _conversationId,
                 displayOptions,
-                onToolCall);
+                onToolCall,
+                onAssistantReasoningUpdate: UpdateReasoning);
 
             foundForDataset = foundResponse;
             finalAssistantResponseForDataset = foundResponse ? finalContent : null;
@@ -255,6 +261,8 @@ public partial class RightSidebarViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 aiMessage.Content = finalContent;
+                if (string.IsNullOrWhiteSpace(aiMessage.Thoughts))
+                    aiMessage.Thoughts = null;
                 processThread?.CompleteThread();
                 FinalizeProcessHeader(aiMessage, processThread);
                 aiMessage.PipelineStatusText = null;
@@ -353,6 +361,5 @@ public partial class RightSidebarViewModel : ViewModelBase
         message.ProcessHeaderText = steps > 0
             ? $"Thought process ({steps} steps)"
             : "Thought process";
-        message.IsProcessThreadExpanded = false;
     }
 }

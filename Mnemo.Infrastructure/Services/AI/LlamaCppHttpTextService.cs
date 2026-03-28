@@ -7,6 +7,7 @@ using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
@@ -20,15 +21,21 @@ namespace Mnemo.Infrastructure.Services.AI;
 /// </summary>
 public class LlamaCppHttpTextService : ITextGenerationService
 {
+    /// <summary>Always passed as <c>chat_template_kwargs</c>; there is no user toggle—template thinking stays off.</summary>
+    private static readonly IReadOnlyDictionary<string, bool> DisableThinkingChatTemplateKwargs =
+        new Dictionary<string, bool> { ["enable_thinking"] = false };
+
+    private const double LlamaRepeatPenalty = 1.15;
+
+    private const double LlamaPresencePenalty = 0.75;
+
     private readonly HttpClient _httpClient;
     private readonly ILoggerService _logger;
-    private readonly ISettingsService _settings;
     private readonly LlamaCppServerManager _serverManager;
 
-    public LlamaCppHttpTextService(ILoggerService logger, ISettingsService settings, LlamaCppServerManager serverManager)
+    public LlamaCppHttpTextService(ILoggerService logger, LlamaCppServerManager serverManager)
     {
         _logger = logger;
-        _settings = settings;
         _serverManager = serverManager;
         _httpClient = new HttpClient
         {
@@ -50,7 +57,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
             {
                 var endpoint = $"{manifest.Endpoint.TrimEnd('/')}/v1/chat/completions";
                 var (temperature, maxTokens) = GetGenerationParams(manifest);
-                object requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: false, manifest, responseJsonSchema);
+                object requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: false, manifest, responseJsonSchema, imageBase64Contents: null, DisableThinkingChatTemplateKwargs);
 
                 _logger.Info("LlamaCppHttpTextService", $"Sending request to {endpoint} (temp={temperature}, max_tokens={maxTokens})");
 
@@ -84,7 +91,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
         }
     }
 
-    public async IAsyncEnumerable<string> GenerateStreamingAsync(
+    public async IAsyncEnumerable<StreamChunk> GenerateStreamingAsync(
         AIModelManifest manifest,
         string prompt,
         [EnumeratorCancellation] CancellationToken ct,
@@ -115,7 +122,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
         }
     }
 
-    private async IAsyncEnumerable<string> GetStreamingChunksAsync(
+    private async IAsyncEnumerable<StreamChunk> GetStreamingChunksAsync(
         AIModelManifest manifest,
         string prompt,
         IReadOnlyList<string>? imageBase64Contents,
@@ -123,7 +130,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
     {
         var endpoint = $"{manifest.Endpoint!.TrimEnd('/')}/v1/chat/completions";
         var (temperature, maxTokens) = GetGenerationParams(manifest);
-        var requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: true, manifest, responseJsonSchema: null, imageBase64Contents);
+        var requestBody = BuildChatRequest(prompt, temperature, maxTokens, stream: true, manifest, responseJsonSchema: null, imageBase64Contents, DisableThinkingChatTemplateKwargs);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Content = new StringContent(
@@ -176,14 +183,8 @@ public class LlamaCppHttpTextService : ITextGenerationService
                     if (json.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                     {
                         var delta = choices[0].GetProperty("delta");
-                        if (delta.TryGetProperty("content", out var content))
-                        {
-                            var text = content.GetString();
-                            if (!string.IsNullOrEmpty(text))
-                            {
-                                yield return text;
-                            }
-                        }
+                        foreach (var chunk in ExtractStreamingDeltaChunks(delta))
+                            yield return chunk;
                     }
                 }
             }
@@ -211,21 +212,24 @@ public class LlamaCppHttpTextService : ITextGenerationService
     }
 
     /// <summary>
-    /// Extracts streaming text fragments from <c>choices[0].delta</c>. Some servers (e.g. llama.cpp) send
+    /// Extracts streaming chunks from <c>choices[0].delta</c>. Some servers (e.g. llama.cpp) send
     /// <c>tool_calls</c> as an empty array on the same line as <c>content</c>; we must not skip those lines.
-    /// Thinking-style models may stream assistant text in <c>reasoning_content</c> instead of or in addition to <c>content</c>.
+    /// Thinking models stream <c>reasoning_content</c> separately from <c>content</c>; emit reasoning first when both appear on one delta.
     /// </summary>
-    private static IEnumerable<string> ExtractStreamingDeltaTextFragments(JsonElement delta)
+    private static IEnumerable<StreamChunk> ExtractStreamingDeltaChunks(JsonElement delta)
     {
-        foreach (var prop in new[] { "content", "reasoning_content" })
+        if (delta.TryGetProperty("reasoning_content", out var rc) && rc.ValueKind == JsonValueKind.String)
         {
-            if (!delta.TryGetProperty(prop, out var el))
-                continue;
-            if (el.ValueKind != JsonValueKind.String)
-                continue;
-            var text = el.GetString();
+            var rText = rc.GetString();
+            if (!string.IsNullOrEmpty(rText))
+                yield return new StreamChunk.Reasoning(rText);
+        }
+
+        if (delta.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String)
+        {
+            var text = c.GetString();
             if (!string.IsNullOrEmpty(text))
-                yield return text;
+                yield return new StreamChunk.Content(text);
         }
     }
 
@@ -268,7 +272,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
     {
         var endpoint = $"{manifest.Endpoint!.TrimEnd('/')}/v1/chat/completions";
         var (temperature, maxTokens) = GetGenerationParams(manifest);
-        var requestBody = BuildToolAwareChatRequest(messages, tools, temperature, maxTokens, stream: true);
+        var requestBody = BuildToolAwareChatRequest(messages, tools, temperature, maxTokens, stream: true, DisableThinkingChatTemplateKwargs);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Content = new StringContent(
@@ -333,9 +337,9 @@ public class LlamaCppHttpTextService : ITextGenerationService
                         }
                     }
 
-                    // Text tokens: llama.cpp often sends "tool_calls": [] together with content; a stray `continue` here drops all reply text.
-                    foreach (var text in ExtractStreamingDeltaTextFragments(delta))
-                        yield return new StreamChunk.Content(text);
+                    // Text / reasoning: llama.cpp often sends "tool_calls": [] together with content; a stray `continue` here drops reply text.
+                    foreach (var chunk in ExtractStreamingDeltaChunks(delta))
+                        yield return chunk;
                 }
             }
         }
@@ -357,11 +361,19 @@ public class LlamaCppHttpTextService : ITextGenerationService
     }
 
     /// <summary>Build request body for tool-aware chat completions using an explicit message list.</summary>
-    private static object BuildToolAwareChatRequest(IReadOnlyList<object> messages, IReadOnlyList<SkillToolDefinition> tools, double temperature, int maxTokens, bool stream)
+    private static object BuildToolAwareChatRequest(
+        IReadOnlyList<object> messages,
+        IReadOnlyList<SkillToolDefinition> tools,
+        double temperature,
+        int maxTokens,
+        bool stream,
+        IReadOnlyDictionary<string, bool>? chatTemplateKwargs)
     {
         if (tools.Count == 0)
         {
-            return new { messages, temperature, max_tokens = maxTokens, stream };
+            return chatTemplateKwargs != null
+                ? new { messages, temperature, max_tokens = maxTokens, stream, repeat_penalty = LlamaRepeatPenalty, presence_penalty = LlamaPresencePenalty, chat_template_kwargs = chatTemplateKwargs }
+                : new { messages, temperature, max_tokens = maxTokens, stream, repeat_penalty = LlamaRepeatPenalty, presence_penalty = LlamaPresencePenalty };
         }
 
         var toolDefs = tools.Select(t => new
@@ -375,7 +387,9 @@ public class LlamaCppHttpTextService : ITextGenerationService
             }
         }).ToArray();
 
-        return new { messages, tools = toolDefs, tool_choice = "auto", temperature, max_tokens = maxTokens, stream };
+        return chatTemplateKwargs != null
+            ? new { messages, tools = toolDefs, tool_choice = "auto", temperature, max_tokens = maxTokens, stream, repeat_penalty = LlamaRepeatPenalty, presence_penalty = LlamaPresencePenalty, chat_template_kwargs = chatTemplateKwargs }
+            : new { messages, tools = toolDefs, tool_choice = "auto", temperature, max_tokens = maxTokens, stream, repeat_penalty = LlamaRepeatPenalty, presence_penalty = LlamaPresencePenalty };
     }
 
     public void UnloadModel(string modelId)
@@ -390,7 +404,15 @@ public class LlamaCppHttpTextService : ITextGenerationService
     }
 
     /// <summary>Build request body for chat completions. When responseJsonSchema is set, adds response_format so the Llama server forces JSON output. When imageBase64Contents is set, builds multimodal user content (OpenAI vision format).</summary>
-    private static object BuildChatRequest(string prompt, double temperature, int maxTokens, bool stream, AIModelManifest manifest, object? responseJsonSchema = null, IReadOnlyList<string>? imageBase64Contents = null)
+    private static object BuildChatRequest(
+        string prompt,
+        double temperature,
+        int maxTokens,
+        bool stream,
+        AIModelManifest manifest,
+        object? responseJsonSchema = null,
+        IReadOnlyList<string>? imageBase64Contents = null,
+        IReadOnlyDictionary<string, bool>? chatTemplateKwargs = null)
     {
         object content;
         if (imageBase64Contents != null && imageBase64Contents.Count > 0)
@@ -417,9 +439,13 @@ public class LlamaCppHttpTextService : ITextGenerationService
             responseFormat = BuildJsonSchemaResponseFormat(schemaName, responseJsonSchema);
         }
 
-        return responseFormat != null
-            ? new { messages, temperature, max_tokens = maxTokens, stream, response_format = responseFormat }
-            : new { messages, temperature, max_tokens = maxTokens, stream };
+        if (responseFormat != null && chatTemplateKwargs != null)
+            return new { messages, temperature, max_tokens = maxTokens, stream, repeat_penalty = LlamaRepeatPenalty, presence_penalty = LlamaPresencePenalty, response_format = responseFormat, chat_template_kwargs = chatTemplateKwargs };
+        if (responseFormat != null)
+            return new { messages, temperature, max_tokens = maxTokens, stream, repeat_penalty = LlamaRepeatPenalty, presence_penalty = LlamaPresencePenalty, response_format = responseFormat };
+        if (chatTemplateKwargs != null)
+            return new { messages, temperature, max_tokens = maxTokens, stream, repeat_penalty = LlamaRepeatPenalty, presence_penalty = LlamaPresencePenalty, chat_template_kwargs = chatTemplateKwargs };
+        return new { messages, temperature, max_tokens = maxTokens, stream, repeat_penalty = LlamaRepeatPenalty, presence_penalty = LlamaPresencePenalty };
     }
 
     /// <summary>Build response_format for Llama server forced JSON output (OpenAI-compatible json_schema). Same pattern used for manager routing and learning path.</summary>
@@ -446,7 +472,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
         }
 
         // Try to read from metadata
-        var temperature = 0.6;
+        var temperature = 0.8;
         var maxTokens = 8192;
 
         if (manifest.Metadata.TryGetValue("Temperature", out var tempStr) && double.TryParse(tempStr, out var temp))

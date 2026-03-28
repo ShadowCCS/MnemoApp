@@ -40,7 +40,7 @@ public sealed class DelegatingTextGenerationService : ITextGenerationService
         return await _teacher.GenerateTextAsync(string.Empty, prompt, ct, responseJsonSchema).ConfigureAwait(false);
     }
 
-    public IAsyncEnumerable<string> GenerateStreamingAsync(
+    public IAsyncEnumerable<StreamChunk> GenerateStreamingAsync(
         AIModelManifest manifest,
         string prompt,
         CancellationToken ct,

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Linq;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules.Chat.ViewModels;
@@ -17,20 +18,29 @@ public class ChatMessageViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(HasProcessThread));
         OnPropertyChanged(nameof(HasProcessThreadOrThoughts));
+        OnPropertyChanged(nameof(HasSubstantiveProcessThread));
     }
 
     private string _content = string.Empty;
     public string Content
     {
         get => _content;
-        set => SetProperty(ref _content, value);
+        set
+        {
+            if (SetProperty(ref _content, value))
+                OnPropertyChanged(nameof(HasCopiableAssistantContent));
+        }
     }
 
     private bool _isUser;
     public bool IsUser
     {
         get => _isUser;
-        set => SetProperty(ref _isUser, value);
+        set
+        {
+            if (SetProperty(ref _isUser, value))
+                OnPropertyChanged(nameof(HasCopiableAssistantContent));
+        }
     }
 
     private DateTime _timestamp = DateTime.Now;
@@ -50,6 +60,7 @@ public class ChatMessageViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(IsThinking));
                 OnPropertyChanged(nameof(HasProcessThreadOrThoughts));
+                OnPropertyChanged(nameof(HasSubstantiveProcessThread));
             }
         }
     }
@@ -58,7 +69,11 @@ public class ChatMessageViewModel : ViewModelBase
     public int ThoughtsCount
     {
         get => _thoughtsCount;
-        set => SetProperty(ref _thoughtsCount, value);
+        set
+        {
+            if (SetProperty(ref _thoughtsCount, value))
+                OnPropertyChanged(nameof(HasSubstantiveProcessThread));
+        }
     }
 
     private string? _elapsedText;
@@ -84,7 +99,7 @@ public class ChatMessageViewModel : ViewModelBase
     }
 
     private bool _isProcessThreadExpanded;
-    /// <summary>Controls whether the thought process panel is expanded (auto-expands during streaming).</summary>
+    /// <summary>Controls whether the thought process panel body is expanded (user toggle; default collapsed).</summary>
     public bool IsProcessThreadExpanded
     {
         get => _isProcessThreadExpanded;
@@ -142,11 +157,30 @@ public class ChatMessageViewModel : ViewModelBase
 
     public bool HasProcessThreadOrThoughts => HasProcessThread || IsThinking;
 
+    /// <summary>
+    /// True when the process thread is worth showing (tool use, continuation after tools, or explicit thinking text) — not routing / model prep / generation alone.
+    /// </summary>
+    public bool HasSubstantiveProcessThread =>
+        IsThinking
+        || ThoughtsCount > 0
+        || ProcessSteps.Any(s =>
+            s.PhaseKind == ChatProcessPhaseKind.Tool
+            || s.PhaseKind == ChatProcessPhaseKind.Continuing
+            || s.HasToolCalls);
+
     private bool _isStreaming;
     /// <summary>True while the assistant message is still being generated (enables live token display).</summary>
     public bool IsStreaming
     {
         get => _isStreaming;
-        set => SetProperty(ref _isStreaming, value);
+        set
+        {
+            if (SetProperty(ref _isStreaming, value))
+                OnPropertyChanged(nameof(HasCopiableAssistantContent));
+        }
     }
+
+    /// <summary>True when this assistant bubble has finished text suitable for copying to the clipboard.</summary>
+    public bool HasCopiableAssistantContent =>
+        !IsUser && !IsStreaming && !string.IsNullOrWhiteSpace(Content);
 }

@@ -205,6 +205,12 @@
     "Atlas": "Atlas",
     "AskAnything": "Pregunta algo sobre tu contenido",
     "NewChat": "Nuevo Chat",
+    "ChatHistory": "Chats",
+    "MoreChatActions": "Más acciones",
+    "RenameChat": "Renombrar chat",
+    "RenameChatPlaceholder": "Título del chat",
+    "DeleteChatTitle": "Eliminar chat",
+    "DeleteChatMessage": "Esta conversación se eliminará del historial. No se puede deshacer.",
     "CloseAssistant": "Cerrar asistente",
     "ThoughtProcess": "Proceso de Pensamiento",
     "ScrollToBottom": "Desliza hacia abajo",
@@ -217,7 +223,7 @@
     "AssistantModeExplainer": "Explicador",
     "VoiceInput": "Entrada por Voz",
     "Listening": "Escuchando...",
-    "SendEnter": "Enviar (Enter)",
+    "SendEnter": "Enviar (Enter · Ctrl+Enter nueva línea)",
     "Stop": "Detener",
     "WelcomeMessage": "¡Hola! Soy tu asistente Mnemo. Pregúntame para explicar un concepto, resumir una lección o ayudarte a practicar.",
     "SuggestionExplain": "Explica esta página",
@@ -236,7 +242,10 @@
     "PipelineStatusGenerating": "Generando respuesta",
     "PipelineStatusContinuingAfterTool": "Continuando respuesta",
     "PipelineStatusRunningTool": "Llamada a herramienta",
-    "ProcessThread": "Proceso"
+    "ProcessThread": "Proceso",
+    "Disclaimer": "La IA puede cometer errores. Verifica la información importante.",
+    "Regenerate": "Regenerar respuesta",
+    "CopyMessage": "Copiar mensaje"
   },
   "Notes": {
     "NewNote": "Nueva Nota",

@@ -87,7 +87,7 @@ public class ChatMessage : ViewModelBase
     }
 
     private bool _isProcessThreadExpanded;
-    /// <summary>Controls whether the thought process panel is expanded (auto-expands during streaming).</summary>
+    /// <summary>Controls whether the thought process panel body is expanded (user toggle; default collapsed).</summary>
     public bool IsProcessThreadExpanded
     {
         get => _isProcessThreadExpanded;
