@@ -35,21 +35,29 @@ public static class BlockMarkdownSerializer
     /// </summary>
     public static string SerializeBlock(BlockViewModel block)
     {
-        var content = block.Content ?? string.Empty;
+        var body = SerializeBodyForMarkdown(block);
         return block.Type switch
         {
-            BlockType.Text => content,
-            BlockType.Heading1 => $"# {content}",
-            BlockType.Heading2 => $"## {content}",
-            BlockType.Heading3 => $"### {content}",
-            BlockType.BulletList => $"- {content}",
-            BlockType.NumberedList => $"{block.ListNumberIndex}. {content}",
-            BlockType.Checklist => block.IsChecked ? $"- [x] {content}" : $"- [ ] {content}",
-            BlockType.Quote => "> " + content.Replace("\n", "\n> ", StringComparison.Ordinal),
-            BlockType.Code => "```\n" + content + "\n```",
+            BlockType.Text => body,
+            BlockType.Heading1 => $"# {body}",
+            BlockType.Heading2 => $"## {body}",
+            BlockType.Heading3 => $"### {body}",
+            BlockType.BulletList => $"- {body}",
+            BlockType.NumberedList => $"{block.ListNumberIndex}. {body}",
+            BlockType.Checklist => block.IsChecked ? $"- [x] {body}" : $"- [ ] {body}",
+            BlockType.Quote => "> " + body.Replace("\n", "\n> ", StringComparison.Ordinal),
+            BlockType.Code => "```\n" + (block.Content ?? string.Empty) + "\n```",
             BlockType.Divider => "---",
-            _ => content
+            _ => body
         };
+    }
+
+    /// <summary>Inline markdown for rich blocks; code/divider use literal <see cref="BlockViewModel.Content"/> in <see cref="SerializeBlock"/>.</summary>
+    public static string SerializeBodyForMarkdown(BlockViewModel block)
+    {
+        if (block.Type is BlockType.Code or BlockType.Divider)
+            return block.Content ?? string.Empty;
+        return InlineMarkdownSerializer.SerializeRuns(block.Runs);
     }
 
     /// <summary>
@@ -140,7 +148,7 @@ public static class BlockMarkdownSerializer
                 continue;
             }
 
-            // Bullet list: - at start (after optional whitespace)
+            // Bullet list: - at start (after optional leading whitespace on the line)
             if (trimmed.StartsWith("- ", StringComparison.Ordinal))
             {
                 result.Add(CreateBlockWithContent(BlockType.BulletList, trimmed["- ".Length..].Trim(), order++));
@@ -148,15 +156,38 @@ public static class BlockMarkdownSerializer
                 continue;
             }
 
-            // Quote
-            if (trimmed.StartsWith("> ", StringComparison.Ordinal))
+            // Bullet list: * or + (CommonMark); require whitespace after marker so "*emphasis*" is not a list
+            var starOrPlusBullet = Regex.Match(trimmed, @"^(\*|\+)\s+(.*)$");
+            if (starOrPlusBullet.Success)
             {
-                var quoteLines = new List<string> { trimmed["> ".Length..].Trim() };
+                result.Add(CreateBlockWithContent(BlockType.BulletList, starOrPlusBullet.Groups[2].Value.Trim(), order++));
                 i++;
-                while (i < lines.Length && lines[i].TrimStart().StartsWith("> ", StringComparison.Ordinal))
+                continue;
+            }
+
+            // Quote
+            if (trimmed.StartsWith("> ", StringComparison.Ordinal) || trimmed == ">")
+            {
+                var firstLine = trimmed == ">" ? string.Empty : trimmed["> ".Length..].Trim();
+                var quoteLines = new List<string> { firstLine };
+                i++;
+                while (i < lines.Length)
                 {
-                    quoteLines.Add(lines[i].TrimStart()["> ".Length..].Trim());
-                    i++;
+                    var nextTrimmed = lines[i].TrimStart();
+                    if (nextTrimmed.StartsWith("> ", StringComparison.Ordinal))
+                    {
+                        quoteLines.Add(nextTrimmed["> ".Length..].Trim());
+                        i++;
+                    }
+                    else if (nextTrimmed == ">")
+                    {
+                        quoteLines.Add(string.Empty);
+                        i++;
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
                 result.Add(CreateBlockWithContent(BlockType.Quote, string.Join("\n", quoteLines), order++));
                 continue;
@@ -182,7 +213,9 @@ public static class BlockMarkdownSerializer
     private static BlockViewModel CreateBlockWithContent(BlockType type, string content, int order)
     {
         var vm = BlockFactory.CreateBlock(type, order);
-        vm.Content = content ?? string.Empty;
+        if (type == BlockType.Divider)
+            return vm;
+        vm.SetRuns(InlineMarkdownParser.ToRuns(content ?? string.Empty));
         return vm;
     }
 

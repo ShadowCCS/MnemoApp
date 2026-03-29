@@ -92,7 +92,6 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             {
                 ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
                 ((RelayCommand)StopCommand).NotifyCanExecuteChanged();
-                ((RelayCommand)NewChatCommand).NotifyCanExecuteChanged();
                 OnPropertyChanged(nameof(CanUseChatActions));
                 OnPropertyChanged(nameof(CanSwitchChatHistory));
                 DeleteChatCommand.NotifyCanExecuteChanged();
@@ -196,7 +195,10 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     /// <summary>True when chat actions that must not overlap generation (e.g. regenerate) are allowed.</summary>
     public bool CanUseChatActions => !IsBusy && !IsRecording;
 
-    /// <summary>True when the user can switch threads or start a new chat from the history sidebar.</summary>
+    /// <summary>True when the user can switch threads or start a new chat from the history sidebar (streaming is cancelled on navigation).</summary>
+    public bool CanNavigateChatHistory => !IsRecording && _isHistoryReady;
+
+    /// <summary>True when history actions that must not overlap generation (delete, rename) are allowed.</summary>
     public bool CanSwitchChatHistory => !IsBusy && !IsRecording && _isHistoryReady;
 
     /// <summary>Raised when the view should scroll to the end (e.g. after new message or user clicked "Scroll to bottom").</summary>
@@ -222,6 +224,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
                 ((AsyncRelayCommand)CancelRecordingCommand).NotifyCanExecuteChanged();
                 ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
                 OnPropertyChanged(nameof(CanUseChatActions));
+                OnPropertyChanged(nameof(CanNavigateChatHistory));
                 OnPropertyChanged(nameof(CanSwitchChatHistory));
                 DeleteChatCommand.NotifyCanExecuteChanged();
                 RenameChatCommand.NotifyCanExecuteChanged();
@@ -256,7 +259,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording && _isHistoryReady);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
-        NewChatCommand = new RelayCommand(NewChat, () => !IsBusy && !IsRecording && _isHistoryReady);
+        NewChatCommand = new RelayCommand(NewChat, () => !IsRecording && _isHistoryReady);
         ToggleChatHistorySidebarCommand = new RelayCommand(() => IsChatHistorySidebarOpen = !IsChatHistorySidebarOpen);
         SuggestionSelectedCommand = new RelayCommand<string>(ApplySuggestion);
         ScrollToBottomCommand = new RelayCommand(OnScrollToBottom);
@@ -549,14 +552,18 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
 
     private void NewChat()
     {
-        if (!_isHistoryReady || IsBusy || IsRecording) return;
+        if (!_isHistoryReady || IsRecording) return;
+        if (IsBusy)
+            StopGeneration();
         EnterEphemeralConversation(persistIfLeavingMaterialized: true);
         PendingAttachments.Clear();
     }
 
     private void SelectConversationById(string id, bool persistBookends = true)
     {
-        if (!_isHistoryReady || IsBusy || IsRecording) return;
+        if (!_isHistoryReady || IsRecording) return;
+        if (IsBusy)
+            StopGeneration();
         if (id == _conversationId) return;
         if (persistBookends && !_isEphemeralConversation && _chatSessions.ContainsKey(_conversationId))
             PersistFireAndForget();
@@ -849,6 +856,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     {
         ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
         ((RelayCommand)NewChatCommand).NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanNavigateChatHistory));
         OnPropertyChanged(nameof(CanSwitchChatHistory));
         DeleteChatCommand.NotifyCanExecuteChanged();
         RenameChatCommand.NotifyCanExecuteChanged();
@@ -1141,6 +1149,13 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     {
         _cts = new CancellationTokenSource();
 
+        var streamingTurn = await Dispatcher.UIThread.InvokeAsync(() =>
+            (
+                ConversationId: _conversationId,
+                Messages: Messages,
+                AssistantMode: SelectedAssistantMode
+            ));
+
         List<string>? imageBase64 = null;
         if (imagePaths.Count > 0)
         {
@@ -1178,7 +1193,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             datasetScope = ChatDatasetLoggingScope.BeginTurn(out datasetTurnId);
 
         var conversationHistory = ChatStreamingHelper.BuildConversationHistory(
-            Messages, aiMessage, m => m.IsUser, m => m.Content,
+            streamingTurn.Messages, aiMessage, m => m.IsUser, m => m.Content,
             excludeLastUserTurn: true);
 
         var foundForDataset = false;
@@ -1208,12 +1223,12 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
                     aiMessage.Thoughts = string.IsNullOrEmpty(reasoning) ? null : reasoning;
                 }, DispatcherPriority.Background);
 
-            var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, _conversationId).ConfigureAwait(false);
+            var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, streamingTurn.ConversationId).ConfigureAwait(false);
             var decision = analyzed.IsSuccess && analyzed.Value != null
                 ? analyzed.Value
                 : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skill = "NONE" };
             pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
-            var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode);
+            var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(streamingTurn.AssistantMode);
             composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.Skill);
 
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
@@ -1238,7 +1253,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
                 imageBase64,
                 pipelineProgress,
                 precomputedDecision: decision,
-                conversationRoutingKey: _conversationId,
+                conversationRoutingKey: streamingTurn.ConversationId,
                 displayOptions,
                 onToolCall,
                 onAssistantReasoningUpdate: UpdateReasoning);
@@ -1298,15 +1313,15 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
                 {
                     contextForDataset = await Dispatcher.UIThread.InvokeAsync(() =>
                         ChatStreamingHelper.BuildDatasetConversationContextString(
-                            Messages, m => m.IsUser, m => m.Content));
+                            streamingTurn.Messages, m => m.IsUser, m => m.Content));
                 }
 
                 await TryCommitDatasetLogAsync(
                     datasetTurnId,
-                    _conversationId,
+                    streamingTurn.ConversationId,
                     thisTurnIndex,
                     "chat_module",
-                    SelectedAssistantMode,
+                    streamingTurn.AssistantMode,
                     userMessage,
                     contextForDataset,
                     composedSystemForDataset,
@@ -1328,8 +1343,8 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             Dispatcher.UIThread.Post(() =>
             {
                 IsBusy = false;
-                if (!_disposed && ActiveSession != null)
-                    ActiveSession.LastActivityUtc = DateTime.UtcNow;
+                if (!_disposed && _chatSessions.TryGetValue(streamingTurn.ConversationId, out var finishedSession))
+                    finishedSession.LastActivityUtc = DateTime.UtcNow;
                 PersistFireAndForget();
             });
         }

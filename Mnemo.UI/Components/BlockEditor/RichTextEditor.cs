@@ -6,7 +6,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
-using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
@@ -615,20 +614,7 @@ public class RichTextEditor : Control
                 e.Handled = true;
                 break;
 
-            case Key.C when ctrl:
-                _ = CopyAsync();
-                e.Handled = true;
-                break;
-
-            case Key.X when ctrl:
-                _ = CutAsync();
-                e.Handled = true;
-                break;
-
-            case Key.V when ctrl:
-                _ = PasteAsync();
-                e.Handled = true;
-                break;
+            // Ctrl+C / Ctrl+X / Ctrl+V: owned by BlockEditor tunnel handler (markdown + Mnemo JSON).
         }
 
         if (e.Handled)
@@ -754,34 +740,6 @@ public class RichTextEditor : Control
         {
             return 0;
         }
-    }
-
-    // ── Clipboard ────────────────────────────────────────────────────────────
-
-    private async System.Threading.Tasks.Task CopyAsync()
-    {
-        int start = Math.Min(_selectionStart, _selectionEnd);
-        int end = Math.Max(_selectionStart, _selectionEnd);
-        if (start >= end) return;
-        var text = FlattenRuns(Runs ?? Array.Empty<InlineRun>()).Substring(start, end - start);
-        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-        if (clipboard != null)
-            await clipboard.SetTextAsync(text);
-    }
-
-    private async System.Threading.Tasks.Task CutAsync()
-    {
-        await CopyAsync();
-        DeleteSelection();
-    }
-
-    private async System.Threading.Tasks.Task PasteAsync()
-    {
-        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-        if (clipboard == null) return;
-        var text = await clipboard.TryGetTextAsync();
-        if (!string.IsNullOrEmpty(text))
-            InsertText(text);
     }
 
     // ── Word nav helpers ─────────────────────────────────────────────────────

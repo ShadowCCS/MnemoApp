@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Mnemo.Core.Models;
@@ -92,6 +93,64 @@ public static class InlineRunFormatApplier
             result.Add(current);
 
         return result;
+    }
+
+    /// <summary>
+    /// Returns runs covering flattened indices [start, end). Empty range yields an empty list.
+    /// </summary>
+    public static List<InlineRun> SliceRuns(IReadOnlyList<InlineRun> runs, int start, int end)
+    {
+        if (runs.Count == 0 || start >= end)
+            return new List<InlineRun>();
+
+        int totalLen = Flatten(runs).Length;
+        start = Math.Clamp(start, 0, totalLen);
+        end = Math.Clamp(end, 0, totalLen);
+        if (start >= end)
+            return new List<InlineRun>();
+
+        var result = new List<InlineRun>();
+        int offset = 0;
+        foreach (var run in runs)
+        {
+            int runEnd = offset + run.Text.Length;
+            int segStart = Math.Max(start, offset);
+            int segEnd = Math.Min(end, runEnd);
+            if (segStart < segEnd)
+            {
+                int localA = segStart - offset;
+                int localB = segEnd - offset;
+                result.Add(new InlineRun(run.Text[localA..localB], run.Style));
+            }
+
+            offset = runEnd;
+        }
+
+        return Normalize(result);
+    }
+
+    /// <summary>
+    /// Replace flattened range [start, end) with <paramref name="insertion"/> runs.
+    /// </summary>
+    public static List<InlineRun> ReplaceRange(
+        IReadOnlyList<InlineRun> runs, int start, int end, IReadOnlyList<InlineRun> insertion)
+    {
+        int len = Flatten(runs).Length;
+        start = Math.Clamp(start, 0, len);
+        end = Math.Clamp(end, 0, len);
+        if (start > end)
+            (start, end) = (end, start);
+
+        var head = SliceRuns(runs, 0, start);
+        var tail = SliceRuns(runs, end, len);
+        var combined = new List<InlineRun>(head.Count + insertion.Count + tail.Count);
+        combined.AddRange(head);
+        combined.AddRange(insertion);
+        combined.AddRange(tail);
+        var merged = Normalize(combined);
+        if (merged.Count == 0)
+            merged.Add(InlineRun.Plain(string.Empty));
+        return merged;
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -34,9 +35,10 @@ public class KnowledgeService : IKnowledgeService
 
             var content = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
             var sourceId = Guid.NewGuid().ToString();
-            
-            var chunkTexts = ChunkText(content);
+
+            var chunkTexts = ChunkText(content).ToList();
             var knowledgeChunks = new System.Collections.Concurrent.ConcurrentBag<KnowledgeChunk>();
+            var failCount = 0;
 
             // Parallelize embedding generation with bounded parallelism to avoid CPU/memory contention
             var parallelOptions = new ParallelOptions 
@@ -45,6 +47,7 @@ public class KnowledgeService : IKnowledgeService
                 MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) 
             };
 
+            var sw = Stopwatch.StartNew();
             await Parallel.ForEachAsync(chunkTexts, parallelOptions, async (chunkText, token) =>
             {
                 var embeddingResult = await _embeddingService.GetEmbeddingAsync(chunkText, token).ConfigureAwait(false);
@@ -59,9 +62,25 @@ public class KnowledgeService : IKnowledgeService
                         Metadata = new Dictionary<string, object> { { "path", path } }
                     });
                 }
+                else
+                {
+                    Interlocked.Increment(ref failCount);
+                }
             }).ConfigureAwait(false);
 
             await _vectorStore.SaveChunksAsync(knowledgeChunks, ct).ConfigureAwait(false);
+            sw.Stop();
+
+            var embedded = knowledgeChunks.Count;
+            var total = chunkTexts.Count;
+            _logger.Info("KnowledgeService",
+                $"Finished ingesting document: {path} | embedded {embedded}/{total} chunks in {sw.ElapsedMilliseconds} ms.");
+            if (failCount > 0)
+            {
+                _logger.Warning("KnowledgeService",
+                    $"{failCount} chunk embedding(s) failed for {path} ({embedded} saved). See OnnxEmbeddingService errors for details.");
+            }
+
             return Result.Success();
         }
         catch (Exception ex)

@@ -94,13 +94,13 @@ public partial class ChatView : UserControl
     private void OnChatViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (sender is not ChatViewModel vm) return;
-        if (e.PropertyName is null || e.PropertyName == nameof(ChatViewModel.CanSwitchChatHistory))
+        if (e.PropertyName is null || e.PropertyName == nameof(ChatViewModel.CanNavigateChatHistory))
             SyncHistoryNavigationEnabled(vm);
     }
 
     private void SyncHistoryNavigationEnabled(ChatViewModel vm)
     {
-        HistoryNavigationEnabled = vm.CanSwitchChatHistory;
+        HistoryNavigationEnabled = vm.CanNavigateChatHistory;
     }
 
     private void OnRequestScrollToBottom(object? sender, EventArgs e)

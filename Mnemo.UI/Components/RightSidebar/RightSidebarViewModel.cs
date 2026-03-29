@@ -52,7 +52,6 @@ public partial class RightSidebarViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
     [NotifyCanExecuteChangedFor(nameof(StopCommand))]
-    [NotifyCanExecuteChangedFor(nameof(NewChatCommand))]
     private bool _isBusy;
 
     /// <summary>Available assistant modes for the mode dropdown.</summary>
@@ -90,7 +89,7 @@ public partial class RightSidebarViewModel : ViewModelBase
         ToggleCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
         SendCommand = new AsyncRelayCommand(SendAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
-        NewChatCommand = new RelayCommand(NewChat, () => !IsBusy);
+        NewChatCommand = new RelayCommand(NewChat);
         SuggestionSelectedCommand = new RelayCommand<string>(ApplySuggestion);
 
         Messages.Add(CreateWelcomeMessage());
@@ -142,6 +141,8 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     private void NewChat()
     {
+        if (IsBusy)
+            StopGeneration();
         _routingToolHintStore.Clear(_conversationId);
         _conversationId = Guid.NewGuid().ToString("N");
         _turnIndex = 0;
@@ -182,6 +183,10 @@ public partial class RightSidebarViewModel : ViewModelBase
 
         _cts = new CancellationTokenSource();
 
+        var streamingConversationId = _conversationId;
+        var streamingAssistantMode = SelectedAssistantMode;
+        var historyMessages = Messages.ToList();
+
         var logDataset = await _settingsService.GetAsync(ChatDatasetSettings.LoggingEnabledKey, false).ConfigureAwait(false);
         IDisposable? datasetScope = null;
         string? datasetTurnId = null;
@@ -190,7 +195,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             datasetScope = ChatDatasetLoggingScope.BeginTurn(out datasetTurnId);
 
         var conversationHistory = ChatStreamingHelper.BuildConversationHistory(
-            Messages, aiMessage, m => m.IsUser, m => m.Content,
+            historyMessages, aiMessage, m => m.IsUser, m => m.Content,
             excludeLastUserTurn: true);
 
         var foundForDataset = false;
@@ -220,12 +225,12 @@ public partial class RightSidebarViewModel : ViewModelBase
                     aiMessage.Thoughts = string.IsNullOrEmpty(reasoning) ? null : reasoning;
                 }, DispatcherPriority.Background);
 
-            var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, _conversationId).ConfigureAwait(false);
+            var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, streamingConversationId).ConfigureAwait(false);
             var decision = analyzed.IsSuccess && analyzed.Value != null
                 ? analyzed.Value
                 : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skill = "NONE" };
             pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
-            var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(SelectedAssistantMode);
+            var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(streamingAssistantMode);
             composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.Skill);
 
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
@@ -250,7 +255,7 @@ public partial class RightSidebarViewModel : ViewModelBase
                 imageBase64Contents: null,
                 pipelineProgress,
                 precomputedDecision: decision,
-                conversationRoutingKey: _conversationId,
+                conversationRoutingKey: streamingConversationId,
                 displayOptions,
                 onToolCall,
                 onAssistantReasoningUpdate: UpdateReasoning);
@@ -309,15 +314,15 @@ public partial class RightSidebarViewModel : ViewModelBase
                 {
                     var contextForDataset = await Dispatcher.UIThread.InvokeAsync(() =>
                         ChatStreamingHelper.BuildDatasetConversationContextString(
-                            Messages, m => m.IsUser, m => m.Content));
+                            historyMessages, m => m.IsUser, m => m.Content));
 
                     await _chatDatasetLogger.CommitTurnAsync(new ChatDatasetCommitRequest
                     {
                         TurnId = datasetTurnId,
-                        ConversationId = _conversationId,
+                        ConversationId = streamingConversationId,
                         TurnIndex = thisTurnIndex,
                         Source = "right_sidebar",
-                        AssistantMode = SelectedAssistantMode,
+                        AssistantMode = streamingAssistantMode,
                         LatestUserMessage = userMessage,
                         ConversationContext = contextForDataset,
                         ComposedSystemPrompt = composedSystemForDataset,

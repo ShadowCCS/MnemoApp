@@ -10,7 +10,9 @@ using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.History;
 using Mnemo.Core.Models;
+using Mnemo.Core.Services;
 using Mnemo.UI.Components.BlockEditor;
+using Mnemo.UI.Services;
 using Mnemo.UI.Controls;
 using Mnemo.UI.Modules.Notes.ViewModels;
 
@@ -72,11 +74,17 @@ public partial class NotesView : UserControl
         if (editor == null)
             return;
 
+        var sp = ((App)Application.Current!).Services;
         if (editor.History == null)
         {
-            var historyManager = ((App)Application.Current!).Services?.GetService<IHistoryManager>();
+            var historyManager = sp?.GetService<IHistoryManager>();
             if (historyManager != null)
                 editor.History = historyManager;
+        }
+        if (sp != null)
+        {
+            editor.NoteClipboardCodec ??= sp.GetService<INoteClipboardPayloadCodec>();
+            editor.NoteClipboardService ??= sp.GetService<INoteClipboardPlatformService>();
         }
 
         editor.LoadBlocks(vm.GetBlocksForCurrentNote());

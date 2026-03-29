@@ -1208,6 +1208,9 @@ public partial class EditableBlock : UserControl
     private RichTextEditor? GetEditor() =>
         _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
 
+    /// <summary>Live rich-text control when this block is not using a plain <see cref="TextBox"/>.</summary>
+    public RichTextEditor? TryGetRichTextEditor() => GetEditor() as RichTextEditor;
+
     public string? GetSelectedText()
     {
         var range = GetSelectionRange();

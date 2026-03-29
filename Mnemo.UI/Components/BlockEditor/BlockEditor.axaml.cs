@@ -12,9 +12,12 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Mnemo.Core.Formatting;
 using Mnemo.Core.History;
 using Mnemo.Core.Models;
+using Mnemo.Core.Services;
 using Mnemo.UI.Modules.Notes.Operations;
+using Mnemo.UI.Services;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
@@ -71,6 +74,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         get => _history;
         set => _history = value;
     }
+
+    /// <summary>Optional: set from the host view for Mnemo JSON + markdown clipboard.</summary>
+    public INoteClipboardPayloadCodec? NoteClipboardCodec { get; set; }
+
+    /// <summary>Optional: set from the host view for multi-format clipboard I/O.</summary>
+    public INoteClipboardPlatformService? NoteClipboardService { get; set; }
 
     public ObservableCollection<BlockViewModel> Blocks
     {
@@ -889,6 +898,29 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     #region Clipboard and block-selection keyboard (copy as markdown, paste as blocks, backspace deletes selection)
 
+    /// <summary>
+    /// Block kinds that should replace the current block type when pasted at the start of a rich block
+    /// (e.g. "# Title" must become a heading, not literal text in a Text block).
+    /// </summary>
+    private static bool IsStructuralBlockTypeForLineStartPaste(BlockType t) =>
+        t is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3
+        or BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist
+        or BlockType.Quote;
+
+    /// <summary>
+    /// Applies pasted block type and body runs, then list/checklist metadata. Runs are committed first so
+    /// <see cref="BlockViewModel.Type"/>'s heading path runs on the final run list.
+    /// </summary>
+    private static void ApplyPastedStructuralBlockToViewModel(BlockViewModel target, BlockViewModel pastedFirst)
+    {
+        target.CommitRunsFromEditor(InlineRunFormatApplier.Normalize(pastedFirst.CloneRuns()));
+        target.Type = pastedFirst.Type;
+        if (pastedFirst.Type == BlockType.NumberedList)
+            target.ListNumberIndex = pastedFirst.ListNumberIndex;
+        if (pastedFirst.Type == BlockType.Checklist)
+            target.IsChecked = pastedFirst.IsChecked;
+    }
+
     private void Editor_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Handled) return;
@@ -909,12 +941,22 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        // 2. Ctrl+C: copy selected blocks (or cross-block text selection) as markdown
+        // 2. Ctrl+C: copy selected blocks (or cross-block text selection) as markdown + Mnemo JSON.
+        // Mark handled immediately: clipboard writes are async and may yield; if Handled stays false,
+        // routing continues and the OS / other handlers can put plain text on the clipboard and wipe our payload.
         bool ctrlC = e.Key == Key.C && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
         if (ctrlC)
         {
-            _ = TryCopySelectionToClipboardAsync();
             e.Handled = true;
+            _ = TryCopySelectionToClipboardAsync();
+            return;
+        }
+
+        bool ctrlX = e.Key == Key.X && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
+        if (ctrlX)
+        {
+            e.Handled = true;
+            _ = TryCutSelectionAsync();
             return;
         }
 
@@ -922,8 +964,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         bool ctrlV = e.Key == Key.V && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
         if (ctrlV)
         {
-            _ = TryPasteFromClipboardAsync(hasBlockSelection);
             e.Handled = true;
+            _ = TryPasteFromClipboardAsync(hasBlockSelection);
             return;
         }
 
@@ -1123,49 +1165,142 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private async Task TryCopySelectionToClipboardAsync()
     {
+        await TryCopySelectionToClipboardCoreAsync();
+    }
+
+    private async Task TryCutSelectionAsync()
+    {
+        var copied = await TryCopySelectionToClipboardCoreAsync();
+        if (!copied) return;
+
+        var hasBlockSelection = Blocks.Any(b => b.IsSelected);
+        if (hasBlockSelection)
+        {
+            DeleteSelectedBlocks();
+            return;
+        }
+
+        if (HasCrossBlockTextSelection())
+        {
+            TryDeleteTextSelection();
+            return;
+        }
+
+        int fi = GetFocusedBlockIndex();
+        if (fi < 0) return;
+        var ed = GetEditableBlockAt(fi);
+        if (ed?.GetSelectionRange() is { } range && range.start < range.end)
+            ed.DeleteSelection();
+    }
+
+    /// <returns>True if clipboard was written.</returns>
+    private async Task<bool> TryCopySelectionToClipboardCoreAsync()
+    {
+        FlushTypingBatch();
+
         // Mode 2: block selection (drag-box)
         var selectedBlocks = Blocks.Where(b => b.IsSelected).ToList();
         if (selectedBlocks.Count > 0)
         {
-            var markdown = BlockMarkdownSerializer.Serialize(selectedBlocks);
-            await SetClipboardTextAsync(markdown);
-            return;
+            await WriteBlocksToClipboardAsync(selectedBlocks);
+            return true;
         }
 
         // Mode 1: cross-block text selection (gather blocks that have text selection)
         var containers = GetBlockContainersInOrder();
-        if (containers == null) return;
-
         var toCopy = new List<BlockViewModel>();
-        for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+        if (containers != null)
         {
-            var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
-            if (editableBlock == null) continue;
-            var selectedText = editableBlock.GetSelectedText();
-            if (string.IsNullOrEmpty(selectedText)) continue;
-            var block = Blocks[i];
-            var vm = BlockFactory.CreateBlock(block.Type, toCopy.Count);
-            vm.Content = selectedText;
-            if (block.Type == BlockType.Checklist)
-                vm.IsChecked = block.IsChecked;
-            toCopy.Add(vm);
-        }
-        if (toCopy.Count == 0) return;
-        var md = BlockMarkdownSerializer.Serialize(toCopy);
-        await SetClipboardTextAsync(md);
-    }
-
-    private async Task SetClipboardTextAsync(string text)
-    {
-        try
-        {
-            var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel?.Clipboard != null)
+            for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
             {
-                await topLevel.Clipboard.SetTextAsync(text);
+                var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+                if (editableBlock == null) continue;
+                var range = editableBlock.GetSelectionRange();
+                if (range == null || range.Value.start >= range.Value.end) continue;
+                var block = Blocks[i];
+                int start = range.Value.start, end = range.Value.end;
+                var liveRuns = GetLiveRunsForBlockIndex(i);
+                var sliceRuns = InlineRunFormatApplier.SliceRuns(liveRuns, start, end);
+                var vm = BlockFactory.CreateBlock(block.Type, toCopy.Count);
+                vm.SetRuns(sliceRuns);
+                if (block.Type == BlockType.Checklist)
+                    vm.IsChecked = block.IsChecked;
+                if (block.Type == BlockType.NumberedList)
+                    vm.ListNumberIndex = block.ListNumberIndex;
+                toCopy.Add(vm);
             }
         }
-        catch { /* clipboard can fail */ }
+
+        if (toCopy.Count > 0)
+        {
+            await WriteBlocksToClipboardAsync(toCopy);
+            return true;
+        }
+
+        // Mode 3: focused block (caret-only or no cross-block selection)
+        int fi = GetFocusedBlockIndex();
+        if (fi >= 0 && fi < Blocks.Count)
+        {
+            var b = Blocks[fi];
+            if (b.Type != BlockType.Divider)
+            {
+                await WriteBlocksToClipboardAsync(new List<BlockViewModel> { b });
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private IReadOnlyList<InlineRun> GetLiveRunsForBlockIndex(int index)
+    {
+        if (index < 0 || index >= Blocks.Count)
+            return Array.Empty<InlineRun>();
+        var rte = GetEditableBlockAt(index)?.TryGetRichTextEditor();
+        if (rte?.Runs != null)
+            return InlineRunFormatApplier.Normalize(new List<InlineRun>(rte.Runs));
+        return Blocks[index].Runs;
+    }
+
+    /// <summary>Push live <see cref="RichTextEditor.Runs"/> into the view model so clipboard serialization matches the editor.</summary>
+    private void SyncViewModelsFromRichEditors(IEnumerable<BlockViewModel> blocks)
+    {
+        foreach (var b in blocks)
+        {
+            int idx = Blocks.IndexOf(b);
+            if (idx < 0) continue;
+            var rte = GetEditableBlockAt(idx)?.TryGetRichTextEditor();
+            if (rte == null) continue;
+            b.SetRuns(InlineRunFormatApplier.Normalize(new List<InlineRun>(rte.Runs)));
+        }
+    }
+
+    private async Task WriteBlocksToClipboardAsync(IReadOnlyList<BlockViewModel> blocks)
+    {
+        if (blocks.Count == 0) return;
+        SyncViewModelsFromRichEditors(blocks);
+        var markdown = BlockMarkdownSerializer.Serialize(blocks);
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.Clipboard == null) return;
+
+        try
+        {
+            if (NoteClipboardService != null && NoteClipboardCodec != null)
+            {
+                var doc = NoteClipboardMapper.ToDocument(blocks);
+                var json = NoteClipboardCodec.Serialize(doc);
+                NoteClipboardDiagnostics.Log($"Copy {blocks.Count} block(s); md preview: {Truncate(markdown, 120)}");
+                for (int bi = 0; bi < blocks.Count; bi++)
+                    NoteClipboardDiagnostics.Log($"  block[{bi}] type={blocks[bi].Type} {NoteClipboardDiagnostics.SummarizeRuns(blocks[bi].Runs)}");
+                await NoteClipboardService.WriteAsync(topLevel.Clipboard, markdown, json).ConfigureAwait(true);
+            }
+            else
+                await topLevel.Clipboard.SetTextAsync(markdown).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            BlockEditorLogger.LogError("Clipboard write failed", ex);
+        }
     }
 
     private async Task TryPasteFromClipboardAsync(bool replaceBlockSelection)
@@ -1175,11 +1310,36 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var topLevel = TopLevel.GetTopLevel(this);
             if (topLevel?.Clipboard == null) return;
 
-            var text = await topLevel.Clipboard.TryGetTextAsync();
-            if (string.IsNullOrWhiteSpace(text)) return;
+            string? text = null;
+            string? mnemoJson = null;
+            if (NoteClipboardService != null)
+            {
+                var read = await NoteClipboardService.ReadAsync(topLevel.Clipboard).ConfigureAwait(true);
+                mnemoJson = read.MnemoJson;
+                text = read.Text;
+            }
+            else
+                text = await topLevel.Clipboard.TryGetTextAsync().ConfigureAwait(true);
 
-            var pasted = BlockMarkdownSerializer.Deserialize(text);
+            BlockViewModel[] pasted;
+            if (NoteClipboardCodec != null &&
+                !string.IsNullOrEmpty(mnemoJson) &&
+                NoteClipboardCodec.TryDeserialize(mnemoJson, out var document) &&
+                document != null)
+            {
+                NoteClipboardDiagnostics.Log($"Paste: Mnemo JSON path, blocks={document.Blocks?.Count ?? 0}");
+                pasted = NoteClipboardMapper.ToViewModels(document, 0).ToArray();
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(text)) return;
+                NoteClipboardDiagnostics.Log($"Paste: markdown fallback, textLen={text.Length} preview={Truncate(text, 120)}");
+                pasted = BlockMarkdownSerializer.Deserialize(text);
+            }
+
             if (pasted.Length == 0) return;
+            if (pasted.Length > 0)
+                NoteClipboardDiagnostics.Log($"Paste: first block type={pasted[0].Type} {NoteClipboardDiagnostics.SummarizeRuns(pasted[0].Runs)}");
 
             BeginStructuralChange();
 
@@ -1195,24 +1355,86 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                         var range = editableBlock?.GetSelectionOrCaretRange();
                         if (range.HasValue)
                         {
-                            var content = focusedVm.Content ?? string.Empty;
+                            var rtePaste = editableBlock?.TryGetRichTextEditor();
+                            var content = rtePaste?.Text ?? focusedVm.Content ?? string.Empty;
                             int start = Math.Clamp(range.Value.start, 0, content.Length);
                             int end = Math.Clamp(range.Value.end, 0, content.Length);
                             string textBefore = content[0..start];
                             string textAfter = content[end..];
                             string firstContent = pasted[0].Content ?? string.Empty;
 
-                            focusedVm.Content = textBefore + firstContent;
-                            editableBlock!.SetCaretIndex(textBefore.Length + firstContent.Length);
+                            if (focusedVm.Type == BlockType.Code)
+                            {
+                                focusedVm.Content = textBefore + firstContent;
+                                editableBlock!.SetCaretIndex(textBefore.Length + firstContent.Length);
+
+                                if (pasted.Length == 1)
+                                {
+                                    if (textAfter.Length > 0)
+                                    {
+                                        var tailBlock = BlockFactory.CreateBlock(BlockType.Text, focusedIndex + 1);
+                                        tailBlock.Content = textAfter;
+                                        SubscribeToBlock(tailBlock);
+                                        Blocks.Insert(focusedIndex + 1, tailBlock);
+                                        ReorderBlocks();
+                                    }
+                                    ClearBlockSelection();
+                                    CommitStructuralChange("Paste");
+                                    BlocksChanged?.Invoke();
+                                    return;
+                                }
+
+                                int insertAtCode = focusedIndex + 1;
+                                for (int i = 1; i < pasted.Length; i++)
+                                {
+                                    var block = pasted[i];
+                                    string blockContent = (block.Content ?? string.Empty) +
+                                        (i == pasted.Length - 1 ? textAfter : string.Empty);
+                                    block.Content = blockContent;
+                                    SubscribeToBlock(block);
+                                    Blocks.Insert(insertAtCode, block);
+                                    block.Order = insertAtCode;
+                                    insertAtCode++;
+                                }
+                                ReorderBlocks();
+                                ClearBlockSelection();
+                                CommitStructuralChange("Paste");
+                                BlocksChanged?.Invoke();
+                                return;
+                            }
+
+                            var liveRunsForPaste = GetLiveRunsForBlockIndex(focusedIndex);
+                            var tailRuns = InlineRunFormatApplier.SliceRuns(liveRunsForPaste, end, content.Length);
+                            var beforeRuns = InlineRunFormatApplier.SliceRuns(liveRunsForPaste, 0, start);
+                            bool promoteStructuralFirst =
+                                InlineRunFormatApplier.Flatten(beforeRuns).Length == 0
+                                && IsStructuralBlockTypeForLineStartPaste(pasted[0].Type);
+
+                            int caretAfterPaste;
+                            if (promoteStructuralFirst)
+                            {
+                                ApplyPastedStructuralBlockToViewModel(focusedVm, pasted[0]);
+                                caretAfterPaste = InlineRunFormatApplier.Flatten(focusedVm.Runs).Length;
+                            }
+                            else
+                            {
+                                var pasteFirstRuns = pasted[0].CloneRuns();
+                                var mergedFirst = InlineRunFormatApplier.Normalize(
+                                    new List<InlineRun>([..beforeRuns, ..pasteFirstRuns]));
+                                focusedVm.CommitRunsFromEditor(mergedFirst);
+                                caretAfterPaste = start + InlineRunFormatApplier.Flatten(pasteFirstRuns).Length;
+                            }
+
+                            editableBlock!.SetCaretIndex(caretAfterPaste);
 
                             if (pasted.Length == 1)
                             {
-                                if (textAfter.Length > 0)
+                                if (InlineRunFormatApplier.Flatten(tailRuns).Length > 0)
                                 {
-                                    var tailBlock = BlockFactory.CreateBlock(BlockType.Text, focusedIndex + 1);
-                                    tailBlock.Content = textAfter;
-                                    SubscribeToBlock(tailBlock);
-                                    Blocks.Insert(focusedIndex + 1, tailBlock);
+                                    var tailBlockRich = BlockFactory.CreateBlock(BlockType.Text, focusedIndex + 1);
+                                    tailBlockRich.SetRuns(tailRuns);
+                                    SubscribeToBlock(tailBlockRich);
+                                    Blocks.Insert(focusedIndex + 1, tailBlockRich);
                                     ReorderBlocks();
                                 }
                                 ClearBlockSelection();
@@ -1221,17 +1443,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                 return;
                             }
 
-                            // Multiple pasted blocks: insert pasted[1] .. pasted[n-1]; last one gets pasted[last].Content + textAfter
-                            int insertAt = focusedIndex + 1;
+                            int insertAtRich = focusedIndex + 1;
                             for (int i = 1; i < pasted.Length; i++)
                             {
                                 var block = pasted[i];
-                                string blockContent = (block.Content ?? string.Empty) + (i == pasted.Length - 1 ? textAfter : string.Empty);
-                                block.Content = blockContent;
+                                if (i == pasted.Length - 1)
+                                {
+                                    var mergedLast = InlineRunFormatApplier.Normalize(
+                                        new List<InlineRun>([..block.CloneRuns(), ..tailRuns]));
+                                    block.SetRuns(mergedLast);
+                                }
                                 SubscribeToBlock(block);
-                                Blocks.Insert(insertAt, block);
-                                block.Order = insertAt;
-                                insertAt++;
+                                Blocks.Insert(insertAtRich, block);
+                                block.Order = insertAtRich;
+                                insertAtRich++;
                             }
                             ReorderBlocks();
                             ClearBlockSelection();
@@ -1290,7 +1515,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     DispatcherPriority.Input);
             }
         }
-        catch { /* paste can fail */ }
+        catch (Exception ex)
+        {
+            BlockEditorLogger.LogError("Paste from clipboard failed", ex);
+        }
     }
 
     private int GetFocusedBlockIndex()
