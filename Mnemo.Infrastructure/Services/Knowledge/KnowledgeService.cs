@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 namespace Mnemo.Infrastructure.Services.Knowledge;
 
@@ -33,53 +35,55 @@ public class KnowledgeService : IKnowledgeService
         {
             if (!File.Exists(path)) return Result.Failure("File not found.");
 
-            var content = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+            var readResult = await ReadDocumentContentForIngestAsync(path, ct).ConfigureAwait(false);
+            if (!readResult.IsSuccess)
+            {
+                _logger.Error("KnowledgeService", readResult.ErrorMessage ?? "Document read failed.", readResult.Exception);
+                return Result.Failure(readResult.ErrorMessage ?? "Document read failed.", readResult.Exception);
+            }
+
+            var content = readResult.Value!;
             var sourceId = Guid.NewGuid().ToString();
 
             var chunkTexts = ChunkText(content).ToList();
-            var knowledgeChunks = new System.Collections.Concurrent.ConcurrentBag<KnowledgeChunk>();
-            var failCount = 0;
-
-            // Parallelize embedding generation with bounded parallelism to avoid CPU/memory contention
-            var parallelOptions = new ParallelOptions 
-            { 
-                CancellationToken = ct,
-                MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) 
-            };
-
-            var sw = Stopwatch.StartNew();
-            await Parallel.ForEachAsync(chunkTexts, parallelOptions, async (chunkText, token) =>
+            if (chunkTexts.Count == 0)
             {
-                var embeddingResult = await _embeddingService.GetEmbeddingAsync(chunkText, token).ConfigureAwait(false);
-                if (embeddingResult.IsSuccess)
-                {
-                    knowledgeChunks.Add(new KnowledgeChunk
-                    {
-                        Content = chunkText,
-                        SourceId = sourceId,
-                        ScopeId = scopeId,
-                        Embedding = embeddingResult.Value,
-                        Metadata = new Dictionary<string, object> { { "path", path } }
-                    });
-                }
-                else
-                {
-                    Interlocked.Increment(ref failCount);
-                }
-            }).ConfigureAwait(false);
-
-            await _vectorStore.SaveChunksAsync(knowledgeChunks, ct).ConfigureAwait(false);
-            sw.Stop();
-
-            var embedded = knowledgeChunks.Count;
-            var total = chunkTexts.Count;
-            _logger.Info("KnowledgeService",
-                $"Finished ingesting document: {path} | embedded {embedded}/{total} chunks in {sw.ElapsedMilliseconds} ms.");
-            if (failCount > 0)
-            {
-                _logger.Warning("KnowledgeService",
-                    $"{failCount} chunk embedding(s) failed for {path} ({embedded} saved). See OnnxEmbeddingService errors for details.");
+                const string msg =
+                    "Document text produced no embeddable chunks (content too short, formatting-only, or chunking removed everything).";
+                _logger.Error("KnowledgeService", msg);
+                return Result.Failure(msg);
             }
+
+            var embedSw = Stopwatch.StartNew();
+            var embeddingBatch = await _embeddingService.GetEmbeddingsBatchAsync(chunkTexts, ct).ConfigureAwait(false);
+            embedSw.Stop();
+            if (!embeddingBatch.IsSuccess)
+            {
+                _logger.Error("KnowledgeService",
+                    $"Batch embedding failed for {path}: {embeddingBatch.ErrorMessage}", embeddingBatch.Exception);
+                return Result.Failure(embeddingBatch.ErrorMessage ?? "Embedding failed.", embeddingBatch.Exception);
+            }
+
+            var knowledgeChunks = new List<KnowledgeChunk>(chunkTexts.Count);
+            for (var i = 0; i < chunkTexts.Count; i++)
+            {
+                knowledgeChunks.Add(new KnowledgeChunk
+                {
+                    Content = chunkTexts[i],
+                    SourceId = sourceId,
+                    ScopeId = scopeId,
+                    Embedding = embeddingBatch.Value![i],
+                    Metadata = new Dictionary<string, object> { { "path", path } }
+                });
+            }
+
+            var saveSw = Stopwatch.StartNew();
+            await _vectorStore.SaveChunksAsync(knowledgeChunks, ct).ConfigureAwait(false);
+            saveSw.Stop();
+
+            _logger.Info("KnowledgeService",
+                $"Finished ingesting document: {path} | embedded {knowledgeChunks.Count}/{chunkTexts.Count} chunks | " +
+                $"embed {embedSw.ElapsedMilliseconds} ms, save {saveSw.ElapsedMilliseconds} ms (total {embedSw.ElapsedMilliseconds + saveSw.ElapsedMilliseconds} ms).");
 
             return Result.Success();
         }
@@ -133,6 +137,68 @@ public class KnowledgeService : IKnowledgeService
             _logger.Error("KnowledgeService", $"Failed to remove scope: {scopeId}", ex);
             return Result.Failure($"Failed to remove scope: {scopeId}", ex);
         }
+    }
+
+    private async Task<Result<string>> ReadDocumentContentForIngestAsync(string path, CancellationToken ct)
+    {
+        try
+        {
+            if (string.Equals(Path.GetExtension(path), ".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                var pdfText = await Task.Run(() => ReadPdfText(path), ct).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(pdfText))
+                {
+                    return Result<string>.Failure(
+                        "This PDF has no extractable text in Mnemo (PdfPig). Common causes: scanned image-only pages, " +
+                        "text stored only as outlines/paths, or fonts/encodings PdfPig cannot decode. " +
+                        "Use a text-based PDF, export plain text from the source, or run OCR and ingest the result.");
+                }
+
+                _logger.Info("KnowledgeService", $"Extracted PDF text: {path} ({pdfText.Length} characters).");
+                return Result<string>.Success(pdfText);
+            }
+
+            var text = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(text))
+                return Result<string>.Failure("Document is empty or whitespace only; nothing to ingest.");
+
+            return Result<string>.Success(text);
+        }
+        catch (Exception ex)
+        {
+            return Result<string>.Failure($"Failed to read document: {ex.Message}", ex);
+        }
+    }
+
+    private static string ReadPdfText(string path)
+    {
+        using var document = PdfDocument.Open(path);
+        var sb = new StringBuilder();
+        foreach (var page in document.GetPages())
+        {
+            var block = ExtractPageText(page);
+            if (!string.IsNullOrWhiteSpace(block))
+                sb.AppendLine(block);
+        }
+
+        return sb.ToString();
+    }
+
+    private static string ExtractPageText(Page page)
+    {
+        var t = page.Text;
+        if (!string.IsNullOrWhiteSpace(t))
+            return t;
+
+        var words = page.GetWords();
+        if (words.Any())
+            return string.Join(" ", words.Select(w => w.Text));
+
+        var letters = page.Letters;
+        if (letters.Any())
+            return string.Join("", letters.Select(l => l.Value));
+
+        return "";
     }
 
     private IEnumerable<string> ChunkText(string text)
