@@ -8,7 +8,7 @@ namespace Mnemo.Infrastructure.Services.AI;
 /// </summary>
 public static class TeacherSyntheticManifest
 {
-    public const string ChatModelId = "teacher:vertex/gemini-3.1-flash-lite-preview";
+    public const string ChatModelId = "teacher:vertex/gemini-3.1-flash";
 
     public static bool IsTeacher(AIModelManifest? manifest) =>
         manifest != null && string.Equals(manifest.Id, ChatModelId, StringComparison.Ordinal);
@@ -16,7 +16,7 @@ public static class TeacherSyntheticManifest
     public static AIModelManifest CreateChatModel() => new()
     {
         Id = ChatModelId,
-        DisplayName = "Gemini 3.1 Flash Lite Preview (teacher)",
+        DisplayName = "Gemini 3 Flash Lite Preview (teacher)",
         Type = AIModelType.Text,
         Role = AIModelRoles.Low,
         PromptTemplate = "LLAMA3",

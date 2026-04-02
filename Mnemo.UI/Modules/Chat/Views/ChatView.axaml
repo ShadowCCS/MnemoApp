@@ -985,7 +985,7 @@
                                  Padding="16,14,16,6"/>
 
                         <!-- Toolbar row -->
-                        <Grid Grid.Row="2" ColumnDefinitions="Auto, Auto, Auto, Auto, *, Auto, Auto"
+                        <Grid Grid.Row="2" ColumnDefinitions="Auto, Auto, Auto, Auto, Auto, *, Auto, Auto"
                               MinWidth="0" IsEnabled="{Binding !IsRecording}"
                               Margin="8,0,8,10">
                             <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,2,0"
@@ -1022,15 +1022,39 @@
                                     </DataTemplate>
                                 </controls:ModernComboBox.ItemTemplate>
                             </controls:ModernComboBox>
-                            <Border Grid.Column="4" MinWidth="0"/>
-                            <Button Grid.Column="5" Classes="PromptActionButton" Margin="0,0,6,0"
+                            <Border Grid.Column="4"
+                                    IsVisible="{Binding ShowMemoryPill}"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0"
+                                    Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                    BorderBrush="{DynamicResource SidebarBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Padding="10,5"
+                                    MaxWidth="200"
+                                    Cursor="Help">
+                                <ToolTip.Tip>
+                                    <TextBlock Text="{Binding MemoryPillTooltipText}"
+                                               TextWrapping="Wrap"
+                                               MaxWidth="420"
+                                               FontSize="{DynamicResource FontSize.Body.Small}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                </ToolTip.Tip>
+                                <TextBlock Text="{Binding MemoryPillDisplayText}"
+                                           TextTrimming="CharacterEllipsis"
+                                           FontSize="{DynamicResource FontSize.Body.Caption}"
+                                           FontFamily="{DynamicResource Font.Medium}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Border>
+                            <Border Grid.Column="5" MinWidth="0"/>
+                            <Button Grid.Column="6" Classes="PromptActionButton" Margin="0,0,6,0"
                                     ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}"
                                     Command="{Binding StartRecordingCommand}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextFadedBrush}"/>
                             </Button>
-                            <Panel Grid.Column="6">
+                            <Panel Grid.Column="7">
                                 <Button Command="{Binding SendMessageCommand}"
                                         IsVisible="{Binding !IsBusy}"
                                         Background="{DynamicResource CardAccentBrush}"

@@ -246,7 +246,16 @@
     "ProcessThread": "Ablauf",
     "Disclaimer": "KI kann Fehler machen. Wichtige Informationen überprüfen.",
     "Regenerate": "Antwort neu erzeugen",
-    "CopyMessage": "Nachricht kopieren"
+    "CopyMessage": "Nachricht kopieren",
+    "MemoryPill": "Speicher",
+    "MemoryPillTooltipHint": "Konversationsgedächtnis für diesen Chat (Tool-Fakten, rollende Zusammenfassung, optional Langzeitabruf).",
+    "MemoryPillSectionSummary": "Rollende Zusammenfassung",
+    "MemoryPillActiveSkill": "Aktive Fähigkeit",
+    "MemoryPillKeyFacts": "Kernfakten",
+    "MemoryPillSectionWorking": "Arbeitsgedächtnis (Fakten)",
+    "MemoryPillTurnCount": "Runden",
+    "MemoryPillLastSummarized": "Zuletzt zusammengefasst bis Runde",
+    "MemoryPillTier3On": "Langzeitabruf: in der Wissensdatenbank für diesen Chat eingebettet."
   },
   "Notes": {
     "NewNote": "Neue Notiz",

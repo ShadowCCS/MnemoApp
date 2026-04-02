@@ -31,9 +31,24 @@ public sealed class MindmapToolService
 
         var limit = p.Limit is > 0 and <= 100 ? p.Limit!.Value : 50;
         var q = p.Search?.Trim();
+        var fuzzy = p.Fuzzy ?? true;
         var list = res.Value;
         if (!string.IsNullOrEmpty(q))
-            list = list.Where(m => m.Title.Contains(q, StringComparison.OrdinalIgnoreCase));
+        {
+            list = list.Where(m =>
+            {
+                var title = m.Title ?? string.Empty;
+                if (title.Contains(q, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                var tokens = TextSearchMatch.ResolveSearchTokens(q);
+                if (tokens.Count == 0)
+                    return false;
+                if (tokens.Count == 1)
+                    return TextSearchMatch.MatchTokens(title, tokens, matchAll: true, fuzzy);
+                return TextSearchMatch.MatchTokens(title, tokens, matchAll: false, fuzzy);
+            });
+        }
 
         var slice = list.OrderBy(m => m.Title, StringComparer.OrdinalIgnoreCase).Take(limit)
             .Select(m => new { mindmap_id = m.Id, title = m.Title }).ToList();

@@ -444,7 +444,13 @@ public sealed class VertexGeminiTeacherClient : ITeacherModelClient, IDisposable
                     var callId = string.IsNullOrEmpty(id) ? $"call_{toolOrdinal}" : id;
                     toolOrdinal++;
 
-                    yield return new StreamChunk.ToolCall(new ToolCallRequest(callId, name, argsJson));
+                    string? thoughtSig = null;
+                    if (part.TryGetProperty("thoughtSignature", out var tsEl) && tsEl.ValueKind == JsonValueKind.String)
+                        thoughtSig = tsEl.GetString();
+                    else if (part.TryGetProperty("thought_signature", out var tsSnake) && tsSnake.ValueKind == JsonValueKind.String)
+                        thoughtSig = tsSnake.GetString();
+
+                    yield return new StreamChunk.ToolCall(new ToolCallRequest(callId, name, argsJson, thoughtSig));
                 }
             }
         }
@@ -712,7 +718,7 @@ public sealed class VertexGeminiTeacherClient : ITeacherModelClient, IDisposable
     private static JsonElement BuildRoutingResponseSchema()
     {
         const string json =
-            """{"type":"object","properties":{"complexity":{"type":"string","enum":["simple","reasoning"]},"skill":{"type":"string"},"confidence":{"type":"string"},"reason":{"type":"string"}},"required":["complexity","skill"]}""";
+            """{"type":"object","properties":{"complexity":{"type":"string","enum":["simple","reasoning"]},"skills":{"type":"array","items":{"type":"string"},"minItems":1},"confidence":{"type":"string"},"reason":{"type":"string"}},"required":["complexity","skills"]}""";
         return JsonSerializer.Deserialize<JsonElement>(json);
     }
 
@@ -780,7 +786,11 @@ public sealed class VertexGeminiTeacherClient : ITeacherModelClient, IDisposable
         var project = await GetProjectIdAsync(ct).ConfigureAwait(false);
         var location = await GetLocationAsync(ct).ConfigureAwait(false);
         var model = await GetModelIdAsync(ct).ConfigureAwait(false);
-        return $"https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:{method}";
+        var path = $"v1/projects/{project}/locations/{location}/publishers/google/models/{model}:{method}";
+        // Global models use the non-regional host; regional uses {region}-aiplatform.googleapis.com.
+        if (string.Equals(location, "global", StringComparison.OrdinalIgnoreCase))
+            return $"https://aiplatform.googleapis.com/{path}";
+        return $"https://{location}-aiplatform.googleapis.com/{path}";
     }
 
     public void Dispose() => _http.Dispose();

@@ -12,11 +12,14 @@ public interface IOrchestrationLayer
 {
     /// <summary>
     /// Classifies the user message for main-model selection (simple vs reasoning) and skill context selection.
+    /// When <paramref name="memorySnapshot"/> contains a summary, the routing prompt includes a rich
+    /// <c>[CONVERSATION CONTEXT]</c> block that enables correct classification of short follow-ups.
     /// </summary>
     Task<Result<RoutingAndSkillDecision>> RouteAndClassifySkillAsync(
         string userMessage,
         RoutingToolHint? recentToolHint = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        ConversationMemorySnapshot? memorySnapshot = null);
 
     /// <summary>
     /// Runs one or more orchestration tasks using the universal TaskType prompt format.

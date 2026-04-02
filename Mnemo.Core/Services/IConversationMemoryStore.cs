@@ -50,6 +50,12 @@ public interface IConversationMemoryStore
     void Evict(string conversationId);
 
     /// <summary>
+    /// Returns all conversations that have pending summaries not yet embedded into the
+    /// long-term vector store, filtered to those with turn count above <paramref name="tier3ThresholdTurns"/>.
+    /// </summary>
+    IReadOnlyList<ConversationMemorySnapshot> GetConversationsPendingTier3Embedding(int tier3ThresholdTurns);
+
+    /// <summary>
     /// Returns the latest tool hint derived from the most recent fact whose source is a tool name,
     /// for backward compatibility with <see cref="IRoutingToolHintStore"/> consumers.
     /// Returns null when no facts exist.

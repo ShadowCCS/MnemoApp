@@ -24,6 +24,12 @@ public sealed class ChatModulePersistedConversation
     public string? CustomTitle { get; set; }
 
     public List<ChatModulePersistedMessage> Messages { get; set; } = new();
+
+    /// <summary>
+    /// JSON-serialized <see cref="Mnemo.Core.Models.ConversationMemorySnapshot"/> for this conversation.
+    /// Null when no memory has been accumulated yet (new or pre-memory conversations).
+    /// </summary>
+    public string? MemorySnapshotJson { get; set; }
 }
 
 /// <summary>Serializable chat bubble (no transient UI/streaming state).</summary>

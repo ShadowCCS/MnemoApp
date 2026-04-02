@@ -5,6 +5,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -33,6 +34,12 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"
     };
 
+    /// <summary>Number of turns between automatic summarizations.</summary>
+    private const int SummarizationInterval = 3;
+
+    /// <summary>Minimum turn count before Tier-3 long-term memory embedding is triggered.</summary>
+    private const int Tier3EmbeddingThreshold = 15;
+
     private readonly IAIOrchestrator _orchestrator;
     private readonly ILoggerService _logger;
     private readonly ILocalizationService _localizationService;
@@ -44,6 +51,10 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     private readonly IChatDatasetLogger _chatDatasetLogger;
     private readonly IRoutingToolHintStore _routingToolHintStore;
     private readonly IChatModuleHistoryService _chatHistoryService;
+    private readonly IConversationMemoryStore _memoryStore;
+    private readonly IConversationSummarizer _memorySummarizer;
+    private readonly IConversationMemoryInjector _memoryInjector;
+    private readonly IConversationLongTermMemoryEmbedder _longTermMemoryEmbedder;
 
     private string _conversationId = string.Empty;
 
@@ -136,6 +147,30 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
 
     /// <summary>True when the empty-state welcome + suggestions should show (no user messages in the thread yet).</summary>
     public bool ShowWelcomeIntro => _isHistoryReady && !Messages.Any(m => m.IsUser);
+
+    private bool _showMemoryPill;
+    /// <summary>True when this thread has working memory, a rolling summary, or long-term recall.</summary>
+    public bool ShowMemoryPill
+    {
+        get => _showMemoryPill;
+        private set => SetProperty(ref _showMemoryPill, value);
+    }
+
+    private string _memoryPillDisplayText = string.Empty;
+    /// <summary>Short label for the memory pill (e.g. “Memory · 3”).</summary>
+    public string MemoryPillDisplayText
+    {
+        get => _memoryPillDisplayText;
+        private set => SetProperty(ref _memoryPillDisplayText, value);
+    }
+
+    private string _memoryPillTooltipText = string.Empty;
+    /// <summary>Full memory snapshot for hover tooltip.</summary>
+    public string MemoryPillTooltipText
+    {
+        get => _memoryPillTooltipText;
+        private set => SetProperty(ref _memoryPillTooltipText, value);
+    }
 
     public bool IsChatHistorySidebarOpen
     {
@@ -243,7 +278,22 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     private ChatSession? ActiveSession =>
         !string.IsNullOrEmpty(_conversationId) && _chatSessions.TryGetValue(_conversationId, out var s) ? s : null;
 
-    public ChatViewModel(IAIOrchestrator orchestrator, ILoggerService logger, ILocalizationService localizationService, IOverlayService overlayService, ISpeechRecognitionService speechService, ISettingsService settingsService, ISkillSystemPromptComposer skillSystemPromptComposer, ChatPauseToSendEstimator pauseToSendEstimator, IChatDatasetLogger chatDatasetLogger, IRoutingToolHintStore routingToolHintStore, IChatModuleHistoryService chatHistoryService)
+    public ChatViewModel(
+        IAIOrchestrator orchestrator,
+        ILoggerService logger,
+        ILocalizationService localizationService,
+        IOverlayService overlayService,
+        ISpeechRecognitionService speechService,
+        ISettingsService settingsService,
+        ISkillSystemPromptComposer skillSystemPromptComposer,
+        ChatPauseToSendEstimator pauseToSendEstimator,
+        IChatDatasetLogger chatDatasetLogger,
+        IRoutingToolHintStore routingToolHintStore,
+        IChatModuleHistoryService chatHistoryService,
+        IConversationMemoryStore memoryStore,
+        IConversationSummarizer memorySummarizer,
+        IConversationMemoryInjector memoryInjector,
+        IConversationLongTermMemoryEmbedder longTermMemoryEmbedder)
     {
         _orchestrator = orchestrator;
         _logger = logger;
@@ -255,6 +305,10 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         _chatDatasetLogger = chatDatasetLogger;
         _routingToolHintStore = routingToolHintStore;
         _chatHistoryService = chatHistoryService;
+        _memoryStore = memoryStore;
+        _memorySummarizer = memorySummarizer;
+        _memoryInjector = memoryInjector;
+        _longTermMemoryEmbedder = longTermMemoryEmbedder;
         _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording && _isHistoryReady);
@@ -585,6 +639,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         if (persistBookends)
             PersistFireAndForget();
         NotifyShowWelcomeIntroChanged();
+        RefreshMemoryPillUi();
     }
 
     /// <summary>Starts a new thread that only appears in the sidebar and storage after the first user message.</summary>
@@ -594,7 +649,10 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             PersistFireAndForget();
 
         if (!string.IsNullOrEmpty(_conversationId))
+        {
             _routingToolHintStore.Clear(_conversationId);
+            _memoryStore.Evict(_conversationId);
+        }
 
         _conversationId = Guid.NewGuid().ToString("N");
         _ephemeralMessages.Clear();
@@ -607,6 +665,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         OnPropertyChanged(nameof(SelectedAssistantMode));
         NotifyShowWelcomeIntroChanged();
         RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
+        RefreshMemoryPillUi();
     }
 
     private void MaterializeEphemeralConversation()
@@ -633,6 +692,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         OnPropertyChanged(nameof(Messages));
         OnPropertyChanged(nameof(SelectedAssistantMode));
         NotifyShowWelcomeIntroChanged();
+        RefreshMemoryPillUi();
     }
 
     private async Task LoadHistoryAsync()
@@ -709,6 +769,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         OnPropertyChanged(nameof(SelectedAssistantMode));
         NotifyShowWelcomeIntroChanged();
         RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
+        RefreshMemoryPillUi();
     }
 
     private void ClearSessionsAndRows()
@@ -733,9 +794,10 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
 
     private ChatSession MapPersistedConversation(ChatModulePersistedConversation c)
     {
+        var id = string.IsNullOrEmpty(c.Id) ? Guid.NewGuid().ToString("N") : c.Id;
         var session = new ChatSession
         {
-            Id = string.IsNullOrEmpty(c.Id) ? Guid.NewGuid().ToString("N") : c.Id,
+            Id = id,
             AssistantMode = ChatStreamingHelper.NormalizeAssistantMode(c.AssistantMode),
             LastActivityUtc = c.LastActivityUtc == default ? DateTime.UtcNow : c.LastActivityUtc,
             CustomTitle = string.IsNullOrWhiteSpace(c.CustomTitle) ? null : c.CustomTitle.Trim()
@@ -743,6 +805,22 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         foreach (var m in c.Messages ?? Enumerable.Empty<ChatModulePersistedMessage>())
             session.Messages.Add(MapFromPersistedMessage(m));
         StripLegacyWelcomeAssistantMessages(session);
+
+        // Hydrate memory snapshot from persisted JSON
+        if (!string.IsNullOrWhiteSpace(c.MemorySnapshotJson))
+        {
+            try
+            {
+                var snapshot = System.Text.Json.JsonSerializer.Deserialize<ConversationMemorySnapshot>(c.MemorySnapshotJson);
+                if (snapshot != null)
+                    _memoryStore.Load(snapshot);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning("Chat", $"Failed to deserialize memory snapshot for {id}: {ex.Message}");
+            }
+        }
+
         return session;
     }
 
@@ -812,13 +890,31 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     {
         var list = _chatSessions.Values
             .OrderByDescending(s => s.LastActivityUtc)
-            .Select(s => new ChatModulePersistedConversation
+            .Select(s =>
             {
-                Id = s.Id,
-                LastActivityUtc = s.LastActivityUtc,
-                AssistantMode = s.AssistantMode,
-                CustomTitle = s.CustomTitle,
-                Messages = s.Messages.Select(MapToPersistedMessage).ToList()
+                string? memoryJson = null;
+                var snapshot = _memoryStore.Get(s.Id);
+                if (snapshot != null)
+                {
+                    try
+                    {
+                        memoryJson = System.Text.Json.JsonSerializer.Serialize(snapshot);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warning("Chat", $"Failed to serialize memory snapshot for {s.Id}: {ex.Message}");
+                    }
+                }
+
+                return new ChatModulePersistedConversation
+                {
+                    Id = s.Id,
+                    LastActivityUtc = s.LastActivityUtc,
+                    AssistantMode = s.AssistantMode,
+                    CustomTitle = s.CustomTitle,
+                    Messages = s.Messages.Select(MapToPersistedMessage).ToList(),
+                    MemorySnapshotJson = memoryJson
+                };
             })
             .ToList();
         return new ChatModuleHistoryDocument { Version = 1, Conversations = list };
@@ -952,6 +1048,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         if (row != null)
             ConversationRows.Remove(row);
         _routingToolHintStore.Clear(conversationId);
+        _memoryStore.Evict(conversationId);
 
         if (!wasActive)
         {
@@ -1192,9 +1289,17 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         if (logDataset)
             datasetScope = ChatDatasetLoggingScope.BeginTurn(out datasetTurnId);
 
-        var conversationHistory = ChatStreamingHelper.BuildConversationHistory(
+        // Build raw turns for fallback / summarizer input (excludes current user turn to avoid duplication)
+        var rawConversationHistory = ChatStreamingHelper.BuildConversationHistory(
             streamingTurn.Messages, aiMessage, m => m.IsUser, m => m.Content,
             excludeLastUserTurn: true);
+
+        // Build memory-aware history: summary turn + K raw tail (falls back to raw when no summary yet)
+        var conversationHistory = await _memoryInjector.BuildHistoryWithMemoryAsync(
+            streamingTurn.ConversationId,
+            rawConversationHistory,
+            userMessage,
+            _cts.Token).ConfigureAwait(false);
 
         var foundForDataset = false;
         var toolDatasetCallCount = 0;
@@ -1227,10 +1332,10 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, streamingTurn.ConversationId).ConfigureAwait(false);
             var decision = analyzed.IsSuccess && analyzed.Value != null
                 ? analyzed.Value
-                : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skill = "NONE" };
+                : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skills = new[] { "NONE" } };
             pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
             var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(streamingTurn.AssistantMode);
-            composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.Skill);
+            composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.GetNormalizedSkillIds());
 
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
             var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);
@@ -1342,13 +1447,184 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             var cts = _cts;
             _cts = null;
             cts?.Dispose();
+
+            // Increment the memory turn counter and trigger summarization if due.
+            // Use full transcript including this turn (rawConversationHistory was built before the reply completed).
+            var fullTranscriptForMemory = ChatStreamingHelper.BuildFullConversationHistory(
+                streamingTurn.Messages,
+                m => m.IsUser,
+                m => m.Content);
+            _memoryStore.IncrementTurn(streamingTurn.ConversationId);
+            _ = TryRunPostTurnMemoryAsync(streamingTurn.ConversationId, fullTranscriptForMemory);
+
             Dispatcher.UIThread.Post(() =>
             {
                 IsBusy = false;
                 if (!_disposed && _chatSessions.TryGetValue(streamingTurn.ConversationId, out var finishedSession))
                     finishedSession.LastActivityUtc = DateTime.UtcNow;
+                RefreshMemoryPillUi();
                 PersistFireAndForget();
             });
+        }
+    }
+
+    private void RefreshMemoryPillUi()
+    {
+        if (string.IsNullOrEmpty(_conversationId))
+        {
+            ShowMemoryPill = false;
+            MemoryPillDisplayText = string.Empty;
+            MemoryPillTooltipText = string.Empty;
+            return;
+        }
+
+        var snap = _memoryStore.Get(_conversationId);
+        if (snap == null)
+        {
+            ShowMemoryPill = false;
+            MemoryPillDisplayText = string.Empty;
+            MemoryPillTooltipText = string.Empty;
+            return;
+        }
+
+        var hasSummary = snap.LatestSummary != null && !string.IsNullOrWhiteSpace(snap.LatestSummary.Summary);
+        var hasFacts = snap.Facts.Count > 0;
+        var tier3 = snap.HasLongTermMemory;
+
+        if (!hasSummary && !hasFacts && !tier3)
+        {
+            ShowMemoryPill = false;
+            MemoryPillDisplayText = string.Empty;
+            MemoryPillTooltipText = string.Empty;
+            return;
+        }
+
+        ShowMemoryPill = true;
+        var baseLabel = _localizationService.T("MemoryPill", "Chat");
+        MemoryPillDisplayText = hasFacts ? $"{baseLabel} · {snap.Facts.Count}" : baseLabel;
+
+        MemoryPillTooltipText = BuildMemoryTooltipText(snap);
+    }
+
+    private string BuildMemoryTooltipText(ConversationMemorySnapshot snap)
+    {
+        var sb = new StringBuilder(512);
+        sb.AppendLine(_localizationService.T("MemoryPillTooltipHint", "Chat"));
+        sb.AppendLine();
+
+        if (snap.LatestSummary != null && !string.IsNullOrWhiteSpace(snap.LatestSummary.Summary))
+        {
+            sb.AppendLine(_localizationService.T("MemoryPillSectionSummary", "Chat"));
+            sb.AppendLine(snap.LatestSummary.Summary.Trim());
+            sb.AppendLine();
+            sb.AppendLine($"{_localizationService.T("MemoryPillActiveSkill", "Chat")}: {snap.LatestSummary.ActiveSkill}");
+            if (snap.LatestSummary.ActiveEntities.Count > 0)
+            {
+                foreach (var kvp in snap.LatestSummary.ActiveEntities.OrderBy(x => x.Key))
+                    sb.AppendLine($"{kvp.Key}={kvp.Value}");
+            }
+            if (snap.LatestSummary.KeyFacts.Count > 0)
+            {
+                sb.AppendLine(_localizationService.T("MemoryPillKeyFacts", "Chat"));
+                foreach (var f in snap.LatestSummary.KeyFacts.Take(12))
+                    sb.AppendLine($"• {f}");
+            }
+            sb.AppendLine();
+        }
+
+        if (snap.Facts.Count > 0)
+        {
+            sb.AppendLine(_localizationService.T("MemoryPillSectionWorking", "Chat"));
+            foreach (var f in snap.Facts.OrderByDescending(x => x.TurnNumber))
+                sb.AppendLine($"{f.Key}={f.Value}  ({f.Source})");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine($"{_localizationService.T("MemoryPillTurnCount", "Chat")}: {snap.TurnCount}");
+        if (snap.LastSummarizedTurn > 0)
+            sb.AppendLine($"{_localizationService.T("MemoryPillLastSummarized", "Chat")}: {snap.LastSummarizedTurn}");
+        if (snap.HasLongTermMemory)
+            sb.AppendLine(_localizationService.T("MemoryPillTier3On", "Chat"));
+
+        var s = sb.ToString().TrimEnd();
+        const int maxLen = 6000;
+        return s.Length <= maxLen ? s : s[..maxLen] + "…";
+    }
+
+    /// <summary>
+    /// Post-turn memory maintenance: triggers Tier-2 summarization when due and Tier-3
+    /// embedding when the conversation is long enough. Runs fire-and-forget.
+    /// </summary>
+    private async Task TryRunPostTurnMemoryAsync(
+        string conversationId,
+        IReadOnlyList<ConversationTurn> fullTranscriptOldestFirst)
+    {
+        try
+        {
+            var snapshot = _memoryStore.Get(conversationId);
+            if (snapshot == null)
+                return;
+
+            var turnsSinceLastSummary = snapshot.TurnCount - snapshot.LastSummarizedTurn;
+            if (turnsSinceLastSummary < SummarizationInterval)
+            {
+                _logger.Debug("Memory",
+                    $"PostTurn: skip summarize conv={conversationId} (turnsSinceLast={turnsSinceLastSummary} < interval {SummarizationInterval})");
+                return;
+            }
+
+            _logger.Info("Memory",
+                $"PostTurn: summarizing conv={conversationId} turnCount={snapshot.TurnCount} lastSummarized={snapshot.LastSummarizedTurn}");
+
+            // LastSummarizedTurn counts completed user↔assistant exchanges already in the rolling summary.
+            // Transcript is [U1,A1,U2,A2,...]; each "turn" is two ConversationTurn entries.
+            var pairStartIndex = 2 * snapshot.LastSummarizedTurn;
+            if (pairStartIndex >= fullTranscriptOldestFirst.Count)
+                return;
+
+            var newTurns = fullTranscriptOldestFirst.Skip(pairStartIndex).ToList();
+            if (newTurns.Count == 0)
+                return;
+
+            var summaryResult = await _memorySummarizer.SummarizeAsync(snapshot, newTurns)
+                .ConfigureAwait(false);
+
+            if (!summaryResult.IsSuccess || summaryResult.Value == null)
+            {
+                _logger.Warning("Memory",
+                    $"PostTurn: summarization failed conv={conversationId}: {summaryResult.ErrorMessage}");
+                return;
+            }
+
+            _memoryStore.SetSummary(conversationId, summaryResult.Value);
+            _logger.Info("Memory", $"PostTurn: summary stored conv={conversationId}");
+
+            // Tier-3: embed into vector store once the conversation is long enough
+            if (snapshot.TurnCount >= Tier3EmbeddingThreshold && !snapshot.HasLongTermMemory)
+            {
+                var updatedSnapshot = _memoryStore.Get(conversationId);
+                if (updatedSnapshot != null)
+                    await _longTermMemoryEmbedder.EmbedSummaryAsync(updatedSnapshot)
+                        .ConfigureAwait(false);
+            }
+
+            // Persist the updated memory immediately after summarization
+            PersistFireAndForget();
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning("Memory", $"PostTurn: maintenance failed conv={conversationId}: {ex.Message}");
+        }
+        finally
+        {
+            try
+            {
+                Dispatcher.UIThread.Post(RefreshMemoryPillUi);
+            }
+            catch
+            {
+                // ignore UI teardown
+            }
         }
     }
 

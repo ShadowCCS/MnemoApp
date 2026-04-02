@@ -14,6 +14,11 @@ public interface ISkillRegistry
     SkillInjectionContext GetInjection(string? skillId);
 
     /// <summary>
+    /// Merges tools (by unique name) and concatenates system fragments for multiple skills.
+    /// </summary>
+    SkillInjectionContext GetMergedInjection(IReadOnlyList<string>? skillIds);
+
+    /// <summary>
     /// Enabled tools from skill manifests where <c>include_tools</c> is true (for parity checks with <see cref="IFunctionRegistry"/>).
     /// </summary>
     IReadOnlyList<(string SkillId, SkillToolDefinition Tool)> GetAllEnabledManifestTools();

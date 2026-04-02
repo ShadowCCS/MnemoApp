@@ -8,7 +8,7 @@ public static class MindmapToolRegistrar
 {
     public static void Register(IFunctionRegistry registry, MindmapToolService svc)
     {
-        registry.RegisterTool(new AIToolDefinition("list_mindmaps", "Lists mindmaps (optional search, limit).",
+        registry.RegisterTool(new AIToolDefinition("list_mindmaps", "Lists mindmaps. Optional title search: keywords (OR); fuzzy (default true) for typos; limit.",
             typeof(ListMindmapsParameters), async args => await svc.ListMindmapsAsync((ListMindmapsParameters)args).ConfigureAwait(false)));
         registry.RegisterTool(new AIToolDefinition("read_mindmap", "Nodes (with layout), edges, counts.",
             typeof(MindmapIdParameters), async args => await svc.ReadMindmapAsync((MindmapIdParameters)args).ConfigureAwait(false)));

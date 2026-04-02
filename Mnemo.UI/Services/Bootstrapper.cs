@@ -78,6 +78,28 @@ public static class Bootstrapper
             sp.GetRequiredService<IMainThreadDispatcher>()));
         services.AddSingleton<IToolDispatcher, ToolDispatcher>();
         services.AddSingleton<IRoutingToolHintStore, RoutingToolHintStore>();
+
+        // Conversation Memory System
+        services.AddSingleton<IConversationMemoryStore>(sp =>
+            new ConversationMemoryStore(sp.GetRequiredService<ILoggerService>()));
+        services.AddSingleton<IConversationSummarizer, ConversationSummarizer>();
+        services.AddSingleton<IConversationLongTermMemoryEmbedder, ConversationLongTermMemoryEmbedder>();
+        // Module-specific memory extractors registered below in RegisterTools;
+        // the composite is built after module discovery so all extractors are included.
+        services.AddSingleton<NotesMemoryExtractor>();
+        services.AddSingleton<MindmapMemoryExtractor>();
+        services.AddSingleton<IToolResultMemoryExtractor>(sp =>
+            new CompositeToolResultMemoryExtractor(new IToolResultMemoryExtractor[]
+            {
+                sp.GetRequiredService<NotesMemoryExtractor>(),
+                sp.GetRequiredService<MindmapMemoryExtractor>()
+            }));
+        services.AddSingleton<IConversationMemoryInjector>(sp =>
+            new ConversationMemoryInjector(
+                sp.GetRequiredService<IConversationMemoryStore>(),
+                sp.GetRequiredService<IKnowledgeService>(),
+                sp.GetRequiredService<ILoggerService>()));
+
         services.AddSingleton<IAIOrchestrator, AIOrchestrator>();
         services.AddSingleton<IAITaskManager, AITaskManager>();
 

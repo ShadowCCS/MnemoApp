@@ -7,6 +7,7 @@ public sealed class ListMindmapsParameters
 {
     [JsonPropertyName("search")] public string? Search { get; set; }
     [JsonPropertyName("limit")] public int? Limit { get; set; }
+    [JsonPropertyName("fuzzy")] public bool? Fuzzy { get; set; }
 }
 
 public sealed class MindmapIdParameters

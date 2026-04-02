@@ -15,6 +15,8 @@ public sealed class ListNotesParameters
 {
     [JsonPropertyName("search")] public string? Search { get; set; }
     [JsonPropertyName("limit")] public int? Limit { get; set; }
+    /// <summary>When true (default), typo-tolerant token match against title/body.</summary>
+    [JsonPropertyName("fuzzy")] public bool? Fuzzy { get; set; }
 }
 
 public sealed class NoteIdParameters
@@ -54,6 +56,10 @@ public sealed class SearchNotesParameters
     [JsonPropertyName("query")] public string Query { get; set; } = string.Empty;
     [JsonPropertyName("limit")] public int? Limit { get; set; }
     [JsonPropertyName("mode")] public string? Mode { get; set; }
+    /// <summary>When true, every keyword must appear (AND). Default false (OR).</summary>
+    [JsonPropertyName("match_all")] public bool? MatchAll { get; set; }
+    /// <summary>When true (default), allow small edit-distance mismatches on words (e.g. Gemany vs Germany).</summary>
+    [JsonPropertyName("fuzzy")] public bool? Fuzzy { get; set; }
 }
 
 public sealed class GetRecentNotesParameters

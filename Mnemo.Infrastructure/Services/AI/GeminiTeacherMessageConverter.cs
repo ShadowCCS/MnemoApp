@@ -73,7 +73,11 @@ internal static class GeminiTeacherMessageConverter
                                 argsObj = JsonSerializer.Deserialize<Dictionary<string, object>>(argsEl.GetRawText()) ?? argsObj;
                         }
 
-                        parts.Add(new { functionCall = new { name, args = argsObj } });
+                        var thoughtSig = TryGetToolCallThoughtSignature(call);
+                        if (string.IsNullOrEmpty(thoughtSig))
+                            parts.Add(new { functionCall = new { name, args = argsObj } });
+                        else
+                            parts.Add(new { functionCall = new { name, args = argsObj }, thoughtSignature = thoughtSig });
                     }
 
                     if (parts.Count > 0)
@@ -111,6 +115,20 @@ internal static class GeminiTeacherMessageConverter
             systemInstruction = new { parts = new object[] { new { text = string.Join("\n", systemText) } } };
 
         return (systemInstruction, contents);
+    }
+
+    /// <summary>Gemini 3 Vertex: <c>thoughtSignature</c> on the same Part as <c>functionCall</c> must be echoed on follow-up requests.</summary>
+    private static string? TryGetToolCallThoughtSignature(JsonElement call)
+    {
+        if (call.TryGetProperty("thought_signature", out var ts1) && ts1.ValueKind == JsonValueKind.String)
+            return ts1.GetString();
+        if (call.TryGetProperty("thoughtSignature", out var ts2) && ts2.ValueKind == JsonValueKind.String)
+            return ts2.GetString();
+        if (call.TryGetProperty("extra_content", out var ec) && ec.ValueKind == JsonValueKind.Object
+            && ec.TryGetProperty("google", out var g) && g.ValueKind == JsonValueKind.Object
+            && g.TryGetProperty("thought_signature", out var ts3) && ts3.ValueKind == JsonValueKind.String)
+            return ts3.GetString();
+        return null;
     }
 
     private static Dictionary<string, object> ParseToolResponseContent(JsonElement ce)

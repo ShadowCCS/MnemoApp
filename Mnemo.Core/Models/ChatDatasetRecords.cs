@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Mnemo.Core.Models;
 
@@ -99,7 +101,13 @@ public sealed class ChatDatasetManagerSection
 public sealed class ChatDatasetRoutingDecision
 {
     public string Complexity { get; init; } = "";
-    public string Skill { get; init; } = "";
+    /// <summary>Ordered skill ids (same contract as router JSON <c>skills</c>).</summary>
+    public IReadOnlyList<string> Skills { get; init; } = Array.Empty<string>();
+
+    /// <summary>Legacy captures used <c>skill</c> only; deserializes old JSONL for export.</summary>
+    [JsonPropertyName("skill")]
+    public string? LegacySkill { get; init; }
+
     public string? Confidence { get; init; }
     public string? Reason { get; init; }
 }

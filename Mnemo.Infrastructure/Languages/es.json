@@ -246,7 +246,16 @@
     "ProcessThread": "Proceso",
     "Disclaimer": "La IA puede cometer errores. Verifica la información importante.",
     "Regenerate": "Regenerar respuesta",
-    "CopyMessage": "Copiar mensaje"
+    "CopyMessage": "Copiar mensaje",
+    "MemoryPill": "Memoria",
+    "MemoryPillTooltipHint": "Memoria de conversación para este chat (hechos de herramientas, resumen acumulado y recuperación opcional a largo plazo).",
+    "MemoryPillSectionSummary": "Resumen acumulado",
+    "MemoryPillActiveSkill": "Habilidad activa",
+    "MemoryPillKeyFacts": "Hechos clave",
+    "MemoryPillSectionWorking": "Memoria de trabajo (hechos)",
+    "MemoryPillTurnCount": "Turnos",
+    "MemoryPillLastSummarized": "Último resumen hasta el turno",
+    "MemoryPillTier3On": "Recuperación a largo plazo: incrustada en la base de conocimiento de este chat."
   },
   "Notes": {
     "NewNote": "Nueva Nota",

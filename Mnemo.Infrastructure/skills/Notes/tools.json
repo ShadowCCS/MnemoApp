@@ -16,12 +16,13 @@
     },
     {
       "name": "list_notes",
-      "description": "Lists notes newest first. Optional search on title/body.",
+      "description": "Lists notes newest first. Optional search: comma/space keywords (OR). fuzzy (default true) allows small typos.",
       "parameters": {
         "type": "object",
         "properties": {
           "search": { "type": "string" },
-          "limit": { "type": "integer" }
+          "limit": { "type": "integer" },
+          "fuzzy": { "type": "boolean" }
         }
       },
       "enabled": true
@@ -58,13 +59,15 @@
     },
     {
       "name": "search_notes",
-      "description": "Full-text search over note blocks with snippets. mode=text (default) or semantic (knowledge chunks, may not be notes).",
+      "description": "Search notes with block snippets. query: comma/space keywords; match_all requires every keyword; fuzzy (default true) allows typos. mode=text or semantic (may not map to notes).",
       "parameters": {
         "type": "object",
         "properties": {
           "query": { "type": "string" },
           "limit": { "type": "integer" },
-          "mode": { "type": "string" }
+          "mode": { "type": "string" },
+          "match_all": { "type": "boolean" },
+          "fuzzy": { "type": "boolean" }
         },
         "required": ["query"]
       },

@@ -229,10 +229,10 @@ public partial class RightSidebarViewModel : ViewModelBase
             var analyzed = await _orchestrator.AnalyzeMessageAsync(userMessage, _cts.Token, pipelineProgress, streamingConversationId).ConfigureAwait(false);
             var decision = analyzed.IsSuccess && analyzed.Value != null
                 ? analyzed.Value
-                : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skill = "NONE" };
+                : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skills = new[] { "NONE" } };
             pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
             var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(streamingAssistantMode);
-            composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.Skill);
+            composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.GetNormalizedSkillIds());
 
             var reveal = await _settingsService.GetAsync("Chat.StreamingReveal", "balanced").ConfigureAwait(false);
             var displayOptions = ChatStreamingDisplayOptions.Parse(reveal);

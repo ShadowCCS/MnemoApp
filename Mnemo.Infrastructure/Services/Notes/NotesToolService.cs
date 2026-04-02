@@ -67,7 +67,8 @@ public sealed class NotesToolService
         if (!string.IsNullOrWhiteSpace(p.Search))
         {
             var q = p.Search.Trim();
-            ordered = ordered.Where(n => NoteMatchesListSearch(n, q)).ToList();
+            var fuzzy = p.Fuzzy ?? true;
+            ordered = ordered.Where(n => NoteMatchesListSearch(n, q, fuzzy)).ToList();
         }
 
         var slice = ordered.Take(limit).ToList();
@@ -140,7 +141,14 @@ public sealed class NotesToolService
             });
         }
 
-        var q = p.Query.Trim();
+        var rawQuery = p.Query.Trim();
+        var tokens = TextSearchMatch.ResolveSearchTokens(rawQuery);
+        if (tokens.Count == 0)
+            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "query has no searchable tokens.");
+
+        var matchAll = p.MatchAll ?? false;
+        var fuzzy = p.Fuzzy ?? true;
+
         var all = (await _notes.GetAllNotesAsync().ConfigureAwait(false)).ToList();
         var hits = new List<object>();
 
@@ -148,32 +156,60 @@ public sealed class NotesToolService
         {
             NoteDocumentHelper.EnsureBlocks(note);
             var blocks = note.Blocks ?? [];
+            var title = note.Title ?? string.Empty;
+            var titleMatched = TextSearchMatch.MatchTokens(title, tokens, matchAll, fuzzy);
+            var anyBlockHit = false;
 
             foreach (var b in blocks.OrderBy(x => x.Order))
             {
                 b.EnsureInlineRuns();
                 var text = b.Content ?? string.Empty;
-                if (text.Contains(q, StringComparison.OrdinalIgnoreCase))
+                if (!TextSearchMatch.MatchTokens(text, tokens, matchAll, fuzzy))
+                    continue;
+
+                anyBlockHit = true;
+                string snippet;
+                if (TextSearchMatch.TryGetSnippetSpan(text, tokens, fuzzy, out var snStart, out var snLen))
+                    snippet = text.Substring(snStart, snLen);
+                else
+                    snippet = text.Length <= 120 ? text : text[..120];
+
+                hits.Add(new
                 {
-                    var idx = text.IndexOf(q, StringComparison.OrdinalIgnoreCase);
-                    var start = Math.Max(0, idx - 40);
-                    var len = Math.Min(text.Length - start, q.Length + 80);
-                    var snippet = text.Substring(start, len);
-                    hits.Add(new
-                    {
-                        note_id = note.NoteId,
-                        title = note.Title,
-                        block_id = b.Id,
-                        block_type = b.Type.ToString(),
-                        snippet
-                    });
-                    if (hits.Count >= limit) goto done;
-                }
+                    note_id = note.NoteId,
+                    title = note.Title,
+                    block_id = b.Id,
+                    block_type = b.Type.ToString(),
+                    snippet
+                });
+                if (hits.Count >= limit) goto done;
             }
 
-            if (!blocks.Any() && (note.Title?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false))
+            if (!anyBlockHit && titleMatched && blocks.Count > 0)
             {
-                hits.Add(new { note_id = note.NoteId, title = note.Title, block_id = (string?)null, block_type = "Title", snippet = note.Title });
+                var t = title.Length > 120 ? title[..120] : title;
+                hits.Add(new
+                {
+                    note_id = note.NoteId,
+                    title = note.Title,
+                    block_id = (string?)null,
+                    block_type = "Title",
+                    snippet = t
+                });
+                if (hits.Count >= limit) goto done;
+            }
+
+            if (blocks.Count == 0 && titleMatched)
+            {
+                var t = title.Length > 120 ? title[..120] : title;
+                hits.Add(new
+                {
+                    note_id = note.NoteId,
+                    title = note.Title,
+                    block_id = (string?)null,
+                    block_type = "Title",
+                    snippet = t
+                });
                 if (hits.Count >= limit) goto done;
             }
         }
@@ -618,31 +654,23 @@ public sealed class NotesToolService
         return null;
     }
 
-    private static bool NoteMatchesListSearch(Note n, string q)
+    private static bool NoteMatchesListSearch(Note n, string q, bool fuzzy)
     {
         var title = n.Title ?? string.Empty;
         var body = NoteDocumentHelper.GetPlainText(n);
+        var hay = title + "\n" + body;
 
-        if (title.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-            body.Contains(q, StringComparison.OrdinalIgnoreCase))
+        if (hay.Contains(q, StringComparison.OrdinalIgnoreCase))
             return true;
 
-        var tokens = SplitListSearchTokens(q);
-        if (tokens.Count < 2)
+        var tokens = TextSearchMatch.ResolveSearchTokens(q);
+        if (tokens.Count == 0)
             return false;
 
-        return tokens.Exists(t =>
-            title.Contains(t, StringComparison.OrdinalIgnoreCase) ||
-            body.Contains(t, StringComparison.OrdinalIgnoreCase));
-    }
+        if (tokens.Count == 1)
+            return TextSearchMatch.MatchTokens(hay, tokens, matchAll: true, fuzzy);
 
-    private static List<string> SplitListSearchTokens(string q)
-    {
-        return q.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-            .Select(t => t.Trim().Trim(',', '.', ';', ':', '"', '\'', '!', '?'))
-            .Where(t => t.Length >= 2)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return TextSearchMatch.MatchTokens(hay, tokens, matchAll: false, fuzzy);
     }
 
     private static HashSet<string> Tokenize(string text)

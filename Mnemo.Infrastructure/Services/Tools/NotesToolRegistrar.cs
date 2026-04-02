@@ -20,7 +20,7 @@ public static class NotesToolRegistrar
             "Creates a new note. Prefer update_note / append_to_note / insert_blocks when a note already exists.",
             svc.CreateNoteAsync);
         Reg<ListNotesParameters>("list_notes",
-            "Lists notes (newest first). Optional search matches title or body.",
+            "Lists notes (newest first). Optional search: comma/space-separated keywords (OR); optional fuzzy (default true) tolerates small typos.",
             svc.ListNotesAsync);
         Reg<NoteIdParameters>("get_note",
             "Returns full structured block content for a note (canonical read).",
@@ -32,7 +32,7 @@ public static class NotesToolRegistrar
             "Alias for get_note (legacy). Full block content.",
             svc.ReadNoteAsync);
         Reg<SearchNotesParameters>("search_notes",
-            "Full-text search across notes with block-level snippets. mode=text (default) or semantic (knowledge base, may not map to notes).",
+            "Search notes with block snippets. query: comma/space-separated keywords; match_all=true requires every keyword (AND); fuzzy (default true) allows typos. mode=text or semantic (knowledge base).",
             svc.SearchNotesAsync);
         Reg<GetRecentNotesParameters>("get_recent_notes",
             "Recency-ordered notes for 'recent work' flows.",

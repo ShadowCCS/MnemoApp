@@ -246,7 +246,16 @@
     "ProcessThread": "Process",
     "Disclaimer": "AI can make mistakes. Verify important information.",
     "Regenerate": "Regenerate response",
-    "CopyMessage": "Copy message"
+    "CopyMessage": "Copy message",
+    "MemoryPill": "Memory",
+    "MemoryPillTooltipHint": "Conversation memory for this thread (facts from tools, rolling summary, and optional long-term recall).",
+    "MemoryPillSectionSummary": "Rolling summary",
+    "MemoryPillActiveSkill": "Active skill",
+    "MemoryPillKeyFacts": "Key facts",
+    "MemoryPillSectionWorking": "Working memory (facts)",
+    "MemoryPillTurnCount": "Turns",
+    "MemoryPillLastSummarized": "Last summarized through turn",
+    "MemoryPillTier3On": "Long-term recall: embedded in knowledge store for this chat."
   },
   "Notes": {
     "NewNote": "New Note",

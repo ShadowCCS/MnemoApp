@@ -46,12 +46,13 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
     public async Task<Result<RoutingAndSkillDecision>> RouteAndClassifySkillAsync(
         string userMessage,
         RoutingToolHint? recentToolHint = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        ConversationMemorySnapshot? memorySnapshot = null)
     {
         await _skillRegistry.LoadAsync(ct).ConfigureAwait(false);
         var enabledSkillsEarly = _skillRegistry.GetEnabledSkills();
         var skillIdsEarly = enabledSkillsEarly.Select(s => s.Id).ToList();
-        var userBlockEarly = RoutingAndSkillPromptBuilder.Build(userMessage, enabledSkillsEarly, recentToolHint);
+        var userBlockEarly = RoutingAndSkillPromptBuilder.Build(userMessage, enabledSkillsEarly, recentToolHint, memorySnapshot);
 
         if (await _settings.GetAsync(TeacherModelSettings.UseTeacherRoutingKey, false).ConfigureAwait(false)
             && await _teacherClient.IsConfiguredAsync(ct).ConfigureAwait(false))
@@ -64,7 +65,7 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
                 {
                     _logger.Debug(
                         "OrchestrationLayer",
-                        $"Teacher routing+skill decision: complexity={parsedTeacher.Complexity}, skill={parsedTeacher.Skill}, confidence={parsedTeacher.Confidence}, reason={parsedTeacher.Reason}");
+                        $"Teacher routing+skill decision: complexity={parsedTeacher.Complexity}, skills=[{string.Join(", ", parsedTeacher.Skills)}], confidence={parsedTeacher.Confidence}, reason={parsedTeacher.Reason}");
 
                     await TryStageManagerDatasetAsync(
                         ct,
@@ -87,7 +88,7 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
                             ParsedDecision = new ChatDatasetRoutingDecision
                             {
                                 Complexity = parsedTeacher.Complexity.ToString(),
-                                Skill = parsedTeacher.Skill,
+                                Skills = parsedTeacher.Skills,
                                 Confidence = parsedTeacher.Confidence,
                                 Reason = parsedTeacher.Reason
                             }
@@ -181,7 +182,7 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
 
             _logger.Debug(
                 "OrchestrationLayer",
-                $"Manager routing+skill decision: complexity={parsed.Complexity}, skill={parsed.Skill}, confidence={parsed.Confidence}, reason={parsed.Reason}");
+                $"Manager routing+skill decision: complexity={parsed.Complexity}, skills=[{string.Join(", ", parsed.Skills)}], confidence={parsed.Confidence}, reason={parsed.Reason}");
 
             await TryStageManagerDatasetAsync(
                 ct,
@@ -203,7 +204,7 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
                     ParsedDecision = new ChatDatasetRoutingDecision
                     {
                         Complexity = parsed.Complexity.ToString(),
-                        Skill = parsed.Skill,
+                        Skills = parsed.Skills,
                         Confidence = parsed.Confidence,
                         Reason = parsed.Reason
                     }
@@ -262,7 +263,10 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
             };
         }
 
-        var userBlock = BuildTaskUserContent(request.TaskType, request.UserMessage);
+        // convo_summarize passes the full frozen prompt from ConvoSummarizePromptBuilder; do not wrap again.
+        var userBlock = string.Equals(request.TaskType, OrchestrationTaskTypes.ConvoSummarize, StringComparison.Ordinal)
+            ? request.UserMessage
+            : BuildTaskUserContent(request.TaskType, request.UserMessage);
         var prompt = ChatPromptFormatter.Format(manager.PromptTemplate, string.Empty, userBlock);
 
         await _governor.AcquireModelAsync(manager, ct).ConfigureAwait(false);
@@ -329,4 +333,5 @@ public sealed class OrchestrationLayerService : IOrchestrationLayer
 
     private static string Truncate(string s, int maxLen) =>
         s.Length <= maxLen ? s : s[..maxLen] + "…";
+
 }

@@ -15,10 +15,10 @@ public static class TeacherModelSettings
     /// <summary>Google Cloud project id (defaults match Vertex setup in developer docs).</summary>
     public const string VertexProjectIdKey = "Developer.VertexProjectId";
 
-    /// <summary>Vertex region, e.g. europe-north1.</summary>
+    /// <summary>Vertex location: <c>global</c> (aiplatform.googleapis.com) or a region id, e.g. europe-north1 (regional host).</summary>
     public const string VertexLocationKey = "Developer.VertexLocation";
 
-    /// <summary>Model id under publishers/google/models, e.g. gemini-3.1-pro-preview.</summary>
+    /// <summary>Model id under publishers/google/models, e.g. gemini-3.1-pro.</summary>
     public const string VertexModelIdKey = "Developer.VertexModelId";
 
     /// <summary>Chat / streaming / tools: temperature (0–2), stored as string for text field parsing.</summary>
@@ -46,7 +46,7 @@ public static class TeacherModelSettings
     public const string ChatStylePromptKey = "Developer.TeacherChatStylePrompt";
 
     public const string DefaultProjectId = "mnmo-490214";
-    public const string DefaultLocation = "europe-north1";
+    public const string DefaultLocation = "global";
     public const string DefaultModelId = "gemini-3.1-flash-lite-preview";
 
     public const string DefaultChatTemperatureString = "0.7";

@@ -41,6 +41,8 @@ public class AIOrchestrator : IAIOrchestrator
     private readonly ITeacherModelClient _teacherClient;
     private readonly IRoutingToolHintStore _routingToolHintStore;
     private readonly ISkillInjectionOverrideStore _skillInjectionOverrideStore;
+    private readonly IToolResultMemoryExtractor _memoryExtractor;
+    private readonly IConversationMemoryStore _memoryStore;
 
     private readonly object _selectModelLock = new();
     private List<AIModelManifest>? _cachedModels;
@@ -74,7 +76,9 @@ public class AIOrchestrator : IAIOrchestrator
         IToolDispatcher toolDispatcher,
         ITeacherModelClient teacherClient,
         IRoutingToolHintStore routingToolHintStore,
-        ISkillInjectionOverrideStore skillInjectionOverrideStore)
+        ISkillInjectionOverrideStore skillInjectionOverrideStore,
+        IToolResultMemoryExtractor memoryExtractor,
+        IConversationMemoryStore memoryStore)
     {
         _modelRegistry = modelRegistry;
         _knowledgeService = knowledgeService;
@@ -93,6 +97,8 @@ public class AIOrchestrator : IAIOrchestrator
         _teacherClient = teacherClient;
         _routingToolHintStore = routingToolHintStore;
         _skillInjectionOverrideStore = skillInjectionOverrideStore;
+        _memoryExtractor = memoryExtractor;
+        _memoryStore = memoryStore;
         _hardwareDetector.SnapshotInvalidated += () => _cachedRoutingTier = null;
     }
 
@@ -207,10 +213,15 @@ public class AIOrchestrator : IAIOrchestrator
             ? null
             : _routingToolHintStore.TryGet(conversationRoutingKey);
 
-        if (recentHint == null && TryReusePrefetchRoutingDecisionForAnalyze(userMessage, out var fromPrefetch) && fromPrefetch != null)
+        var memorySnapshot = string.IsNullOrWhiteSpace(conversationRoutingKey)
+            ? null
+            : _memoryStore.Get(conversationRoutingKey);
+
+        if (recentHint == null && memorySnapshot?.LatestSummary == null
+            && TryReusePrefetchRoutingDecisionForAnalyze(userMessage, out var fromPrefetch) && fromPrefetch != null)
             return Result<RoutingAndSkillDecision>.Success(fromPrefetch);
 
-        var routed = await _orchestrationLayer.RouteAndClassifySkillAsync(userMessage, recentHint, ct).ConfigureAwait(false);
+        var routed = await _orchestrationLayer.RouteAndClassifySkillAsync(userMessage, recentHint, ct, memorySnapshot).ConfigureAwait(false);
         if (routed.IsSuccess && routed.Value != null)
             return routed;
 
@@ -218,7 +229,7 @@ public class AIOrchestrator : IAIOrchestrator
         return Result<RoutingAndSkillDecision>.Success(new RoutingAndSkillDecision
         {
             Complexity = RoutingComplexity.Simple,
-            Skill = "NONE",
+            Skills = new[] { "NONE" },
             Confidence = null
         });
     }
@@ -252,7 +263,7 @@ public class AIOrchestrator : IAIOrchestrator
             : new List<SkillToolDefinition>();
 
         // Always compose the skill-augmented system prompt so the model gets skill context on both paths
-        var finalSystemPrompt = _skillSystemPromptComposer.Compose(baseSystemPrompt, targetResolution.SkillId);
+        var finalSystemPrompt = _skillSystemPromptComposer.Compose(baseSystemPrompt, SkillIdsForCompose(targetResolution));
         finalSystemPrompt = await AppendTeacherChatStylePromptAsync(finalSystemPrompt, targetResolution.Model, ct).ConfigureAwait(false);
 
         if (activeTools.Count > 0)
@@ -331,7 +342,7 @@ public class AIOrchestrator : IAIOrchestrator
             ? "You are Mnemo's in-app assistant. Be concise and accurate."
             : systemPrompt;
 
-        var finalSystemPrompt = _skillSystemPromptComposer.Compose(baseSystemPrompt, targetResolution.SkillId);
+        var finalSystemPrompt = _skillSystemPromptComposer.Compose(baseSystemPrompt, SkillIdsForCompose(targetResolution));
         finalSystemPrompt = await AppendTeacherChatStylePromptAsync(finalSystemPrompt, targetResolution.Model, ct).ConfigureAwait(false);
 
         var activeTools = imageBase64Contents == null || imageBase64Contents.Count == 0
@@ -482,23 +493,20 @@ public class AIOrchestrator : IAIOrchestrator
 
             _logger.Info("AIOrchestrator", $"Tool-call round {round + 1}: model requested {toolCallsThisRound.Count} tool(s).");
 
-            var assistantToolCalls = toolCallsThisRound.Select(tc => new
-            {
-                id = tc.Id,
-                type = "function",
-                function = new { name = tc.Name, arguments = tc.ArgumentsJson }
-            }).ToArray();
+            var assistantToolCalls = toolCallsThisRound.Select(AssistantToolCallEntry).ToArray();
 
             var assistantPreamble = NormalizeAssistantToolRoundContent(contentBuffer);
             messages.Add(new { role = "assistant", content = assistantPreamble, tool_calls = assistantToolCalls });
 
+            var currentTurnNumber = _memoryStore.Get(conversationRoutingKey ?? string.Empty)?.TurnCount ?? 0;
             var datasetCallsThisRound = new List<ChatDatasetToolCall>(toolCallsThisRound.Count);
             foreach (var toolCall in toolCallsThisRound)
             {
                 ct.ThrowIfCancellationRequested();
                 pipelineStatus?.Report(ChatPipelineStatusKeys.RunningTool(toolCall.Name));
                 var result = await _toolDispatcher.DispatchAsync(toolCall, new ToolDispatchScope(conversationRoutingKey), ct).ConfigureAwait(false);
-                RecordRoutingToolHint(conversationRoutingKey, resolution.SkillId, toolCall.Name, result.Content);
+                RecordRoutingToolHint(conversationRoutingKey, PrimarySkillForRoutingHint(resolution), toolCall.Name, result.Content);
+                ExtractAndStoreMemoryFacts(conversationRoutingKey, toolCall.Name, result.Content, currentTurnNumber);
                 messages.Add(new { role = "tool", tool_call_id = result.ToolCallId, name = result.Name, content = result.Content });
                 
                 var dsCall = new ChatDatasetToolCall
@@ -615,24 +623,21 @@ public class AIOrchestrator : IAIOrchestrator
             _logger.Info("AIOrchestrator", $"Tool-call round {round + 1}: model requested {toolCallsThisRound.Count} tool(s).");
 
             // Build the assistant message that carries the tool-call requests
-            var assistantToolCalls = toolCallsThisRound.Select(tc => new
-            {
-                id = tc.Id,
-                type = "function",
-                function = new { name = tc.Name, arguments = tc.ArgumentsJson }
-            }).ToArray();
+            var assistantToolCalls = toolCallsThisRound.Select(AssistantToolCallEntry).ToArray();
 
             var assistantPreamble = NormalizeAssistantToolRoundContent(contentBuffer);
             messages.Add(new { role = "assistant", content = assistantPreamble, tool_calls = assistantToolCalls });
 
             // Dispatch all tool calls in this round and append their results
+            var currentTurnNumber2 = _memoryStore.Get(conversationRoutingKey ?? string.Empty)?.TurnCount ?? 0;
             var datasetCallsThisRound = new List<ChatDatasetToolCall>(toolCallsThisRound.Count);
             foreach (var toolCall in toolCallsThisRound)
             {
                 ct.ThrowIfCancellationRequested();
                 pipelineStatus?.Report(ChatPipelineStatusKeys.RunningTool(toolCall.Name));
                 var result = await _toolDispatcher.DispatchAsync(toolCall, new ToolDispatchScope(conversationRoutingKey), ct).ConfigureAwait(false);
-                RecordRoutingToolHint(conversationRoutingKey, resolution.SkillId, toolCall.Name, result.Content);
+                RecordRoutingToolHint(conversationRoutingKey, PrimarySkillForRoutingHint(resolution), toolCall.Name, result.Content);
+                ExtractAndStoreMemoryFacts(conversationRoutingKey, toolCall.Name, result.Content, currentTurnNumber2);
                 messages.Add(new { role = "tool", tool_call_id = result.ToolCallId, name = result.Name, content = result.Content });
                 
                 var dsCall = new ChatDatasetToolCall
@@ -680,6 +685,21 @@ public class AIOrchestrator : IAIOrchestrator
         }
     }
 
+    /// <summary>OpenAI-style tool_calls entry; includes <c>thought_signature</c> when the provider returned one (Gemini 3 Vertex).</summary>
+    private static object AssistantToolCallEntry(ToolCallRequest tc)
+    {
+        if (string.IsNullOrEmpty(tc.ThoughtSignature))
+            return new { id = tc.Id, type = "function", function = new { name = tc.Name, arguments = tc.ArgumentsJson } };
+
+        return new Dictionary<string, object?>
+        {
+            ["id"] = tc.Id,
+            ["type"] = "function",
+            ["function"] = new Dictionary<string, object?> { ["name"] = tc.Name, ["arguments"] = tc.ArgumentsJson },
+            ["thought_signature"] = tc.ThoughtSignature
+        };
+    }
+
     /// <summary>
     /// OpenAI-style assistant <c>content</c> for a turn that also includes <c>tool_calls</c>: omit when empty so payloads stay compact.
     /// </summary>
@@ -698,6 +718,28 @@ public class AIOrchestrator : IAIOrchestrator
             return;
 
         _routingToolHintStore.Record(conversationRoutingKey, skillId, toolName, TruncateRoutingDetail(resultContent));
+    }
+
+    private void ExtractAndStoreMemoryFacts(string? conversationRoutingKey, string toolName, string? resultContent, int turnNumber)
+    {
+        if (string.IsNullOrWhiteSpace(conversationRoutingKey) || string.IsNullOrWhiteSpace(resultContent))
+            return;
+
+        try
+        {
+            var n = 0;
+            foreach (var fact in _memoryExtractor.Extract(toolName, resultContent, turnNumber))
+            {
+                _memoryStore.AddFact(conversationRoutingKey, fact);
+                n++;
+            }
+            if (n > 0)
+                _logger.Debug("Memory", $"Orchestrator: extracted {n} fact(s) from tool={toolName} conv={conversationRoutingKey}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning("Memory", $"Orchestrator: fact extraction failed for tool {toolName}: {ex.Message}");
+        }
     }
 
     private static string? TruncateRoutingDetail(string? s, int maxLen = 400)
@@ -766,6 +808,7 @@ public class AIOrchestrator : IAIOrchestrator
                 Model = model,
                 RoutingComplexity = RoutingComplexity.Simple,
                 SkillId = "NONE",
+                ResolvedSkillIds = new[] { "NONE" },
                 ManagerConfidence = null
             },
             ct).ConfigureAwait(false);
@@ -905,15 +948,18 @@ public class AIOrchestrator : IAIOrchestrator
 
         if (lowModel == null)
         {
-            var skillId = precomputedDecision?.Skill ?? "NONE";
+            var skillIds = precomputedDecision?.GetNormalizedSkillIds() ?? new[] { "NONE" };
+            var skillId = skillIds.Count > 0 ? skillIds[0] : "NONE";
+            var displayId = skillIds.Count > 1 ? string.Join(",", skillIds) : skillId;
             var res = await FinalizeRoutingResolutionAsync(
                 WithSkillInjectionOverride(
                     new RoutingResolution
                     {
                         Model = models?.FirstOrDefault(m => m.Type == AIModelType.Text),
                         RoutingComplexity = RoutingComplexity.Simple,
-                        SkillId = skillId,
-                        InjectionContext = _skillRegistry.GetInjection(skillId)
+                        SkillId = displayId,
+                        ResolvedSkillIds = skillIds,
+                        InjectionContext = _skillRegistry.GetMergedInjection(skillIds)
                     },
                     conversationRoutingKey),
                 ct).ConfigureAwait(false);
@@ -960,6 +1006,7 @@ public class AIOrchestrator : IAIOrchestrator
                         Model = lowModel,
                         RoutingComplexity = RoutingComplexity.Simple,
                         SkillId = "NONE",
+                        ResolvedSkillIds = new[] { "NONE" },
                         ManagerConfidence = null,
                         InjectionContext = _skillRegistry.GetInjection("NONE")
                     },
@@ -971,10 +1018,12 @@ public class AIOrchestrator : IAIOrchestrator
         var hardware = _hardwareDetector.Detect();
         var tier = _cachedRoutingTier ??= _hardwareTierEvaluator.EvaluateTier(hardware);
 
-        _logger.Info("AIOrchestrator", $"Orchestration routing: complexity={decision.Complexity}, skill={decision.Skill}, hardwareTier={tier}, confidence={decision.Confidence}, reason={decision.Reason}");
+        var normalizedIds = decision.GetNormalizedSkillIds();
+        var displaySkillId = normalizedIds.Count > 1 ? string.Join(",", normalizedIds) : normalizedIds[0];
+        _logger.Info("AIOrchestrator", $"Orchestration routing: complexity={decision.Complexity}, skill={displaySkillId}, hardwareTier={tier}, confidence={decision.Confidence}, reason={decision.Reason}");
         pipelineStatus?.Report(ChatPipelineStatusKeys.PreparingModel);
 
-        var injectionContext = _skillRegistry.GetInjection(decision.Skill);
+        var injectionContext = _skillRegistry.GetMergedInjection(normalizedIds);
 
         if (decision.Complexity == RoutingComplexity.Simple)
         {
@@ -984,7 +1033,8 @@ public class AIOrchestrator : IAIOrchestrator
                     {
                         Model = lowModel,
                         RoutingComplexity = RoutingComplexity.Simple,
-                        SkillId = decision.Skill,
+                        SkillId = displaySkillId,
+                        ResolvedSkillIds = normalizedIds,
                         ManagerConfidence = decision.Confidence,
                         InjectionContext = injectionContext
                     },
@@ -1007,7 +1057,8 @@ public class AIOrchestrator : IAIOrchestrator
                 {
                     Model = target,
                     RoutingComplexity = RoutingComplexity.Reasoning,
-                    SkillId = decision.Skill,
+                    SkillId = displaySkillId,
+                    ResolvedSkillIds = normalizedIds,
                     ManagerConfidence = decision.Confidence,
                     InjectionContext = injectionContext
                 },
@@ -1108,16 +1159,18 @@ public class AIOrchestrator : IAIOrchestrator
         var sid = skillOverride.Trim();
         if (string.IsNullOrWhiteSpace(sid) || string.Equals(sid, "NONE", StringComparison.OrdinalIgnoreCase))
         {
-            return r with
-            {
-                SkillId = "NONE",
-                InjectionContext = _skillRegistry.GetInjection("NONE")
-            };
+        return r with
+        {
+            SkillId = "NONE",
+            ResolvedSkillIds = new[] { "NONE" },
+            InjectionContext = _skillRegistry.GetInjection("NONE")
+        };
         }
 
         return r with
         {
             SkillId = sid,
+            ResolvedSkillIds = new[] { sid },
             InjectionContext = _skillRegistry.GetInjection(sid)
         };
     }
@@ -1133,6 +1186,7 @@ public class AIOrchestrator : IAIOrchestrator
             Model = TeacherSyntheticManifest.CreateChatModel(),
             RoutingComplexity = r.RoutingComplexity,
             SkillId = r.SkillId,
+            ResolvedSkillIds = r.ResolvedSkillIds,
             ManagerConfidence = r.ManagerConfidence,
             InjectionContext = r.InjectionContext
         };
@@ -1274,10 +1328,31 @@ public class AIOrchestrator : IAIOrchestrator
     {
         public AIModelManifest? Model { get; init; }
         public RoutingComplexity RoutingComplexity { get; init; }
+        /// <summary>Display id: one skill, or comma-separated when multiple.</summary>
         public string SkillId { get; init; }
+        /// <summary>Ordered ids for merged injection; when null, <see cref="SkillId"/> is treated as a single skill.</summary>
+        public IReadOnlyList<string>? ResolvedSkillIds { get; init; }
         public string? ManagerConfidence { get; init; }
         /// <summary>Resolved skill injection context, including enabled tool definitions for this turn.</summary>
         public SkillInjectionContext? InjectionContext { get; init; }
+    }
+
+    private static IReadOnlyList<string> SkillIdsForCompose(RoutingResolution r)
+    {
+        if (r.ResolvedSkillIds is { Count: > 0 })
+            return r.ResolvedSkillIds;
+        var s = string.IsNullOrWhiteSpace(r.SkillId) ? "NONE" : r.SkillId.Trim();
+        if (s.Contains(',', StringComparison.Ordinal))
+            return s.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return new[] { s };
+    }
+
+    private static string PrimarySkillForRoutingHint(RoutingResolution r)
+    {
+        if (r.ResolvedSkillIds is { Count: > 0 })
+            return r.ResolvedSkillIds[0];
+        var first = r.SkillId.Split(',')[0].Trim();
+        return string.IsNullOrEmpty(first) ? "NONE" : first;
     }
 
     public async Task WarmUpLowTierModelAsync(CancellationToken ct = default)
@@ -1328,7 +1403,7 @@ public class AIOrchestrator : IAIOrchestrator
             ? "You are Mnemo's in-app assistant. Be concise and accurate."
             : systemPrompt;
 
-        var finalSystemPrompt = _skillSystemPromptComposer.Compose(effectiveSystemPrompt, targetResolution.SkillId);
+        var finalSystemPrompt = _skillSystemPromptComposer.Compose(effectiveSystemPrompt, SkillIdsForCompose(targetResolution));
         var formattedPrompt = ChatPromptFormatter.Format(targetResolution.Model.PromptTemplate, finalSystemPrompt, userPrompt);
         return await PromptWithModelAsync(targetResolution.Model.Id, formattedPrompt, ct, responseJsonSchema).ConfigureAwait(false);
     }

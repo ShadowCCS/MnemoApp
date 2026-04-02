@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Mnemo.Core.Services;
 
 namespace Mnemo.Infrastructure.Services.AI;
@@ -18,6 +19,15 @@ public sealed class SkillSystemPromptComposer : ISkillSystemPromptComposer
     public string Compose(string baseSystemPrompt, string? skillId)
     {
         var injection = _skillRegistry.GetInjection(skillId);
+        if (string.IsNullOrWhiteSpace(injection.SystemPromptFragment))
+            return baseSystemPrompt;
+
+        return $"{baseSystemPrompt}\n\n{SkillBehaviorGuardrails}\n{injection.SystemPromptFragment}";
+    }
+
+    public string Compose(string baseSystemPrompt, IReadOnlyList<string> skillIds)
+    {
+        var injection = _skillRegistry.GetMergedInjection(skillIds);
         if (string.IsNullOrWhiteSpace(injection.SystemPromptFragment))
             return baseSystemPrompt;
 

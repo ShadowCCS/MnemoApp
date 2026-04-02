@@ -245,7 +245,16 @@
       "ProcessThread": "処理",
       "Disclaimer": "AIは間違いを犯す可能性があります。重要な情報は確認してください。",
       "Regenerate": "返答を再生成",
-      "CopyMessage": "メッセージをコピー"
+      "CopyMessage": "メッセージをコピー",
+      "MemoryPill": "メモリ",
+      "MemoryPillTooltipHint": "このスレッドの会話メモリ（ツールの事実、要約、長期リコールの有無）。",
+      "MemoryPillSectionSummary": "ローリング要約",
+      "MemoryPillActiveSkill": "アクティブスキル",
+      "MemoryPillKeyFacts": "重要な事実",
+      "MemoryPillSectionWorking": "ワーキングメモリ（事実）",
+      "MemoryPillTurnCount": "ターン数",
+      "MemoryPillLastSummarized": "最終要約までのターン",
+      "MemoryPillTier3On": "長期リコール: このチャット用に知識ストアへ埋め込み済み。"
     },
     "Notes": {
       "NewNote": "新しいノート",

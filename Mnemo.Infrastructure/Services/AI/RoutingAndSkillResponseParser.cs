@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using Mnemo.Core.Models;
 
@@ -16,10 +17,6 @@ internal static class RoutingAndSkillResponseParser
             using var doc = JsonDocument.Parse(raw.Trim());
             var root = doc.RootElement;
 
-            if (!root.TryGetProperty("skill", out var skillProp) || skillProp.ValueKind != JsonValueKind.String)
-                return null;
-
-            // Models often omit "complexity" even though the contract asks for it; default to simple.
             RoutingComplexity complexity = RoutingComplexity.Simple;
             if (root.TryGetProperty("complexity", out var complexityProp) &&
                 complexityProp.ValueKind == JsonValueKind.String &&
@@ -28,9 +25,18 @@ internal static class RoutingAndSkillResponseParser
                 complexity = RoutingComplexity.Reasoning;
             }
 
-            var skill = skillProp.GetString();
-            if (string.IsNullOrWhiteSpace(skill))
-                skill = "NONE";
+            var skillsList = TryParseSkillsArray(root);
+            if (skillsList == null &&
+                root.TryGetProperty("skill", out var skillProp) &&
+                skillProp.ValueKind == JsonValueKind.String)
+            {
+                var one = skillProp.GetString();
+                if (!string.IsNullOrWhiteSpace(one))
+                    skillsList = new List<string> { one.Trim() };
+            }
+
+            if (skillsList == null || skillsList.Count == 0)
+                return null;
 
             string? confidence = null;
             if (root.TryGetProperty("confidence", out var confProp) && confProp.ValueKind == JsonValueKind.String)
@@ -43,7 +49,7 @@ internal static class RoutingAndSkillResponseParser
             return new RoutingAndSkillDecision
             {
                 Complexity = complexity,
-                Skill = skill!,
+                Skills = skillsList,
                 Confidence = confidence,
                 Reason = reason
             };
@@ -52,5 +58,25 @@ internal static class RoutingAndSkillResponseParser
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// New contract: non-empty <c>skills</c> array. Returns null if absent or empty.
+    /// </summary>
+    private static List<string>? TryParseSkillsArray(JsonElement root)
+    {
+        if (!root.TryGetProperty("skills", out var skillsProp) || skillsProp.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var list = new List<string>();
+        foreach (var el in skillsProp.EnumerateArray())
+        {
+            if (el.ValueKind != JsonValueKind.String) continue;
+            var s = el.GetString();
+            if (!string.IsNullOrWhiteSpace(s))
+                list.Add(s.Trim());
+        }
+
+        return list.Count > 0 ? list : null;
     }
 }

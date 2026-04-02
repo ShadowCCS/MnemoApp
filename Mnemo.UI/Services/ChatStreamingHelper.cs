@@ -108,6 +108,25 @@ Response length: DETAILED. Be thorough: explain reasoning, add examples, steps, 
     }
 
     /// <summary>
+    /// Full session transcript as <see cref="ConversationTurn"/> list (no <see cref="MaxContextMessageCount"/> cap).
+    /// Use for memory summarization so "new turns since last summary" is not truncated.
+    /// Oldest first; include the latest assistant reply once it is finalized.
+    /// </summary>
+    public static IReadOnlyList<ConversationTurn> BuildFullConversationHistory<T>(
+        IList<T> messages,
+        Func<T, bool> isUser,
+        Func<T, string> getContent)
+    {
+        if (messages == null || messages.Count == 0) return Array.Empty<ConversationTurn>();
+
+        return messages
+            .Select(m => new ConversationTurn(
+                isUser(m) ? ConversationRole.User : ConversationRole.Assistant,
+                getContent(m)))
+            .ToList();
+    }
+
+    /// <summary>
     /// Flat transcript for dataset logging after a turn finishes. Includes every message in the window,
     /// including the assistant reply for the current turn (pass <paramref name="excludeMessage"/> as null).
     /// </summary>

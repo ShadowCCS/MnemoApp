@@ -90,6 +90,59 @@ public sealed class SkillRegistry : ISkillRegistry
         };
     }
 
+    public SkillInjectionContext GetMergedInjection(IReadOnlyList<string>? skillIds)
+    {
+        if (skillIds == null || skillIds.Count == 0)
+            return new SkillInjectionContext();
+
+        var distinct = new List<string>();
+        foreach (var id in skillIds)
+        {
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            var t = id.Trim();
+            if (string.Equals(t, "NONE", StringComparison.OrdinalIgnoreCase)) continue;
+            if (distinct.Exists(x => string.Equals(x, t, StringComparison.OrdinalIgnoreCase))) continue;
+            distinct.Add(t);
+        }
+
+        if (distinct.Count == 0)
+            return new SkillInjectionContext();
+
+        if (distinct.Count == 1)
+            return GetInjection(distinct[0]);
+
+        var fragments = new List<string>();
+        var tools = new List<SkillToolDefinition>();
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var skillId in distinct)
+        {
+            var inj = GetInjection(skillId);
+            if (!string.IsNullOrWhiteSpace(inj.SystemPromptFragment))
+                fragments.Add(inj.SystemPromptFragment);
+
+            foreach (var t in inj.Tools)
+            {
+                if (string.IsNullOrWhiteSpace(t.Name))
+                    continue;
+                if (!seenNames.Add(t.Name))
+                {
+                    _logger.Debug("SkillRegistry",
+                        $"Merged injection: duplicate tool name '{t.Name}' when merging skills; keeping first.");
+                    continue;
+                }
+
+                tools.Add(t);
+            }
+        }
+
+        return new SkillInjectionContext
+        {
+            SystemPromptFragment = fragments.Count == 0 ? null : string.Join("\n\n", fragments),
+            Tools = tools
+        };
+    }
+
     public IReadOnlyList<(string SkillId, SkillToolDefinition Tool)> GetAllEnabledManifestTools()
     {
         lock (_lock)

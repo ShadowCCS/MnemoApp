@@ -2,12 +2,13 @@
   "tools": [
     {
       "name": "list_mindmaps",
-      "description": "Lists mindmaps. Optional search filters title; limit caps results.",
+      "description": "Lists mindmaps. Optional search: keywords on title (OR); fuzzy (default true) allows typos. limit caps results.",
       "parameters": {
         "type": "object",
         "properties": {
           "search": { "type": "string" },
-          "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "fuzzy": { "type": "boolean" }
         }
       },
       "enabled": true

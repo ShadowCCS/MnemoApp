@@ -182,12 +182,22 @@ public sealed class DatasetExporter
 
     private static string BuildCompletionFromDecision(ChatDatasetRoutingDecision d)
     {
-        // Reconstruct minimal JSON matching the training format from v1
         var obj = new JsonObject();
         if (!string.IsNullOrWhiteSpace(d.Complexity))
             obj["complexity"] = d.Complexity.ToLowerInvariant();
-        if (!string.IsNullOrWhiteSpace(d.Skill))
-            obj["skill"] = d.Skill;
+
+        var arr = new JsonArray();
+        if (d.Skills is { Count: > 0 })
+        {
+            foreach (var s in d.Skills)
+                arr.Add(s);
+        }
+        else if (!string.IsNullOrWhiteSpace(d.LegacySkill))
+            arr.Add(d.LegacySkill.Trim());
+        else
+            arr.Add("NONE");
+        obj["skills"] = arr;
+
         if (!string.IsNullOrWhiteSpace(d.Confidence))
             obj["confidence"] = d.Confidence.ToLowerInvariant();
         if (!string.IsNullOrWhiteSpace(d.Reason))
@@ -377,6 +387,95 @@ public sealed class DatasetExporter
 
         return new { role = msg.Role, content = msg.Content ?? "" };
     }
+
+    // ──────────────────────────────────────────────
+    // Memory system dataset exports
+    // ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Writes a <c>convo_summarize_dataset.jsonl</c> file from the provided generated examples.
+    /// Each line is a <c>{ prompt, completion }</c> pair matching the manager fine-tuning format.
+    /// </summary>
+    /// <param name="examples">Examples produced by <see cref="ConvoSummarizeDatasetBuilder"/>.</param>
+    /// <param name="outputPath">Full path for the output JSONL file.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task<DatasetMemoryExportResult> ExportManagerSummarizationDatasetAsync(
+        IReadOnlyList<DatasetSummarizationExample> examples,
+        string outputPath,
+        CancellationToken ct = default)
+    {
+        if (examples == null || examples.Count == 0)
+            return new DatasetMemoryExportResult { IsSuccess = true, RowCount = 0, OutputPath = outputPath };
+
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? ".");
+
+        var lines = examples
+            .Where(e => !string.IsNullOrWhiteSpace(e.Prompt) && !string.IsNullOrWhiteSpace(e.Completion))
+            .Select(e => JsonSerializer.Serialize(new { prompt = e.Prompt, completion = e.Completion }, WriteOptions))
+            .ToList();
+
+        await File.WriteAllLinesAsync(outputPath, lines, Encoding.UTF8, ct).ConfigureAwait(false);
+
+        var bySeedType = examples
+            .GroupBy(e => e.SeedType)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        _logger.Info("DatasetExporter",
+            $"Wrote {lines.Count} convo_summarize examples to {outputPath} " +
+            $"({string.Join(", ", bySeedType.Select(kvp => $"{kvp.Key}:{kvp.Value}"))})");
+
+        return new DatasetMemoryExportResult
+        {
+            IsSuccess = true,
+            RowCount = lines.Count,
+            OutputPath = outputPath,
+            RowsBySeedType = bySeedType
+        };
+    }
+
+    /// <summary>
+    /// Writes a <c>routing_with_context_dataset.jsonl</c> file from the provided generated examples.
+    /// Each line is a <c>{ prompt, completion }</c> pair for context-aware routing fine-tuning.
+    /// </summary>
+    /// <param name="examples">Examples produced by <see cref="RoutingWithContextDatasetBuilder"/>.</param>
+    /// <param name="outputPath">Full path for the output JSONL file.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task<DatasetMemoryExportResult> ExportRoutingWithContextDatasetAsync(
+        IReadOnlyList<DatasetRoutingWithContextExample> examples,
+        string outputPath,
+        CancellationToken ct = default)
+    {
+        if (examples == null || examples.Count == 0)
+            return new DatasetMemoryExportResult { IsSuccess = true, RowCount = 0, OutputPath = outputPath };
+
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? ".");
+
+        var lines = examples
+            .Where(e => !string.IsNullOrWhiteSpace(e.Prompt) && !string.IsNullOrWhiteSpace(e.Completion))
+            .Select(e => JsonSerializer.Serialize(new { prompt = e.Prompt, completion = e.Completion }, WriteOptions))
+            .ToList();
+
+        await File.WriteAllLinesAsync(outputPath, lines, Encoding.UTF8, ct).ConfigureAwait(false);
+
+        var bySeedType = examples
+            .GroupBy(e => e.SeedType)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var shortFollowUpCount = examples.Count(e => e.IsShortFollowUp);
+        _logger.Info("DatasetExporter",
+            $"Wrote {lines.Count} routing_with_context examples to {outputPath} " +
+            $"(short_followup={shortFollowUpCount}, " +
+            $"{string.Join(", ", bySeedType.Select(kvp => $"{kvp.Key}:{kvp.Value}"))})");
+
+        return new DatasetMemoryExportResult
+        {
+            IsSuccess = true,
+            RowCount = lines.Count,
+            OutputPath = outputPath,
+            RowsBySeedType = bySeedType,
+            ShortFollowUpCount = shortFollowUpCount
+        };
+    }
 }
 
 /// <summary>Summary of a completed export operation.</summary>
@@ -394,4 +493,15 @@ public sealed class DatasetExportResult
 
     public static DatasetExportResult Failure(string message) =>
         new() { IsSuccess = false, ErrorMessage = message };
+}
+
+/// <summary>Summary of a memory-system dataset export (summarization or routing-with-context).</summary>
+public sealed class DatasetMemoryExportResult
+{
+    public bool IsSuccess { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string? OutputPath { get; init; }
+    public int RowCount { get; init; }
+    public Dictionary<string, int> RowsBySeedType { get; init; } = new();
+    public int ShortFollowUpCount { get; init; }
 }
