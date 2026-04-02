@@ -15,7 +15,9 @@ using Mnemo.Infrastructure.History;
 using Mnemo.Infrastructure.Services.AI;
 using Mnemo.Infrastructure.Services.AI.PlatformHardware;
 using Mnemo.Infrastructure.Services.Knowledge;
+using Mnemo.Infrastructure.Services.Notes;
 using Mnemo.Infrastructure.Services.Speech;
+using Mnemo.Infrastructure.Services.Tools;
 
 namespace Mnemo.UI.Services;
 
@@ -58,6 +60,22 @@ public static class Bootstrapper
         services.AddSingleton<ISkillRegistry, SkillRegistry>();
         services.AddSingleton<ISkillSystemPromptComposer, SkillSystemPromptComposer>();
         services.AddSingleton<IOrchestrationLayer, OrchestrationLayerService>();
+        services.AddSingleton<IToolResultFormatter, ToolResultFormatter>();
+        services.AddSingleton<IMainThreadDispatcher, AvaloniaMainThreadDispatcher>();
+        services.AddSingleton(sp => new NotesToolService(
+            sp.GetRequiredService<INoteService>(),
+            sp.GetRequiredService<INavigationService>(),
+            sp.GetRequiredService<IMainThreadDispatcher>(),
+            sp.GetRequiredService<IKnowledgeService>()));
+        services.AddSingleton<ApplicationToolService>();
+        services.AddSingleton<IToolDispatchAmbient, ToolDispatchAmbient>();
+        services.AddSingleton<ISkillInjectionOverrideStore, SkillInjectionOverrideStore>();
+        services.AddSingleton<SkillDiscoveryToolService>();
+        services.AddSingleton<SettingsToolService>();
+        services.AddSingleton(sp => new MindmapToolService(
+            sp.GetRequiredService<IMindmapService>(),
+            sp.GetRequiredService<INavigationService>(),
+            sp.GetRequiredService<IMainThreadDispatcher>()));
         services.AddSingleton<IToolDispatcher, ToolDispatcher>();
         services.AddSingleton<IRoutingToolHintStore, RoutingToolHintStore>();
         services.AddSingleton<IAIOrchestrator, AIOrchestrator>();
@@ -137,17 +155,14 @@ public static class Bootstrapper
         var modelRegistry = serviceProvider.GetRequiredService<IAIModelRegistry>();
         _ = modelRegistry.RefreshAsync();
         var skillRegistry = serviceProvider.GetRequiredService<ISkillRegistry>();
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                await skillRegistry.LoadAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger.Warning("Bootstrapper", $"Failed to load skill registry: {ex.Message}");
-            }
-        });
+            skillRegistry.LoadAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            logger.Warning("Bootstrapper", $"Failed to load skill registry: {ex.Message}");
+        }
 
         // 7. Auto-start manager (mini orchestration) model server
         var serverManager = serviceProvider.GetRequiredService<LlamaCppServerManager>();
@@ -192,6 +207,8 @@ public static class Bootstrapper
             module.RegisterTools(funcRegistry, serviceProvider);
             module.RegisterWidgets(widgetRegistry);
         }
+
+        ToolManifestValidator.ValidateAndLog(skillRegistry, funcRegistry, logger);
 
         return serviceProvider;
     }

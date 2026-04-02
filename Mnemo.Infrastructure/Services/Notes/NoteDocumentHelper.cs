@@ -1,0 +1,82 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Mnemo.Core.Models;
+using Mnemo.Infrastructure.Services.Notes.Markdown;
+
+namespace Mnemo.Infrastructure.Services.Notes;
+
+internal static class NoteDocumentHelper
+{
+    public static string GetPlainText(Note note)
+    {
+        EnsureBlocks(note);
+        if (note.Blocks is { Count: > 0 })
+        {
+            foreach (var b in note.Blocks)
+                b.EnsureInlineRuns();
+            return string.Join("\n\n", note.Blocks.OrderBy(b => b.Order).Select(b => b.Content));
+        }
+
+        return note.Content ?? string.Empty;
+    }
+
+    /// <summary>Ensures <see cref="Note.Blocks"/> is populated from legacy <see cref="Note.Content"/> or markdown when needed.</summary>
+    public static void EnsureBlocks(Note note)
+    {
+        if (note.Blocks is { Count: > 0 })
+        {
+            NormalizeOrders(note.Blocks);
+            return;
+        }
+
+        var raw = note.Content ?? string.Empty;
+        if (string.IsNullOrEmpty(raw))
+        {
+            note.Blocks = [];
+            return;
+        }
+
+        var parsed = NoteBlockMarkdownConverter.Deserialize(raw);
+        if (parsed.Count > 0)
+            note.Blocks = parsed;
+        else
+        {
+            note.Blocks =
+            [
+                new Block
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Type = BlockType.Text,
+                    Content = raw,
+                    Order = 0
+                }
+            ];
+        }
+
+        note.Content = string.Empty;
+        NormalizeOrders(note.Blocks);
+    }
+
+    public static void NormalizeOrders(List<Block> blocks)
+    {
+        var ordered = blocks.OrderBy(b => b.Order).ThenBy(b => b.Id).ToList();
+        for (var i = 0; i < ordered.Count; i++)
+            ordered[i].Order = i;
+        blocks.Clear();
+        blocks.AddRange(ordered);
+    }
+
+    public static object BlockToDto(Block b)
+    {
+        b.EnsureInlineRuns();
+        return new
+        {
+            block_id = b.Id,
+            type = b.Type.ToString(),
+            content = b.Content,
+            order = b.Order,
+            meta = b.Meta.Count > 0 ? b.Meta : null
+        };
+    }
+}

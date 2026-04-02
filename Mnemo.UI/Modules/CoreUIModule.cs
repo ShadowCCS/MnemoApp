@@ -1,9 +1,12 @@
+using System;
 using Mnemo.Core.Services;
-using Mnemo.UI.ViewModels;
-using Mnemo.UI.Components.Sidebar;
-using Mnemo.UI.Components.RightSidebar;
+using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Infrastructure.Services.Tools;
 using Mnemo.UI.Components;
+using Mnemo.UI.Components.RightSidebar;
+using Mnemo.UI.Components.Sidebar;
 using Mnemo.UI.Services;
+using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules;
 
@@ -20,27 +23,24 @@ public class CoreUIModule : IModule
 
     public void RegisterTranslationSources(ITranslationSourceRegistry registry)
     {
-        // No translations for core UI
     }
 
     public void RegisterRoutes(INavigationRegistry registry)
     {
-        // Global routes could go here if any
     }
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        // Global sidebar items if any
     }
 
     public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
     {
-        // Global AI tools if any
+        var app = services.GetRequiredService<ApplicationToolService>();
+        ApplicationToolRegistrar.Register(registry, app);
+        SkillDiscoveryToolRegistrar.Register(registry, services.GetRequiredService<SkillDiscoveryToolService>());
     }
 
     public void RegisterWidgets(IWidgetRegistry registry)
     {
-        // No widgets for core UI
     }
 }
-

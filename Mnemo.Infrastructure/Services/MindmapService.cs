@@ -192,6 +192,16 @@ public class MindmapService : IMindmapService
         if (!mapResult.IsSuccess) return Result<MindmapEdge>.Failure(mapResult.ErrorMessage!);
 
         var mindmap = mapResult.Value!;
+
+        if (mindmap.Nodes.All(n => n.Id != fromId))
+            return Result<MindmapEdge>.Failure($"Node '{fromId}' not found in mindmap.");
+        if (mindmap.Nodes.All(n => n.Id != toId))
+            return Result<MindmapEdge>.Failure($"Node '{toId}' not found in mindmap.");
+
+        var existingSame = mindmap.Edges.FirstOrDefault(e =>
+            e.FromId == fromId && e.ToId == toId && e.Kind == kind);
+        if (existingSame != null)
+            return Result<MindmapEdge>.Success(existingSame);
         
         if (kind == MindmapEdgeKind.Hierarchy && WouldCreateCycle(mindmap, fromId, toId))
         {

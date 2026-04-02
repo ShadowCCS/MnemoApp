@@ -90,6 +90,24 @@ public sealed class SkillRegistry : ISkillRegistry
         };
     }
 
+    public IReadOnlyList<(string SkillId, SkillToolDefinition Tool)> GetAllEnabledManifestTools()
+    {
+        lock (_lock)
+        {
+            var list = new List<(string, SkillToolDefinition)>();
+            foreach (var kv in _skills)
+            {
+                var def = kv.Value.Definition;
+                if (!def.Injection.IncludeTools)
+                    continue;
+                foreach (var t in kv.Value.Tools.Tools.Where(x => x.Enabled && !string.IsNullOrWhiteSpace(x.Name)))
+                    list.Add((kv.Key, t));
+            }
+
+            return list;
+        }
+    }
+
     private async Task<Dictionary<string, LoadedSkill>> LoadFromDiskAsync(CancellationToken ct)
     {
         var skills = new Dictionary<string, LoadedSkill>(StringComparer.OrdinalIgnoreCase);

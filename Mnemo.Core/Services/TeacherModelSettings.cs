@@ -18,7 +18,7 @@ public static class TeacherModelSettings
     /// <summary>Vertex region, e.g. europe-north1.</summary>
     public const string VertexLocationKey = "Developer.VertexLocation";
 
-    /// <summary>Model id under publishers/google/models, e.g. gemini-2.5-flash.</summary>
+    /// <summary>Model id under publishers/google/models, e.g. gemini-3.1-pro-preview.</summary>
     public const string VertexModelIdKey = "Developer.VertexModelId";
 
     /// <summary>Chat / streaming / tools: temperature (0–2), stored as string for text field parsing.</summary>
@@ -47,7 +47,7 @@ public static class TeacherModelSettings
 
     public const string DefaultProjectId = "mnmo-490214";
     public const string DefaultLocation = "europe-north1";
-    public const string DefaultModelId = "gemini-2.5-flash";
+    public const string DefaultModelId = "gemini-3.1-flash-lite-preview";
 
     public const string DefaultChatTemperatureString = "0.7";
     public const string DefaultChatMaxOutputTokensString = "65536";

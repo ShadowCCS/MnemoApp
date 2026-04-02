@@ -16,15 +16,17 @@ internal static class RoutingAndSkillResponseParser
             using var doc = JsonDocument.Parse(raw.Trim());
             var root = doc.RootElement;
 
-            if (!root.TryGetProperty("complexity", out var complexityProp) || complexityProp.ValueKind != JsonValueKind.String)
-                return null;
-
             if (!root.TryGetProperty("skill", out var skillProp) || skillProp.ValueKind != JsonValueKind.String)
                 return null;
 
-            var complexity = string.Equals(complexityProp.GetString(), "reasoning", StringComparison.OrdinalIgnoreCase)
-                ? RoutingComplexity.Reasoning
-                : RoutingComplexity.Simple;
+            // Models often omit "complexity" even though the contract asks for it; default to simple.
+            RoutingComplexity complexity = RoutingComplexity.Simple;
+            if (root.TryGetProperty("complexity", out var complexityProp) &&
+                complexityProp.ValueKind == JsonValueKind.String &&
+                string.Equals(complexityProp.GetString(), "reasoning", StringComparison.OrdinalIgnoreCase))
+            {
+                complexity = RoutingComplexity.Reasoning;
+            }
 
             var skill = skillProp.GetString();
             if (string.IsNullOrWhiteSpace(skill))

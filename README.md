@@ -166,6 +166,17 @@ Pre-built releases will be available soon. For now, build from source using the 
 
 See [coding-standard.md](coding-standard.md) for detailed coding standards and architecture guidelines.
 
+## Documentation
+
+Project documentation is available in the [`docs/`](./docs/README.md) folder, including:
+
+- student-facing how-to guides
+- architecture and startup composition
+- project-by-project references (`Mnemo.Core`, `Mnemo.Infrastructure`, `Mnemo.UI`)
+- feature module overview
+- AI skills/tooling references
+- development and testing guides
+
 ### Key Principles
 
 - **MVVM Pattern**: ViewModels contain logic, Views are declarative

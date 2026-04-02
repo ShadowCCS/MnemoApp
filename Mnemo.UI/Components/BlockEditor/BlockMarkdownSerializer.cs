@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Mnemo.Core.Models;
+using Mnemo.Infrastructure.Services.Notes.Markdown;
 
 namespace Mnemo.UI.Components.BlockEditor;
 

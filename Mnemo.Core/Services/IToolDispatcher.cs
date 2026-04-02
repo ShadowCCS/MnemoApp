@@ -10,5 +10,5 @@ namespace Mnemo.Core.Services;
 /// </summary>
 public interface IToolDispatcher
 {
-    Task<ToolCallResult> DispatchAsync(ToolCallRequest request, CancellationToken ct = default);
+    Task<ToolCallResult> DispatchAsync(ToolCallRequest request, ToolDispatchScope? scope = null, CancellationToken ct = default);
 }

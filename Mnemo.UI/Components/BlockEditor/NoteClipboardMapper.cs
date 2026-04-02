@@ -4,6 +4,8 @@ using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Models.Clipboard;
 
+using Mnemo.Infrastructure.Services.Notes.Markdown;
+
 namespace Mnemo.UI.Components.BlockEditor;
 
 public static class NoteClipboardMapper

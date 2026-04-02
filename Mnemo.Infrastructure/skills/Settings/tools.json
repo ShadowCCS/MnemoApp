@@ -1,0 +1,52 @@
+{
+  "tools": [
+    {
+      "name": "get_setting",
+      "description": "Reads an allowlisted setting. Use exact \"key\" from list_settings (e.g. Appearance.Theme). Alias \"theme\" is accepted for Appearance.Theme.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" }
+        },
+        "required": ["key"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "set_setting",
+      "description": "Writes an allowlisted setting. Keys must match list_settings (e.g. Appearance.Theme for light/dark theme); alias \"theme\" also works. Value must match the setting type.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "value": {}
+        },
+        "required": ["key", "value"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "list_settings",
+      "description": "Lists known setting keys. Optional category: App, User, Editor, AI, Appearance (theme).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": { "type": "string" }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "name": "reset_setting",
+      "description": "Resets a writable setting to its documented default.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" }
+        },
+        "required": ["key"]
+      },
+      "enabled": true
+    }
+  ]
+}

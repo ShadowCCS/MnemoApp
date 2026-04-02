@@ -5,7 +5,7 @@
   "description": "The Notes module: folders, favorites, tree, block editor, creating/editing note content, or using note tools.",
   "detection_hint": "note, notes module, folder, favorite, star, sidebar, tree, breadcrumb, block editor, create note, edit note, append, read note, list notes",
   "injection": {
-    "system_prompt_fragment": "Notes: local documents; folders and tree; favorite = star near title. Block editor: headings, lists, quotes, code, \"/\" for block menu; markdown shortcuts (e.g. \"## \" + space → H2). Tools: list_notes, read_note, create_note, update_note, append_to_note, open_note. Rule: if a suitable note already exists (by title or context), use update_note or append_to_note—avoid create_note. Prefer tools over only describing text.",
+    "system_prompt_fragment": "Notes: block editor; markdown in tools is converted to real blocks (like paste). Prefer surgical edits: get_note → replace_block / insert_blocks / append_to_note (blocks or markdown text). Use read_note_lines / replace_note_lines / insert_note_lines for line-based edits on the markdown projection. list_notes / search_notes / get_recent_notes for discovery. restructure_note only for full rewrites. Tool results are JSON: ok, code, message, data.",
     "include_tools": true
   }
 }

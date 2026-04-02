@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Threading;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 
@@ -20,34 +21,35 @@ public class ThemeService : IThemeService
         _settingsService = settingsService;
     }
 
-    public async Task ApplyThemeAsync(string themeName)
-    {
-        var app = Application.Current;
-        if (app == null) return;
-
-        var themeUri = new Uri($"avares://Mnemo.UI/Themes/Core/{themeName}/theme.axaml");
-        
-        // Find existing theme style and replace it
-        var existingTheme = app.Styles.FirstOrDefault(s => s is StyleInclude si && si.Source?.ToString().Contains("/Themes/Core/") == true);
-        
-        if (existingTheme != null)
+    public Task ApplyThemeAsync(string themeName) =>
+        Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            var index = app.Styles.IndexOf(existingTheme);
-            app.Styles[index] = new StyleInclude(new Uri("avares://Mnemo.UI/"))
-            {
-                Source = themeUri
-            };
-        }
-        else
-        {
-            app.Styles.Add(new StyleInclude(new Uri("avares://Mnemo.UI/"))
-            {
-                Source = themeUri
-            });
-        }
+            var app = Application.Current;
+            if (app == null) return;
 
-        await _settingsService.SetAsync(ThemeSettingKey, themeName);
-    }
+            var themeUri = new Uri($"avares://Mnemo.UI/Themes/Core/{themeName}/theme.axaml");
+
+            // Find existing theme style and replace it
+            var existingTheme = app.Styles.FirstOrDefault(s => s is StyleInclude si && si.Source?.ToString().Contains("/Themes/Core/") == true);
+
+            if (existingTheme != null)
+            {
+                var index = app.Styles.IndexOf(existingTheme);
+                app.Styles[index] = new StyleInclude(new Uri("avares://Mnemo.UI/"))
+                {
+                    Source = themeUri
+                };
+            }
+            else
+            {
+                app.Styles.Add(new StyleInclude(new Uri("avares://Mnemo.UI/"))
+                {
+                    Source = themeUri
+                });
+            }
+
+            await _settingsService.SetAsync(ThemeSettingKey, themeName).ConfigureAwait(false);
+        });
 
     public Task<IEnumerable<ThemeManifest>> GetAllThemesAsync()
     {

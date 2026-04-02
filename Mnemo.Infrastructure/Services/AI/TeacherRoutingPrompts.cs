@@ -12,7 +12,8 @@ internal static class TeacherRoutingPrompts
         + "\"skill\" = one of the listed skills or NONE; "
         + "optional \"confidence\" (high|medium|low); optional \"reason\" (short). "
         + "simple = quick answers; reasoning = multi-step, deep analysis, or long writing. "
-        + "Choose Application for Mnemo-the-product questions: settings, navigation, themes, what the app does, app-wide help. "
+        + "Choose Application for Mnemo-the-product questions: navigation, themes, what the app does, app-wide help. "
+        + "Choose Settings when the user wants to read or change allowlisted app preferences (language, editor/AI toggles, display name). "
         + "Choose Notes, Mindmap, or Path only when the user is clearly about that module. "
         + "Choose NONE for general study/subject chat with no app or module tie. "
         + "If [RECENT TOOL CONTEXT] appears, short follow-ups that continue that action should keep that context's skill.";

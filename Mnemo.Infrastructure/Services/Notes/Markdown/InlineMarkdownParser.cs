@@ -6,16 +6,15 @@ using Markdig.Syntax.Inlines;
 using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 
-namespace Mnemo.UI.Components.BlockEditor;
+namespace Mnemo.Infrastructure.Services.Notes.Markdown;
 
-/// <summary>Parses inline markdown into <see cref="InlineRun"/> lists using Markdig.</summary>
+/// <summary>Parses inline markdown into <see cref="InlineRun"/> lists using Markdig (shared with block editor).</summary>
 public static class InlineMarkdownParser
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
-    /// <summary>Parse markdown fragment (headings, paragraphs, line breaks) into runs.</summary>
     public static List<InlineRun> ToRuns(string? markdown)
     {
         if (string.IsNullOrEmpty(markdown))
@@ -23,7 +22,7 @@ public static class InlineMarkdownParser
 
         var doc = global::Markdig.Markdown.Parse(markdown, Pipeline);
         var runs = new List<InlineRun>();
-        bool firstBlock = true;
+        var firstBlock = true;
         foreach (var block in doc)
         {
             if (!firstBlock)
@@ -67,7 +66,7 @@ public static class InlineMarkdownParser
 
     private static void AppendBlockContainer(ContainerBlock container, List<InlineRun> runs)
     {
-        bool first = true;
+        var first = true;
         foreach (var child in container)
         {
             if (!first)
@@ -125,16 +124,13 @@ public static class InlineMarkdownParser
                 foreach (var c in container)
                     VisitInlines(c, style, runs);
                 break;
-
-            default:
-                break;
         }
     }
 
     private static string LinesToString(Markdig.Helpers.StringLineGroup lines)
     {
         var sb = new StringBuilder();
-        int i = 0;
+        var i = 0;
         foreach (var line in lines)
         {
             if (i++ > 0) sb.AppendLine();

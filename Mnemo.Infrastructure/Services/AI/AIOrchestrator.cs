@@ -40,6 +40,7 @@ public class AIOrchestrator : IAIOrchestrator
     private readonly IToolDispatcher _toolDispatcher;
     private readonly ITeacherModelClient _teacherClient;
     private readonly IRoutingToolHintStore _routingToolHintStore;
+    private readonly ISkillInjectionOverrideStore _skillInjectionOverrideStore;
 
     private readonly object _selectModelLock = new();
     private List<AIModelManifest>? _cachedModels;
@@ -72,7 +73,8 @@ public class AIOrchestrator : IAIOrchestrator
         IChatDatasetLogger chatDatasetLogger,
         IToolDispatcher toolDispatcher,
         ITeacherModelClient teacherClient,
-        IRoutingToolHintStore routingToolHintStore)
+        IRoutingToolHintStore routingToolHintStore,
+        ISkillInjectionOverrideStore skillInjectionOverrideStore)
     {
         _modelRegistry = modelRegistry;
         _knowledgeService = knowledgeService;
@@ -90,6 +92,7 @@ public class AIOrchestrator : IAIOrchestrator
         _toolDispatcher = toolDispatcher;
         _teacherClient = teacherClient;
         _routingToolHintStore = routingToolHintStore;
+        _skillInjectionOverrideStore = skillInjectionOverrideStore;
         _hardwareDetector.SnapshotInvalidated += () => _cachedRoutingTier = null;
     }
 
@@ -494,7 +497,7 @@ public class AIOrchestrator : IAIOrchestrator
             {
                 ct.ThrowIfCancellationRequested();
                 pipelineStatus?.Report(ChatPipelineStatusKeys.RunningTool(toolCall.Name));
-                var result = await _toolDispatcher.DispatchAsync(toolCall, ct).ConfigureAwait(false);
+                var result = await _toolDispatcher.DispatchAsync(toolCall, new ToolDispatchScope(conversationRoutingKey), ct).ConfigureAwait(false);
                 RecordRoutingToolHint(conversationRoutingKey, resolution.SkillId, toolCall.Name, result.Content);
                 messages.Add(new { role = "tool", tool_call_id = result.ToolCallId, name = result.Name, content = result.Content });
                 
@@ -628,7 +631,7 @@ public class AIOrchestrator : IAIOrchestrator
             {
                 ct.ThrowIfCancellationRequested();
                 pipelineStatus?.Report(ChatPipelineStatusKeys.RunningTool(toolCall.Name));
-                var result = await _toolDispatcher.DispatchAsync(toolCall, ct).ConfigureAwait(false);
+                var result = await _toolDispatcher.DispatchAsync(toolCall, new ToolDispatchScope(conversationRoutingKey), ct).ConfigureAwait(false);
                 RecordRoutingToolHint(conversationRoutingKey, resolution.SkillId, toolCall.Name, result.Content);
                 messages.Add(new { role = "tool", tool_call_id = result.ToolCallId, name = result.Name, content = result.Content });
                 
@@ -795,10 +798,11 @@ public class AIOrchestrator : IAIOrchestrator
         {
             _logger.Debug("AIOrchestrator", "Using cached prefetch routing result.");
             pipelineStatus?.Report(ChatPipelineStatusKeys.PreparingModel);
-            return await FinalizeRoutingResolutionAsync(cached, ct).ConfigureAwait(false);
+            var adjustedPrefetch = WithSkillInjectionOverride(cached, conversationRoutingKey);
+            return await FinalizeRoutingResolutionAsync(adjustedPrefetch, ct).ConfigureAwait(false);
         }
 
-        var resolved = await ResolveRoutingTargetModelAsync(routingInput, ct, pipelineStatus, precomputedDecision, routingToolHint).ConfigureAwait(false);
+        var resolved = await ResolveRoutingTargetModelAsync(routingInput, ct, pipelineStatus, precomputedDecision, routingToolHint, conversationRoutingKey).ConfigureAwait(false);
         return resolved.Resolution;
     }
 
@@ -873,7 +877,8 @@ public class AIOrchestrator : IAIOrchestrator
         CancellationToken ct,
         IProgress<string>? pipelineStatus,
         RoutingAndSkillDecision? precomputedDecision = null,
-        RoutingToolHint? routingToolHint = null)
+        RoutingToolHint? routingToolHint = null,
+        string? conversationRoutingKey = null)
     {
         var now = DateTime.UtcNow;
 
@@ -902,13 +907,15 @@ public class AIOrchestrator : IAIOrchestrator
         {
             var skillId = precomputedDecision?.Skill ?? "NONE";
             var res = await FinalizeRoutingResolutionAsync(
-                new RoutingResolution
-                {
-                    Model = models?.FirstOrDefault(m => m.Type == AIModelType.Text),
-                    RoutingComplexity = RoutingComplexity.Simple,
-                    SkillId = skillId,
-                    InjectionContext = _skillRegistry.GetInjection(skillId)
-                },
+                WithSkillInjectionOverride(
+                    new RoutingResolution
+                    {
+                        Model = models?.FirstOrDefault(m => m.Type == AIModelType.Text),
+                        RoutingComplexity = RoutingComplexity.Simple,
+                        SkillId = skillId,
+                        InjectionContext = _skillRegistry.GetInjection(skillId)
+                    },
+                    conversationRoutingKey),
                 ct).ConfigureAwait(false);
             return (res, precomputedDecision);
         }
@@ -947,14 +954,16 @@ public class AIOrchestrator : IAIOrchestrator
                 $"Routing failed after {MaxRoutingAttempts} attempts: {lastRoutingError ?? "unknown error"}; using low-tier model.");
             pipelineStatus?.Report(ChatPipelineStatusKeys.PreparingModel);
             var failed = await FinalizeRoutingResolutionAsync(
-                new RoutingResolution
-                {
-                    Model = lowModel,
-                    RoutingComplexity = RoutingComplexity.Simple,
-                    SkillId = "NONE",
-                    ManagerConfidence = null,
-                    InjectionContext = _skillRegistry.GetInjection("NONE")
-                },
+                WithSkillInjectionOverride(
+                    new RoutingResolution
+                    {
+                        Model = lowModel,
+                        RoutingComplexity = RoutingComplexity.Simple,
+                        SkillId = "NONE",
+                        ManagerConfidence = null,
+                        InjectionContext = _skillRegistry.GetInjection("NONE")
+                    },
+                    conversationRoutingKey),
                 ct).ConfigureAwait(false);
             return (failed, null);
         }
@@ -970,14 +979,16 @@ public class AIOrchestrator : IAIOrchestrator
         if (decision.Complexity == RoutingComplexity.Simple)
         {
             var simple = await FinalizeRoutingResolutionAsync(
-                new RoutingResolution
-                {
-                    Model = lowModel,
-                    RoutingComplexity = RoutingComplexity.Simple,
-                    SkillId = decision.Skill,
-                    ManagerConfidence = decision.Confidence,
-                    InjectionContext = injectionContext
-                },
+                WithSkillInjectionOverride(
+                    new RoutingResolution
+                    {
+                        Model = lowModel,
+                        RoutingComplexity = RoutingComplexity.Simple,
+                        SkillId = decision.Skill,
+                        ManagerConfidence = decision.Confidence,
+                        InjectionContext = injectionContext
+                    },
+                    conversationRoutingKey),
                 ct).ConfigureAwait(false);
             return (simple, decision);
         }
@@ -991,14 +1002,16 @@ public class AIOrchestrator : IAIOrchestrator
         };
 
         var reasoning = await FinalizeRoutingResolutionAsync(
-            new RoutingResolution
-            {
-                Model = target,
-                RoutingComplexity = RoutingComplexity.Reasoning,
-                SkillId = decision.Skill,
-                ManagerConfidence = decision.Confidence,
-                InjectionContext = injectionContext
-            },
+            WithSkillInjectionOverride(
+                new RoutingResolution
+                {
+                    Model = target,
+                    RoutingComplexity = RoutingComplexity.Reasoning,
+                    SkillId = decision.Skill,
+                    ManagerConfidence = decision.Confidence,
+                    InjectionContext = injectionContext
+                },
+                conversationRoutingKey),
             ct).ConfigureAwait(false);
         return (reasoning, decision);
     }
@@ -1081,6 +1094,32 @@ public class AIOrchestrator : IAIOrchestrator
             _lastHeavyChatWarmUtc = DateTime.UtcNow;
             _lastHeavyChatWarmModelId = model.Id;
         }
+    }
+
+    private RoutingResolution WithSkillInjectionOverride(RoutingResolution r, string? conversationKey)
+    {
+        if (string.IsNullOrWhiteSpace(conversationKey))
+            return r;
+
+        var skillOverride = _skillInjectionOverrideStore.TryGet(conversationKey);
+        if (skillOverride == null)
+            return r;
+
+        var sid = skillOverride.Trim();
+        if (string.IsNullOrWhiteSpace(sid) || string.Equals(sid, "NONE", StringComparison.OrdinalIgnoreCase))
+        {
+            return r with
+            {
+                SkillId = "NONE",
+                InjectionContext = _skillRegistry.GetInjection("NONE")
+            };
+        }
+
+        return r with
+        {
+            SkillId = sid,
+            InjectionContext = _skillRegistry.GetInjection(sid)
+        };
     }
 
     private async Task<RoutingResolution> FinalizeRoutingResolutionAsync(RoutingResolution r, CancellationToken ct)

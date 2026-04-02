@@ -27,7 +27,8 @@ internal static class RoutingAndSkillPromptBuilder
 
         sb.AppendLine(
             "- NONE: General study or subject Q&A when the user is not asking about the Mnemo app or a specific module. " +
-            "If they ask about Mnemo overall, settings, navigation, themes, or app-wide \"where do I…\", choose Application—not NONE. " +
+            "If they ask about Mnemo overall, navigation, themes, or app-wide \"where do I…\", choose Application—not NONE. " +
+            "If they ask to change a specific setting (language, editor toggles, AI toggles, profile name) using tool workflows, choose Settings—not NONE. " +
             "If they clearly mean Notes, Mindmap, or Learning Path content/workflow, choose that skill—not NONE.");
 
         if (recentToolHint != null)

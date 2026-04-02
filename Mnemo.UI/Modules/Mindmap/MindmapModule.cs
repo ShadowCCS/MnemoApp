@@ -1,5 +1,8 @@
+using System;
 using Mnemo.Core.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Infrastructure.Services;
+using Mnemo.Infrastructure.Services.Tools;
 using Mnemo.UI.Modules.Mindmap.ViewModels;
 
 namespace Mnemo.UI.Modules.Mindmap;
@@ -15,7 +18,6 @@ public class MindmapModule : IModule
 
     public void RegisterTranslationSources(ITranslationSourceRegistry registry)
     {
-        // No module translations yet
     }
 
     public void RegisterRoutes(INavigationRegistry registry)
@@ -31,12 +33,11 @@ public class MindmapModule : IModule
 
     public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
     {
-        // No tools for overview yet
+        var svc = services.GetRequiredService<MindmapToolService>();
+        MindmapToolRegistrar.Register(registry, svc);
     }
 
     public void RegisterWidgets(IWidgetRegistry registry)
     {
-        // No widgets for mindmap
     }
 }
-

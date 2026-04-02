@@ -1197,6 +1197,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             excludeLastUserTurn: true);
 
         var foundForDataset = false;
+        var toolDatasetCallCount = 0;
         var cancelledForDataset = false;
         string? errorForDataset = null;
         var composedSystemForDataset = string.Empty;
@@ -1236,6 +1237,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
 
             Action<ChatDatasetToolCall> onToolCall = tc =>
             {
+                toolDatasetCallCount++;
                 Dispatcher.UIThread.Post(() =>
                 {
                     processThread?.AddToolCall(tc, k => _localizationService.T(k, "Chat"));
@@ -1258,8 +1260,8 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
                 onToolCall,
                 onAssistantReasoningUpdate: UpdateReasoning);
 
-            foundForDataset = foundResponse;
-            finalAssistantResponseForDataset = foundResponse ? finalContent : null;
+            foundForDataset = foundResponse || toolDatasetCallCount > 0;
+            finalAssistantResponseForDataset = foundForDataset ? finalContent : null;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -1272,7 +1274,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
                 aiMessage.IsStreaming = false;
             });
 
-            if (!foundResponse)
+            if (!foundResponse && toolDatasetCallCount == 0)
             {
                 await Dispatcher.UIThread.InvokeAsync(() =>
                     aiMessage.Content = _localizationService.T("ErrorSorry", "Chat"));

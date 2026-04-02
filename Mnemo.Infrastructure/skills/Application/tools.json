@@ -1,28 +1,70 @@
 {
   "tools": [
     {
-      "name": "open_settings",
-      "description": "Opens the application settings menu",
-      "parameters": {
-        "type": "object",
-        "properties": {}
-      },
-      "enabled": false
+      "name": "get_version",
+      "description": "Returns application version and informational version string.",
+      "parameters": { "type": "object", "properties": {} },
+      "enabled": true
+    },
+    {
+      "name": "get_current_route",
+      "description": "Returns the current navigation route and view model name.",
+      "parameters": { "type": "object", "properties": {} },
+      "enabled": true
     },
     {
       "name": "navigate_to",
-      "description": "Navigate to a specific section of the app",
+      "description": "Navigates to overview, notes, chat, mindmap, path, or settings. Optional entity_id is passed to the route (e.g. note id, mindmap id).",
       "parameters": {
         "type": "object",
         "properties": {
-          "section": {
-            "type": "string",
-            "enum": ["flashcards", "quiz", "notes", "path", "settings", "chat"]
-          }
+          "destination": { "type": "string" },
+          "entity_id": { "type": "string", "description": "Optional id for detail routes" }
         },
-        "required": ["section"]
+        "required": ["destination"]
       },
-      "enabled": false
+      "enabled": true
+    },
+    {
+      "name": "open_settings",
+      "description": "Opens the Settings screen. Optional section hint.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "section": { "type": "string" }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "name": "get_skills",
+      "description": "Lists all enabled Mnemo skills (ids, descriptions, hints, and whether each skill exposes tools).",
+      "parameters": { "type": "object", "properties": {} },
+      "enabled": true
+    },
+    {
+      "name": "fetch_skill",
+      "description": "Returns the system prompt fragment and full tool definitions (JSON Schema parameters) for one skill_id.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "skill_id": { "type": "string", "description": "Skill id from get_skills or NONE" }
+        },
+        "required": ["skill_id"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "inject_skill",
+      "description": "Returns the same payload as fetch_skill. Optionally applies skill_id for this conversation so later turns use that skill's tools/context (use NONE or empty skill_id to clear).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "skill_id": { "type": "string", "description": "Target skill id, NONE, or omit/empty to clear override" },
+          "apply_for_conversation": { "type": "boolean", "description": "Default true: persist for this chat thread when a routing key exists" }
+        }
+      },
+      "enabled": true
     }
   ]
 }

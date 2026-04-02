@@ -19,7 +19,8 @@ namespace Mnemo.Infrastructure.Services.AI;
 ///   <item><c>main_model_dataset.jsonl</c> — one messages-array entry per turn for training the main chat model (tool use, text responses).</item>
 /// </list>
 /// Both output files are placed alongside the source file unless an explicit output directory is specified.
-/// Turns where <c>outcome.cancelled</c> is true or <c>outcome.foundResponse</c> is false are skipped by default.
+/// Turns where <c>outcome.cancelled</c> is true or <c>outcome.foundResponse</c> is false are skipped by default
+/// (note: turns that only executed tools with no streamed assistant tokens still set <c>foundResponse</c> when logged).
 /// For a **canonical main-model example** with user-facing text before each tool round (valid <c>content</c> + <c>tool_calls</c>), see <c>docs/datasets/README.md</c>.
 /// </summary>
 public sealed class DatasetExporter
@@ -102,8 +103,13 @@ public sealed class DatasetExporter
 
             if (skipNoResponse && !record.Outcome.FoundResponse)
             {
-                skippedCount++;
-                continue;
+                // Older logs marked "no response" when the model only ran tools and streamed no text tokens.
+                var legacyToolTurn = record.Chat?.ToolRounds is { Count: > 0 };
+                if (!legacyToolTurn)
+                {
+                    skippedCount++;
+                    continue;
+                }
             }
 
             // Manager dataset row
@@ -224,12 +230,15 @@ public sealed class DatasetExporter
         if (chat == null)
             return null;
 
-        // Determine the final assistant response
+        // Determine the final assistant response (may be empty after tool rounds — still valid for training)
         var finalResponse = record.FinalAssistantResponse
             ?? (string.IsNullOrWhiteSpace(chat.AssistantResponse) ? null : chat.AssistantResponse);
 
-        if (string.IsNullOrWhiteSpace(finalResponse))
+        var hasToolRounds = chat.ToolRounds is { Count: > 0 };
+        if (string.IsNullOrWhiteSpace(finalResponse) && !hasToolRounds)
             return null;
+
+        finalResponse ??= string.Empty;
 
         var messages = new List<object>();
 

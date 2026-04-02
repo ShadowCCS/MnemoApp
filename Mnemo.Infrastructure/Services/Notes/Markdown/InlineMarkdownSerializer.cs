@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Text;
 using Mnemo.Core.Models;
 
-namespace Mnemo.UI.Components.BlockEditor;
+namespace Mnemo.Infrastructure.Services.Notes.Markdown;
 
-/// <summary>Serializes <see cref="InlineRun"/> lists to CommonMark-style inline markdown (no underline/highlight).</summary>
+/// <summary>Serializes <see cref="InlineRun"/> lists to CommonMark-style inline markdown.</summary>
 public static class InlineMarkdownSerializer
 {
     public static string SerializeRuns(IReadOnlyList<InlineRun> runs)
@@ -39,8 +39,8 @@ public static class InlineMarkdownSerializer
 
     private static string SerializeCodeSpan(string text)
     {
-        int maxRun = MaxConsecutiveBackticks(text);
-        int fenceLen = maxRun + 1;
+        var maxRun = MaxConsecutiveBackticks(text);
+        var fenceLen = maxRun + 1;
         var fence = new string('`', fenceLen);
         var pad = maxRun > 0 ? " " : string.Empty;
         return fence + pad + text + pad + fence;
@@ -48,8 +48,9 @@ public static class InlineMarkdownSerializer
 
     private static int MaxConsecutiveBackticks(string text)
     {
-        int max = 0, cur = 0;
-        foreach (char c in text)
+        var max = 0;
+        var cur = 0;
+        foreach (var c in text)
         {
             if (c == '`') { cur++; max = System.Math.Max(max, cur); }
             else cur = 0;
@@ -61,7 +62,7 @@ public static class InlineMarkdownSerializer
     {
         if (text.Length == 0) return text;
         var sb = new StringBuilder(text.Length + 8);
-        foreach (char c in text)
+        foreach (var c in text)
         {
             switch (c)
             {

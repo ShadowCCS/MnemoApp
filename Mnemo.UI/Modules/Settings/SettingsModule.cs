@@ -1,4 +1,7 @@
+using System;
 using Mnemo.Core.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Infrastructure.Services.Tools;
 using Mnemo.UI.Modules.Settings.ViewModels;
 
 namespace Mnemo.UI.Modules.Settings;
@@ -12,7 +15,6 @@ public class SettingsModule : IModule
 
     public void RegisterTranslationSources(ITranslationSourceRegistry registry)
     {
-        // No module translations yet
     }
 
     public void RegisterRoutes(INavigationRegistry registry)
@@ -27,12 +29,11 @@ public class SettingsModule : IModule
 
     public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
     {
-        // No tools for settings yet
+        var svc = services.GetRequiredService<SettingsToolService>();
+        SettingsToolRegistrar.Register(registry, svc);
     }
 
     public void RegisterWidgets(IWidgetRegistry registry)
     {
-        // No widgets for settings
     }
 }
-

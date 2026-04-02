@@ -1,0 +1,11 @@
+{
+  "id": "Settings",
+  "version": "1.0.0",
+  "enabled": true,
+  "description": "Application settings: language, appearance (theme), editor toggles, AI toggles, profile display name — only via safe allowlisted keys.",
+  "detection_hint": "settings, preference, language, theme, editor width, spellcheck, autosave, GPU, RAG, profile name",
+  "injection": {
+    "system_prompt_fragment": "Settings tools: use list_settings to discover keys. Only use get_setting/set_setting/reset_setting for catalog keys. Never guess paths or internal keys.",
+    "include_tools": true
+  }
+}
