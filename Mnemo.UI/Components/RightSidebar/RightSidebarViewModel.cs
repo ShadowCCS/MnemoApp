@@ -57,8 +57,14 @@ public partial class RightSidebarViewModel : ViewModelBase
     /// <summary>Available assistant modes for the mode dropdown.</summary>
     public IReadOnlyList<string> AssistantModes { get; } = new[] { "Short", "Normal", "Detailed" };
 
+    /// <summary>Auto (manager), Simple (low-tier), or Reasoning (tiered).</summary>
+    public IReadOnlyList<string> ModelRoutingModes { get; } = new[] { ChatModelRouting.Auto, ChatModelRouting.Simple, ChatModelRouting.Reasoning };
+
     [ObservableProperty]
     private string _selectedAssistantMode = "Normal";
+
+    [ObservableProperty]
+    private string _selectedModelRoutingMode = ChatModelRouting.Auto;
 
     public ObservableCollection<ChatMessage> Messages { get; } = new();
 
@@ -84,7 +90,7 @@ public partial class RightSidebarViewModel : ViewModelBase
         _skillSystemPromptComposer = skillSystemPromptComposer;
         _chatDatasetLogger = chatDatasetLogger;
         _routingToolHintStore = routingToolHintStore;
-        _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
+        _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText, () => SelectedModelRoutingMode);
 
         ToggleCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
         SendCommand = new AsyncRelayCommand(SendAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy);
@@ -185,6 +191,7 @@ public partial class RightSidebarViewModel : ViewModelBase
 
         var streamingConversationId = _conversationId;
         var streamingAssistantMode = SelectedAssistantMode;
+        var streamingModelRoutingMode = SelectedModelRoutingMode;
         var historyMessages = Messages.ToList();
 
         var logDataset = await _settingsService.GetAsync(ChatDatasetSettings.LoggingEnabledKey, false).ConfigureAwait(false);
@@ -230,6 +237,7 @@ public partial class RightSidebarViewModel : ViewModelBase
             var decision = analyzed.IsSuccess && analyzed.Value != null
                 ? analyzed.Value
                 : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skills = new[] { "NONE" } };
+            decision = ChatModelRouting.ApplyComplexityOverride(decision, streamingModelRoutingMode);
             pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
             var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(streamingAssistantMode);
             composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.GetNormalizedSkillIds());

@@ -1,0 +1,47 @@
+{
+  "tools": [
+    {
+      "name": "get_skills",
+      "description": "Lists skill ids and descriptions (e.g. Notes, Mindmap, Settings). Does not by itself add module tools to your callable tool list for this chat. Next step when you need those actions: call inject_skill with that skill_id.",
+      "parameters": { "type": "object", "properties": {} },
+      "enabled": true
+    },
+    {
+      "name": "fetch_skill",
+      "description": "Read-only preview: returns the system prompt fragment and tool schemas for one skill_id. Does NOT register those tools for this turn — you cannot call list_notes, read_mindmap, etc. from fetch_skill alone. To actually run module tools, call inject_skill with the same skill_id.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "skill_id": { "type": "string", "description": "Skill id from get_skills or NONE" }
+        },
+        "required": ["skill_id"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "inject_skill",
+      "description": "REQUIRED to use a module's tools (e.g. list_notes, get_note for Notes). Pass skill_id exactly as returned by get_skills (e.g. \"Notes\", \"Mindmap\", \"Settings\"). Applies that skill's tools and context for this conversation when apply_for_conversation is true (default). fetch_skill does not do this — only inject_skill enables the tools. Do not use navigate_to as a substitute; navigate_to only opens UI screens and does not add list_notes or other module tools.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "skill_id": { "type": "string", "description": "Target skill id from get_skills, e.g. Notes, Mindmap, Settings. NONE or empty clears override." },
+          "apply_for_conversation": { "type": "boolean", "description": "Default true: keep this skill for the rest of this chat thread when a thread key exists" }
+        }
+      },
+      "enabled": true
+    },
+    {
+      "name": "navigate_to",
+      "description": "Opens a module screen in the app (overview, notes, chat, mindmap, path, settings). UI navigation only — does NOT load skill tools. You still cannot call list_notes until you inject_skill with skill_id Notes.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "destination": { "type": "string" },
+          "entity_id": { "type": "string", "description": "Optional id for detail routes" }
+        },
+        "required": ["destination"]
+      },
+      "enabled": true
+    }
+  ]
+}

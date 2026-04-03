@@ -61,6 +61,44 @@ public sealed class NotesToolService
     public async Task<ToolInvocationResult> ListNotesAsync(ListNotesParameters p)
     {
         var limit = p.Limit is > 0 and <= 100 ? p.Limit!.Value : 30;
+        var mode = (p.Mode ?? "text").Trim();
+
+        if (string.Equals(mode, "semantic", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_knowledge == null)
+                return ToolInvocationResult.Failure(ToolResultCodes.ValidationError,
+                    "Semantic search is not available in this environment.");
+
+            if (string.IsNullOrWhiteSpace(p.Search))
+                return ToolInvocationResult.Failure(ToolResultCodes.ValidationError,
+                    "mode=semantic requires a non-empty search string.");
+
+            return await SearchNotesAsync(new SearchNotesParameters
+            {
+                Query = p.Search!.Trim(),
+                Limit = limit,
+                Mode = "semantic",
+                MatchAll = p.MatchAll,
+                Fuzzy = p.Fuzzy
+            }).ConfigureAwait(false);
+        }
+
+        if (p.SnippetSearch == true)
+        {
+            if (string.IsNullOrWhiteSpace(p.Search))
+                return ToolInvocationResult.Failure(ToolResultCodes.ValidationError,
+                    "snippet_search requires a non-empty search string.");
+
+            return await SearchNotesAsync(new SearchNotesParameters
+            {
+                Query = p.Search!.Trim(),
+                Limit = limit,
+                Mode = "text",
+                MatchAll = p.MatchAll,
+                Fuzzy = p.Fuzzy
+            }).ConfigureAwait(false);
+        }
+
         var all = (await _notes.GetAllNotesAsync().ConfigureAwait(false)).ToList();
         var ordered = all.OrderByDescending(n => n.ModifiedAt).ToList();
 
@@ -68,7 +106,8 @@ public sealed class NotesToolService
         {
             var q = p.Search.Trim();
             var fuzzy = p.Fuzzy ?? true;
-            ordered = ordered.Where(n => NoteMatchesListSearch(n, q, fuzzy)).ToList();
+            var matchAll = p.MatchAll ?? false;
+            ordered = ordered.Where(n => NoteMatchesListSearch(n, q, fuzzy, matchAll)).ToList();
         }
 
         var slice = ordered.Take(limit).ToList();
@@ -654,7 +693,7 @@ public sealed class NotesToolService
         return null;
     }
 
-    private static bool NoteMatchesListSearch(Note n, string q, bool fuzzy)
+    private static bool NoteMatchesListSearch(Note n, string q, bool fuzzy, bool matchAll)
     {
         var title = n.Title ?? string.Empty;
         var body = NoteDocumentHelper.GetPlainText(n);
@@ -667,10 +706,7 @@ public sealed class NotesToolService
         if (tokens.Count == 0)
             return false;
 
-        if (tokens.Count == 1)
-            return TextSearchMatch.MatchTokens(hay, tokens, matchAll: true, fuzzy);
-
-        return TextSearchMatch.MatchTokens(hay, tokens, matchAll: false, fuzzy);
+        return TextSearchMatch.MatchTokens(hay, tokens, matchAll, fuzzy);
     }
 
     private static HashSet<string> Tokenize(string text)

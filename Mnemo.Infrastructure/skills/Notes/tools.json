@@ -1,35 +1,25 @@
 {
   "tools": [
     {
-      "name": "create_note",
-      "description": "Creates a new note. Prefer updating an existing note when one matches. Optional content is markdown converted to blocks; optional blocks[] is structured content (type, content, block_id, meta).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "title": { "type": "string" },
-          "content": { "type": "string" },
-          "blocks": { "type": "array", "items": { "type": "object" } }
-        },
-        "required": ["title"]
-      },
-      "enabled": true
-    },
-    {
       "name": "list_notes",
-      "description": "Lists notes newest first. Optional search: comma/space keywords (OR). fuzzy (default true) allows small typos.",
+      "description": "Lists notes or searches. sort: newest (default) = by modified time. search: optional keywords (comma/space OR). fuzzy (default true) tolerates typos. match_all: when true, every keyword must match (AND). snippet_search: when true with search, returns block-level snippets (like deep search); when false, filters note titles/metadata only.",
       "parameters": {
         "type": "object",
         "properties": {
           "search": { "type": "string" },
           "limit": { "type": "integer" },
-          "fuzzy": { "type": "boolean" }
+          "fuzzy": { "type": "boolean" },
+          "match_all": { "type": "boolean" },
+          "sort": { "type": "string", "description": "newest (default)" },
+          "snippet_search": { "type": "boolean" },
+          "mode": { "type": "string", "description": "text (default) or semantic — semantic uses knowledge base, may not map to notes" }
         }
       },
       "enabled": true
     },
     {
       "name": "get_note",
-      "description": "Canonical read: returns note title and full blocks array (block_id, type, content, order, meta).",
+      "description": "Reads a note: title and full blocks (block_id, type, content, order, meta).",
       "parameters": {
         "type": "object",
         "properties": { "note_id": { "type": "string" } },
@@ -38,8 +28,8 @@
       "enabled": true
     },
     {
-      "name": "note_exists",
-      "description": "Checks whether a note_id exists and returns lightweight metadata (title, modifiedUtc) when found.",
+      "name": "get_note_outline",
+      "description": "Heading blocks only (TOC) with block_id for precise block edits.",
       "parameters": {
         "type": "object",
         "properties": { "note_id": { "type": "string" } },
@@ -48,50 +38,27 @@
       "enabled": true
     },
     {
-      "name": "read_note",
-      "description": "Legacy alias for get_note.",
-      "parameters": {
-        "type": "object",
-        "properties": { "note_id": { "type": "string" } },
-        "required": ["note_id"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "search_notes",
-      "description": "Search notes with block snippets. query: comma/space keywords; match_all requires every keyword; fuzzy (default true) allows typos. mode=text or semantic (may not map to notes).",
+      "name": "create_note",
+      "description": "Creates a note. content is markdown converted to blocks. Prefer updating an existing note when one matches.",
       "parameters": {
         "type": "object",
         "properties": {
-          "query": { "type": "string" },
-          "limit": { "type": "integer" },
-          "mode": { "type": "string" },
-          "match_all": { "type": "boolean" },
-          "fuzzy": { "type": "boolean" }
+          "title": { "type": "string" },
+          "content": { "type": "string" }
         },
-        "required": ["query"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "get_recent_notes",
-      "description": "Recency-ordered notes (what was I working on).",
-      "parameters": {
-        "type": "object",
-        "properties": { "limit": { "type": "integer" } }
+        "required": ["title"]
       },
       "enabled": true
     },
     {
       "name": "update_note",
-      "description": "Updates title and/or body. Markdown content becomes blocks; or pass blocks[] to replace structure.",
+      "description": "Updates title and/or body. content is markdown converted to blocks.",
       "parameters": {
         "type": "object",
         "properties": {
           "note_id": { "type": "string" },
           "title": { "type": "string" },
-          "content": { "type": "string" },
-          "blocks": { "type": "array", "items": { "type": "object" } }
+          "content": { "type": "string" }
         },
         "required": ["note_id"]
       },
@@ -99,13 +66,12 @@
     },
     {
       "name": "append_to_note",
-      "description": "Appends markdown (text) or blocks[] to the end as real blocks (not a single collapsed block).",
+      "description": "Appends markdown text to the end as real blocks.",
       "parameters": {
         "type": "object",
         "properties": {
           "note_id": { "type": "string" },
-          "text": { "type": "string" },
-          "blocks": { "type": "array", "items": { "type": "object" } }
+          "text": { "type": "string" }
         },
         "required": ["note_id"]
       },
@@ -113,7 +79,7 @@
     },
     {
       "name": "insert_blocks",
-      "description": "Insert blocks at top, bottom, before_block_id, or after_block_id (anchor_block_id required for the last two).",
+      "description": "Insert structured blocks at top, bottom, before_block_id, or after_block_id (anchor_block_id for last two).",
       "parameters": {
         "type": "object",
         "properties": {
@@ -128,7 +94,7 @@
     },
     {
       "name": "replace_block",
-      "description": "Replace a single block by block_id. block payload uses type + markdown content.",
+      "description": "Replace one block by block_id. block uses type + markdown content.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -150,113 +116,6 @@
           "block_ids": { "type": "array", "items": { "type": "string" } }
         },
         "required": ["note_id", "block_ids"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "restructure_note",
-      "description": "Full replacement of block list. Use only for global reorganize.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "note_id": { "type": "string" },
-          "blocks": { "type": "array", "items": { "type": "object" } }
-        },
-        "required": ["note_id", "blocks"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "convert_block",
-      "description": "Changes block type (e.g. Heading1 to Heading2). new_type is BlockType enum name.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "note_id": { "type": "string" },
-          "block_id": { "type": "string" },
-          "new_type": { "type": "string" }
-        },
-        "required": ["note_id", "block_id", "new_type"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "find_related_notes",
-      "description": "Heuristic related notes via token overlap (local, no cloud).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "note_id": { "type": "string" },
-          "limit": { "type": "integer" }
-        },
-        "required": ["note_id"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "get_backlinks",
-      "description": "Reserved for wiki links; returns unavailable until implemented.",
-      "parameters": {
-        "type": "object",
-        "properties": { "note_id": { "type": "string" } },
-        "required": ["note_id"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "get_note_outline",
-      "description": "Returns heading blocks only (TOC) with block_id and order for precise block operations.",
-      "parameters": {
-        "type": "object",
-        "properties": { "note_id": { "type": "string" } },
-        "required": ["note_id"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "get_workspace_summary",
-      "description": "Aggregate stats: note count, total blocks, recent notes.",
-      "parameters": { "type": "object", "properties": {} },
-      "enabled": true
-    },
-    {
-      "name": "read_note_lines",
-      "description": "Numbered lines over markdown projection of the note. Optional line_range e.g. 1-20.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "note_id": { "type": "string" },
-          "line_range": { "type": "string" }
-        },
-        "required": ["note_id"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "replace_note_lines",
-      "description": "Replace inclusive 1-based lines in markdown projection; rebuilds blocks from markdown.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "note_id": { "type": "string" },
-          "replace_lines": { "type": "string" },
-          "content_markdown": { "type": "string" }
-        },
-        "required": ["note_id", "replace_lines", "content_markdown"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "insert_note_lines",
-      "description": "Insert markdown lines before 1-based at_line in markdown projection.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "note_id": { "type": "string" },
-          "at_line": { "type": "integer" },
-          "content_markdown": { "type": "string" }
-        },
-        "required": ["note_id", "at_line", "content_markdown"]
       },
       "enabled": true
     },

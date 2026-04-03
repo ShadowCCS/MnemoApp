@@ -17,6 +17,14 @@ public sealed class ListNotesParameters
     [JsonPropertyName("limit")] public int? Limit { get; set; }
     /// <summary>When true (default), typo-tolerant token match against title/body.</summary>
     [JsonPropertyName("fuzzy")] public bool? Fuzzy { get; set; }
+    /// <summary>When true, every keyword must match (AND). Default false (OR).</summary>
+    [JsonPropertyName("match_all")] public bool? MatchAll { get; set; }
+    /// <summary>Sort order; newest by modified time (default).</summary>
+    [JsonPropertyName("sort")] public string? Sort { get; set; }
+    /// <summary>When true with search, returns block-level snippets (deep search).</summary>
+    [JsonPropertyName("snippet_search")] public bool? SnippetSearch { get; set; }
+    /// <summary>text (default) or semantic (knowledge base; may not map to notes).</summary>
+    [JsonPropertyName("mode")] public string? Mode { get; set; }
 }
 
 public sealed class NoteIdParameters

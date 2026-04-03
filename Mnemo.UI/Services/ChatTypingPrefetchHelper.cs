@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 
 namespace Mnemo.UI.Services;
@@ -15,6 +16,7 @@ public sealed class ChatTypingPrefetchHelper
     private readonly ChatPauseToSendEstimator _pauseEstimator;
     private readonly ILoggerService _logger;
     private readonly Func<string> _getInputText;
+    private readonly Func<string>? _getModelRoutingMode;
 
     private CancellationTokenSource? _idleCts;
     private DateTime _lastKeystrokeUtc = DateTime.UtcNow;
@@ -23,12 +25,14 @@ public sealed class ChatTypingPrefetchHelper
         IAIOrchestrator orchestrator,
         ChatPauseToSendEstimator pauseEstimator,
         ILoggerService logger,
-        Func<string> getInputText)
+        Func<string> getInputText,
+        Func<string>? getModelRoutingMode = null)
     {
         _orchestrator = orchestrator;
         _pauseEstimator = pauseEstimator;
         _logger = logger;
         _getInputText = getInputText;
+        _getModelRoutingMode = getModelRoutingMode;
     }
 
     /// <summary>Call when chat input text changes.</summary>
@@ -77,7 +81,10 @@ public sealed class ChatTypingPrefetchHelper
 
         try
         {
-            await _orchestrator.PrefetchRoutingAndWarmupAsync(draft, CancellationToken.None).ConfigureAwait(false);
+            var mode = _getModelRoutingMode != null
+                ? ChatModelRouting.NormalizeModelRoutingMode(_getModelRoutingMode())
+                : ChatModelRouting.Auto;
+            await _orchestrator.PrefetchRoutingAndWarmupAsync(draft, mode, CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

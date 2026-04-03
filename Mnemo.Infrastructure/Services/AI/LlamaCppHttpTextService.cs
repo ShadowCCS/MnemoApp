@@ -266,6 +266,81 @@ public class LlamaCppHttpTextService : ITextGenerationService
         }
     }
 
+    /// <summary>
+    /// llama.cpp's built-in Qwen/ChatML chat template uses <c>tool_call.arguments|items</c> which requires
+    /// <c>arguments</c> to be a dict, but the OpenAI-compat layer enforces it as a string — causing a Jinja 500
+    /// on round 2+ when the history contains a prior assistant <c>tool_calls</c> message.
+    /// Fix: flatten assistant tool-call turns + their tool results into a single <c>user</c> message so the
+    /// template never sees structured <c>tool_calls</c> in the history.
+    /// Round-1 (no prior tool turns) is unaffected.
+    /// </summary>
+    private static List<object> FlattenToolHistoryForLlama(IReadOnlyList<object> messages)
+    {
+        // Serialize once to JsonArray so we can inspect role/tool_calls regardless of the anonymous-type shape.
+        JsonArray arr;
+        try
+        {
+            arr = JsonSerializer.SerializeToNode(messages)!.AsArray();
+        }
+        catch
+        {
+            return [.. messages];
+        }
+
+        var result = new List<object>(messages.Count);
+        var i = 0;
+        while (i < arr.Count)
+        {
+            var msg = arr[i]!;
+            var role = msg["role"]?.GetValue<string>();
+
+            // Detect an assistant message that carries tool_calls (the problematic ones)
+            if (role == "assistant" && msg["tool_calls"] is JsonArray toolCalls && toolCalls.Count > 0)
+            {
+                // Collect the preamble text the assistant may have emitted before calling tools
+                var sb = new StringBuilder();
+                var preamble = msg["content"]?.GetValue<string?>();
+                if (!string.IsNullOrWhiteSpace(preamble))
+                    sb.AppendLine(preamble);
+
+                // Inline each tool call as a readable block
+                foreach (var tc in toolCalls)
+                {
+                    var name = tc?["function"]?["name"]?.GetValue<string>() ?? "tool";
+                    var args = tc?["function"]?["arguments"]?.GetValue<string>() ?? "{}";
+                    sb.AppendLine($"[Called {name}({args})]");
+                }
+
+                // Consume the immediately following tool-result messages
+                i++;
+                while (i < arr.Count && arr[i]?["role"]?.GetValue<string>() == "tool")
+                {
+                    var toolName = arr[i]?["name"]?.GetValue<string>() ?? "tool";
+                    var toolContent = arr[i]?["content"]?.GetValue<string>() ?? "";
+                    sb.AppendLine($"[Result of {toolName}: {toolContent}]");
+                    i++;
+                }
+
+                // Emit as a single user message so the template sees it as plain text
+                result.Add(new { role = "user", content = sb.ToString().TrimEnd() });
+                continue;
+            }
+
+            // Orphaned tool messages (shouldn't happen, but guard anyway)
+            if (role == "tool")
+            {
+                i++;
+                continue;
+            }
+
+            // Deserialize back to a plain dictionary so anonymous-type shape is preserved
+            result.Add(JsonSerializer.Deserialize<Dictionary<string, object?>>(msg.ToJsonString())!);
+            i++;
+        }
+
+        return result;
+    }
+
     private async IAsyncEnumerable<StreamChunk> GetStreamingChunksWithToolsAsync(
         AIModelManifest manifest,
         IReadOnlyList<object> messages,
@@ -274,7 +349,14 @@ public class LlamaCppHttpTextService : ITextGenerationService
     {
         var endpoint = $"{manifest.Endpoint!.TrimEnd('/')}/v1/chat/completions";
         var (temperature, maxTokens) = GetGenerationParams(manifest);
-        var requestBody = BuildToolAwareChatRequest(messages, tools, temperature, maxTokens, stream: true, DisableThinkingChatTemplateKwargs);
+        var flatMessages = FlattenToolHistoryForLlama(messages);
+        var requestBody = BuildToolAwareChatRequest(
+            flatMessages,
+            tools,
+            temperature,
+            maxTokens,
+            stream: true,
+            DisableThinkingChatTemplateKwargs);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Content = new StringContent(

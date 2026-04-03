@@ -17,6 +17,7 @@
         <converters:BoolToStreamingIntervalConverter x:Key="BoolToStreamingIntervalConverter"/>
         <converters:NullToBoolConverter x:Key="StringNotEmptyToBoolConverter"/>
         <converters:AssistantModeToLabelConverter x:Key="AssistantModeToLabelConverter"/>
+        <converters:ModelRoutingModeToLabelConverter x:Key="ModelRoutingModeToLabelConverter"/>
         <converters:LocalPathToBitmapConverter x:Key="LocalPathToBitmapConverter"/>
         <converters:ChatAttachmentKindToBoolConverter x:Key="ChatAttachmentKindToBoolConverter"/>
         <converters:ChatViewModelDataContextCommandConverter x:Key="ChatViewModelDataContextCommandConverter"/>
@@ -985,7 +986,7 @@
                                  Padding="16,14,16,6"/>
 
                         <!-- Toolbar row -->
-                        <Grid Grid.Row="2" ColumnDefinitions="Auto, Auto, Auto, Auto, Auto, *, Auto, Auto"
+                        <Grid Grid.Row="2" ColumnDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, *, Auto, Auto"
                               MinWidth="0" IsEnabled="{Binding !IsRecording}"
                               Margin="8,0,8,10">
                             <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,2,0"
@@ -1022,7 +1023,23 @@
                                     </DataTemplate>
                                 </controls:ModernComboBox.ItemTemplate>
                             </controls:ModernComboBox>
-                            <Border Grid.Column="4"
+                            <controls:ModernComboBox Grid.Column="4"
+                                                      Classes="PromptPill"
+                                                      ItemsSource="{Binding ModelRoutingModes}"
+                                                      SelectedItem="{Binding SelectedModelRoutingMode}"
+                                                      MinWidth="88"
+                                                      Margin="0,0,6,0"
+                                                      ToolTip.Tip="{markup:T Ns=Chat, Key=ModelRoutingMode}">
+                                <controls:ModernComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource ModelRoutingModeToLabelConverter}}"
+                                                   FontSize="{DynamicResource FontSize.Body.Caption}"
+                                                   FontFamily="{DynamicResource Font.Medium}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </DataTemplate>
+                                </controls:ModernComboBox.ItemTemplate>
+                            </controls:ModernComboBox>
+                            <Border Grid.Column="5"
                                     IsVisible="{Binding ShowMemoryPill}"
                                     VerticalAlignment="Center"
                                     Margin="0,0,8,0"
@@ -1046,15 +1063,15 @@
                                            FontFamily="{DynamicResource Font.Medium}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Border>
-                            <Border Grid.Column="5" MinWidth="0"/>
-                            <Button Grid.Column="6" Classes="PromptActionButton" Margin="0,0,6,0"
+                            <Border Grid.Column="6" MinWidth="0"/>
+                            <Button Grid.Column="7" Classes="PromptActionButton" Margin="0,0,6,0"
                                     ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}"
                                     Command="{Binding StartRecordingCommand}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextFadedBrush}"/>
                             </Button>
-                            <Panel Grid.Column="7">
+                            <Panel Grid.Column="8">
                                 <Button Command="{Binding SendMessageCommand}"
                                         IsVisible="{Binding !IsBusy}"
                                         Background="{DynamicResource CardAccentBrush}"

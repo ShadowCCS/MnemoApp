@@ -73,7 +73,8 @@ public interface IAIOrchestrator
     /// (low-tier hardware still prefetches the low model),
     /// and throttles rapid switches between heavy models. Send-time selection accepts the cache when the draft is still close (edit distance).
     /// </summary>
-    Task PrefetchRoutingAndWarmupAsync(string routingUserMessage, CancellationToken ct = default);
+    /// <param name="modelRoutingMode">When Simple or Reasoning, matches send-time override for prefetch cache and warm-up.</param>
+    Task PrefetchRoutingAndWarmupAsync(string routingUserMessage, string? modelRoutingMode = null, CancellationToken ct = default);
 }
 
 

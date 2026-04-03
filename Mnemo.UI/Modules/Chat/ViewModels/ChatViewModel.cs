@@ -187,6 +187,9 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     /// <summary>Available assistant modes for the mode dropdown.</summary>
     public IReadOnlyList<string> AssistantModes { get; } = new[] { "Short", "Normal", "Detailed" };
 
+    /// <summary>Auto (manager), Simple (low-tier), or Reasoning (tiered).</summary>
+    public IReadOnlyList<string> ModelRoutingModes { get; } = new[] { ChatModelRouting.Auto, ChatModelRouting.Simple, ChatModelRouting.Reasoning };
+
     private string _selectedAssistantMode = "Normal";
     public string SelectedAssistantMode
     {
@@ -203,6 +206,27 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             else
             {
                 SetProperty(ref _selectedAssistantMode, value);
+            }
+        }
+    }
+
+    private string _selectedModelRoutingMode = ChatModelRouting.Auto;
+    public string SelectedModelRoutingMode
+    {
+        get => ActiveSession?.ModelRoutingMode ?? _selectedModelRoutingMode;
+        set
+        {
+            var session = ActiveSession;
+            if (session != null)
+            {
+                var normalized = ChatModelRouting.NormalizeModelRoutingMode(value);
+                if (session.ModelRoutingMode == normalized) return;
+                session.ModelRoutingMode = normalized;
+                OnPropertyChanged();
+            }
+            else
+            {
+                SetProperty(ref _selectedModelRoutingMode, ChatModelRouting.NormalizeModelRoutingMode(value));
             }
         }
     }
@@ -309,7 +333,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         _memorySummarizer = memorySummarizer;
         _memoryInjector = memoryInjector;
         _longTermMemoryEmbedder = longTermMemoryEmbedder;
-        _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText);
+        _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText, () => SelectedModelRoutingMode);
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording && _isHistoryReady);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
@@ -635,6 +659,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         ResubscribeActiveMessages();
         OnPropertyChanged(nameof(Messages));
         OnPropertyChanged(nameof(SelectedAssistantMode));
+        OnPropertyChanged(nameof(SelectedModelRoutingMode));
         RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
         if (persistBookends)
             PersistFireAndForget();
@@ -663,6 +688,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         ResubscribeActiveMessages();
         OnPropertyChanged(nameof(Messages));
         OnPropertyChanged(nameof(SelectedAssistantMode));
+        OnPropertyChanged(nameof(SelectedModelRoutingMode));
         NotifyShowWelcomeIntroChanged();
         RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
         RefreshMemoryPillUi();
@@ -676,6 +702,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         {
             Id = id,
             AssistantMode = SelectedAssistantMode,
+            ModelRoutingMode = SelectedModelRoutingMode,
             LastActivityUtc = DateTime.UtcNow
         };
         _chatSessions[id] = session;
@@ -691,6 +718,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         ResubscribeActiveMessages();
         OnPropertyChanged(nameof(Messages));
         OnPropertyChanged(nameof(SelectedAssistantMode));
+        OnPropertyChanged(nameof(SelectedModelRoutingMode));
         NotifyShowWelcomeIntroChanged();
         RefreshMemoryPillUi();
     }
@@ -767,6 +795,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             r.IsSelected = r.ConversationId == _conversationId;
         OnPropertyChanged(nameof(Messages));
         OnPropertyChanged(nameof(SelectedAssistantMode));
+        OnPropertyChanged(nameof(SelectedModelRoutingMode));
         NotifyShowWelcomeIntroChanged();
         RequestScrollToBottom?.Invoke(this, EventArgs.Empty);
         RefreshMemoryPillUi();
@@ -799,6 +828,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         {
             Id = id,
             AssistantMode = ChatStreamingHelper.NormalizeAssistantMode(c.AssistantMode),
+            ModelRoutingMode = ChatModelRouting.NormalizeModelRoutingMode(c.ModelRoutingMode),
             LastActivityUtc = c.LastActivityUtc == default ? DateTime.UtcNow : c.LastActivityUtc,
             CustomTitle = string.IsNullOrWhiteSpace(c.CustomTitle) ? null : c.CustomTitle.Trim()
         };
@@ -911,6 +941,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
                     Id = s.Id,
                     LastActivityUtc = s.LastActivityUtc,
                     AssistantMode = s.AssistantMode,
+                    ModelRoutingMode = s.ModelRoutingMode,
                     CustomTitle = s.CustomTitle,
                     Messages = s.Messages.Select(MapToPersistedMessage).ToList(),
                     MemorySnapshotJson = memoryJson
@@ -1250,7 +1281,8 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             (
                 ConversationId: _conversationId,
                 Messages: Messages,
-                AssistantMode: SelectedAssistantMode
+                AssistantMode: SelectedAssistantMode,
+                ModelRoutingMode: SelectedModelRoutingMode
             ));
 
         List<string>? imageBase64 = null;
@@ -1333,6 +1365,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             var decision = analyzed.IsSuccess && analyzed.Value != null
                 ? analyzed.Value
                 : new RoutingAndSkillDecision { Complexity = RoutingComplexity.Simple, Skills = new[] { "NONE" } };
+            decision = ChatModelRouting.ApplyComplexityOverride(decision, streamingTurn.ModelRoutingMode);
             pipelineProgress.Report(ChatPipelineStatusKeys.ReadingSkill);
             var baseSystemPrompt = ChatStreamingHelper.GetSystemPromptForMode(streamingTurn.AssistantMode);
             composedSystemForDataset = _skillSystemPromptComposer.Compose(baseSystemPrompt, decision.GetNormalizedSkillIds());
@@ -1717,6 +1750,8 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         public ObservableCollection<ChatMessageViewModel> Messages { get; } = new();
 
         public string AssistantMode { get; set; } = "Normal";
+
+        public string ModelRoutingMode { get; set; } = ChatModelRouting.Auto;
 
         public DateTime LastActivityUtc { get; set; }
 

@@ -5,7 +5,7 @@
   "description": "The Mindmap module: nodes, edges, canvas, layouts, minimap, export—not general app settings unless clearly Mindmap-specific.",
   "detection_hint": "mindmap, mind map, node, edge, canvas, hierarchy, minimap, zoom, layout tree, radial, export png, mindmap module",
   "injection": {
-    "system_prompt_fragment": "Mindmaps: nodes, edges, styles, autolayout. Tools: list_mindmaps, read_mindmap (layout_algorithm, node style, edge type), create_mindmap, add_node (parent must exist if set), connect_nodes, style_mindmap_node, style_mindmap_subtree (style all hierarchy descendants of anchor_node_id; optional include_anchor), style_mindmap_edge, apply_mindmap_layout, open_mindmap. Prefer tools over prose when mutating diagrams.",
+    "system_prompt_fragment": "Mindmaps: use add_nodes with many entries (or nodes on create_mindmap) for large diagrams; parent_index links to earlier entries in the same batch. read_mindmap for structure. style_nodes with node_ids or subtree_of. apply_layout after edits. Prefer tools over prose when mutating diagrams.",
     "include_tools": true
   }
 }

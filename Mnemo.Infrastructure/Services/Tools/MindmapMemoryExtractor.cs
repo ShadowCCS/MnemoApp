@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
@@ -64,17 +65,6 @@ public sealed class MindmapMemoryExtractor : IToolResultMemoryExtractor
                 break;
             }
 
-            case "mindmap_exists":
-            {
-                if (data.ValueKind != JsonValueKind.Null && data.ValueKind != JsonValueKind.Undefined
-                    && data.TryGetProperty("exists", out var existsProp) && existsProp.GetBoolean())
-                {
-                    if (TryGetString(data, "mindmap_id", out var mmId))
-                        yield return MakeFact("active_mindmap_id", mmId!, toolName, turnNumber, now);
-                }
-                break;
-            }
-
             case "list_mindmaps":
             {
                 if (data.ValueKind != JsonValueKind.Null && data.ValueKind != JsonValueKind.Undefined
@@ -93,12 +83,18 @@ public sealed class MindmapMemoryExtractor : IToolResultMemoryExtractor
                 break;
             }
 
-            case "add_node":
+            case "add_nodes":
             {
                 if (data.ValueKind != JsonValueKind.Null && data.ValueKind != JsonValueKind.Undefined
-                    && TryGetString(data, "node_id", out var nodeId))
+                    && data.TryGetProperty("node_ids", out var nodeIds) && nodeIds.ValueKind == JsonValueKind.Array)
                 {
-                    yield return MakeFact("last_added_node_id", nodeId!, toolName, turnNumber, now);
+                    var last = nodeIds.EnumerateArray().LastOrDefault();
+                    if (last.ValueKind == JsonValueKind.String)
+                    {
+                        var s = last.GetString();
+                        if (!string.IsNullOrWhiteSpace(s))
+                            yield return MakeFact("last_added_node_id", s!, toolName, turnNumber, now);
+                    }
                 }
                 break;
             }

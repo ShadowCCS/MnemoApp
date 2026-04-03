@@ -448,7 +448,7 @@ public class AIOrchestrator : IAIOrchestrator
         StringBuilder? reasoningTurnAccumulator = null,
         Action<string>? onAssistantReasoningUpdate = null)
     {
-        const int MaxToolRounds = 5;
+        const int MaxToolRounds = 8;
 
         for (var round = 0; round < MaxToolRounds; round++)
         {
@@ -570,7 +570,7 @@ public class AIOrchestrator : IAIOrchestrator
         StringBuilder? reasoningTurnAccumulator = null,
         Action<string>? onAssistantReasoningUpdate = null)
     {
-        const int MaxToolRounds = 5;
+        const int MaxToolRounds = 8;
 
         var messages = new List<object>
         {
@@ -845,7 +845,14 @@ public class AIOrchestrator : IAIOrchestrator
             return await FinalizeRoutingResolutionAsync(adjustedPrefetch, ct).ConfigureAwait(false);
         }
 
-        var resolved = await ResolveRoutingTargetModelAsync(routingInput, ct, pipelineStatus, precomputedDecision, routingToolHint, conversationRoutingKey).ConfigureAwait(false);
+        var resolved = await ResolveRoutingTargetModelAsync(
+            routingInput,
+            ct,
+            pipelineStatus,
+            precomputedDecision,
+            routingToolHint,
+            conversationRoutingKey,
+            modelRoutingModeOverride: null).ConfigureAwait(false);
         return resolved.Resolution;
     }
 
@@ -921,7 +928,8 @@ public class AIOrchestrator : IAIOrchestrator
         IProgress<string>? pipelineStatus,
         RoutingAndSkillDecision? precomputedDecision = null,
         RoutingToolHint? routingToolHint = null,
-        string? conversationRoutingKey = null)
+        string? conversationRoutingKey = null,
+        string? modelRoutingModeOverride = null)
     {
         var now = DateTime.UtcNow;
 
@@ -1018,6 +1026,9 @@ public class AIOrchestrator : IAIOrchestrator
         var hardware = _hardwareDetector.Detect();
         var tier = _cachedRoutingTier ??= _hardwareTierEvaluator.EvaluateTier(hardware);
 
+        if (precomputedDecision == null)
+            decision = ChatModelRouting.ApplyComplexityOverride(decision!, modelRoutingModeOverride);
+
         var normalizedIds = decision.GetNormalizedSkillIds();
         var displaySkillId = normalizedIds.Count > 1 ? string.Join(",", normalizedIds) : normalizedIds[0];
         _logger.Info("AIOrchestrator", $"Orchestration routing: complexity={decision.Complexity}, skill={displaySkillId}, hardwareTier={tier}, confidence={decision.Confidence}, reason={decision.Reason}");
@@ -1067,12 +1078,19 @@ public class AIOrchestrator : IAIOrchestrator
         return (reasoning, decision);
     }
 
-    public async Task PrefetchRoutingAndWarmupAsync(string routingUserMessage, CancellationToken ct = default)
+    public async Task PrefetchRoutingAndWarmupAsync(string routingUserMessage, string? modelRoutingMode = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(routingUserMessage))
             return;
 
-        var (resolution, routingDecision) = await ResolveRoutingTargetModelAsync(routingUserMessage, ct, pipelineStatus: null).ConfigureAwait(false);
+        var (resolution, routingDecision) = await ResolveRoutingTargetModelAsync(
+            routingUserMessage,
+            ct,
+            pipelineStatus: null,
+            precomputedDecision: null,
+            routingToolHint: null,
+            conversationRoutingKey: null,
+            modelRoutingModeOverride: modelRoutingMode).ConfigureAwait(false);
         if (resolution.Model == null)
             return;
 

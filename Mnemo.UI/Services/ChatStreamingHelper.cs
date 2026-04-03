@@ -19,7 +19,9 @@ public static class ChatStreamingHelper
 - Use Markdown. Default to English unless the user asks otherwise.
 - Do not invent app UI, settings, or features. If something is uncertain, say so briefly or ask one focused question.
 - Pure study or subject questions: answer directly—no need to mention the app unless relevant.
-- When tools are available, use them to read or change user data instead of only describing what you would do.";
+- When tools are available, use them to read or change user data instead of only describing what you would do.
+- Call only functions whose names appear in the current tool list. Core includes get_skills, fetch_skill, inject_skill, navigate_to. " +
+        "After get_skills, if the user needs Notes/Mindmap/Settings actions, call inject_skill with that skill_id (e.g. Notes). fetch_skill is preview-only. navigate_to only opens UI — it does not enable list_notes or other module tools.";
 
     /// <summary>Short answers: minimal length while staying helpful.</summary>
     public const string ShortSystemPrompt = AssistantBaseSystemPrompt + @"

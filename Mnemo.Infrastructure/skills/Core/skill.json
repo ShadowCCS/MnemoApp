@@ -1,0 +1,11 @@
+{
+  "id": "Core",
+  "version": "1.0.0",
+  "enabled": true,
+  "description": "Always-on tools merged into every chat turn (not a routable module).",
+  "detection_hint": "",
+  "injection": {
+    "system_prompt_fragment": "",
+    "include_tools": true
+  }
+}

@@ -13,6 +13,7 @@
         <converters:BoolToStreamingIntervalConverter x:Key="BoolToStreamingIntervalConverter"/>
         <converters:NullToBoolConverter x:Key="StringNotEmptyToBoolConverter"/>
         <converters:AssistantModeToLabelConverter x:Key="AssistantModeToLabelConverter"/>
+        <converters:ModelRoutingModeToLabelConverter x:Key="ModelRoutingModeToLabelConverter"/>
     </UserControl.Resources>
     <UserControl.Styles>
         <Style Selector="Button.SuggestionChip">
@@ -429,8 +430,8 @@
                                  Padding="4"
                                  Margin="0,0,0,8"/>
 
-                        <!-- Bottom Row: Attach, Mode, (space), Mic, Send -->
-                        <Grid Grid.Row="1" ColumnDefinitions="Auto, Auto, *, Auto, Auto" MinWidth="0">
+                        <!-- Bottom Row: Attach, length, model tier, (space), Mic, Send -->
+                        <Grid Grid.Row="1" ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto" MinWidth="0">
                             <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=AddAttachment}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/upload.svg"
                                                   Width="16" Height="16"
@@ -452,13 +453,29 @@
                                     </DataTemplate>
                                 </controls:ModernComboBox.ItemTemplate>
                             </controls:ModernComboBox>
-                            <Border Grid.Column="2" MinWidth="0"/>
-                            <Button Grid.Column="3" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}">
+                            <controls:ModernComboBox Grid.Column="2"
+                                                      Classes="PromptPill"
+                                                      ItemsSource="{Binding ModelRoutingModes}"
+                                                      SelectedItem="{Binding SelectedModelRoutingMode}"
+                                                      MinWidth="88"
+                                                      Margin="0,0,6,0"
+                                                      ToolTip.Tip="{markup:T Ns=Chat, Key=ModelRoutingMode}">
+                                <controls:ModernComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource ModelRoutingModeToLabelConverter}}"
+                                                   FontSize="{DynamicResource FontSize.Body.Caption}"
+                                                   FontFamily="{DynamicResource Font.Medium}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </DataTemplate>
+                                </controls:ModernComboBox.ItemTemplate>
+                            </controls:ModernComboBox>
+                            <Border Grid.Column="3" MinWidth="0"/>
+                            <Button Grid.Column="4" Classes="PromptActionButton" Margin="0,0,6,0" ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextSecondaryBrush}"/>
                             </Button>
-                            <Button Grid.Column="4"
+                            <Button Grid.Column="5"
                                     Command="{Binding SendCommand}"
                                     IsVisible="{Binding !IsBusy}"
                                     Background="{DynamicResource CardAccentBrush}"
@@ -476,7 +493,7 @@
                                     </controls:SvgIcon.RenderTransform>
                                 </controls:SvgIcon>
                             </Button>
-                            <Button Grid.Column="4"
+                            <Button Grid.Column="5"
                                     Command="{Binding StopCommand}"
                                     IsVisible="{Binding IsBusy}"
                                     Background="{DynamicResource StopButtonBackgroundBrush}"

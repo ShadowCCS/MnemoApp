@@ -113,27 +113,6 @@ public sealed class MindmapToolService
         });
     }
 
-    public async Task<ToolInvocationResult> MindmapExistsAsync(MindmapIdParameters p)
-    {
-        if (string.IsNullOrWhiteSpace(p.MindmapId))
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "mindmap_id is required.");
-
-        var id = p.MindmapId.Trim();
-        var res = await _mindmaps.GetMindmapAsync(id).ConfigureAwait(false);
-        if (!res.IsSuccess || res.Value == null)
-            return ToolInvocationResult.Success("Mindmap does not exist.", new { mindmap_id = id, exists = false });
-
-        var m = res.Value;
-        return ToolInvocationResult.Success("Mindmap exists.", new
-        {
-            mindmap_id = m.Id,
-            exists = true,
-            title = m.Title,
-            node_count = m.Nodes.Count,
-            edge_count = m.Edges.Count
-        });
-    }
-
     public async Task<ToolInvocationResult> CreateMindmapAsync(CreateMindmapParameters p)
     {
         if (string.IsNullOrWhiteSpace(p.Title))
@@ -154,50 +133,98 @@ public sealed class MindmapToolService
             }
         }
 
+        if (p.Nodes is { Count: > 0 })
+        {
+            var batch = await AddNodesAsync(new AddNodesParameters { MindmapId = m.Id, Nodes = p.Nodes }).ConfigureAwait(false);
+            if (!batch.Ok)
+                return batch;
+        }
+
         return ToolInvocationResult.Success($"Mindmap created (id: {m.Id})", new { mindmap_id = m.Id, title = m.Title });
     }
 
-    public async Task<ToolInvocationResult> AddNodeAsync(AddNodeParameters p)
+    public async Task<ToolInvocationResult> AddNodesAsync(AddNodesParameters p)
     {
-        if (string.IsNullOrWhiteSpace(p.MindmapId) || string.IsNullOrWhiteSpace(p.Label))
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "mindmap_id and label are required.");
+        if (string.IsNullOrWhiteSpace(p.MindmapId))
+            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "mindmap_id is required.");
+        if (p.Nodes == null || p.Nodes.Count == 0)
+            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "nodes must be a non-empty array.");
 
-        var mapRes = await _mindmaps.GetMindmapAsync(p.MindmapId.Trim()).ConfigureAwait(false);
-        if (!mapRes.IsSuccess || mapRes.Value == null)
-            return ToolInvocationResult.Failure(ToolResultCodes.NotFound, "Mindmap not found.");
-
-        var mindmap = mapRes.Value;
-        if (!string.IsNullOrWhiteSpace(p.ParentNodeId))
+        var created = new List<string>();
+        for (var i = 0; i < p.Nodes.Count; i++)
         {
-            var pid = p.ParentNodeId.Trim();
-            if (mindmap.Nodes.All(n => n.Id != pid))
-                return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, $"parent_node_id not found: {pid}.");
+            var item = p.Nodes[i];
+            if (string.IsNullOrWhiteSpace(item.Label))
+                return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, $"nodes[{i}].label is required.");
+
+            var mapRes = await _mindmaps.GetMindmapAsync(p.MindmapId.Trim()).ConfigureAwait(false);
+            if (!mapRes.IsSuccess || mapRes.Value == null)
+                return ToolInvocationResult.Failure(ToolResultCodes.NotFound, "Mindmap not found.");
+
+            var mindmap = mapRes.Value;
+            var rootId = mindmap.RootNodeId;
+            if (string.IsNullOrWhiteSpace(rootId))
+                return ToolInvocationResult.Failure(ToolResultCodes.InternalError, "Mindmap has no root node.");
+
+            string? resolvedParent;
+            if (!string.IsNullOrWhiteSpace(item.ParentNodeId))
+            {
+                resolvedParent = item.ParentNodeId.Trim();
+                if (mindmap.Nodes.All(n => n.Id != resolvedParent))
+                    return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, $"parent_node_id not found: {resolvedParent}");
+            }
+            else if (item.ParentIndex.HasValue)
+            {
+                var pi = item.ParentIndex.Value;
+                if (pi < 0 || pi >= created.Count)
+                    return ToolInvocationResult.Failure(ToolResultCodes.ValidationError,
+                        $"nodes[{i}].parent_index must reference an earlier entry in this batch (0..{created.Count - 1}).");
+                resolvedParent = created[pi];
+            }
+            else
+                resolvedParent = rootId;
+
+            double x = 420, y = 320;
+            if (!string.IsNullOrWhiteSpace(resolvedParent) &&
+                mindmap.Layout.Nodes.TryGetValue(resolvedParent!, out var pl))
+            {
+                x = pl.X + 120;
+                y = pl.Y;
+            }
+
+            var content = new TextNodeContent { Text = item.Label.Trim() };
+            var nodeRes = await _mindmaps.AddNodeAsync(mindmap.Id, "text", content, x, y).ConfigureAwait(false);
+            if (!nodeRes.IsSuccess || nodeRes.Value == null)
+                return ToolInvocationResult.Failure(ToolResultCodes.InternalError, nodeRes.ErrorMessage ?? "Add node failed.");
+
+            var newId = nodeRes.Value.Id;
+            if (!string.IsNullOrWhiteSpace(resolvedParent))
+            {
+                var edge = await _mindmaps
+                    .AddEdgeAsync(mindmap.Id, resolvedParent!, newId, MindmapEdgeKind.Hierarchy)
+                    .ConfigureAwait(false);
+                if (!edge.IsSuccess)
+                    return ToolInvocationResult.Failure(ToolResultCodes.InternalError,
+                        $"nodes[{i}]: hierarchy edge failed: {edge.ErrorMessage}");
+            }
+
+            if (item.Color != null || item.Shape != null)
+            {
+                var styleErr = TryBuildMindmapNodeStyleUpdates(item.Color, item.Shape, null, out var styleUpdates);
+                if (styleErr != null)
+                    return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, styleErr);
+                if (styleUpdates.Count > 0)
+                {
+                    var sr = await _mindmaps.UpdateNodeStyleAsync(mindmap.Id, newId, styleUpdates).ConfigureAwait(false);
+                    if (!sr.IsSuccess)
+                        return ToolInvocationResult.Failure(ToolResultCodes.InternalError, sr.ErrorMessage ?? "Node style failed.");
+                }
+            }
+
+            created.Add(newId);
         }
 
-        double x = 420, y = 320;
-        if (!string.IsNullOrWhiteSpace(p.ParentNodeId) &&
-            mindmap.Layout.Nodes.TryGetValue(p.ParentNodeId.Trim(), out var pl))
-        {
-            x = pl.X + 120;
-            y = pl.Y;
-        }
-
-        var content = new TextNodeContent { Text = p.Label.Trim() };
-        var nodeRes = await _mindmaps.AddNodeAsync(mindmap.Id, "text", content, x, y).ConfigureAwait(false);
-        if (!nodeRes.IsSuccess || nodeRes.Value == null)
-            return ToolInvocationResult.Failure(ToolResultCodes.InternalError, nodeRes.ErrorMessage ?? "Add node failed.");
-
-        if (!string.IsNullOrWhiteSpace(p.ParentNodeId))
-        {
-            var edge = await _mindmaps
-                .AddEdgeAsync(mindmap.Id, p.ParentNodeId.Trim(), nodeRes.Value.Id, MindmapEdgeKind.Hierarchy)
-                .ConfigureAwait(false);
-            if (!edge.IsSuccess)
-                return ToolInvocationResult.Success($"Node added but hierarchy edge failed: {edge.ErrorMessage}",
-                    new { node_id = nodeRes.Value.Id });
-        }
-
-        return ToolInvocationResult.Success("Node added.", new { node_id = nodeRes.Value.Id });
+        return ToolInvocationResult.Success($"Added {created.Count} node(s).", new { node_ids = created });
     }
 
     public async Task<ToolInvocationResult> ConnectNodesAsync(ConnectNodesParameters p)
@@ -220,35 +247,17 @@ public sealed class MindmapToolService
         return ToolInvocationResult.Success("Connected.", new { edge_id = edgeRes.Value.Id });
     }
 
-    public async Task<ToolInvocationResult> StyleMindmapNodeAsync(StyleMindmapNodeParameters p)
+    public async Task<ToolInvocationResult> StyleNodesAsync(StyleNodesParameters p)
     {
-        if (string.IsNullOrWhiteSpace(p.MindmapId) || string.IsNullOrWhiteSpace(p.NodeId))
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "mindmap_id and node_id are required.");
+        if (string.IsNullOrWhiteSpace(p.MindmapId))
+            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "mindmap_id is required.");
 
-        var mapRes = await _mindmaps.GetMindmapAsync(p.MindmapId.Trim()).ConfigureAwait(false);
-        if (!mapRes.IsSuccess || mapRes.Value == null)
-            return ToolInvocationResult.Failure(ToolResultCodes.NotFound, "Mindmap not found.");
-
-        var mindmap = mapRes.Value;
-        var nid = p.NodeId.Trim();
-        if (mindmap.Nodes.All(n => n.Id != nid))
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, $"node_id not found: {nid}");
-
-        var buildErr = TryBuildMindmapNodeStyleUpdates(p.Color, p.Shape, p.Collapsed, out var updates);
-        if (buildErr != null)
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, buildErr);
-
-        var res = await _mindmaps.UpdateNodeStyleAsync(mindmap.Id, nid, updates).ConfigureAwait(false);
-        if (!res.IsSuccess)
-            return ToolInvocationResult.Failure(ToolResultCodes.InternalError, res.ErrorMessage ?? "Update node style failed.");
-
-        return ToolInvocationResult.Success("Node style updated.");
-    }
-
-    public async Task<ToolInvocationResult> StyleMindmapSubtreeAsync(StyleMindmapSubtreeParameters p)
-    {
-        if (string.IsNullOrWhiteSpace(p.MindmapId) || string.IsNullOrWhiteSpace(p.AnchorNodeId))
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "mindmap_id and anchor_node_id are required.");
+        var hasIds = p.NodeIds is { Count: > 0 };
+        var hasSubtree = !string.IsNullOrWhiteSpace(p.SubtreeOf);
+        if (!hasIds && !hasSubtree)
+            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "Provide node_ids or subtree_of.");
+        if (hasIds && hasSubtree)
+            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "Provide only one of node_ids or subtree_of.");
 
         var buildErr = TryBuildMindmapNodeStyleUpdates(p.Color, p.Shape, p.Collapsed, out var updates);
         if (buildErr != null)
@@ -259,16 +268,37 @@ public sealed class MindmapToolService
             return ToolInvocationResult.Failure(ToolResultCodes.NotFound, "Mindmap not found.");
 
         var mindmap = mapRes.Value;
-        var anchor = p.AnchorNodeId.Trim();
-        if (mindmap.Nodes.All(n => n.Id != anchor))
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, $"anchor_node_id not found: {anchor}");
+
+        if (hasIds)
+        {
+            var n = 0;
+            foreach (var raw in p.NodeIds!)
+            {
+                if (string.IsNullOrWhiteSpace(raw))
+                    continue;
+                var nid = raw.Trim();
+                if (mindmap.Nodes.All(x => x.Id != nid))
+                    return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, $"node_id not found: {nid}");
+
+                var res = await _mindmaps.UpdateNodeStyleAsync(mindmap.Id, nid, updates).ConfigureAwait(false);
+                if (!res.IsSuccess)
+                    return ToolInvocationResult.Failure(ToolResultCodes.InternalError, res.ErrorMessage ?? "Update node style failed.");
+                n++;
+            }
+
+            return ToolInvocationResult.Success($"Style applied to {n} node(s).", new { updated_count = n });
+        }
+
+        var anchor = p.SubtreeOf!.Trim();
+        if (mindmap.Nodes.All(x => x.Id != anchor))
+            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, $"subtree_of not found: {anchor}");
 
         var targets = new HashSet<string>(CollectHierarchyDescendantNodeIds(mindmap, anchor), StringComparer.Ordinal);
         if (p.IncludeAnchor == true)
             targets.Add(anchor);
 
         if (targets.Count == 0)
-            return ToolInvocationResult.Success("No hierarchy descendants to style (only links or empty branch).", new { updated_count = 0 });
+            return ToolInvocationResult.Success("No hierarchy descendants to style.", new { updated_count = 0 });
 
         foreach (var nid in targets.OrderBy(x => x, StringComparer.Ordinal))
         {
@@ -336,32 +366,6 @@ public sealed class MindmapToolService
                 queue.Enqueue(e.ToId);
             }
         }
-    }
-
-    public async Task<ToolInvocationResult> StyleMindmapEdgeAsync(StyleMindmapEdgeParameters p)
-    {
-        if (string.IsNullOrWhiteSpace(p.MindmapId) || string.IsNullOrWhiteSpace(p.EdgeId))
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, "mindmap_id and edge_id are required.");
-
-        var t = p.EdgeType?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(t) || Array.IndexOf(EdgeTypes.All, t) < 0)
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError,
-                $"edge_type must be one of: {string.Join(", ", EdgeTypes.All)}.");
-
-        var mapRes = await _mindmaps.GetMindmapAsync(p.MindmapId.Trim()).ConfigureAwait(false);
-        if (!mapRes.IsSuccess || mapRes.Value == null)
-            return ToolInvocationResult.Failure(ToolResultCodes.NotFound, "Mindmap not found.");
-
-        var mindmap = mapRes.Value;
-        var eid = p.EdgeId.Trim();
-        if (mindmap.Edges.All(e => e.Id != eid))
-            return ToolInvocationResult.Failure(ToolResultCodes.ValidationError, $"edge_id not found: {eid}");
-
-        var res = await _mindmaps.UpdateEdgeTypeAsync(mindmap.Id, eid, t).ConfigureAwait(false);
-        if (!res.IsSuccess)
-            return ToolInvocationResult.Failure(ToolResultCodes.InternalError, res.ErrorMessage ?? "Update edge style failed.");
-
-        return ToolInvocationResult.Success("Edge style updated.");
     }
 
     public async Task<ToolInvocationResult> ApplyMindmapLayoutAsync(ApplyMindmapLayoutParameters p)

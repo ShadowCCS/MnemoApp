@@ -13,55 +13,12 @@
       "enabled": true
     },
     {
-      "name": "navigate_to",
-      "description": "Navigates to overview, notes, chat, mindmap, path, or settings. Optional entity_id is passed to the route (e.g. note id, mindmap id).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "destination": { "type": "string" },
-          "entity_id": { "type": "string", "description": "Optional id for detail routes" }
-        },
-        "required": ["destination"]
-      },
-      "enabled": true
-    },
-    {
       "name": "open_settings",
       "description": "Opens the Settings screen. Optional section hint.",
       "parameters": {
         "type": "object",
         "properties": {
           "section": { "type": "string" }
-        }
-      },
-      "enabled": true
-    },
-    {
-      "name": "get_skills",
-      "description": "Lists all enabled Mnemo skills (ids, descriptions, hints, and whether each skill exposes tools).",
-      "parameters": { "type": "object", "properties": {} },
-      "enabled": true
-    },
-    {
-      "name": "fetch_skill",
-      "description": "Returns the system prompt fragment and full tool definitions (JSON Schema parameters) for one skill_id.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "skill_id": { "type": "string", "description": "Skill id from get_skills or NONE" }
-        },
-        "required": ["skill_id"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "inject_skill",
-      "description": "Returns the same payload as fetch_skill. Optionally applies skill_id for this conversation so later turns use that skill's tools/context (use NONE or empty skill_id to clear).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "skill_id": { "type": "string", "description": "Target skill id, NONE, or omit/empty to clear override" },
-          "apply_for_conversation": { "type": "boolean", "description": "Default true: persist for this chat thread when a routing key exists" }
         }
       },
       "enabled": true

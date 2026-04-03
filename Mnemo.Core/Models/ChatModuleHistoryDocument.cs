@@ -20,6 +20,9 @@ public sealed class ChatModulePersistedConversation
 
     public string AssistantMode { get; set; } = "Normal";
 
+    /// <summary>Auto (manager routing), Simple (low-tier), or Reasoning (tiered). Default Auto.</summary>
+    public string ModelRoutingMode { get; set; } = ChatModelRouting.Auto;
+
     /// <summary>Optional user-defined title for the sidebar; when null, title is derived from the first user message.</summary>
     public string? CustomTitle { get; set; }
 

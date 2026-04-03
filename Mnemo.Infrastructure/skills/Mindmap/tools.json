@@ -2,7 +2,7 @@
   "tools": [
     {
       "name": "list_mindmaps",
-      "description": "Lists mindmaps. Optional search: keywords on title (OR); fuzzy (default true) allows typos. limit caps results.",
+      "description": "Lists mindmaps. Optional search: keywords on title (OR); fuzzy (default true); limit caps results.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -26,41 +26,55 @@
       "enabled": true
     },
     {
-      "name": "mindmap_exists",
-      "description": "Checks whether a mindmap_id exists and returns lightweight metadata (title, node_count, edge_count) when found.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "mindmap_id": { "type": "string" }
-        },
-        "required": ["mindmap_id"]
-      },
-      "enabled": true
-    },
-    {
       "name": "create_mindmap",
-      "description": "Creates a mindmap. Optional root_label overrides default root text.",
+      "description": "Creates a mindmap. Optional root_label. Optional nodes[] to add many nodes in one call (parent_node_id or parent_index for hierarchy within the batch).",
       "parameters": {
         "type": "object",
         "properties": {
           "title": { "type": "string" },
-          "root_label": { "type": "string" }
+          "root_label": { "type": "string" },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "parent_node_id": { "type": "string" },
+                "parent_index": { "type": "integer" },
+                "color": { "type": "string" },
+                "shape": { "type": "string", "enum": ["rectangle", "pill", "circle"] }
+              },
+              "required": ["label"]
+            }
+          }
         },
         "required": ["title"]
       },
       "enabled": true
     },
     {
-      "name": "add_node",
-      "description": "Adds a text node. If parent_node_id is set, creates a hierarchy edge from parent to the new node.",
+      "name": "add_nodes",
+      "description": "Adds one or more text nodes in one call. parent_node_id attaches to an existing node; parent_index refers to an earlier entry in this nodes array (0-based). Optional color/shape per node.",
       "parameters": {
         "type": "object",
         "properties": {
           "mindmap_id": { "type": "string" },
-          "parent_node_id": { "type": "string" },
-          "label": { "type": "string" }
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "parent_node_id": { "type": "string" },
+                "parent_index": { "type": "integer" },
+                "color": { "type": "string" },
+                "shape": { "type": "string", "enum": ["rectangle", "pill", "circle"] }
+              },
+              "required": ["label"]
+            }
+          }
         },
-        "required": ["mindmap_id", "label"]
+        "required": ["mindmap_id", "nodes"]
       },
       "enabled": true
     },
@@ -80,58 +94,26 @@
       "enabled": true
     },
     {
-      "name": "style_mindmap_node",
-      "description": "Sets node styling: color (hex e.g. #e95b45, or default to reset), shape (rectangle, pill, circle), and/or collapsed (boolean to hide/show subtree via hierarchy).",
+      "name": "style_nodes",
+      "description": "Style nodes: pass node_ids for explicit list, OR subtree_of to style all hierarchy descendants of that node (include_anchor optional). Sets color, shape, and/or collapsed.",
       "parameters": {
         "type": "object",
         "properties": {
           "mindmap_id": { "type": "string" },
-          "node_id": { "type": "string" },
-          "color": { "type": "string" },
-          "shape": { "type": "string", "enum": ["rectangle", "pill", "circle"] },
-          "collapsed": { "type": "boolean" }
-        },
-        "required": ["mindmap_id", "node_id"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "style_mindmap_subtree",
-      "description": "Applies the same node styling to every node under anchor_node_id via hierarchy edges (direct and nested children). Does not follow plain link edges. Anchor is excluded unless include_anchor is true.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "mindmap_id": { "type": "string" },
-          "anchor_node_id": { "type": "string" },
+          "node_ids": { "type": "array", "items": { "type": "string" } },
+          "subtree_of": { "type": "string" },
           "include_anchor": { "type": "boolean" },
           "color": { "type": "string" },
           "shape": { "type": "string", "enum": ["rectangle", "pill", "circle"] },
           "collapsed": { "type": "boolean" }
         },
-        "required": ["mindmap_id", "anchor_node_id"]
+        "required": ["mindmap_id"]
       },
       "enabled": true
     },
     {
-      "name": "style_mindmap_edge",
-      "description": "Sets edge draw style (solid, dashed, dotted, double, arrow, bidirect).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "mindmap_id": { "type": "string" },
-          "edge_id": { "type": "string" },
-          "edge_type": {
-            "type": "string",
-            "enum": ["solid", "dashed", "dotted", "double", "arrow", "bidirect"]
-          }
-        },
-        "required": ["mindmap_id", "edge_id", "edge_type"]
-      },
-      "enabled": true
-    },
-    {
-      "name": "apply_mindmap_layout",
-      "description": "Recomputes node positions from hierarchy edges using TreeVertical, TreeHorizontal, or Radial. Pass layout_algorithm or use the mindmap's current mode.",
+      "name": "apply_layout",
+      "description": "Recomputes positions from hierarchy edges: TreeVertical, TreeHorizontal, or Radial.",
       "parameters": {
         "type": "object",
         "properties": {

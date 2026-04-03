@@ -12,6 +12,8 @@ namespace Mnemo.Infrastructure.Services.AI;
 
 public sealed class SkillRegistry : ISkillRegistry
 {
+    private const string CoreSkillId = "Core";
+
     private readonly ILoggerService _logger;
     private readonly object _lock = new();
     private Dictionary<string, LoadedSkill> _skills = new(StringComparer.OrdinalIgnoreCase);
@@ -49,7 +51,10 @@ public sealed class SkillRegistry : ISkillRegistry
     {
         lock (_lock)
         {
-            return _skills.Values.Select(v => v.Definition).ToList();
+            return _skills.Values
+                .Select(v => v.Definition)
+                .Where(d => !string.Equals(d.Id, CoreSkillId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
         }
     }
 
@@ -67,33 +72,23 @@ public sealed class SkillRegistry : ISkillRegistry
     public SkillInjectionContext GetInjection(string? skillId)
     {
         if (string.IsNullOrWhiteSpace(skillId) || string.Equals(skillId, "NONE", StringComparison.OrdinalIgnoreCase))
-            return new SkillInjectionContext();
+            return new SkillInjectionContext { Tools = MergeCoreInto(Array.Empty<SkillToolDefinition>()) };
 
-        LoadedSkill? loaded;
-        lock (_lock)
-        {
-            _skills.TryGetValue(skillId, out loaded);
-        }
-
-        if (loaded == null)
-            return new SkillInjectionContext();
-
-        var includeTools = loaded.Definition.Injection.IncludeTools;
-        var enabledTools = includeTools
-            ? loaded.Tools.Tools.Where(t => t.Enabled).ToList()
-            : [];
+        var raw = BuildSkillInjection(skillId);
+        if (raw == null)
+            return new SkillInjectionContext { Tools = MergeCoreInto(Array.Empty<SkillToolDefinition>()) };
 
         return new SkillInjectionContext
         {
-            SystemPromptFragment = loaded.Definition.Injection.SystemPromptFragment,
-            Tools = enabledTools
+            SystemPromptFragment = raw.SystemPromptFragment,
+            Tools = MergeCoreInto(raw.Tools)
         };
     }
 
     public SkillInjectionContext GetMergedInjection(IReadOnlyList<string>? skillIds)
     {
         if (skillIds == null || skillIds.Count == 0)
-            return new SkillInjectionContext();
+            return new SkillInjectionContext { Tools = MergeCoreInto(Array.Empty<SkillToolDefinition>()) };
 
         var distinct = new List<string>();
         foreach (var id in skillIds)
@@ -101,12 +96,13 @@ public sealed class SkillRegistry : ISkillRegistry
             if (string.IsNullOrWhiteSpace(id)) continue;
             var t = id.Trim();
             if (string.Equals(t, "NONE", StringComparison.OrdinalIgnoreCase)) continue;
+            if (string.Equals(t, CoreSkillId, StringComparison.OrdinalIgnoreCase)) continue;
             if (distinct.Exists(x => string.Equals(x, t, StringComparison.OrdinalIgnoreCase))) continue;
             distinct.Add(t);
         }
 
         if (distinct.Count == 0)
-            return new SkillInjectionContext();
+            return new SkillInjectionContext { Tools = MergeCoreInto(Array.Empty<SkillToolDefinition>()) };
 
         if (distinct.Count == 1)
             return GetInjection(distinct[0]);
@@ -117,7 +113,8 @@ public sealed class SkillRegistry : ISkillRegistry
 
         foreach (var skillId in distinct)
         {
-            var inj = GetInjection(skillId);
+            var inj = BuildSkillInjection(skillId);
+            if (inj == null) continue;
             if (!string.IsNullOrWhiteSpace(inj.SystemPromptFragment))
                 fragments.Add(inj.SystemPromptFragment);
 
@@ -139,7 +136,7 @@ public sealed class SkillRegistry : ISkillRegistry
         return new SkillInjectionContext
         {
             SystemPromptFragment = fragments.Count == 0 ? null : string.Join("\n\n", fragments),
-            Tools = tools
+            Tools = MergeCoreInto(tools)
         };
     }
 
@@ -159,6 +156,56 @@ public sealed class SkillRegistry : ISkillRegistry
 
             return list;
         }
+    }
+
+    /// <summary>Skill tools and fragment only (no Core merge).</summary>
+    private SkillInjectionContext? BuildSkillInjection(string skillId)
+    {
+        LoadedSkill? loaded;
+        lock (_lock)
+        {
+            _skills.TryGetValue(skillId, out loaded);
+        }
+
+        if (loaded == null)
+            return null;
+
+        var includeTools = loaded.Definition.Injection.IncludeTools;
+        var enabledTools = includeTools
+            ? loaded.Tools.Tools.Where(t => t.Enabled).ToList()
+            : [];
+
+        return new SkillInjectionContext
+        {
+            SystemPromptFragment = loaded.Definition.Injection.SystemPromptFragment,
+            Tools = enabledTools
+        };
+    }
+
+    private IReadOnlyList<SkillToolDefinition> MergeCoreInto(IReadOnlyList<SkillToolDefinition> tools)
+    {
+        List<SkillToolDefinition> core;
+        lock (_lock)
+        {
+            if (!_skills.TryGetValue(CoreSkillId, out var coreSkill))
+                return tools.ToList();
+
+            core = coreSkill.Tools.Tools.Where(t => t.Enabled && !string.IsNullOrWhiteSpace(t.Name)).ToList();
+        }
+
+        if (core.Count == 0)
+            return tools.ToList();
+
+        var seen = new HashSet<string>(tools.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);
+        var list = tools.ToList();
+        foreach (var t in core)
+        {
+            if (!seen.Add(t.Name))
+                continue;
+            list.Add(t);
+        }
+
+        return list;
     }
 
     private async Task<Dictionary<string, LoadedSkill>> LoadFromDiskAsync(CancellationToken ct)

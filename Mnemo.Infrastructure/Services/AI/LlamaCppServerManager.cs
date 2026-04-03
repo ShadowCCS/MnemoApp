@@ -580,6 +580,7 @@ public class LlamaCppServerManager : IAIServerManager
         sb.Append("--cache-reuse 0 ");
         sb.Append("--cont-batching ");
         sb.Append("--metrics ");
+        sb.Append("--jinja ");
 
         if (useGpu)
         {

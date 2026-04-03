@@ -52,7 +52,6 @@ public sealed class NotesMemoryExtractor : IToolResultMemoryExtractor
             }
 
             case "get_note":
-            case "read_note":
             {
                 if (TryGetString(data, "note_id", out var noteId))
                     yield return MakeFact("active_note_id", noteId!, toolName, turnNumber, now);
@@ -61,18 +60,7 @@ public sealed class NotesMemoryExtractor : IToolResultMemoryExtractor
                 break;
             }
 
-            case "note_exists":
-            {
-                if (data.TryGetProperty("exists", out var existsProp) && existsProp.GetBoolean())
-                {
-                    if (TryGetString(data, "note_id", out var noteId))
-                        yield return MakeFact("active_note_id", noteId!, toolName, turnNumber, now);
-                }
-                break;
-            }
-
             case "list_notes":
-            case "get_recent_notes":
             {
                 if (data.TryGetProperty("notes", out var notes) && notes.ValueKind == JsonValueKind.Array)
                 {
@@ -87,6 +75,19 @@ public sealed class NotesMemoryExtractor : IToolResultMemoryExtractor
                         yield return MakeFact("listed_note_ids",
                             JsonSerializer.Serialize(ids), toolName, turnNumber, now);
                 }
+
+                if (data.TryGetProperty("hits", out var hits) && hits.ValueKind == JsonValueKind.Array)
+                {
+                    var ids = new List<string>();
+                    foreach (var h in hits.EnumerateArray())
+                    {
+                        if (TryGetString(h, "note_id", out var id))
+                            ids.Add(id!);
+                    }
+                    if (ids.Count > 0)
+                        yield return MakeFact("search_result_note_ids",
+                            JsonSerializer.Serialize(ids), toolName, turnNumber, now);
+                }
                 break;
             }
 
@@ -95,10 +96,6 @@ public sealed class NotesMemoryExtractor : IToolResultMemoryExtractor
             case "insert_blocks":
             case "replace_block":
             case "delete_blocks":
-            case "restructure_note":
-            case "convert_block":
-            case "replace_note_lines":
-            case "insert_note_lines":
             {
                 // These tools don't return note_id in data, but the message contains it —
                 // active_note_id was already set from the get/create; no update needed unless
@@ -123,22 +120,6 @@ public sealed class NotesMemoryExtractor : IToolResultMemoryExtractor
                 break;
             }
 
-            case "search_notes":
-            {
-                if (data.TryGetProperty("hits", out var hits) && hits.ValueKind == JsonValueKind.Array)
-                {
-                    var ids = new List<string>();
-                    foreach (var h in hits.EnumerateArray())
-                    {
-                        if (TryGetString(h, "note_id", out var id))
-                            ids.Add(id!);
-                    }
-                    if (ids.Count > 0)
-                        yield return MakeFact("search_result_note_ids",
-                            JsonSerializer.Serialize(ids), toolName, turnNumber, now);
-                }
-                break;
-            }
         }
     }
 
