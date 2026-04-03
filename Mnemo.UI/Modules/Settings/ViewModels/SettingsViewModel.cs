@@ -20,6 +20,8 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IThemeService _themeService;
     private readonly ILocalizationService _localizationService;
     private readonly DatasetExporter _datasetExporter;
+    private readonly IChatHistoryClearService _chatHistoryClearService;
+    private readonly IOverlayService _overlayService;
 
     private bool _developerGateUnlocked;
     private bool _developerMode;
@@ -74,12 +76,20 @@ public partial class SettingsViewModel : ViewModelBase
         await _settingsService.SetAsync(DeveloperModeGateUnlockedKey, true).ConfigureAwait(false);
     }
 
-    public SettingsViewModel(ISettingsService settingsService, IThemeService themeService, ILocalizationService localizationService, DatasetExporter datasetExporter)
+    public SettingsViewModel(
+        ISettingsService settingsService,
+        IThemeService themeService,
+        ILocalizationService localizationService,
+        DatasetExporter datasetExporter,
+        IChatHistoryClearService chatHistoryClearService,
+        IOverlayService overlayService)
     {
         _settingsService = settingsService;
         _themeService = themeService;
         _localizationService = localizationService;
         _datasetExporter = datasetExporter;
+        _chatHistoryClearService = chatHistoryClearService;
+        _overlayService = overlayService;
 
         AttachSettingsHandlers();
         _ = LoadInitialSettingsAsync();
@@ -207,6 +217,25 @@ public partial class SettingsViewModel : ViewModelBase
             new[] { T("Never"), T("FiveMinutes"), T("FifteenMinutes"), T("OneHour") },
             UnloadTimeoutPolicy.FifteenMinutes,
             UnloadTimeoutPolicy.TryNormalizeToCanonicalKey));
+        var clearChatLabel = T("ClearAllChatHistory");
+        aiGroup.Items.Add(new AsyncActionSettingViewModel(
+            T("ClearChatHistory"),
+            T("ClearChatHistoryDescription"),
+            clearChatLabel,
+            async vm =>
+            {
+                var confirm = await _overlayService.CreateDialogAsync(
+                    T("ClearChatHistoryConfirmTitle"),
+                    T("ClearChatHistoryConfirmMessage"),
+                    clearChatLabel,
+                    _localizationService.T("Cancel", "Common"));
+                if (confirm != clearChatLabel)
+                    return;
+                var result = await _chatHistoryClearService.ClearAllAsync();
+                vm.StatusText = result.IsSuccess
+                    ? T("ClearChatHistoryDone")
+                    : result.ErrorMessage ?? "Failed";
+            }));
 
         var ragGroup = new SettingsGroupViewModel(T("LocalKnowledge"));
         ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", T("EnableRAG"), T("EnableRAGDescription"), true));

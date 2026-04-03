@@ -31,4 +31,6 @@ public sealed class RoutingToolHintStore : IRoutingToolHintStore
 
         _byConversation.TryRemove(conversationKey.Trim(), out _);
     }
+
+    public void ClearAll() => _byConversation.Clear();
 }

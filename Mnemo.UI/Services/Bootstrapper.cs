@@ -32,6 +32,7 @@ public static class Bootstrapper
         services.AddSingleton<ILoggerService, LoggerService>();
         services.AddSingleton<IStorageProvider, SqliteStorageProvider>();
         services.AddSingleton<IChatModuleHistoryService, ChatModuleHistoryService>();
+        services.AddSingleton<IChatHistoryClearService, ChatHistoryClearService>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IChatDatasetLogger, ChatDatasetLogger>();
         services.AddSingleton<DatasetExporter>();

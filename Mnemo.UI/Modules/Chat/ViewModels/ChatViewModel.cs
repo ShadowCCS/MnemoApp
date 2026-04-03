@@ -51,6 +51,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     private readonly IChatDatasetLogger _chatDatasetLogger;
     private readonly IRoutingToolHintStore _routingToolHintStore;
     private readonly IChatModuleHistoryService _chatHistoryService;
+    private readonly IChatHistoryClearService _chatHistoryClearService;
     private readonly IConversationMemoryStore _memoryStore;
     private readonly IConversationSummarizer _memorySummarizer;
     private readonly IConversationMemoryInjector _memoryInjector;
@@ -314,6 +315,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         IChatDatasetLogger chatDatasetLogger,
         IRoutingToolHintStore routingToolHintStore,
         IChatModuleHistoryService chatHistoryService,
+        IChatHistoryClearService chatHistoryClearService,
         IConversationMemoryStore memoryStore,
         IConversationSummarizer memorySummarizer,
         IConversationMemoryInjector memoryInjector,
@@ -329,6 +331,8 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         _chatDatasetLogger = chatDatasetLogger;
         _routingToolHintStore = routingToolHintStore;
         _chatHistoryService = chatHistoryService;
+        _chatHistoryClearService = chatHistoryClearService;
+        _chatHistoryClearService.Cleared += OnChatHistoryClearServiceCleared;
         _memoryStore = memoryStore;
         _memorySummarizer = memorySummarizer;
         _memoryInjector = memoryInjector;
@@ -764,6 +768,22 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         }
     }
 
+    private void OnChatHistoryClearServiceCleared(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_disposed) return;
+            if (IsBusy)
+                StopGeneration();
+            PendingAttachments.Clear();
+            InputText = string.Empty;
+            if (!_isHistoryReady)
+                return;
+            ApplyDocument(new ChatModuleHistoryDocument { Version = 1, Conversations = new() });
+            PersistFireAndForget();
+        }, DispatcherPriority.Normal);
+    }
+
     private void ApplyDocument(ChatModuleHistoryDocument doc)
     {
         ClearSessionsAndRows();
@@ -881,7 +901,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             }
         }
 
-        return new ChatMessageViewModel
+        var vm = new ChatMessageViewModel
         {
             Content = m.Content ?? string.Empty,
             IsUser = m.IsUser,
@@ -890,6 +910,59 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             Sources = m.Sources,
             Attachments = attachments is { Count: > 0 } ? attachments : null
         };
+
+        if (!m.IsUser)
+            HydrateAssistantProcessState(vm, m);
+
+        return vm;
+    }
+
+    private static void HydrateAssistantProcessState(ChatMessageViewModel vm, ChatModulePersistedMessage m)
+    {
+        vm.Thoughts = m.Thoughts;
+        vm.ThoughtsCount = m.ThoughtsCount;
+        if (!string.IsNullOrEmpty(m.ProcessHeaderText))
+            vm.ProcessHeaderText = m.ProcessHeaderText!;
+        if (!string.IsNullOrEmpty(m.ElapsedText))
+            vm.ElapsedText = m.ElapsedText;
+        vm.IsProcessThreadExpanded = m.ProcessThreadExpanded ?? false;
+
+        if (m.ProcessSteps is not { Count: > 0 }) return;
+
+        foreach (var step in m.ProcessSteps)
+            vm.ProcessSteps.Add(MapStepFromPersisted(step));
+    }
+
+    private static ChatProcessStepViewModel MapStepFromPersisted(ChatModulePersistedProcessStep s)
+    {
+        var phase = Enum.TryParse<ChatProcessPhaseKind>(s.PhaseKind, ignoreCase: true, out var pk)
+            ? pk
+            : ChatProcessPhaseKind.Routing;
+
+        var vm = new ChatProcessStepViewModel
+        {
+            Label = s.Label ?? string.Empty,
+            Detail = s.Detail,
+            PhaseKind = phase,
+            IsComplete = true,
+            IsActive = false,
+            IsPending = false
+        };
+
+        if (s.ToolCalls is not { Count: > 0 }) return vm;
+
+        foreach (var tc in s.ToolCalls)
+        {
+            vm.ToolCalls.Add(new ChatToolCallViewModel
+            {
+                Name = tc.Name ?? string.Empty,
+                Arguments = tc.Arguments ?? string.Empty,
+                Result = tc.Result ?? string.Empty,
+                Summary = tc.Summary ?? string.Empty
+            });
+        }
+
+        return vm;
     }
 
     private static ChatModulePersistedMessage MapToPersistedMessage(ChatMessageViewModel m)
@@ -905,7 +978,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             }).ToList();
         }
 
-        return new ChatModulePersistedMessage
+        var msg = new ChatModulePersistedMessage
         {
             Content = m.Content,
             IsUser = m.IsUser,
@@ -913,6 +986,44 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             Suggestions = m.Suggestions,
             Sources = m.Sources,
             Attachments = attachments
+        };
+
+        if (!m.IsUser)
+            AppendAssistantProcessPersistence(msg, m);
+
+        return msg;
+    }
+
+    private static void AppendAssistantProcessPersistence(ChatModulePersistedMessage msg, ChatMessageViewModel m)
+    {
+        msg.Thoughts = m.Thoughts;
+        msg.ThoughtsCount = m.ThoughtsCount;
+        msg.ProcessHeaderText = m.ProcessHeaderText;
+        msg.ElapsedText = m.ElapsedText;
+        msg.ProcessThreadExpanded = m.IsProcessThreadExpanded;
+
+        if (m.ProcessSteps.Count == 0) return;
+
+        msg.ProcessSteps = m.ProcessSteps.Select(MapStepToPersisted).ToList();
+    }
+
+    private static ChatModulePersistedProcessStep MapStepToPersisted(ChatProcessStepViewModel s)
+    {
+        return new ChatModulePersistedProcessStep
+        {
+            Label = s.Label,
+            Detail = s.Detail,
+            PhaseKind = s.PhaseKind.ToString(),
+            IsComplete = s.IsComplete,
+            ToolCalls = s.ToolCalls.Count == 0
+                ? null
+                : s.ToolCalls.Select(tc => new ChatModulePersistedToolCallEntry
+                {
+                    Name = tc.Name,
+                    Arguments = tc.Arguments,
+                    Result = tc.Result,
+                    Summary = tc.Summary
+                }).ToList()
         };
     }
 
@@ -1718,6 +1829,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        _chatHistoryClearService.Cleared -= OnChatHistoryClearServiceCleared;
         _disposed = true;
         if (_messagesSubscriptionTarget != null)
             _messagesSubscriptionTarget.CollectionChanged -= OnMessagesCollectionChanged;

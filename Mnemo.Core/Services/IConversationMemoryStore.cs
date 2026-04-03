@@ -49,6 +49,9 @@ public interface IConversationMemoryStore
     /// </summary>
     void Evict(string conversationId);
 
+    /// <summary>Removes every conversation snapshot (e.g. when clearing all chat history).</summary>
+    void EvictAll();
+
     /// <summary>
     /// Returns all conversations that have pending summaries not yet embedded into the
     /// long-term vector store, filtered to those with turn count above <paramref name="tier3ThresholdTurns"/>.

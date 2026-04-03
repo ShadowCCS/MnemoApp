@@ -49,6 +49,46 @@ public sealed class ChatModulePersistedMessage
     public List<string>? Sources { get; set; }
 
     public List<ChatModulePersistedAttachment>? Attachments { get; set; }
+
+    // Assistant-only: thought process / tool thread (restored when reopening a conversation)
+    public string? Thoughts { get; set; }
+
+    public int ThoughtsCount { get; set; }
+
+    public string? ProcessHeaderText { get; set; }
+
+    public string? ElapsedText { get; set; }
+
+    public bool? ProcessThreadExpanded { get; set; }
+
+    public List<ChatModulePersistedProcessStep>? ProcessSteps { get; set; }
+}
+
+/// <summary>One step in the assistant process thread (routing, model, tools, …).</summary>
+public sealed class ChatModulePersistedProcessStep
+{
+    public string Label { get; set; } = string.Empty;
+
+    public string? Detail { get; set; }
+
+    /// <summary>Phase kind name for reload: Routing, Model, Generating, Tool, or Continuing.</summary>
+    public string PhaseKind { get; set; } = "Routing";
+
+    public bool IsComplete { get; set; } = true;
+
+    public List<ChatModulePersistedToolCallEntry>? ToolCalls { get; set; }
+}
+
+/// <summary>One tool invocation shown under a process step.</summary>
+public sealed class ChatModulePersistedToolCallEntry
+{
+    public string Name { get; set; } = string.Empty;
+
+    public string Arguments { get; set; } = string.Empty;
+
+    public string Result { get; set; } = string.Empty;
+
+    public string Summary { get; set; } = string.Empty;
 }
 
 public sealed class ChatModulePersistedAttachment

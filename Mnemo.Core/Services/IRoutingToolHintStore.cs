@@ -12,4 +12,6 @@ public interface IRoutingToolHintStore
     RoutingToolHint? TryGet(string conversationKey);
 
     void Clear(string conversationKey);
+
+    void ClearAll();
 }

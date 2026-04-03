@@ -128,6 +128,12 @@ public sealed class ConversationMemoryStore : IConversationMemoryStore
         _logger.Info("Memory", $"Store: evicted conv={conversationId}");
     }
 
+    public void EvictAll()
+    {
+        _snapshots.Clear();
+        _logger.Info("Memory", "Store: evicted all conversations");
+    }
+
     public RoutingToolHint? GetLatestToolHint(string conversationId)
     {
         if (string.IsNullOrWhiteSpace(conversationId))

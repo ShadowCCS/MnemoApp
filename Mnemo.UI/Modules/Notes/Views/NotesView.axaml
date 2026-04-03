@@ -39,8 +39,27 @@
             <Border BorderThickness="0,0,1,0" BorderBrush="{DynamicResource NotesPaneDividerBrush}"
                     HorizontalAlignment="Stretch">
                 <Grid RowDefinitions="Auto,*">
+                    <Grid.Resources>
+                        <x:Double x:Key="TreeViewItemIndent">8</x:Double>
+                        <x:Double x:Key="TreeViewItemMinHeight">28</x:Double>
+                    </Grid.Resources>
+                    <Grid.Styles>
+                        <Style Selector="controls|MnemoTreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">
+                            <Setter Property="Margin" Value="2,0,4,0"/>
+                        </Style>
+                        <Style Selector="controls|MnemoTreeViewItem /template/ ContentPresenter#PART_HeaderPresenter">
+                            <Setter Property="MinWidth" Value="0"/>
+                            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                        </Style>
+                        <Style Selector="controls|MnemoTreeViewItem /template/ Grid#PART_Header">
+                            <Setter Property="MinWidth" Value="0"/>
+                        </Style>
+                        <Style Selector="controls|MnemoTreeViewItem /template/ Border#PART_LayoutRoot">
+                            <Setter Property="MinWidth" Value="0"/>
+                        </Style>
+                    </Grid.Styles>
                     <!-- Header -->
-                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="16,20,16,12">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="10,12,10,8">
                         <TextBlock Text="{markup:T Ns=Notes, Key=Notes}"
                                    FontSize="{DynamicResource FontSize.Heading2}"
                                    FontFamily="{DynamicResource Font.Bold}"
@@ -70,22 +89,23 @@
 
                     <!-- Content -->
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="12,0,12,12" Spacing="4">
+                        <StackPanel Margin="6,0,6,8" Spacing="4">
                             <!-- Favorites -->
                             <StackPanel IsVisible="{Binding FavouriteNotes.Count}">
                                 <TextBlock Text="{markup:T Ns=Notes, Key=Favourites}" 
-                                           Margin="12,8,12,4"
+                                           Margin="4,4,4,2"
                                            FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                            FontFamily="{DynamicResource Font.SemiBold}"
                                            Foreground="{DynamicResource TextTertiaryBrush}"/>
                                 <controls:MnemoTreeView ItemsSource="{Binding FavouriteNotes}"
                                           SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                           Background="Transparent" BorderThickness="0"/>
-                                <Rectangle Height="1" Fill="{DynamicResource NotesPaneDividerBrush}" Margin="4,8,4,8" Opacity="0.5"/>
+                                <Rectangle Height="1" Fill="{DynamicResource NotesPaneDividerBrush}" Margin="2,6,2,6" Opacity="0.5"/>
                             </StackPanel>
 
                             <!-- My Notes (Folders + Notes) -->
-                            <Grid ColumnDefinitions="*,Auto" Margin="12,4,4,4">
+                            <Grid ColumnDefinitions="*,Auto" Margin="4,2,4,2">
                                 <TextBlock Text="{markup:T Ns=Notes, Key=MyNotes}"
                                            FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                            FontFamily="{DynamicResource Font.SemiBold}"
@@ -105,6 +125,7 @@
                                 <controls:MnemoTreeView x:Name="MyNotesTreeView"
                                           ItemsSource="{Binding RootTreeItems}"
                                           SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay}"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                           Background="Transparent"
                                           BorderThickness="0">
                                     <controls:MnemoTreeView.Styles>
@@ -192,6 +213,9 @@
                     <!-- Title row with favorite star -->
                     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
                         <TextBox Grid.Column="0" Text="{Binding SelectedNoteTitle, Mode=TwoWay}"
+                                 MinWidth="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ToolTip.Tip="{Binding SelectedNoteTitle}"
                                  FontSize="{DynamicResource FontSize.Heading1}"
                                  FontFamily="{DynamicResource Font.Bold}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
