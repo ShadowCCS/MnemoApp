@@ -286,6 +286,8 @@
     "NewFolder": "Nueva carpeta",
     "ToggleFavorite": "Alternar favorito",
     "MoreActions": "Más acciones",
+    "MoveUp": "Subir",
+    "MoveDown": "Bajar",
     "Created": "Creado",
     "LastModified": "Última modificación",
     "JustNow": "justo ahora",

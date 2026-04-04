@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -14,10 +14,15 @@ public partial class NoteTreeRow : UserControl
 {
     private const double DragStartThreshold = 5.0;
     private const string FolderItemClass = "folder-item";
-    private PointerPressedEventArgs? _pendingDragPress;
+    private const double DoubleClickMaxMs = 400.0;
+    private const double DoubleClickMaxPx = 5.0;
+
     private Point _pressPosition;
+    private bool _dragArmed;
+    private IPointer? _armedPointer;
     private MnemoTreeViewItem? _treeViewItem;
-    private EventHandler<PointerPressedEventArgs>? _folderPointerPressedHandler;
+    private DateTime _lastClickTime = DateTime.MinValue;
+    private Point _lastClickPosition;
 
     public NoteTreeRow()
     {
@@ -29,14 +34,13 @@ public partial class NoteTreeRow : UserControl
         base.OnAttachedToVisualTree(e);
         if (RowBorder == null) return;
 
-        Avalonia.Input.DragDrop.SetAllowDrop(RowBorder, true);
-        RowBorder.AddHandler(Avalonia.Input.DragDrop.DragOverEvent, OnDragOver, RoutingStrategies.Bubble);
-        RowBorder.AddHandler(Avalonia.Input.DragDrop.DropEvent, OnDrop, RoutingStrategies.Bubble);
-        // Tunnel with handledEventsToo so we get the press even if TreeViewItem already handled it; then we capture for drag-from-anywhere.
         AddHandler(PointerPressedEvent, OnPointerPressedTunnel, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Bubble);
         AddHandler(PointerReleasedEvent, OnPointerReleased, RoutingStrategies.Bubble);
         AddHandler(PointerCaptureLostEvent, OnPointerCaptureLost, RoutingStrategies.Bubble);
+        // PointerEntered/Exited are direct events; attach them on RowBorder directly
+        RowBorder.PointerEntered += OnRowPointerEntered;
+        RowBorder.PointerExited += OnRowPointerExited;
 
         _treeViewItem = this.FindAncestorOfType<MnemoTreeViewItem>();
         if (_treeViewItem != null)
@@ -44,11 +48,7 @@ public partial class NoteTreeRow : UserControl
             UpdateSelectedClass(_treeViewItem.IsSelected);
             _treeViewItem.PropertyChanged += OnTreeViewItemPropertyChanged;
             if (DataContext is NoteTreeItemViewModel item && item.IsFolder)
-            {
                 _treeViewItem.Classes.Add(FolderItemClass);
-                _folderPointerPressedHandler = OnFolderTreeViewItemPointerPressedTunnel;
-                _treeViewItem.AddHandler(PointerPressedEvent, _folderPointerPressedHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
-            }
         }
     }
 
@@ -57,24 +57,22 @@ public partial class NoteTreeRow : UserControl
         if (_treeViewItem != null)
         {
             _treeViewItem.PropertyChanged -= OnTreeViewItemPropertyChanged;
-            if (_folderPointerPressedHandler != null)
-            {
-                _treeViewItem.RemoveHandler(PointerPressedEvent, _folderPointerPressedHandler);
-                _folderPointerPressedHandler = null;
-            }
             _treeViewItem.Classes.Remove(FolderItemClass);
             _treeViewItem = null;
         }
+
         if (RowBorder != null)
         {
             RowBorder.Classes.Remove("selected");
-            RowBorder.RemoveHandler(Avalonia.Input.DragDrop.DragOverEvent, OnDragOver);
-            RowBorder.RemoveHandler(Avalonia.Input.DragDrop.DropEvent, OnDrop);
+            RowBorder.PointerEntered -= OnRowPointerEntered;
+            RowBorder.PointerExited -= OnRowPointerExited;
         }
+
         RemoveHandler(PointerPressedEvent, OnPointerPressedTunnel);
         RemoveHandler(PointerMovedEvent, OnPointerMoved);
         RemoveHandler(PointerReleasedEvent, OnPointerReleased);
         RemoveHandler(PointerCaptureLostEvent, OnPointerCaptureLost);
+
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -87,7 +85,6 @@ public partial class NoteTreeRow : UserControl
     private void UpdateSelectedClass(bool isSelected)
     {
         if (RowBorder == null) return;
-        // Folders are not selectable: never show selected state for folder rows.
         if (DataContext is NoteTreeItemViewModel item && item.IsFolder)
         {
             RowBorder.Classes.Remove("selected");
@@ -99,7 +96,6 @@ public partial class NoteTreeRow : UserControl
             RowBorder.Classes.Remove("selected");
     }
 
-    /// <summary>True only when the pointer is within this row's MoreButton bounds (avoids wrong Button in ancestor chain / hit-test).</summary>
     private bool IsPointerOnMoreButton(PointerEventArgs e)
     {
         if (MoreButton == null) return false;
@@ -109,126 +105,105 @@ public partial class NoteTreeRow : UserControl
         return pt.X >= 0 && pt.Y >= 0 && pt.X <= w && pt.Y <= h;
     }
 
-    /// <summary>
-    /// Called on the TreeViewItem (Tunnel) for folder rows only. Only toggle when the click is on the folder header, not on a child item.
-    /// </summary>
-    private void OnFolderTreeViewItemPointerPressedTunnel(object? sender, PointerPressedEventArgs e)
+    private void OnRowPointerEntered(object? sender, PointerEventArgs e)
     {
-        if (e.GetCurrentPoint(null).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed) return;
-        if (sender is not MnemoTreeViewItem tvi || tvi.DataContext is not NoteTreeItemViewModel item || !item.IsFolder) return;
-        // Only handle if the click was on this folder's header row. If the hit element is inside a child item, do not handle.
-        if (e.Source is Visual source && source.FindAncestorOfType<MnemoTreeViewItem>() is MnemoTreeViewItem hitTreeViewItem && hitTreeViewItem != tvi)
-            return;
-        // Let the MoreButton handle its own click.
-        if (IsPointerOnMoreButton(e)) return;
-        e.Handled = true;
-        item.IsExpanded = !item.IsExpanded;
+        var coordinator = FindDragCoordinator();
+        if (coordinator?.IsDragging == true) return;
+
+        if (MoreButton != null) MoreButton.Opacity = 1.0;
     }
 
-    /// <summary>
-    /// Tunnel: set selection and prepare for possible drag (capture). For folders we only mark handled (toggle is done on TreeViewItem).
-    /// </summary>
+    private void OnRowPointerExited(object? sender, PointerEventArgs e)
+    {
+        var coordinator = FindDragCoordinator();
+        if (coordinator?.IsDragging == true) return;
+
+        if (MoreButton != null) MoreButton.Opacity = 0.0;
+    }
+
+    private bool IsEditing => NameTextBox?.IsVisible == true;
+
     private void OnPointerPressedTunnel(object? sender, PointerPressedEventArgs e)
     {
+        if (IsEditing) return;
         if (DataContext is not NoteTreeItemViewModel item) return;
         if (e.GetCurrentPoint(this).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed) return;
-        // Let the MoreButton receive the click normally — don't capture or mark handled.
         if (IsPointerOnMoreButton(e)) return;
 
         var vm = FindNotesViewModel();
 
-        if (item.IsFolder)
-            e.Handled = true;
-        else if (vm != null)
-        {
+        if (!item.IsFolder && vm != null)
             vm.SelectedTreeItem = item;
+
+        var now = DateTime.UtcNow;
+        var pos = e.GetPosition(this);
+        var elapsed = (now - _lastClickTime).TotalMilliseconds;
+        var dist = Math.Sqrt(Math.Pow(pos.X - _lastClickPosition.X, 2) + Math.Pow(pos.Y - _lastClickPosition.Y, 2));
+
+        if (elapsed <= DoubleClickMaxMs && dist <= DoubleClickMaxPx)
+        {
+            // Double-click: start rename
+            _lastClickTime = DateTime.MinValue;
+            _dragArmed = false;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            BeginRename(item);
+            return;
         }
 
-        // Prepare drag from anywhere: capture here in tunnel so we get move/release even when press was on Button/icon/text.
-        var (collection, _) = vm != null ? FindContainingCollectionInAnyTree(vm, item) : (null, -1);
-        if (collection == null) return;
+        _lastClickTime = now;
+        _lastClickPosition = pos;
 
-        _pendingDragPress = e;
-        _pressPosition = e.GetPosition(this);
-        e.Handled = true; // Prevent TreeViewItem/PressedMixin from capturing pointer so we receive PointerMoved.
+        // Arm drag: capture pointer so we get move/release even when other controls handle the press
+        _pressPosition = pos;
+        _dragArmed = true;
+        _armedPointer = e.Pointer;
+
+        // Mark handled + capture so drag threshold can run; folder expand uses chevron or release-without-drag.
+        e.Handled = true;
         e.Pointer.Capture(this);
     }
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (_pendingDragPress == null || DataContext is not NoteTreeItemViewModel item) return;
+        if (IsEditing) return;
+        if (!_dragArmed || DataContext is not NoteTreeItemViewModel item) return;
 
         var current = e.GetPosition(this);
         var delta = current - _pressPosition;
         if (Math.Abs(delta.X) <= DragStartThreshold && Math.Abs(delta.Y) <= DragStartThreshold)
             return;
 
-        var transfer = new DataTransfer();
-        transfer.Add(DataTransferItem.Create(NotesViewModel.NoteTreeItemDragDataFormat, item));
-        _ = DragDrop.DoDragDropAsync(_pendingDragPress, transfer, DragDropEffects.Move);
+        // Threshold exceeded: hand off to DragCoordinator
+        _dragArmed = false;
+        var pointer = _armedPointer;
+        _armedPointer = null;
 
-        _pendingDragPress = null;
+        // Release our capture first; DragCoordinator will capture _paneRoot
+        pointer?.Capture(null);
+
+        var notesView = FindNotesView();
+        notesView?.InitiateDrag(item, this, e.Pointer);
+
+        if (MoreButton != null) MoreButton.Opacity = 0.0;
     }
 
     private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (IsEditing) { e.Pointer.Capture(null); return; }
+        // Folder: toggle only on a true click (never crossed drag threshold). Drag leaves _dragArmed false.
+        if (DataContext is NoteTreeItemViewModel folderItem && folderItem.IsFolder && _dragArmed)
+            folderItem.IsExpanded = !folderItem.IsExpanded;
+
         e.Pointer.Capture(null);
-        ClearPendingDrag();
+        _dragArmed = false;
+        _armedPointer = null;
     }
 
     private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
-        ClearPendingDrag();
-    }
-
-    private void ClearPendingDrag()
-    {
-        _pendingDragPress = null;
-    }
-
-    private void OnDragOver(object? sender, DragEventArgs e)
-    {
-        if (!e.DataTransfer.Contains(NotesViewModel.NoteTreeItemDragDataFormat))
-        {
-            e.DragEffects = DragDropEffects.None;
-            return;
-        }
-        var vm = FindNotesViewModel();
-        if (vm == null) { e.DragEffects = DragDropEffects.None; return; }
-        // Only allow drop on "My Notes" tree
-        if (DataContext is NoteTreeItemViewModel target)
-        {
-            var (collection, _) = FindContainingCollection(vm.RootTreeItems, target);
-            e.DragEffects = collection != null ? DragDropEffects.Move : DragDropEffects.None;
-        }
-        else
-            e.DragEffects = DragDropEffects.None;
-    }
-
-    private async void OnDrop(object? sender, DragEventArgs e)
-    {
-        if (DataContext is not NoteTreeItemViewModel target) return;
-        if (e.DataTransfer.TryGetValue(NotesViewModel.NoteTreeItemDragDataFormat) is not { } source) return;
-
-        var vm = FindNotesViewModel();
-        if (vm == null) return;
-
-        // If target is a folder, dropping anywhere within its row = drop into folder. Otherwise reorder (insert before/after by vertical position).
-        bool dropOnFolder = target.IsFolder && target.FolderId != null;
-        bool insertAfter = true;
-        if (!dropOnFolder && RowBorder != null)
-        {
-            try
-            {
-                var pos = e.GetPosition(RowBorder);
-                var height = Math.Max(RowBorder.Bounds.Height, 1.0);
-                insertAfter = pos.Y >= height / 2;
-            }
-            catch { }
-        }
-
-        await vm.MoveTreeItemAsync(source, target, dropOnFolder, insertAfter);
-        e.Handled = true;
+        _dragArmed = false;
+        _armedPointer = null;
     }
 
     private NotesViewModel? FindNotesViewModel()
@@ -243,28 +218,20 @@ public partial class NoteTreeRow : UserControl
         return null;
     }
 
-    /// <summary>Finds the collection containing the item in either RootTreeItems or FavouriteNotes.</summary>
-    private static (ObservableCollection<NoteTreeItemViewModel>? collection, int index) FindContainingCollectionInAnyTree(
-        NotesViewModel vm,
-        NoteTreeItemViewModel item)
+    private NotesView? FindNotesView()
     {
-        var (col, idx) = FindContainingCollection(vm.RootTreeItems, item);
-        if (col != null) return (col, idx);
-        return FindContainingCollection(vm.FavouriteNotes, item);
+        var current = this as Visual;
+        while (current != null)
+        {
+            if (current is NotesView nv) return nv;
+            current = current.GetVisualParent();
+        }
+        return null;
     }
 
-    private static (ObservableCollection<NoteTreeItemViewModel>? collection, int index) FindContainingCollection(
-        ObservableCollection<NoteTreeItemViewModel> root,
-        NoteTreeItemViewModel item)
+    private DragCoordinator? FindDragCoordinator()
     {
-        for (var i = 0; i < root.Count; i++)
-        {
-            if (ReferenceEquals(root[i], item))
-                return (root, i);
-            var (col, idx) = FindContainingCollection(root[i].Children, item);
-            if (col != null) return (col, idx);
-        }
-        return (null, -1);
+        return FindNotesView()?._dragCoordinator;
     }
 
     private async void OnDeleteClick(object? sender, RoutedEventArgs e)
@@ -278,47 +245,98 @@ public partial class NoteTreeRow : UserControl
             await vm.DeleteNoteCommand.ExecuteAsync(item);
     }
 
+    private async void OnMoveUpClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control c || c.Tag is not NoteTreeItemViewModel item) return;
+        var vm = FindNotesViewModel();
+        if (vm == null) return;
+        await vm.MoveItemUpCommand.ExecuteAsync(item);
+    }
+
+    private async void OnMoveDownClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control c || c.Tag is not NoteTreeItemViewModel item) return;
+        var vm = FindNotesViewModel();
+        if (vm == null) return;
+        await vm.MoveItemDownCommand.ExecuteAsync(item);
+    }
+
     private void OnRenameClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Control c || c.Tag is not NoteTreeItemViewModel item) return;
-        if (!item.IsRenamableFolder) return;
+        BeginRename(item);
+    }
+
+    private TopLevel? _editTopLevel;
+
+    private void BeginRename(NoteTreeItemViewModel item)
+    {
+        if (!item.IsRenamableFolder && item.Note == null) return;
         NameTextBlock!.IsVisible = false;
         NameTextBox!.IsVisible = true;
         NameTextBox.Text = item.Name;
         NameTextBox.CaretIndex = NameTextBox.Text?.Length ?? 0;
         NameTextBox.SelectAll();
-        // Defer focus so the flyout can close first
         Dispatcher.UIThread.Post(() => NameTextBox.Focus(), DispatcherPriority.Loaded);
+
+        _editTopLevel = TopLevel.GetTopLevel(this);
+        _editTopLevel?.AddHandler(PointerPressedEvent, OnGlobalPointerPressedDuringEdit, RoutingStrategies.Tunnel);
+    }
+
+    private void StopGlobalEditListener()
+    {
+        _editTopLevel?.RemoveHandler(PointerPressedEvent, OnGlobalPointerPressedDuringEdit);
+        _editTopLevel = null;
+    }
+
+    private void OnGlobalPointerPressedDuringEdit(object? sender, PointerPressedEventArgs e)
+    {
+        if (NameTextBox == null || !NameTextBox.IsVisible) { StopGlobalEditListener(); return; }
+        // If the press is inside the TextBox, let it through normally.
+        var pos = e.GetPosition(NameTextBox);
+        if (pos.X >= 0 && pos.Y >= 0 && pos.X <= NameTextBox.Bounds.Width && pos.Y <= NameTextBox.Bounds.Height)
+            return;
+        // Press is outside — commit and stop listening.
+        StopGlobalEditListener();
+        CommitRename();
     }
 
     private void OnNameEditLostFocus(object? sender, RoutedEventArgs e)
     {
-        CommitRename();
+        // Only commit on real focus loss (not when we're already committing via global press handler).
+        if (IsEditing) CommitRename();
     }
 
     private void OnNameEditKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Avalonia.Input.Key.Enter)
-        {
-            CommitRename();
-            e.Handled = true;
-        }
-        else if (e.Key == Avalonia.Input.Key.Escape)
-        {
-            CancelRename();
-            e.Handled = true;
-        }
+        if (e.Key == Key.Enter) { CommitRename(); e.Handled = true; }
+        else if (e.Key == Key.Escape) { CancelRename(); e.Handled = true; }
     }
 
     private async void CommitRename()
     {
-        if (!NameTextBox!.IsVisible || DataContext is not NoteTreeItemViewModel item || !item.IsRenamableFolder) return;
+        if (!NameTextBox!.IsVisible || DataContext is not NoteTreeItemViewModel item) return;
+        StopGlobalEditListener();
         var newName = (NameTextBox.Text ?? "").Trim();
-        if (string.IsNullOrEmpty(newName)) newName = item.Name;
-        item.SetFolderName(newName);
         var vm = FindNotesViewModel();
-        if (vm != null)
-            await vm.RenameFolderCommand.ExecuteAsync(item);
+
+        if (item.IsRenamableFolder)
+        {
+            if (string.IsNullOrEmpty(newName)) newName = item.Name;
+            item.SetFolderName(newName);
+            if (vm != null)
+                await vm.RenameFolderCommand.ExecuteAsync(item);
+        }
+        else if (item.Note != null)
+        {
+            if (string.IsNullOrEmpty(newName)) newName = item.Name;
+            if (vm != null)
+                await vm.SaveNoteWithContentAsync(item.Note, null, newName);
+            else
+                item.Note.Title = newName;
+            item.NotifyNameChanged();
+        }
+
         NameTextBox.IsVisible = false;
         NameTextBlock!.IsVisible = true;
     }
@@ -326,6 +344,7 @@ public partial class NoteTreeRow : UserControl
     private void CancelRename()
     {
         if (!NameTextBox!.IsVisible) return;
+        StopGlobalEditListener();
         NameTextBox.IsVisible = false;
         NameTextBlock!.IsVisible = true;
     }

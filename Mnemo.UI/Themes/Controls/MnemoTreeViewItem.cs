@@ -36,6 +36,12 @@ namespace Mnemo.UI.Controls
                 defaultBindingMode: BindingMode.TwoWay);
 
         /// <summary>
+        /// Defines the <see cref="ExpandOnHeaderClick"/> property.
+        /// </summary>
+        public static readonly StyledProperty<bool> ExpandOnHeaderClickProperty =
+            AvaloniaProperty.Register<MnemoTreeViewItem, bool>(nameof(ExpandOnHeaderClick), defaultValue: true);
+
+        /// <summary>
         /// Defines the <see cref="IsSelected"/> property.
         /// </summary>
         public static readonly StyledProperty<bool> IsSelectedProperty =
@@ -94,6 +100,15 @@ namespace Mnemo.UI.Controls
         {
             get => GetValue(IsExpandedProperty);
             set => SetValue(IsExpandedProperty, value);
+        }
+
+        /// <summary>
+        /// When true, a press on the header (not the chevron) toggles <see cref="IsExpanded"/>. Set false when the header hosts drag-reorder content; use the chevron or app-specific click handling instead.
+        /// </summary>
+        public bool ExpandOnHeaderClick
+        {
+            get => GetValue(ExpandOnHeaderClickProperty);
+            set => SetValue(ExpandOnHeaderClickProperty, value);
         }
 
         /// <summary>
@@ -216,6 +231,10 @@ namespace Mnemo.UI.Controls
         /// <inheritdoc/>
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            // If a TextBox descendant has focus (inline rename), let it handle all keyboard input.
+            if (this.GetVisualDescendants().OfType<TextBox>().Any(tb => tb.IsFocused))
+                return;
+
             if (!e.Handled)
             {
                 Func<MnemoTreeViewItem, bool>? handler =
@@ -323,7 +342,9 @@ namespace Mnemo.UI.Controls
                 return;
             }
 
-            if (_header != null && e.Source is Visual visual &&
+            if (ExpandOnHeaderClick &&
+                _header != null &&
+                e.Source is Visual visual &&
                 (visual == _header || visual.GetVisualAncestors().Any(a => a == _header)))
             {
                 SetCurrentValue(IsExpandedProperty, !IsExpanded);

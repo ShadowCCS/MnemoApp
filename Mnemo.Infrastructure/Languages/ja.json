@@ -285,6 +285,8 @@
       "NewFolder": "新しいフォルダー",
       "ToggleFavorite": "お気に入りの切り替え",
       "MoreActions": "その他のアクション",
+      "MoveUp": "上に移動",
+      "MoveDown": "下に移動",
       "Created": "作成日",
       "LastModified": "最終更新日時",
       "JustNow": "今すぐ",

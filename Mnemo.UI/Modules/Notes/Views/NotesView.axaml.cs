@@ -26,6 +26,9 @@ public partial class NotesView : UserControl
     private Note? _pendingSaveNote;
     private const int SaveDebounceMs = 500;
 
+    internal DragCoordinator? _dragCoordinator;
+    private Window? _attachedWindow;
+
     public NotesView()
     {
         InitializeComponent();
@@ -40,7 +43,6 @@ public partial class NotesView : UserControl
         vm.PropertyChanged -= OnViewModelPropertyChanged;
         vm.PropertyChanged += OnViewModelPropertyChanged;
 
-        // Load blocks if a note is already selected (e.g. after load)
         if (vm.SelectedNote != null)
             Dispatcher.UIThread.Post(() => LoadBlocksForCurrentNote(), DispatcherPriority.Loaded);
     }
@@ -51,7 +53,6 @@ public partial class NotesView : UserControl
             return;
 
         FlushPendingSave();
-
         Dispatcher.UIThread.Post(() => LoadBlocksForCurrentNote(), DispatcherPriority.Loaded);
     }
 
@@ -145,8 +146,84 @@ public partial class NotesView : UserControl
         if (titleBox != null)
             titleBox.LostFocus += OnTitleBoxLostFocus;
 
-        SetupMyNotesDropTargets();
+        SetupDragCoordinator();
         SetupGutterBoxSelect();
+
+        _attachedWindow = this.GetVisualAncestors().OfType<Window>().FirstOrDefault();
+        if (_attachedWindow != null)
+        {
+            _attachedWindow.KeyDown += OnWindowKeyDown;
+            _attachedWindow.Deactivated += OnWindowDeactivated;
+        }
+    }
+
+    private void SetupDragCoordinator()
+    {
+        // Register global pointer handlers immediately — these only do work when _dragCoordinator.IsDragging
+        AddHandler(PointerMovedEvent, OnPanePointerMoved, RoutingStrategies.Tunnel);
+        AddHandler(PointerReleasedEvent, OnPanePointerReleased, RoutingStrategies.Tunnel);
+    }
+
+    private void EnsureDragCoordinator()
+    {
+        if (_dragCoordinator != null) return;
+
+        // By the time a drag starts, the visual tree is fully realized — walk it now
+        var overlayCanvas = this.GetVisualDescendants().OfType<Canvas>().FirstOrDefault(c => c.Name == "DragOverlayCanvas");
+        var scrollViewer = this.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(s => s.Name == "SidebarScrollViewer");
+        var paneRoot = this.GetVisualDescendants().OfType<Border>().FirstOrDefault(b => b.Name == "SidebarPaneBorder");
+
+        if (overlayCanvas == null || scrollViewer == null || paneRoot == null) return;
+
+        _dragCoordinator = new DragCoordinator(overlayCanvas, scrollViewer, paneRoot);
+    }
+
+    private void OnPanePointerMoved(object? sender, PointerEventArgs e)
+    {
+        _dragCoordinator?.OnPointerMoved(e);
+    }
+
+    private async void OnPanePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_dragCoordinator == null || !_dragCoordinator.IsDragging) return;
+        if (DataContext is not NotesViewModel vm) return;
+
+        var source = _dragCoordinator.SourceItem;
+        var drop = _dragCoordinator.OnPointerReleased(e);
+
+        if (source == null) return;
+
+        if (drop == null)
+        {
+            // Dropped on empty space → move to root
+            await vm.MoveTreeItemToRootAsync(source);
+            return;
+        }
+
+        bool insertAfter = drop.Value.Mode == DragCoordinator.DropMode.InsertBelow;
+        bool dropOnFolder = drop.Value.Mode == DragCoordinator.DropMode.DropIntoFolder;
+        await vm.MoveTreeItemAsync(source, drop.Value.Target, dropOnFolder, insertAfter);
+    }
+
+    /// <summary>Called by <see cref="NoteTreeRow"/> once drag threshold is crossed.</summary>
+    public void InitiateDrag(NoteTreeItemViewModel item, NoteTreeRow row, IPointer pointer)
+    {
+        EnsureDragCoordinator();
+        _dragCoordinator?.BeginDrag(item, row, pointer);
+    }
+
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && _dragCoordinator?.IsDragging == true)
+        {
+            _dragCoordinator.CancelDrag();
+            e.Handled = true;
+        }
+    }
+
+    private void OnWindowDeactivated(object? sender, EventArgs e)
+    {
+        _dragCoordinator?.CancelDrag();
     }
 
     private void SetupGutterBoxSelect()
@@ -164,147 +241,38 @@ public partial class NotesView : UserControl
         var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
         if (editor == null) return;
 
-        // Check if press is in the gutter (outside the editor's own bounds)
         var posInEditor = e.GetPosition(editor);
         var editorBounds = new Rect(0, 0, editor.Bounds.Width, editor.Bounds.Height);
-        if (editorBounds.Contains(posInEditor)) return; // inside editor — let it handle
+        if (editorBounds.Contains(posInEditor)) return;
 
-        // Only arm if press is vertically within the editor's vertical extent
         if (posInEditor.Y < 0 || posInEditor.Y > editor.Bounds.Height) return;
 
         editor.ArmExternalBoxSelect(posInEditor, e.Pointer);
-        // Don't mark handled — let ScrollViewer defocus etc. still run
-    }
-
-    private void SetupMyNotesDropTargets()
-    {
-        var header = this.FindControl<Grid>("MyNotesHeader");
-        var treeArea = this.FindControl<Border>("MyNotesTreeArea");
-        var tree = this.FindControl<MnemoTreeView>("MyNotesTreeView");
-        if (header != null)
-        {
-            DragDrop.SetAllowDrop(header, true);
-            header.AddHandler(DragDrop.DragOverEvent, OnMyNotesSectionDragOver, RoutingStrategies.Bubble);
-            header.AddHandler(DragDrop.DropEvent, OnMyNotesSectionDrop, RoutingStrategies.Bubble);
-        }
-        if (treeArea != null)
-        {
-            DragDrop.SetAllowDrop(treeArea, true);
-            treeArea.AddHandler(DragDrop.DragOverEvent, OnMyNotesSectionDragOver, RoutingStrategies.Bubble);
-            treeArea.AddHandler(DragDrop.DropEvent, OnMyNotesSectionDrop, RoutingStrategies.Bubble);
-        }
-        if (tree != null)
-        {
-            DragDrop.SetAllowDrop(tree, true);
-            tree.AddHandler(DragDrop.DragOverEvent, OnMyNotesSectionDragOver, RoutingStrategies.Bubble);
-            tree.AddHandler(DragDrop.DropEvent, OnMyNotesSectionDrop, RoutingStrategies.Bubble);
-        }
-    }
-
-    private void OnMyNotesSectionDragOver(object? sender, DragEventArgs e)
-    {
-        e.DragEffects = e.DataTransfer.Contains(NotesViewModel.NoteTreeItemDragDataFormat)
-            ? DragDropEffects.Move
-            : DragDropEffects.None;
-    }
-
-    private async void OnMyNotesSectionDrop(object? sender, DragEventArgs e)
-    {
-        if (DataContext is not NotesViewModel vm) return;
-        if (e.DataTransfer.TryGetValue(NotesViewModel.NoteTreeItemDragDataFormat) is not { } source) return;
-
-        // When drop target is tree/treeArea, check if we're over a row: if so, perform drop-into-folder or reorder there
-        if (sender is Visual dropTarget && (dropTarget is MnemoTreeView || dropTarget is Border))
-        {
-            var (target, dropOnFolder, insertAfter) = GetDropTargetRowInfo(dropTarget, e);
-            if (target != null)
-            {
-                await vm.MoveTreeItemAsync(source, target, dropOnFolder, insertAfter);
-                e.Handled = true;
-                return;
-            }
-        }
-
-        await vm.MoveTreeItemToRootAsync(source);
-    }
-
-    /// <summary>
-    /// When drop occurs on the tree/section, find the row under the cursor and return target item plus drop semantics.
-    /// Returns (null, false, true) when not over a row.
-    /// </summary>
-    private static (NoteTreeItemViewModel? target, bool dropOnFolder, bool insertAfter) GetDropTargetRowInfo(Visual dropTarget, DragEventArgs e)
-    {
-        try
-        {
-            var pos = e.GetPosition(dropTarget);
-            var hit = dropTarget.GetVisualAt(pos);
-            var current = hit;
-            NoteTreeRow? row = null;
-            while (current != null)
-            {
-                if (current is NoteTreeRow r)
-                {
-                    row = r;
-                    break;
-                }
-                current = current.GetVisualParent();
-            }
-            if (row?.DataContext is not NoteTreeItemViewModel target)
-                return (null, false, true);
-
-            bool dropOnFolder = target.IsFolder && target.FolderId != null;
-            bool insertAfter = true;
-            if (!dropOnFolder && row.GetVisualChildren().OfType<Border>().FirstOrDefault() is Border rowBorder)
-            {
-                try
-                {
-                    var rowPos = e.GetPosition(rowBorder);
-                    var height = Math.Max(rowBorder.Bounds.Height, 1.0);
-                    insertAfter = rowPos.Y >= height / 2;
-                }
-                catch { }
-            }
-            return (target, dropOnFolder, insertAfter);
-        }
-        catch { }
-        return (null, false, true);
-    }
-
-    private static bool IsDropOnTreeRow(Visual dropTarget, DragEventArgs e)
-    {
-        var (target, _, _) = GetDropTargetRowInfo(dropTarget, e);
-        return target != null;
     }
 
     protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
+        _dragCoordinator?.Dispose();
+        _dragCoordinator = null;
+
+        if (_attachedWindow != null)
+        {
+            _attachedWindow.KeyDown -= OnWindowKeyDown;
+            _attachedWindow.Deactivated -= OnWindowDeactivated;
+            _attachedWindow = null;
+        }
+
         FlushPendingSave();
 
         var titleBox = this.FindControl<TextBox>("NoteTitleBox");
         if (titleBox != null)
             titleBox.LostFocus -= OnTitleBoxLostFocus;
 
-        var scrollViewer = this.FindControl<ScrollViewer>("EditorScrollViewer");
-        scrollViewer?.RemoveHandler(PointerPressedEvent, OnGutterPointerPressed);
+        var editorScrollViewer = this.FindControl<ScrollViewer>("EditorScrollViewer");
+        editorScrollViewer?.RemoveHandler(PointerPressedEvent, OnGutterPointerPressed);
 
-        var header = this.FindControl<Grid>("MyNotesHeader");
-        var treeArea = this.FindControl<Border>("MyNotesTreeArea");
-        var tree = this.FindControl<MnemoTreeView>("MyNotesTreeView");
-        if (header != null)
-        {
-            header.RemoveHandler(DragDrop.DragOverEvent, OnMyNotesSectionDragOver);
-            header.RemoveHandler(DragDrop.DropEvent, OnMyNotesSectionDrop);
-        }
-        if (treeArea != null)
-        {
-            treeArea.RemoveHandler(DragDrop.DragOverEvent, OnMyNotesSectionDragOver);
-            treeArea.RemoveHandler(DragDrop.DropEvent, OnMyNotesSectionDrop);
-        }
-        if (tree != null)
-        {
-            tree.RemoveHandler(DragDrop.DragOverEvent, OnMyNotesSectionDragOver);
-            tree.RemoveHandler(DragDrop.DropEvent, OnMyNotesSectionDrop);
-        }
+        RemoveHandler(PointerMovedEvent, OnPanePointerMoved);
+        RemoveHandler(PointerReleasedEvent, OnPanePointerReleased);
 
         if (DataContext is NotesViewModel vm)
             vm.PropertyChanged -= OnViewModelPropertyChanged;
@@ -328,5 +296,4 @@ public partial class NotesView : UserControl
         if (titleBox != null)
             await vm.SaveCurrentNoteAsync(null, titleBox.Text);
     }
-
 }

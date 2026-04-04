@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -17,6 +18,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 {
     private const string LastOpenNoteIdKey = "Notes.LastOpenNoteId";
     private const string NotesSidebarOpenKey = "Notes.SidebarOpen";
+    private const string NotesExpandedFolderIdsKey = "Notes.ExpandedFolderIds";
 
     /// <summary>
     /// When navigation passes a note id (e.g. AI <c>open_note</c>), select that note after load instead of the last saved selection.
@@ -98,6 +100,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
     private Dictionary<string, NoteFolder> _foldersById = new();
 
+    /// <summary>Authoritative expanded folder ids (updated synchronously on expand/collapse; not derived from the tree).</summary>
+    private HashSet<string> _expandedFolderIds = new(StringComparer.Ordinal);
+
+    private bool _suppressExpandFolderPersistence;
+
     public NotesViewModel(INoteService noteService, INoteFolderService folderService, ISettingsService settingsService, ILocalizationService localizationService)
     {
         _noteService = noteService;
@@ -132,7 +139,8 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             foreach (var n in notes)
                 Notes.Add(n);
 
-            BuildTree(folders, notes);
+            await LoadExpandedFolderIdsFromSettingsAsync();
+            await BuildTreeAsync(folders, notes);
             RefreshAllNotesFlatList(notes);
             RefreshFavouriteNotes();
 
@@ -206,9 +214,13 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         }
     }
 
-    private void BuildTree(List<NoteFolder> folders, List<Note> notes)
+    private async Task BuildTreeAsync(List<NoteFolder> folders, List<Note> notes)
     {
-        var expandedFolderIds = CollectExpandedFolderIds(RootTreeItems);
+        var folderIdsValid = new HashSet<string>(folders.Select(f => f.FolderId), StringComparer.Ordinal);
+        _expandedFolderIds.IntersectWith(folderIdsValid);
+
+        var expandedFolderIds = new HashSet<string>(_expandedFolderIds, StringComparer.Ordinal);
+
         RootTreeItems.Clear();
 
         var folderIds = new HashSet<string>(folders.Select(f => f.FolderId));
@@ -226,43 +238,75 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             .OrderByDescending(n => n.ModifiedAt)
             .ToList();
 
-        // Folders first (with their nested children)
-        foreach (var f in rootFolders)
+        _suppressExpandFolderPersistence = true;
+        try
         {
-            var node = new NoteTreeItemViewModel(f);
-            AddChildren(node, f.FolderId, folders, notes);
-            RootTreeItems.Add(node);
+            // Folders first (with their nested children)
+            foreach (var f in rootFolders)
+            {
+                var node = new NoteTreeItemViewModel(f, OnFolderExpandedChanged);
+                AddChildren(node, f.FolderId, folders, notes);
+                RootTreeItems.Add(node);
+            }
+
+            // Notes without a folder appear directly at root level (no synthetic wrapper needed)
+            foreach (var n in rootNotes.Concat(orphanNotes).OrderBy(n => n.Order).ThenByDescending(n => n.ModifiedAt))
+                RootTreeItems.Add(new NoteTreeItemViewModel(n));
+
+            RestoreExpanded(RootTreeItems, expandedFolderIds);
+        }
+        finally
+        {
+            _suppressExpandFolderPersistence = false;
         }
 
-        // Notes without a folder appear directly at root level (no synthetic wrapper needed)
-        foreach (var n in rootNotes.Concat(orphanNotes).OrderBy(n => n.Order).ThenByDescending(n => n.ModifiedAt))
-            RootTreeItems.Add(new NoteTreeItemViewModel(n));
-
-        RestoreExpanded(RootTreeItems, expandedFolderIds);
+        await SaveExpandedFolderIdsToSettingsAsync();
     }
 
-    private static HashSet<string?> CollectExpandedFolderIds(ObservableCollection<NoteTreeItemViewModel> root)
+    private void OnFolderExpandedChanged(string folderId, bool isExpanded)
     {
-        var set = new HashSet<string?>();
-        foreach (var item in root)
-            CollectExpandedRecursive(item, set);
-        return set;
+        if (_suppressExpandFolderPersistence) return;
+        if (isExpanded)
+            _expandedFolderIds.Add(folderId);
+        else
+            _expandedFolderIds.Remove(folderId);
+        _ = SaveExpandedFolderIdsToSettingsAsync();
     }
 
-    private static void CollectExpandedRecursive(NoteTreeItemViewModel node, HashSet<string?> set)
+    private async Task SaveExpandedFolderIdsToSettingsAsync()
     {
-        if (node.IsFolder && node.IsExpanded && node.FolderId != null)
-            set.Add(node.FolderId);
-        foreach (var child in node.Children)
-            CollectExpandedRecursive(child, set);
+        var ids = _expandedFolderIds.OrderBy(s => s, StringComparer.Ordinal).ToArray();
+        var json = JsonSerializer.Serialize(ids);
+        await _settingsService.SetAsync(NotesExpandedFolderIdsKey, json);
     }
 
-    private static void RestoreExpanded(ObservableCollection<NoteTreeItemViewModel> root, HashSet<string?> expandedIds)
+    private async Task LoadExpandedFolderIdsFromSettingsAsync()
+    {
+        _expandedFolderIds = new HashSet<string>(StringComparer.Ordinal);
+        var json = await _settingsService.GetAsync<string?>(NotesExpandedFolderIdsKey, null);
+        if (string.IsNullOrWhiteSpace(json)) return;
+        try
+        {
+            var ids = JsonSerializer.Deserialize<string[]>(json);
+            if (ids == null) return;
+            foreach (var id in ids)
+            {
+                if (!string.IsNullOrEmpty(id))
+                    _expandedFolderIds.Add(id);
+            }
+        }
+        catch
+        {
+            // keep empty
+        }
+    }
+
+    private static void RestoreExpanded(ObservableCollection<NoteTreeItemViewModel> root, HashSet<string> expandedIds)
     {
         foreach (var item in root)
         {
-            if (item.IsFolder && item.FolderId != null && expandedIds.Contains(item.FolderId))
-                item.IsExpanded = true;
+            if (item.IsFolder && item.FolderId != null)
+                item.IsExpanded = expandedIds.Contains(item.FolderId);
             RestoreExpanded(item.Children, expandedIds);
         }
     }
@@ -274,7 +318,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
         foreach (var f in childFolders)
         {
-            var childNode = new NoteTreeItemViewModel(f);
+            var childNode = new NoteTreeItemViewModel(f, OnFolderExpandedChanged);
             AddChildren(childNode, f.FolderId, folders, notes);
             node.Children.Add(childNode);
         }
@@ -569,7 +613,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         }
         var foldersList = _foldersById.Values.ToList();
         var notesList = Notes.ToList();
-        BuildTree(foldersList, notesList);
+        await BuildTreeAsync(foldersList, notesList);
         RefreshFlattenedTreeItems();
         RefreshFavouriteNotes();
     }
@@ -656,7 +700,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         _foldersById[folder.FolderId] = folder;
         var folders = _foldersById.Values.ToList();
         var notes = Notes.ToList();
-        BuildTree(folders, notes);
+        await BuildTreeAsync(folders, notes);
         RefreshFlattenedTreeItems();
     }
 
@@ -670,6 +714,32 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     /// </summary>
     public static readonly DataFormat<NoteTreeItemViewModel> NoteTreeItemDragDataFormat =
         AvaloniaDataFormats.CreateApplicationFormat<NoteTreeItemViewModel>(NoteTreeItemDragKey);
+
+    /// <summary>
+    /// Moves an item one position up within its sibling collection.
+    /// </summary>
+    [RelayCommand]
+    private async Task MoveItemUpAsync(NoteTreeItemViewModel? item)
+    {
+        if (item == null) return;
+        var (col, idx) = FindContainingCollection(RootTreeItems, item);
+        if (col == null || idx <= 0) return;
+        col.Move(idx, idx - 1);
+        await PersistOrderAsync(col);
+    }
+
+    /// <summary>
+    /// Moves an item one position down within its sibling collection.
+    /// </summary>
+    [RelayCommand]
+    private async Task MoveItemDownAsync(NoteTreeItemViewModel? item)
+    {
+        if (item == null) return;
+        var (col, idx) = FindContainingCollection(RootTreeItems, item);
+        if (col == null || idx < 0 || idx >= col.Count - 1) return;
+        col.Move(idx, idx + 1);
+        await PersistOrderAsync(col);
+    }
 
     /// <summary>
     /// Moves a tree item to root (parentless). Call when user drops on "My Notes" section background or header.
@@ -695,7 +765,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
         var foldersList = _foldersById.Values.ToList();
         var notesForTree = Notes.ToList();
-        BuildTree(foldersList, notesForTree);
+        await BuildTreeAsync(foldersList, notesForTree);
         RefreshFlattenedTreeItems();
         RefreshFavouriteNotes();
     }
@@ -735,7 +805,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
             var foldersList = _foldersById.Values.ToList();
             var notesForTree = Notes.ToList();
-            BuildTree(foldersList, notesForTree);
+            await BuildTreeAsync(foldersList, notesForTree);
             RefreshFlattenedTreeItems();
             RefreshFavouriteNotes();
             return;
@@ -792,7 +862,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         await PersistOrderAsync(targetCol);
         var folders = _foldersById.Values.ToList();
         var notesList = Notes.ToList();
-        BuildTree(folders, notesList);
+        await BuildTreeAsync(folders, notesList);
         RefreshFlattenedTreeItems();
         RefreshFavouriteNotes();
     }

@@ -286,6 +286,8 @@
     "NewFolder": "Neue Ordner",
     "ToggleFavorite": "Lieblingsstatus wechseln",
     "MoreActions": "Mehr Aktionen",
+    "MoveUp": "Nach oben",
+    "MoveDown": "Nach unten",
     "Created": "Erstellt",
     "LastModified": "Letzte Bearbeitung",
     "JustNow": "Jetzt",

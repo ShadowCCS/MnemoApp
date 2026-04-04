@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -10,8 +11,10 @@ namespace Mnemo.UI.Modules.Notes.ViewModels;
 /// </summary>
 public partial class NoteTreeItemViewModel : ObservableObject
 {
+    private readonly Action<string, bool>? _onFolderExpandedChanged;
+
     [ObservableProperty]
-    private bool _isExpanded = true;
+    private bool _isExpanded;
 
     public bool IsFolder { get; }
     public string? FolderId { get; }
@@ -45,11 +48,12 @@ public partial class NoteTreeItemViewModel : ObservableObject
 
     public ObservableCollection<NoteTreeItemViewModel> Children { get; } = new();
 
-    public NoteTreeItemViewModel(NoteFolder folder)
+    public NoteTreeItemViewModel(NoteFolder folder, Action<string, bool>? onFolderExpandedChanged = null)
     {
         IsFolder = true;
         FolderId = folder.FolderId;
         Folder = folder;
+        _onFolderExpandedChanged = onFolderExpandedChanged;
         Children.CollectionChanged += OnChildrenChanged;
     }
 
@@ -69,6 +73,7 @@ public partial class NoteTreeItemViewModel : ObservableObject
     {
         IsFolder = false;
         Note = note;
+        IsExpanded = true; // leaf rows; binding exists on tree item — avoid collapsed chrome
     }
 
     /// <summary>
@@ -93,5 +98,11 @@ public partial class NoteTreeItemViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsFolderEmpty));
         OnPropertyChanged(nameof(IsFolderWithChildren));
+    }
+
+    partial void OnIsExpandedChanged(bool value)
+    {
+        if (IsFolder && FolderId != null)
+            _onFolderExpandedChanged?.Invoke(FolderId, value);
     }
 }
