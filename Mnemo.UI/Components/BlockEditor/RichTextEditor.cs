@@ -493,6 +493,24 @@ public class RichTextEditor : Control
 
     // ── Pointer input ────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Programmatically begins a drag-select from outside a pointer event (e.g. when the press
+    /// landed in the block padding rather than directly over this control). Captures the pointer
+    /// so subsequent PointerMoved events update the selection normally.
+    /// </summary>
+    public void StartDragSelect(int anchorCharIndex, IPointer pointer)
+    {
+        Focus();
+        anchorCharIndex = Math.Clamp(anchorCharIndex, 0, TextLength);
+        CaretIndex = anchorCharIndex;
+        SelectionStart = anchorCharIndex;
+        SelectionEnd = anchorCharIndex;
+        _dragAnchor = anchorCharIndex;
+        _isDragging = true;
+        pointer.Capture(this);
+        ResetCaretBlink();
+    }
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);

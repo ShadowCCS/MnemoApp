@@ -632,9 +632,28 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             // the caret from the click (HitTestPoint). Otherwise we'd set Handled and the caret would never move.
             if (vm.IsFocused)
             {
-                // Clear all blocks so the other block's selection always breaks; don't rely on GetBlockIndexAtPoint.
                 ClearTextSelectionInAllBlocksExcept(-1);
                 ClearBlockSelection();
+
+                // If the press landed outside the RichTextEditor itself (e.g. in block padding),
+                // the editor won't receive OnPointerPressed. Initiate drag-select manually so the
+                // full block width acts as a hit target for starting text selection.
+                var richEditor = editableBlock.TryGetRichTextEditor();
+                if (richEditor != null)
+                {
+                    bool pointerIsOverEditor = richEditor.IsPointerOver;
+                    if (!pointerIsOverEditor)
+                    {
+                        var pointInFocusedBlock = this.TranslatePoint(pos, editableBlock);
+                        if (pointInFocusedBlock.HasValue)
+                        {
+                            var paddingCharIndex = editableBlock.GetCharacterIndexFromPoint(pointInFocusedBlock.Value);
+                            paddingCharIndex = Math.Clamp(paddingCharIndex, 0, vm.Content?.Length ?? 0);
+                            richEditor.StartDragSelect(paddingCharIndex, e.Pointer);
+                            e.Handled = true;
+                        }
+                    }
+                }
                 return;
             }
 
