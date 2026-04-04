@@ -546,6 +546,79 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         _ = await _noteService.SaveNoteAsync(note);
     }
 
+    [RelayCommand]
+    private async Task DuplicateNoteAsync(NoteTreeItemViewModel? item)
+    {
+        if (item?.Note == null) return;
+        var source = item.Note;
+
+        var bumped = new List<Note>();
+        foreach (var n in Notes.Where(n => n.FolderId == source.FolderId))
+        {
+            if (n.Order > source.Order)
+            {
+                n.Order++;
+                bumped.Add(n);
+            }
+        }
+
+        var clone = new Note
+        {
+            NoteId = Guid.NewGuid().ToString(),
+            Title = FormatDuplicateNoteTitle(source.Title),
+            FolderId = source.FolderId,
+            FolderPath = source.FolderPath,
+            Content = source.Content ?? string.Empty,
+            Blocks = CloneNoteBlocksForDuplicate(source.Blocks),
+            Order = source.Order + 1,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow,
+            IsFavorite = false
+        };
+
+        Notes.Add(clone);
+        await _noteService.SaveNoteAsync(clone);
+        foreach (var n in bumped)
+            await _noteService.SaveNoteAsync(n);
+
+        await BuildTreeAsync(_foldersById.Values.ToList(), Notes.ToList());
+        RefreshAllNotesFlatList();
+        RefreshFlattenedTreeItems();
+
+        var newVm = FindTreeItemByNoteId(RootTreeItems, clone.NoteId);
+        if (newVm != null)
+        {
+            SelectedTreeItem = newVm;
+            SelectedNote = clone;
+        }
+    }
+
+    private string FormatDuplicateNoteTitle(string? title)
+    {
+        var baseTitle = string.IsNullOrWhiteSpace(title) ? "Untitled" : title.Trim();
+        return string.Format(_localizationService.T("DuplicateNoteTitleFormat", "Notes"), baseTitle);
+    }
+
+    private static List<Block>? CloneNoteBlocksForDuplicate(List<Block>? blocks)
+    {
+        if (blocks == null || blocks.Count == 0)
+            return null;
+        foreach (var b in blocks)
+            b.EnsureInlineRuns();
+        var json = JsonSerializer.Serialize(blocks);
+        var list = JsonSerializer.Deserialize<List<Block>>(json);
+        if (list == null || list.Count == 0)
+            return null;
+        var ordered = list.OrderBy(b => b.Order).ToList();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            ordered[i].Id = Guid.NewGuid().ToString();
+            ordered[i].Order = i;
+            ordered[i].EnsureInlineRuns();
+        }
+        return ordered;
+    }
+
     // Search and Recent commands removed as per request
 
 

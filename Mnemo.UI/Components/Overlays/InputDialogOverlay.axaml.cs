@@ -23,6 +23,7 @@ namespace Mnemo.UI.Components.Overlays
 
         public ICommand ConfirmCommand { get; }
         public ICommand CancelCommand { get; }
+        public ICommand CloseCommand { get; }
 
         public Action<string?>? OnResult { get; set; }
 
@@ -30,6 +31,7 @@ namespace Mnemo.UI.Components.Overlays
         {
             ConfirmCommand = new RelayCommand(OnConfirm);
             CancelCommand = new RelayCommand(OnCancel);
+            CloseCommand = new RelayCommand(OnCancel);
             InitializeComponent();
             DataContext = this;
         }

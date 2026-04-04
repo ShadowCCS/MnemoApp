@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
@@ -68,7 +69,8 @@ namespace Mnemo.UI.Controls
 
         static SvgIcon()
         {
-            ColorProperty.Changed.AddClassHandler<SvgIcon>((x, e) => x.InvalidateVisual());
+            ColorProperty.Changed.AddClassHandler<SvgIcon>((x, _) => x.InvalidateVisual());
+            TextElement.ForegroundProperty.Changed.AddClassHandler<SvgIcon>((x, _) => x.InvalidateVisual());
             SvgPathProperty.Changed.AddClassHandler<SvgIcon>((x, e) =>
             {
                 x._svgPicture?.Decrement();
@@ -76,6 +78,14 @@ namespace Mnemo.UI.Controls
                 x._loadedPath = null;
                 x.InvalidateVisual();
             });
+        }
+
+        private static SKColor? TryGetSkTint(IBrush? brush)
+        {
+            if (brush is not ISolidColorBrush solid)
+                return null;
+            var c = solid.Color;
+            return new SKColor(c.R, c.G, c.B, c.A);
         }
 
         private void LoadSvg(string path)
@@ -139,12 +149,9 @@ namespace Mnemo.UI.Controls
             LoadSvg(SvgPath);
             if (_svgPicture == null) return;
 
-            SKColor? color = null;
-            if (Color is ISolidColorBrush solidBrush)
-            {
-                var c = solidBrush.Color;
-                color = new SKColor(c.R, c.G, c.B, c.A);
-            }
+            // Color: explicit tint. Else inherited text foreground (MenuItem / ContentPresenter TemplateBinding).
+            var inheritedFg = TextElement.GetForeground(this);
+            SKColor? color = TryGetSkTint(Color) ?? TryGetSkTint(inheritedFg);
 
             _svgPicture.Increment();
             context.Custom(new SvgIconDrawOperation(_svgPicture, Bounds, color));

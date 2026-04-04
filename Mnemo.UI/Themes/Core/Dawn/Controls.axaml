@@ -368,6 +368,28 @@
     <x:Double x:Key="MenuFlyoutThemeMinHeight">0</x:Double>
     <x:Double x:Key="HorizontalMenuFlyoutThemeMinWidth">0</x:Double>
 
+    <!-- MenuItem / MenuFlyout rows (keys referenced by Themes/Controls/MenuItem.axaml, Menu.axaml) -->
+    <SolidColorBrush x:Key="MenuFlyoutItemBackground" Color="{DynamicResource ListBoxItemBackground}"/>
+    <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="{DynamicResource ListBoxItemForeground}"/>
+    <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="{DynamicResource MenuFlyoutItemRowHoverBackground}"/>
+    <SolidColorBrush x:Key="MenuFlyoutDangerItemBackgroundPointerOver" Color="{DynamicResource MenuFlyoutDangerRowHover}"/>
+    <SolidColorBrush x:Key="MenuFlyoutDangerItemBackgroundSelected" Color="{DynamicResource MenuFlyoutDangerRowSelected}"/>
+    <SolidColorBrush x:Key="MenuFlyoutDangerItemBackgroundPressed" Color="{DynamicResource MenuFlyoutDangerRowPressed}"/>
+    <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="{DynamicResource ListBoxItemForegroundPointerOver}"/>
+    <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="{DynamicResource ListBoxItemBackgroundPressed}"/>
+    <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed" Color="{DynamicResource ListBoxItemForegroundPressed}"/>
+    <SolidColorBrush x:Key="MenuFlyoutItemBackgroundDisabled" Color="Transparent"/>
+    <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="{DynamicResource ListBoxItemForegroundDisabled}"/>
+    <SolidColorBrush x:Key="MenuFlyoutSubItemChevron" Color="{DynamicResource TextSecondary}"/>
+    <SolidColorBrush x:Key="MenuFlyoutSubItemChevronPointerOver" Color="{DynamicResource TextSecondary}"/>
+    <SolidColorBrush x:Key="MenuFlyoutSubItemChevronPressed" Color="{DynamicResource TextSecondary}"/>
+    <SolidColorBrush x:Key="MenuFlyoutSubItemChevronDisabled" Color="{DynamicResource TextDisabled}"/>
+    <SolidColorBrush x:Key="MenuFlyoutSubItemChevronSubMenuOpened" Color="{DynamicResource TextPrimary}"/>
+    <Thickness x:Key="MenuFlyoutItemChevronMargin">12,0,0,0</Thickness>
+    <Thickness x:Key="MenuBarItemPadding">10,6,10,6</Thickness>
+    <Thickness x:Key="HorizontalMenuFlyoutItemThemePaddingNarrow">8,6</Thickness>
+    <Thickness x:Key="HorizontalMenuFlyoutItemMargin">4,0</Thickness>
+
     <!-- Navigation Button -->
     <SolidColorBrush x:Key="NavigationButtonBackgroundBrush" Color="{DynamicResource NavigationButtonBackground}"/>
     <SolidColorBrush x:Key="NavigationButtonBackgroundHoverBrush" Color="{DynamicResource NavigationButtonBackgroundHover}"/>

@@ -5,6 +5,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.Services;
 using Mnemo.UI.Controls;
 using Mnemo.UI.Modules.Notes.ViewModels;
 
@@ -239,10 +241,29 @@ public partial class NoteTreeRow : UserControl
         if (sender is not Control c || c.Tag is not NoteTreeItemViewModel item) return;
         var vm = FindNotesViewModel();
         if (vm == null) return;
+
+        var app = Application.Current as App;
+        var overlay = app?.Services?.GetService<IOverlayService>();
+        var loc = app?.Services?.GetService<ILocalizationService>();
+        if (overlay == null || loc == null) return;
+
+        var title = item.IsFolder
+            ? loc.T("DeleteFolderConfirmTitle", "Notes")
+            : loc.T("DeleteNoteConfirmTitle", "Notes");
+        var message = item.IsFolder
+            ? string.Format(loc.T("DeleteFolderConfirmMessage", "Notes"), item.Name)
+            : string.Format(loc.T("DeleteNoteConfirmMessage", "Notes"), item.Name);
+
+        var deleteLabel = loc.T("Delete", "Notes");
+        var cancel = loc.T("Cancel", "Common");
+        var result = await overlay.CreateDialogAsync(title, message, deleteLabel, cancel).ConfigureAwait(true);
+        if (result != deleteLabel)
+            return;
+
         if (item.IsFolder)
-            await vm.DeleteFolderCommand.ExecuteAsync(item);
+            await vm.DeleteFolderCommand.ExecuteAsync(item).ConfigureAwait(false);
         else
-            await vm.DeleteNoteCommand.ExecuteAsync(item);
+            await vm.DeleteNoteCommand.ExecuteAsync(item).ConfigureAwait(false);
     }
 
     private async void OnMoveUpClick(object? sender, RoutedEventArgs e)
@@ -259,6 +280,22 @@ public partial class NoteTreeRow : UserControl
         var vm = FindNotesViewModel();
         if (vm == null) return;
         await vm.MoveItemDownCommand.ExecuteAsync(item);
+    }
+
+    private void OnNewNoteClick(object? sender, RoutedEventArgs e)
+    {
+        var vm = FindNotesViewModel();
+        if (vm == null) return;
+        _ = vm.NewNoteCommand.ExecuteAsync(null);
+    }
+
+    private void OnDuplicateClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control c || c.Tag is not NoteTreeItemViewModel item) return;
+        if (item.Note == null) return;
+        var vm = FindNotesViewModel();
+        if (vm == null) return;
+        _ = vm.DuplicateNoteCommand.ExecuteAsync(item);
     }
 
     private void OnRenameClick(object? sender, RoutedEventArgs e)

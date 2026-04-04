@@ -313,6 +313,11 @@
     <Color x:Key="TooltipBackground">#F5F5F5</Color>
     <Color x:Key="TooltipForeground">#1A1A1A</Color>
     <Color x:Key="TooltipBorder">#E5E5E5</Color>
+    <!-- MenuFlyout: row hover must read darker than TooltipBackground (#F5F5F5) -->
+    <Color x:Key="MenuFlyoutItemRowHoverBackground">#E0E0E0</Color>
+    <Color x:Key="MenuFlyoutDangerRowHover">#F5CACA</Color>
+    <Color x:Key="MenuFlyoutDangerRowSelected">#EDB4B4</Color>
+    <Color x:Key="MenuFlyoutDangerRowPressed">#E09898</Color>
 
     <!-- Navigation Button -->
     <Color x:Key="NavigationButtonBackground">Transparent</Color>

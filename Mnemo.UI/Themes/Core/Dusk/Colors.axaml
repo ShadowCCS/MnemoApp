@@ -312,6 +312,9 @@
     <Color x:Key="TooltipBackground">#312e2d</Color>
     <Color x:Key="TooltipForeground">#CFCCCB</Color>
     <Color x:Key="TooltipBorder">#464549</Color>
+    <Color x:Key="MenuFlyoutDangerRowHover">#5C383C</Color>
+    <Color x:Key="MenuFlyoutDangerRowSelected">#6B4045</Color>
+    <Color x:Key="MenuFlyoutDangerRowPressed">#4A2A2E</Color>
 
     <!-- Navigation Button -->
     <Color x:Key="NavigationButtonBackground">Transparent</Color>

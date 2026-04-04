@@ -23,6 +23,7 @@ namespace Mnemo.UI.Components.Overlays
 
         public ICommand PrimaryCommand { get; }
         public ICommand SecondaryCommand { get; }
+        public ICommand CloseCommand { get; }
 
         public Action<string?>? OnChoose { get; set; }
 
@@ -30,6 +31,7 @@ namespace Mnemo.UI.Components.Overlays
         {
             PrimaryCommand = new RelayCommand(OnPrimary);
             SecondaryCommand = new RelayCommand(OnSecondary);
+            CloseCommand = new RelayCommand(OnClose);
             InitializeComponent();
             DataContext = this;
         }
@@ -47,6 +49,11 @@ namespace Mnemo.UI.Components.Overlays
         private void OnSecondary()
         {
             OnChoose?.Invoke(SecondaryText);
+        }
+
+        private void OnClose()
+        {
+            OnChoose?.Invoke(null);
         }
     }
 }
