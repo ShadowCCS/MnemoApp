@@ -3,19 +3,25 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Formatting;
 using Mnemo.Core.History;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Common;
 using Mnemo.UI.Modules.Notes.Operations;
 using Mnemo.UI.Services;
 
@@ -80,6 +86,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     /// <summary>Optional: set from the host view for multi-format clipboard I/O.</summary>
     public INoteClipboardPlatformService? NoteClipboardService { get; set; }
+
+    /// <summary>Optional: image import when pasting paths / duplicating / hydrating clipboard blocks.</summary>
+    public IImageAssetService? ImageAssetService { get; set; }
 
     public ObservableCollection<BlockViewModel> Blocks
     {
@@ -265,6 +274,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.ContentChanged += OnBlockContentChanged;
         block.PropertyChanged += OnBlockPropertyChanged;
         block.DeleteRequested += OnBlockDeleteRequested;
+        block.DuplicateBlockRequested += OnDuplicateBlockRequested;
         block.NewBlockRequested += OnNewBlockRequested;
         block.NewBlockOfTypeRequested += OnNewBlockOfTypeRequested;
         block.DeleteAndFocusAboveRequested += OnDeleteAndFocusAboveRequested;
@@ -279,6 +289,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.ContentChanged -= OnBlockContentChanged;
         block.PropertyChanged -= OnBlockPropertyChanged;
         block.DeleteRequested -= OnBlockDeleteRequested;
+        block.DuplicateBlockRequested -= OnDuplicateBlockRequested;
         block.NewBlockRequested -= OnNewBlockRequested;
         block.NewBlockOfTypeRequested -= OnNewBlockOfTypeRequested;
         block.DeleteAndFocusAboveRequested -= OnDeleteAndFocusAboveRequested;
@@ -477,6 +488,43 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         CommitStructuralChange("New block");
         BlocksChanged?.Invoke();
+    }
+
+    private void OnDuplicateBlockRequested(BlockViewModel block)
+    {
+        _ = DuplicateImageBlockAsync(block);
+    }
+
+    private async Task DuplicateImageBlockAsync(BlockViewModel block)
+    {
+        if (block.Type != BlockType.Image) return;
+        var svc = ResolveImageAssetService();
+        if (svc == null) return;
+
+        var srcPath = GetBlockMetaString(block, "imagePath");
+        if (string.IsNullOrEmpty(srcPath) || !File.Exists(srcPath)) return;
+
+        var index = Blocks.IndexOf(block);
+        if (index < 0) return;
+
+        var newVm = BlockFactory.CreateBlock(BlockType.Image, 0);
+        var result = await svc.ImportAndCopyAsync(srcPath, newVm.Id).ConfigureAwait(true);
+        if (!result.IsSuccess || string.IsNullOrEmpty(result.Value)) return;
+
+        BeginStructuralChange();
+
+        newVm.Meta["imagePath"] = result.Value;
+        newVm.Meta["imageAlt"] = GetBlockMetaString(block, "imageAlt");
+        newVm.Meta["imageWidth"] = GetBlockMetaDouble(block, "imageWidth");
+
+        SubscribeToBlock(newVm);
+        Blocks.Insert(index + 1, newVm);
+        ReorderBlocks();
+        ClearBlockSelection();
+        CommitStructuralChange("Duplicate image block");
+        BlocksChanged?.Invoke();
+
+        Dispatcher.UIThread.Post(() => newVm.IsFocused = true, DispatcherPriority.Input);
     }
 
     private void OnFocusPreviousRequested(BlockViewModel block)
@@ -926,6 +974,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         or BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist
         or BlockType.Quote;
 
+    /// <summary>Image/Divider blocks have no inline runs — merging them into a Text block drops the payload.</summary>
+    private static bool PasteFirstBlockRequiresBlockInsert(BlockViewModel[] pasted) =>
+        pasted.Length > 0 && pasted[0].Type is BlockType.Image or BlockType.Divider;
+
     /// <summary>
     /// Applies pasted block type and body runs, then list/checklist metadata. Runs are committed first so
     /// <see cref="BlockViewModel.Type"/>'s heading path runs on the final run list.
@@ -1302,6 +1354,23 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel?.Clipboard == null) return;
 
+        Bitmap? singleImageBitmap = null;
+        if (blocks.Count == 1 && blocks[0].Type == BlockType.Image)
+        {
+            var p = GetBlockMetaString(blocks[0], "imagePath");
+            if (!string.IsNullOrEmpty(p) && File.Exists(p))
+            {
+                try
+                {
+                    singleImageBitmap = new Bitmap(p);
+                }
+                catch
+                {
+                    singleImageBitmap = null;
+                }
+            }
+        }
+
         try
         {
             if (NoteClipboardService != null && NoteClipboardCodec != null)
@@ -1311,14 +1380,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 NoteClipboardDiagnostics.Log($"Copy {blocks.Count} block(s); md preview: {Truncate(markdown, 120)}");
                 for (int bi = 0; bi < blocks.Count; bi++)
                     NoteClipboardDiagnostics.Log($"  block[{bi}] type={blocks[bi].Type} {NoteClipboardDiagnostics.SummarizeRuns(blocks[bi].Runs)}");
-                await NoteClipboardService.WriteAsync(topLevel.Clipboard, markdown, json).ConfigureAwait(true);
+                await NoteClipboardService.WriteAsync(topLevel.Clipboard, markdown, json, singleImageBitmap).ConfigureAwait(true);
             }
+            else if (singleImageBitmap != null)
+                await topLevel.Clipboard.SetBitmapAsync(singleImageBitmap).ConfigureAwait(true);
             else
                 await topLevel.Clipboard.SetTextAsync(markdown).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             BlockEditorLogger.LogError("Clipboard write failed", ex);
+        }
+        finally
+        {
+            singleImageBitmap?.Dispose();
         }
     }
 
@@ -1351,12 +1426,23 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(text)) return;
-                NoteClipboardDiagnostics.Log($"Paste: markdown fallback, textLen={text.Length} preview={Truncate(text, 120)}");
-                pasted = BlockMarkdownSerializer.Deserialize(text);
+                var fromSystem = await TryPasteImageBlocksFromSystemClipboardAsync(topLevel.Clipboard, text).ConfigureAwait(true);
+                if (fromSystem != null)
+                {
+                    NoteClipboardDiagnostics.Log($"Paste: system clipboard image / file path, blocks={fromSystem.Length}");
+                    pasted = fromSystem;
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(text)) return;
+                    NoteClipboardDiagnostics.Log($"Paste: markdown fallback, textLen={text.Length} preview={Truncate(text, 120)}");
+                    pasted = BlockMarkdownSerializer.Deserialize(text);
+                }
             }
 
             if (pasted.Length == 0) return;
+
+            await HydratePastedImageBlocksAsync(pasted).ConfigureAwait(true);
             if (pasted.Length > 0)
                 NoteClipboardDiagnostics.Log($"Paste: first block type={pasted[0].Type} {NoteClipboardDiagnostics.SummarizeRuns(pasted[0].Runs)}");
 
@@ -1368,7 +1454,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 if (focusedIndex >= 0 && focusedIndex < Blocks.Count)
                 {
                     var focusedVm = Blocks[focusedIndex];
-                    if (focusedVm.Type != BlockType.Divider)
+                    if (focusedVm.Type != BlockType.Divider && focusedVm.Type != BlockType.Image
+                        && !PasteFirstBlockRequiresBlockInsert(pasted))
                     {
                         var editableBlock = GetEditableBlockAt(focusedIndex);
                         var range = editableBlock?.GetSelectionOrCaretRange();
@@ -1538,6 +1625,133 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             BlockEditorLogger.LogError("Paste from clipboard failed", ex);
         }
+    }
+
+    private static readonly HashSet<string> ClipboardImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif"
+    };
+
+    private IImageAssetService? ResolveImageAssetService() =>
+        ImageAssetService ?? (Application.Current as App)?.Services?.GetService(typeof(IImageAssetService)) as IImageAssetService;
+
+    private static string GetBlockMetaString(BlockViewModel vm, string key)
+    {
+        if (!vm.Meta.TryGetValue(key, out var val) || val == null) return string.Empty;
+        if (val is string s) return s;
+        if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
+        return val.ToString() ?? string.Empty;
+    }
+
+    private static double GetBlockMetaDouble(BlockViewModel vm, string key)
+    {
+        if (!vm.Meta.TryGetValue(key, out var val)) return 0;
+        if (val is double d) return d;
+        if (val is JsonElement je && je.ValueKind == JsonValueKind.Number) return je.GetDouble();
+        if (double.TryParse(val?.ToString(), out var p)) return p;
+        return 0;
+    }
+
+    private async Task HydratePastedImageBlocksAsync(BlockViewModel[] pasted)
+    {
+        var svc = ResolveImageAssetService();
+        if (svc == null) return;
+        foreach (var vm in pasted)
+        {
+            if (vm.Type != BlockType.Image) continue;
+            var path = GetBlockMetaString(vm, "imagePath");
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) continue;
+            var fileName = Path.GetFileNameWithoutExtension(path);
+            if (string.Equals(fileName, vm.Id, StringComparison.OrdinalIgnoreCase)) continue;
+            try
+            {
+                var r = await svc.ImportAndCopyAsync(path, vm.Id).ConfigureAwait(true);
+                if (r.IsSuccess && !string.IsNullOrEmpty(r.Value))
+                    vm.Meta["imagePath"] = r.Value!;
+            }
+            catch
+            {
+                // Keep original path if import fails (e.g. locked file).
+            }
+        }
+    }
+
+    private async Task<BlockViewModel[]?> TryPasteImageBlocksFromSystemClipboardAsync(IClipboard clipboard, string? textHint)
+    {
+        try
+        {
+            var files = await clipboard.TryGetFilesAsync().ConfigureAwait(true);
+            if (files != null)
+            {
+                foreach (var f in files)
+                {
+                    var p = f.TryGetLocalPath();
+                    if (string.IsNullOrEmpty(p) || !File.Exists(p)) continue;
+                    if (!ClipboardImageExtensions.Contains(Path.GetExtension(p))) continue;
+                    return new[] { CreateImageBlockStubForPaste(p) };
+                }
+            }
+        }
+        catch
+        {
+            // fall through
+        }
+
+        var bmp = await clipboard.TryGetBitmapAsync().ConfigureAwait(true);
+        if (bmp != null)
+        {
+            try
+            {
+                return new[] { await SaveClipboardBitmapToNewImageBlockAsync(bmp).ConfigureAwait(true) };
+            }
+            finally
+            {
+                bmp.Dispose();
+            }
+        }
+
+        var pathFromText = NormalizeSingleLineImagePathFromClipboard(textHint);
+        if (pathFromText != null && File.Exists(pathFromText) &&
+            ClipboardImageExtensions.Contains(Path.GetExtension(pathFromText)))
+            return new[] { CreateImageBlockStubForPaste(pathFromText) };
+
+        return null;
+    }
+
+    private static BlockViewModel CreateImageBlockStubForPaste(string pathOrExternal)
+    {
+        var vm = BlockFactory.CreateBlock(BlockType.Image, 0);
+        vm.Meta["imagePath"] = pathOrExternal;
+        vm.Meta["imageAlt"] = string.Empty;
+        vm.Meta["imageWidth"] = 0.0;
+        vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+        return vm;
+    }
+
+    private static Task<BlockViewModel> SaveClipboardBitmapToNewImageBlockAsync(Bitmap source)
+    {
+        // Avalonia Bitmap / platform surface must be used on the UI thread; Task.Run breaks Save on Windows.
+        var vm = BlockFactory.CreateBlock(BlockType.Image, 0);
+        var dir = MnemoAppPaths.GetImagesDirectory();
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, vm.Id + ".png");
+        source.Save(path);
+        vm.Meta["imagePath"] = path;
+        vm.Meta["imageAlt"] = string.Empty;
+        vm.Meta["imageWidth"] = 0.0;
+        vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+        return Task.FromResult(vm);
+    }
+
+    private static string? NormalizeSingleLineImagePathFromClipboard(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var t = text.Trim();
+        if (t.IndexOf('\r') >= 0 || t.IndexOf('\n') >= 0) return null;
+        if (t.Length >= 2 &&
+            ((t[0] == '"' && t[^1] == '"') || (t[0] == '\'' && t[^1] == '\'')))
+            t = t[1..^1].Trim();
+        return string.IsNullOrWhiteSpace(t) ? null : t;
     }
 
     private int GetFocusedBlockIndex()

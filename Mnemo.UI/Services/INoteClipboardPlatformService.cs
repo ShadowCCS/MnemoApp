@@ -1,10 +1,12 @@
 using Avalonia.Input.Platform;
+using Avalonia.Media.Imaging;
 
 namespace Mnemo.UI.Services;
 
 public interface INoteClipboardPlatformService
 {
-    Task WriteAsync(IClipboard clipboard, string markdown, string mnemoJson);
+    /// <param name="clipboardBitmap">Optional raster for CF_BITMAP / PNG interchange (e.g. paste into browser).</param>
+    Task WriteAsync(IClipboard clipboard, string markdown, string mnemoJson, Bitmap? clipboardBitmap = null);
     Task<NoteClipboardReadData> ReadAsync(IClipboard clipboard);
 }
 

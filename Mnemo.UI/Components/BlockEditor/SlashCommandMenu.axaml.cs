@@ -101,7 +101,8 @@ public partial class SlashCommandMenu : UserControl
             new() { IconPath = iconBase + "list-check.svg", Name = T("Checklist"), Description = T("ChecklistDescription"), Shortcut = "[]", BlockType = BlockType.Checklist },
             new() { IconPath = iconBase + "quote.svg", Name = T("Quote"), Description = T("QuoteDescription"), Shortcut = "\"", BlockType = BlockType.Quote },
             new() { IconPath = iconBase + "math-function.svg", Name = T("Code"), Description = T("CodeDescription"), Shortcut = null, BlockType = BlockType.Code },
-            new() { IconPath = iconBase + "separator.svg", Name = T("Divider"), Description = T("DividerDescription"), Shortcut = "---", BlockType = BlockType.Divider }
+            new() { IconPath = iconBase + "separator.svg", Name = T("Divider"), Description = T("DividerDescription"), Shortcut = "---", BlockType = BlockType.Divider },
+            new() { IconPath = iconBase + "photo.svg", Name = T("Image"), Description = T("ImageDescription"), Shortcut = null, BlockType = BlockType.Image }
         };
     }
 

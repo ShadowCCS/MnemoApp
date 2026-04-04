@@ -23,11 +23,22 @@ public class FocusManager
             var editor = FindFocusableEditor();
             if (editor == null)
             {
+                var imageHost = FindImageBlockHoverHost();
+                if (imageHost != null)
+                {
+                    imageHost.Focus();
+                    return;
+                }
+
                 Dispatcher.UIThread.Post(() =>
                 {
                     var e2 = FindFocusableEditor();
-                    if (e2 == null) return;
-                    ApplyFocus(e2, caretPosition);
+                    if (e2 != null)
+                    {
+                        ApplyFocus(e2, caretPosition);
+                        return;
+                    }
+                    FindImageBlockHoverHost()?.Focus();
                 }, DispatcherPriority.Loaded);
                 return;
             }
@@ -81,5 +92,15 @@ public class FocusManager
         return _parentControl.GetVisualDescendants()
             .OfType<RichTextEditor>()
             .FirstOrDefault(e => e.IsVisible && e.IsEffectivelyVisible);
+    }
+
+    /// <summary>
+    /// Image blocks use a named <c>HoverHost</c> border instead of <see cref="RichTextEditor"/>; focus it for keyboard delete/menu.
+    /// </summary>
+    private Control? FindImageBlockHoverHost()
+    {
+        return _parentControl.GetVisualDescendants()
+            .OfType<Control>()
+            .FirstOrDefault(c => c.Name == "HoverHost" && c.Focusable && c.IsVisible && c.IsEffectivelyVisible);
     }
 }

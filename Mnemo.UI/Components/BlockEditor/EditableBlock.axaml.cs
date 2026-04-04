@@ -669,7 +669,7 @@ public partial class EditableBlock : UserControl
             }
         }
 
-        var addedBlockBelow = blockType == BlockType.Divider && EnsureEditableBlockBelowIfNeeded();
+        var addedBlockBelow = (blockType == BlockType.Divider || blockType == BlockType.Image) && EnsureEditableBlockBelowIfNeeded();
 
         if (!addedBlockBelow)
         {
@@ -700,7 +700,7 @@ public partial class EditableBlock : UserControl
         return true;
     }
 
-    private static bool IsEditableBlockType(BlockType type) => type != BlockType.Divider;
+    private static bool IsEditableBlockType(BlockType type) => type != BlockType.Divider && type != BlockType.Image;
 
     #endregion
 
@@ -804,8 +804,8 @@ public partial class EditableBlock : UserControl
         _stateManager.SetNormal();
         _focusManager?.ClearCache();
 
-        // When converting to Divider, ensure there is an editable block below so the user can keep typing
-        var addedBlockBelow = blockType == BlockType.Divider && EnsureEditableBlockBelowIfNeeded();
+        // When converting to Divider or Image, ensure there is an editable block below so the user can keep typing
+        var addedBlockBelow = (blockType == BlockType.Divider || blockType == BlockType.Image) && EnsureEditableBlockBelowIfNeeded();
 
         if (!addedBlockBelow)
         {

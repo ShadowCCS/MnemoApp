@@ -16,7 +16,8 @@ public enum BlockType
     Checklist,
     Quote,
     Code,
-    Divider
+    Divider,
+    Image
 }
 
 public class Block

@@ -21,5 +21,12 @@ public static class MnemoAppPaths
 
     public static string GetLocalUserDataFile(string fileName)
         => Path.Combine(GetLocalUserDataRoot(), fileName);
+
+    /// <summary>
+    /// Returns the directory where image block assets are stored:
+    /// <c>%LocalAppData%\Mnemo\images\</c>.
+    /// </summary>
+    public static string GetImagesDirectory()
+        => Path.Combine(GetLocalUserDataRoot(), "images");
 }
 

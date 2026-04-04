@@ -1,0 +1,213 @@
+<UserControl
+    x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Image.ImageBlockComponent"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Top"
+    x:CompileBindings="False">
+
+    <UserControl.Styles>
+        <Style Selector="Border.image-placeholder">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Border.image-placeholder:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+        </Style>
+        <Style Selector="Border.resize-pill">
+            <Setter Property="Background" Value="{DynamicResource TextControlForeground}" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="Width" Value="6" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Opacity" Value="0.15" />
+            <Setter Property="Cursor" Value="SizeWestEast" />
+        </Style>
+        <Style Selector="Border.resize-pill:pointerover">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border
+        x:Name="HoverHost"
+        Background="Transparent"
+        Focusable="True"
+        HorizontalAlignment="Stretch"
+        PointerEntered="HoverHost_PointerEntered"
+        PointerExited="HoverHost_PointerExited"
+        PointerPressed="HoverHost_PointerPressed"
+        KeyDown="HoverHost_KeyDown">
+
+        <Grid
+            x:Name="RootGrid"
+            HorizontalAlignment="Stretch"
+            Background="Transparent"
+            RowDefinitions="Auto,Auto">
+
+            <!-- Row 0: placeholder full width OR centered image + pill -->
+            <Grid Grid.Row="0" HorizontalAlignment="Stretch" Background="Transparent">
+
+                <!-- Empty state: spans full editor column width -->
+                <Border
+                    x:Name="PlaceholderBorder"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    Classes="image-placeholder"
+                    MinHeight="160"
+                    Height="160"
+                    IsVisible="False"
+                    PointerPressed="Placeholder_PointerPressed">
+                    <Grid HorizontalAlignment="Stretch" Background="Transparent">
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <PathIcon
+                                Width="28"
+                                Height="28"
+                                Data="M3 5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5ZM5 5V14.5858L8.29289 11.2929C8.68342 10.9024 9.31658 10.9024 9.70711 11.2929L13 14.5858L14.2929 13.2929C14.6834 12.9024 15.3166 12.9024 15.7071 13.2929L19 16.5858V5H5ZM19 19V19.0001L5 19V16.4142L9 12.4142L12.5858 16H11L14 16L15 15L19 19ZM10 9C10 9.55228 9.55228 10 9 10C8.44772 10 8 9.55228 8 9C8 8.44772 8.44772 8 9 8C9.55228 8 10 8.44772 10 9Z"
+                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                Opacity="0.6" />
+                            <TextBlock
+                                x:Name="PlaceholderLabel"
+                                HorizontalAlignment="Center"
+                                FontSize="13"
+                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                Opacity="0.7" />
+                        </StackPanel>
+                        <Button
+                            x:Name="FlyoutButtonPlaceholder"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,8,8,0"
+                            Padding="4"
+                            Opacity="0"
+                            IsVisible="False"
+                            ZIndex="2"
+                            Cursor="Hand"
+                            CornerRadius="4"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuItem x:Name="PhFlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
+                                    <MenuItem x:Name="PhFlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
+                                    <MenuItem x:Name="PhFlyoutCaptionItem" Click="FlyoutCaption_Click" Cursor="Hand" />
+                                    <Separator />
+                                    <MenuItem x:Name="PhFlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
+                                    <MenuItem x:Name="PhFlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                            <PathIcon
+                                Width="14"
+                                Height="14"
+                                Data="M5 12C5 12.5523 4.55228 13 4 13C3.44772 13 3 12.5523 3 12C3 11.4477 3.44772 11 4 11C4.55228 11 5 11.4477 5 12ZM13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12ZM21 12C21 12.5523 20.5523 13 20 13C19.4477 13 19 12.5523 19 12C19 11.4477 19.4477 11 20 11C20.5523 11 21 11.4477 21 12Z"
+                                Foreground="{DynamicResource TextPrimaryBrush}" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Loaded: image + resize, centered in row -->
+                <Grid
+                    x:Name="LoadedImageRow"
+                    HorizontalAlignment="Center"
+                    Background="Transparent"
+                    ColumnDefinitions="Auto,Auto"
+                    IsVisible="False">
+                    <Border
+                        Grid.Column="0"
+                        HorizontalAlignment="Left"
+                        Background="Transparent"
+                        ClipToBounds="True"
+                        CornerRadius="4">
+                        <Grid HorizontalAlignment="Left" Background="Transparent">
+                            <Border
+                                x:Name="ImageInnerBorder"
+                                HorizontalAlignment="Left"
+                                CornerRadius="4"
+                                ClipToBounds="True">
+                                <Image
+                                    x:Name="DisplayImage"
+                                    Stretch="Uniform"
+                                    MaxHeight="600"
+                                    HorizontalAlignment="Left" />
+                            </Border>
+                            <Button
+                                x:Name="FlyoutButton"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Margin="0,8,8,0"
+                                Padding="4"
+                                Opacity="0"
+                                IsVisible="False"
+                                ZIndex="2"
+                                Cursor="Hand"
+                                CornerRadius="4"
+                                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                        <MenuItem x:Name="FlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="FlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="FlyoutCaptionItem" Click="FlyoutCaption_Click" Cursor="Hand" />
+                                        <Separator />
+                                        <MenuItem x:Name="FlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="FlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                                <PathIcon
+                                    Width="14"
+                                    Height="14"
+                                    Data="M5 12C5 12.5523 4.55228 13 4 13C3.44772 13 3 12.5523 3 12C3 11.4477 3.44772 11 4 11C4.55228 11 5 11.4477 5 12ZM13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12ZM21 12C21 12.5523 20.5523 13 20 13C19.4477 13 19 12.5523 19 12C19 11.4477 19.4477 11 20 11C20.5523 11 21 11.4477 21 12Z"
+                                    Foreground="{DynamicResource TextPrimaryBrush}" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <Border
+                        Grid.Column="1"
+                        Background="Transparent"
+                        Width="16"
+                        Margin="4,0,0,0"
+                        VerticalAlignment="Stretch"
+                        Cursor="SizeWestEast"
+                        PointerEntered="ResizePill_PointerEntered"
+                        PointerExited="ResizePill_PointerExited"
+                        PointerPressed="ResizePill_PointerPressed">
+                        <Border
+                            x:Name="ResizePill"
+                            Classes="resize-pill"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center" />
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <Grid
+                Grid.Row="1"
+                HorizontalAlignment="Stretch"
+                Margin="0,4,0,0"
+                Background="Transparent">
+                <Border
+                    x:Name="CaptionHost"
+                    HorizontalAlignment="Stretch"
+                    Background="Transparent">
+                    <TextBox
+                        x:Name="CaptionBox"
+                        HorizontalAlignment="Stretch"
+                        Padding="0"
+                        FontSize="12"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Opacity="0.6"
+                        TextWrapping="Wrap"
+                        GotFocus="CaptionBox_GotFocus"
+                        LostFocus="CaptionBox_LostFocus"
+                        TextChanged="Caption_TextChanged"
+                        KeyDown="Caption_KeyDown" />
+                </Border>
+            </Grid>
+
+        </Grid>
+    </Border>
+</UserControl>

@@ -280,6 +280,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 BlockType.BulletList => T("ListItem"),
                 BlockType.NumberedList => T("ListItem"),
                 BlockType.Checklist => T("ChecklistItem"),
+                BlockType.Image => string.Empty,
                 _ => string.Empty
             };
         }
@@ -287,6 +288,8 @@ public class BlockViewModel : INotifyPropertyChanged
 
     public event Action<BlockViewModel>? ContentChanged;
     public event Action<BlockViewModel>? DeleteRequested;
+    /// <summary>Duplicate this block (e.g. image: copy asset into a new block below).</summary>
+    public event Action<BlockViewModel>? DuplicateBlockRequested;
     public event Action<BlockViewModel, string?>? NewBlockRequested;
     public event Action<BlockViewModel, BlockType>? NewBlockOfTypeRequested;
     public event Action<BlockViewModel>? DeleteAndFocusAboveRequested;
@@ -349,6 +352,23 @@ public class BlockViewModel : INotifyPropertyChanged
                     metaChanged = true;
                 }
                 break;
+            case BlockType.Image:
+                if (!_meta.ContainsKey("imagePath"))
+                {
+                    _meta["imagePath"] = string.Empty;
+                    metaChanged = true;
+                }
+                if (!_meta.ContainsKey("imageAlt"))
+                {
+                    _meta["imageAlt"] = string.Empty;
+                    metaChanged = true;
+                }
+                if (!_meta.ContainsKey("imageWidth"))
+                {
+                    _meta["imageWidth"] = 0.0;
+                    metaChanged = true;
+                }
+                break;
         }
         
         if (metaChanged)
@@ -383,6 +403,11 @@ public class BlockViewModel : INotifyPropertyChanged
     public void RequestDelete()
     {
         DeleteRequested?.Invoke(this);
+    }
+
+    public void RequestDuplicateBlock()
+    {
+        DuplicateBlockRequested?.Invoke(this);
     }
 
     public void RequestNewBlock(string? initialContentForNewBlock = null)

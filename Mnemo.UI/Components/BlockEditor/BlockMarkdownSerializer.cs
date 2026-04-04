@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Mnemo.Core.Models;
 using Mnemo.Infrastructure.Services.Notes.Markdown;
@@ -49,8 +50,25 @@ public static class BlockMarkdownSerializer
             BlockType.Quote => "> " + body.Replace("\n", "\n> ", StringComparison.Ordinal),
             BlockType.Code => "```\n" + (block.Content ?? string.Empty) + "\n```",
             BlockType.Divider => "---",
+            BlockType.Image => SerializeImageMarkdown(block),
             _ => body
         };
+    }
+
+    private static string SerializeImageMarkdown(BlockViewModel block)
+    {
+        var path = MetaString(block, "imagePath");
+        if (string.IsNullOrEmpty(path)) return string.Empty;
+        var alt = MetaString(block, "imageAlt").Replace("\\", "\\\\", StringComparison.Ordinal).Replace("]", "\\]", StringComparison.Ordinal);
+        return $"![{alt}]({path})";
+    }
+
+    private static string MetaString(BlockViewModel block, string key)
+    {
+        if (!block.Meta.TryGetValue(key, out var val) || val == null) return string.Empty;
+        if (val is string s) return s;
+        if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
+        return val.ToString() ?? string.Empty;
     }
 
     /// <summary>Inline markdown for rich blocks; code/divider use literal <see cref="BlockViewModel.Content"/> in <see cref="SerializeBlock"/>.</summary>
@@ -203,6 +221,20 @@ public static class BlockMarkdownSerializer
                 continue;
             }
 
+            // Markdown image ![alt](path)
+            var imgMatch = Regex.Match(trimmed, @"^!\[([^\]]*)\]\(([^)]+)\)\s*$");
+            if (imgMatch.Success)
+            {
+                var vm = BlockFactory.CreateBlock(BlockType.Image, order++);
+                vm.Meta["imagePath"] = UnescapeMarkdownImageTarget(imgMatch.Groups[2].Value.Trim());
+                vm.Meta["imageAlt"] = UnescapeMarkdownImageAlt(imgMatch.Groups[1].Value);
+                vm.Meta["imageWidth"] = 0.0;
+                vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+                result.Add(vm);
+                i++;
+                continue;
+            }
+
             // Plain text
             result.Add(CreateBlockWithContent(BlockType.Text, line, order++));
             i++;
@@ -221,4 +253,15 @@ public static class BlockMarkdownSerializer
     }
 
     private static bool IsCodeBlock(BlockType type) => type == BlockType.Code;
+
+    private static string UnescapeMarkdownImageAlt(string alt) =>
+        alt.Replace("\\]", "]", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+
+    private static string UnescapeMarkdownImageTarget(string raw)
+    {
+        var t = raw.Trim();
+        if (t.Length >= 2 && t[0] == '<' && t[^1] == '>')
+            t = t[1..^1].Trim();
+        return t;
+    }
 }

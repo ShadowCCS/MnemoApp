@@ -86,6 +86,7 @@ public partial class NotesView : UserControl
         {
             editor.NoteClipboardCodec ??= sp.GetService<INoteClipboardPayloadCodec>();
             editor.NoteClipboardService ??= sp.GetService<INoteClipboardPlatformService>();
+            editor.ImageAssetService ??= sp.GetService<IImageAssetService>();
         }
 
         editor.LoadBlocks(vm.GetBlocksForCurrentNote());

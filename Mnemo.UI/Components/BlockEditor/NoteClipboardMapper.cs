@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Models.Clipboard;
@@ -46,6 +47,21 @@ public static class NoteClipboardMapper
             lang != null)
             dto.CodeLanguage = lang.ToString();
 
+        if (vm.Type == BlockType.Image)
+        {
+            dto.ImagePath = MetaString(vm, "imagePath");
+            dto.ImageAlt = MetaString(vm, "imageAlt");
+            if (vm.Meta.TryGetValue("imageWidth", out var w) && w != null)
+            {
+                dto.ImageWidth = w switch
+                {
+                    double d => d,
+                    System.Text.Json.JsonElement je when je.ValueKind == System.Text.Json.JsonValueKind.Number => je.GetDouble(),
+                    _ => double.TryParse(w.ToString(), out var p) ? p : null
+                };
+            }
+        }
+
         dto.Content = vm.Content;
         return dto;
     }
@@ -74,6 +90,15 @@ public static class NoteClipboardMapper
         if (dto.Type == BlockType.NumberedList && dto.ListNumberIndex is { } n)
             vm.ListNumberIndex = n;
 
+        if (dto.Type == BlockType.Image)
+        {
+            vm.Meta["imagePath"] = dto.ImagePath ?? string.Empty;
+            vm.Meta["imageAlt"] = dto.ImageAlt ?? string.Empty;
+            vm.Meta["imageWidth"] = dto.ImageWidth is > 0 ? dto.ImageWidth.Value : 0.0;
+            vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+            return vm;
+        }
+
         if (dto.Runs is { Count: > 0 })
         {
             var runs = dto.Runs.Select(FromRunDto).ToList();
@@ -85,6 +110,14 @@ public static class NoteClipboardMapper
             vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
 
         return vm;
+    }
+
+    private static string MetaString(BlockViewModel vm, string key)
+    {
+        if (!vm.Meta.TryGetValue(key, out var val) || val == null) return string.Empty;
+        if (val is string s) return s;
+        if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
+        return val.ToString() ?? string.Empty;
     }
 
     private static InlineRun FromRunDto(NoteClipboardRunDto dto)

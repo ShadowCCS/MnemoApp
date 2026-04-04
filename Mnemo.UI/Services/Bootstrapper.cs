@@ -41,6 +41,7 @@ public static class Bootstrapper
         services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
         services.AddSingleton<INoteClipboardPayloadCodec, NoteClipboardPayloadCodec>();
         services.AddSingleton<INoteClipboardPlatformService, NoteClipboardPlatformService>();
+        services.AddSingleton<IImageAssetService, ImageAssetService>();
 
         // AI Services
         services.AddSingleton<IPlatformHardwareGpuProvider>(sp =>

@@ -18,6 +18,7 @@ public static class BlockFactory
             BlockType.Checklist => CreateChecklistBlock(order),
             BlockType.Quote => new BlockViewModel(type, "", order),
             BlockType.Divider => new BlockViewModel(type, "", order),
+            BlockType.Image => CreateImageBlock(order),
             _ => new BlockViewModel(BlockType.Text, "", order)
         };
     }
@@ -32,6 +33,13 @@ public static class BlockFactory
     private static BlockViewModel CreateChecklistBlock(int order)
     {
         return new BlockViewModel(BlockType.Checklist, "", order);
+    }
+
+    private static BlockViewModel CreateImageBlock(int order)
+    {
+        var block = new BlockViewModel(BlockType.Image, "", order);
+        // EnsureMetaKeys is called in the ctor; imagePath/imageAlt/imageWidth are pre-populated.
+        return block;
     }
 }
 

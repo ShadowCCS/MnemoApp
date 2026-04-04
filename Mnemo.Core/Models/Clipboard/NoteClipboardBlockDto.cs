@@ -13,4 +13,13 @@ public sealed class NoteClipboardBlockDto
     public int? ListNumberIndex { get; set; }
     /// <summary>Code block language (optional).</summary>
     public string? CodeLanguage { get; set; }
+
+    /// <summary>Stored image path for <see cref="BlockType.Image"/> (app-local or absolute).</summary>
+    public string? ImagePath { get; set; }
+
+    /// <summary>Caption / alt text for image blocks.</summary>
+    public string? ImageAlt { get; set; }
+
+    /// <summary>Display width in layout units; 0 means natural size.</summary>
+    public double? ImageWidth { get; set; }
 }
