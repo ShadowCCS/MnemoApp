@@ -14,7 +14,7 @@
     VerticalAlignment="Stretch"
     ClipToBounds="False">
     <Grid Background="Transparent" Cursor="IBeam">
-        <Border Background="Transparent" ClipToBounds="False" Padding="32,0,32,0">
+        <Border Background="Transparent" ClipToBounds="False" Padding="32,0,32,0" DragDrop.AllowDrop="True">
             <Grid Background="Transparent">
                 <Grid x:Name="EditorRoot" RowDefinitions="Auto,*" Background="Transparent" ClipToBounds="False">
                     <ItemsControl x:Name="BlocksItemsControl" Grid.Row="0" ItemsSource="{Binding Blocks}" Background="Transparent">
@@ -24,7 +24,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <Border x:Name="BelowBlocksArea" Grid.Row="1" MinHeight="120" Background="Transparent" />
+                    <Border x:Name="BelowBlocksArea" Grid.Row="1" MinHeight="120" Background="Transparent" DragDrop.AllowDrop="True" />
                 </Grid>
                 <!-- Overlay inside padded Border so (0,0) = content area; selection box coords match GetPosition(overlay). -->
                 <local:LayoutOverlayPanel x:Name="SelectionBoxOverlay" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
@@ -37,6 +37,7 @@
                         IsVisible="False"
                         IsHitTestVisible="False" />
                 </local:LayoutOverlayPanel>
+                <local:LayoutOverlayPanel x:Name="BlockDragGhostOverlay" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
             </Grid>
         </Border>
     </Grid>

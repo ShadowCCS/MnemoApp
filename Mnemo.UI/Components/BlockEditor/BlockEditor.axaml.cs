@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -43,6 +44,18 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private const double BoxSelectThreshold = 6.0; // pixels to move before box appears
     /// <summary>Horizontal padding on EditorRoot; selection box Margin is relative to the padded content area.</summary>
     private const double EditorContentPaddingX = 32.0;
+
+    private LayoutOverlayPanel? _blockDragGhostOverlay;
+    private Border? _blockDragGhostBorder;
+    private Vector _blockDragGhostPointerOffset;
+    private const double BlockDragGhostOpacity = 0.45;
+
+    /// <summary>Notes editor: scroll <see cref="ScrollViewer"/> while reordering blocks near viewport top/bottom (same idea as sidebar <see cref="Mnemo.UI.Modules.Notes.Views.DragCoordinator"/>).</summary>
+    private DispatcherTimer? _blockDragAutoScrollTimer;
+    private double _blockDragAutoScrollDirection;
+    private const double BlockDragAutoScrollZone = 40.0;
+    private const double BlockDragAutoScrollStep = 9.0;
+    private const int BlockDragAutoScrollIntervalMs = 50;
 
     // Cross-block text selection (Mode 1)
     private bool _isCrossBlockSelecting;
@@ -110,6 +123,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         InitializeComponent();
         DataContext = this;
         DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, Editor_DragOver_BlockGhost, RoutingStrategies.Bubble);
         AddHandler(DragDrop.DragLeaveEvent, Editor_DragLeave, RoutingStrategies.Bubble);
         AddHandler(PointerPressedEvent, Editor_PointerPressedTunnel, RoutingStrategies.Tunnel);
         AddHandler(PointerPressedEvent, Editor_PointerPressedBubble, RoutingStrategies.Bubble, handledEventsToo: true);
@@ -153,6 +167,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             _globalPointerReleasedHandler = null;
             _topLevel = null;
         }
+
+        EndBlockDragGhost();
     }
 
     private void ResolveSelectionBoxBorder()
@@ -163,6 +179,17 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var grid = this.FindControl<Grid>("EditorRoot");
             _selectionBoxBorder = grid?.GetVisualChildren().OfType<Border>().FirstOrDefault(c => c.Name == "SelectionBoxBorder");
         }
+    }
+
+    /// <summary>
+    /// During <see cref="DragDrop.DoDragDropAsync"/>, pointer move events are not delivered; <see cref="DragDrop.DragOverEvent"/> is.
+    /// </summary>
+    private void Editor_DragOver_BlockGhost(object? sender, DragEventArgs e)
+    {
+        if (_blockDragGhostBorder == null || _blockDragGhostOverlay == null) return;
+        if (!e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat)) return;
+        var pos = e.GetPosition(this);
+        UpdateBlockDragGhostFromEditorPoint(pos);
     }
 
     private void Editor_DragLeave(object? sender, DragEventArgs e)
@@ -615,6 +642,161 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     }
 
     /// <summary>
+    /// Shows a live clone of the block (same as notes sidebar ghost) at reduced opacity — avoids RenderTargetBitmap text rasterization artifacts.
+    /// </summary>
+    internal void BeginBlockDragGhost(EditableBlock source, PointerEventArgs e)
+    {
+        EndBlockDragGhost();
+
+        var overlay = this.FindControl<LayoutOverlayPanel>("BlockDragGhostOverlay");
+        if (overlay == null) return;
+
+        double w = source.Bounds.Width;
+        double h = source.Bounds.Height;
+        if (w <= 0 || h <= 0)
+        {
+            var snap = source.BlockDragSnapshotTarget;
+            w = snap.Bounds.Width;
+            h = snap.Bounds.Height;
+        }
+
+        if (w <= 0 || h <= 0) return;
+
+        var ghostBlock = new EditableBlock
+        {
+            DataContext = source.DataContext,
+            Width = w,
+            Height = h,
+            Focusable = false,
+            IsHitTestVisible = false,
+            IsTabStop = false
+        };
+
+        var ghost = new Border
+        {
+            Child = ghostBlock,
+            Opacity = BlockDragGhostOpacity,
+            IsHitTestVisible = false,
+            BoxShadow = BoxShadows.Parse("0 4 16 0 #40000000"),
+            CornerRadius = new CornerRadius(4),
+            Width = w,
+            Height = h
+        };
+
+        var pointerInOverlay = e.GetPosition(overlay);
+        var originPoint = source.TranslatePoint(new Point(0, 0), overlay) ?? new Point(0, 0);
+        _blockDragGhostPointerOffset = pointerInOverlay - originPoint;
+
+        Canvas.SetLeft(ghost, pointerInOverlay.X - _blockDragGhostPointerOffset.X);
+        Canvas.SetTop(ghost, pointerInOverlay.Y - _blockDragGhostPointerOffset.Y);
+
+        overlay.Children.Add(ghost);
+        _blockDragGhostBorder = ghost;
+        _blockDragGhostOverlay = overlay;
+        overlay.InvalidateArrange();
+    }
+
+    /// <summary>
+    /// Positions the reorder ghost using editor-space coordinates (same as <see cref="EditableBlock"/> DragOver).
+    /// </summary>
+    internal void UpdateBlockDragGhostFromEditorPoint(Point cursorPosInEditor)
+    {
+        if (_blockDragGhostBorder == null || _blockDragGhostOverlay == null) return;
+        var pt = this.TranslatePoint(cursorPosInEditor, _blockDragGhostOverlay);
+        if (!pt.HasValue) return;
+        Canvas.SetLeft(_blockDragGhostBorder, pt.Value.X - _blockDragGhostPointerOffset.X);
+        Canvas.SetTop(_blockDragGhostBorder, pt.Value.Y - _blockDragGhostPointerOffset.Y);
+        _blockDragGhostOverlay.InvalidateArrange();
+
+        MaybeAutoScrollViewportDuringBlockDrag(cursorPosInEditor);
+    }
+
+    private void MaybeAutoScrollViewportDuringBlockDrag(Point cursorPosInEditor)
+    {
+        var scrollViewer = this.FindAncestorOfType<ScrollViewer>();
+        if (scrollViewer == null) return;
+
+        var ptInScroll = this.TranslatePoint(cursorPosInEditor, scrollViewer);
+        if (!ptInScroll.HasValue) return;
+
+        double scrollHeight = scrollViewer.Bounds.Height;
+        if (scrollHeight <= 0) return;
+
+        double y = ptInScroll.Value.Y;
+
+        if (y < BlockDragAutoScrollZone)
+        {
+            double intensity = 1.0 - (y / BlockDragAutoScrollZone);
+            _blockDragAutoScrollDirection = -BlockDragAutoScrollStep * (1 + intensity);
+            EnsureBlockDragAutoScrollTimer();
+        }
+        else if (y > scrollHeight - BlockDragAutoScrollZone)
+        {
+            double intensity = 1.0 - ((scrollHeight - y) / BlockDragAutoScrollZone);
+            _blockDragAutoScrollDirection = BlockDragAutoScrollStep * (1 + intensity);
+            EnsureBlockDragAutoScrollTimer();
+        }
+        else
+        {
+            StopBlockDragAutoScroll();
+        }
+    }
+
+    private void EnsureBlockDragAutoScrollTimer()
+    {
+        if (_blockDragAutoScrollTimer != null) return;
+        _blockDragAutoScrollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(BlockDragAutoScrollIntervalMs) };
+        _blockDragAutoScrollTimer.Tick += OnBlockDragAutoScrollTick;
+        _blockDragAutoScrollTimer.Start();
+    }
+
+    private void OnBlockDragAutoScrollTick(object? sender, EventArgs e)
+    {
+        if (_blockDragGhostBorder == null)
+        {
+            StopBlockDragAutoScroll();
+            return;
+        }
+
+        var scrollViewer = this.FindAncestorOfType<ScrollViewer>();
+        if (scrollViewer == null)
+        {
+            StopBlockDragAutoScroll();
+            return;
+        }
+
+        var current = scrollViewer.Offset;
+        double maxY = Math.Max(0, scrollViewer.Extent.Height - scrollViewer.Viewport.Height);
+        double newY = Math.Clamp(current.Y + _blockDragAutoScrollDirection, 0, maxY);
+        scrollViewer.Offset = new Vector(current.X, newY);
+    }
+
+    private void StopBlockDragAutoScroll()
+    {
+        if (_blockDragAutoScrollTimer != null)
+        {
+            _blockDragAutoScrollTimer.Tick -= OnBlockDragAutoScrollTick;
+            _blockDragAutoScrollTimer.Stop();
+            _blockDragAutoScrollTimer = null;
+        }
+        _blockDragAutoScrollDirection = 0;
+    }
+
+    internal void EndBlockDragGhost()
+    {
+        StopBlockDragAutoScroll();
+
+        if (_blockDragGhostBorder != null && _blockDragGhostOverlay != null)
+        {
+            _blockDragGhostOverlay.Children.Remove(_blockDragGhostBorder);
+            _blockDragGhostOverlay.InvalidateArrange();
+        }
+
+        _blockDragGhostBorder = null;
+        _blockDragGhostOverlay = null;
+    }
+
+    /// <summary>
     /// Arms box-select from an external control (e.g. the ScrollViewer gutter outside the editor column).
     /// <paramref name="pressPointInEditor"/> must already be in editor coordinates.
     /// Returns true if armed (caller should capture the pointer on its own control and forward
@@ -661,6 +843,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             (source is Border { Tag: "DragHandle" } ||
              source.GetVisualAncestors().OfType<Border>().Any(b => b.Tag is "DragHandle"));
         if (hitIsDragHandle) return;
+
+        // Insert-below gutter: must not capture pointer or Tapped/click never reaches the border.
+        bool hitIsAddBlockBelow = source != null &&
+            (source is Border { Tag: "AddBlockBelow" } ||
+             source.GetVisualAncestors().OfType<Border>().Any(b => b.Tag is "AddBlockBelow"));
+        if (hitIsAddBlockBelow) return;
 
         // Image block width resize strip — must not capture here or the first drag is eaten by cross-block selection.
         bool hitIsImageResizeHandle = source != null &&
@@ -827,6 +1015,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void Editor_PointerMoved(object? sender, PointerEventArgs e)
     {
+        if (_blockDragGhostBorder != null && _blockDragGhostOverlay != null)
+        {
+            var pos = e.GetPosition(_blockDragGhostOverlay);
+            Canvas.SetLeft(_blockDragGhostBorder, pos.X - _blockDragGhostPointerOffset.X);
+            Canvas.SetTop(_blockDragGhostBorder, pos.Y - _blockDragGhostPointerOffset.Y);
+            _blockDragGhostOverlay.InvalidateArrange();
+        }
+
         // Only process if at least one selection mode is armed or active
         if (!_boxSelectArmed && !_isBoxSelecting && !_crossBlockArmed && !_isCrossBlockSelecting)
             return;

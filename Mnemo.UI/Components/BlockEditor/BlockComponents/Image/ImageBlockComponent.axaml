@@ -185,7 +185,6 @@
                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
                                         <MenuItem x:Name="PhFlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
                                         <MenuItem x:Name="PhFlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
-                                        <MenuItem x:Name="PhFlyoutCaptionItem" Click="FlyoutCaption_Click" Cursor="Hand" />
                                         <Separator />
                                         <MenuItem x:Name="PhFlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
                                         <MenuItem x:Name="PhFlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
@@ -201,15 +200,13 @@
                     </Grid>
                 </Border>
 
-                <!-- Loaded: image + resize, centered in row -->
+                <!-- Loaded: image; resize handle overlays inside right edge (stays on-screen when wide) -->
                 <Grid
                     x:Name="LoadedImageRow"
                     HorizontalAlignment="Left"
                     Background="Transparent"
-                    ColumnDefinitions="Auto,Auto"
                     IsVisible="False">
                     <Border
-                        Grid.Column="0"
                         HorizontalAlignment="Left"
                         Background="Transparent"
                         ClipToBounds="True"
@@ -316,7 +313,6 @@
                                         <MenuFlyout Placement="BottomEdgeAlignedRight">
                                             <MenuItem x:Name="FlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
                                             <MenuItem x:Name="FlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
-                                            <MenuItem x:Name="FlyoutCaptionItem" Click="FlyoutCaption_Click" Cursor="Hand" />
                                             <Separator />
                                             <MenuItem x:Name="FlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
                                             <MenuItem x:Name="FlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
@@ -329,28 +325,28 @@
                                         Foreground="{DynamicResource TextPrimaryBrush}" />
                                 </Button>
                             </StackPanel>
+                            <Border
+                                x:Name="ResizeHitBorder"
+                                Tag="ImageResizeHandle"
+                                ZIndex="1"
+                                Width="14"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Stretch"
+                                Background="Transparent"
+                                Cursor="SizeWestEast"
+                                PointerEntered="ResizePill_PointerEntered"
+                                PointerExited="ResizePill_PointerExited"
+                                PointerPressed="ResizePill_PointerPressed"
+                                PointerMoved="ResizeHitArea_PointerMoved"
+                                PointerReleased="ResizeHitArea_PointerReleased"
+                                PointerCaptureLost="ResizeHitArea_PointerCaptureLost">
+                                <Border
+                                    x:Name="ResizePill"
+                                    Classes="resize-pill"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center" />
+                            </Border>
                         </Grid>
-                    </Border>
-
-                    <Border
-                        Grid.Column="1"
-                        Tag="ImageResizeHandle"
-                        Background="Transparent"
-                        Width="16"
-                        Margin="4,0,0,0"
-                        VerticalAlignment="Stretch"
-                        Cursor="SizeWestEast"
-                        PointerEntered="ResizePill_PointerEntered"
-                        PointerExited="ResizePill_PointerExited"
-                        PointerPressed="ResizePill_PointerPressed"
-                        PointerMoved="ResizeHitArea_PointerMoved"
-                        PointerReleased="ResizeHitArea_PointerReleased"
-                        PointerCaptureLost="ResizeHitArea_PointerCaptureLost">
-                        <Border
-                            x:Name="ResizePill"
-                            Classes="resize-pill"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Center" />
                     </Border>
                 </Grid>
             </Grid>

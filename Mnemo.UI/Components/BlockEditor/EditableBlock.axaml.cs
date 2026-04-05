@@ -44,6 +44,9 @@ public partial class EditableBlock : UserControl
     private InlineFormattingToolbar? _currentFormattingToolbar;
     private TopLevel? _toolbarPointerTopLevel;
 
+    /// <summary>True while the pointer is over the block chrome (gutter icons visible). Gutter borders stay hit-testable so hover works; handlers gate on this.</summary>
+    private bool _blockGutterChromeVisible;
+
     public EditableBlock()
     {
         InitializeComponent();
@@ -1146,32 +1149,93 @@ public partial class EditableBlock : UserControl
 
     #region Drag and Drop
 
-    private void DragHandle_PointerEntered(object? sender, PointerEventArgs e)
+    /// <summary>Root visual captured for block-reorder drag ghost (handle + content).</summary>
+    internal Visual BlockDragSnapshotTarget => BlockContainer;
+
+    private void BlockContainer_PointerEntered(object? sender, PointerEventArgs e)
     {
-        if (sender is Border border)
-        {
-            border.Opacity = 1;
-        }
+        SetBlockGutterChromeVisible(true);
     }
 
-    private void DragHandle_PointerExited(object? sender, PointerEventArgs e)
+    private void BlockContainer_PointerExited(object? sender, PointerEventArgs e)
     {
-        if (sender is Border border)
-        {
-            border.Opacity = 0;
-        }
+        SetBlockGutterChromeVisible(false);
     }
 
-    private void DragHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
+    private void SetBlockGutterChromeVisible(bool visible)
     {
-        if (_viewModel == null) return;
+        _blockGutterChromeVisible = visible;
+
+        // Opacity on the Borders breaks hit-testing in Avalonia; fade only the glyphs.
+        if (AddBlockBelowIcon != null)
+            AddBlockBelowIcon.Opacity = visible ? 1 : 0;
+        if (DragHandleGripPath != null)
+            DragHandleGripPath.Opacity = visible ? 0.4 : 0;
+
+        if (!visible)
+        {
+            ClearGutterHoverBackground(AddBlockBelowBorder);
+            ClearGutterHoverBackground(DragHandleBorder);
+        }
+
+        InvalidateGutterChrome();
+    }
+
+    /// <summary>Forces redraw after glyph opacity changes (avoids stale pixels when moving between blocks).</summary>
+    private void InvalidateGutterChrome()
+    {
+        AddBlockBelowBorder?.InvalidateVisual();
+        DragHandleBorder?.InvalidateVisual();
+        AddBlockBelowIcon?.InvalidateVisual();
+        DragHandleGripPath?.InvalidateVisual();
+        InvalidateVisual();
+    }
+
+    private void BlockGutterBorder_PointerEntered(object? sender, PointerEventArgs e)
+    {
+        if (!_blockGutterChromeVisible || sender is not Border border) return;
+        if (Application.Current?.TryFindResource("ListItemHoverBackgroundBrush", out var res) == true && res is IBrush brush)
+            border.Background = brush;
+    }
+
+    private void BlockGutterBorder_PointerExited(object? sender, PointerEventArgs e)
+    {
+        ClearGutterHoverBackground(sender as Border);
+    }
+
+    private static void ClearGutterHoverBackground(Border? border)
+    {
+        if (border != null)
+            border.Background = Brushes.Transparent;
+    }
+
+    private void AddBlockBelow_Tapped(object? sender, TappedEventArgs e)
+    {
+        if (!_blockGutterChromeVisible || _viewModel == null) return;
+        e.Handled = true;
+        _viewModel.NotifyStructuralChangeStarting();
+        _viewModel.RequestNewBlock();
+    }
+
+    private async void DragHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!_blockGutterChromeVisible || _viewModel == null) return;
 
         // Clear block selection when user starts dragging to reorder
-        FindParentBlockEditor()?.ClearBlockSelection();
+        var editor = FindParentBlockEditor();
+        editor?.ClearBlockSelection();
 
         var transfer = new DataTransfer();
         transfer.Add(DataTransferItem.Create(BlockViewModel.BlockDragDataFormat, _viewModel));
-        _ = DragDrop.DoDragDropAsync(e, transfer, DragDropEffects.Move);
+        editor?.BeginBlockDragGhost(this, e);
+        try
+        {
+            await DragDrop.DoDragDropAsync(e, transfer, DragDropEffects.Move);
+        }
+        finally
+        {
+            editor?.EndBlockDragGhost();
+        }
     }
 
     private void Block_DragOver(object? sender, DragEventArgs e)
@@ -1181,6 +1245,12 @@ public partial class EditableBlock : UserControl
             e.DragEffects = DragDropEffects.None;
             return;
         }
+
+        var parent = FindParentBlockEditor();
+        Point cursorInEditor = parent != null ? e.GetPosition(parent) : default;
+        if (parent != null)
+            parent.UpdateBlockDragGhostFromEditorPoint(cursorInEditor);
+
         if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } draggedBlock || draggedBlock == _viewModel)
         {
             e.DragEffects = DragDropEffects.Move;
@@ -1188,10 +1258,8 @@ public partial class EditableBlock : UserControl
         }
         e.DragEffects = DragDropEffects.Move;
 
-        var parent = FindParentBlockEditor();
         if (parent == null) return;
 
-        var cursorInEditor = e.GetPosition(parent);
         parent.HandleBlockDragOver(cursorInEditor, draggedBlock);
     }
 
@@ -1371,6 +1439,8 @@ public partial class EditableBlock : UserControl
         if (_viewModel?.Type != BlockType.Image)
             return new Rect(0, 0, Bounds.Width, Bounds.Height).Contains(pointInThis);
 
+        if (HitTestImageBlockTarget(AddBlockBelowBorder, pointInThis))
+            return true;
         if (HitTestImageBlockTarget(DragHandleBorder, pointInThis))
             return true;
         if (HitTestImageBlockTarget(BlockContentControl, pointInThis))
@@ -1409,6 +1479,7 @@ public partial class EditableBlock : UserControl
             var r = new Rect(tl.Value, c.Bounds.Size);
             union = union.HasValue ? union.Value.Union(r) : r;
         }
+        Add(AddBlockBelowBorder);
         Add(DragHandleBorder);
         Add(BlockContentControl);
         return union ?? default;

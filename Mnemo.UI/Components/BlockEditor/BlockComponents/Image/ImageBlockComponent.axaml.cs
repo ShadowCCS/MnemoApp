@@ -34,11 +34,11 @@ public partial class ImageBlockComponent : BlockComponentBase
     private double _resizeDragStartX;
     private double _resizeDragStartWidth;
 
-    /// <summary>EditableBlock inner row: BlockContainer horizontal padding (8*2) + drag grid column (24). See EditableBlock.axaml.</summary>
-    private const double BlockContentColumnChrome = 40;
-
-    /// <summary>HoverHost horizontal padding (6*2) + resize column (16) + pill margin (4). See ImageBlockComponent.axaml.</summary>
-    private const double ResizeColumnReserve = 32;
+    /// <summary>
+    /// BlockContainer padding (16) + add column (30) + drag column (30). Content column = list row width minus this.
+    /// See EditableBlock.axaml.
+    /// </summary>
+    private const double BlockItemContentChromeInset = 76;
 
     /// <summary>Hard cap so huge monitors do not allow absurd image widths.</summary>
     private const double MaxImageWidthCap = 1600;
@@ -113,12 +113,10 @@ public partial class ImageBlockComponent : BlockComponentBase
         void SetPh(MenuItem? m, string key) { if (m != null) m.Header = T(key); }
         SetPh(FlyoutReplaceItem, "ImageFlyoutReplace");
         SetPh(FlyoutCopyItem, "ImageFlyoutCopyImage");
-        SetPh(FlyoutCaptionItem, "ImageFlyoutCaption");
         SetPh(FlyoutDuplicateItem, "ImageFlyoutDuplicate");
         SetPh(FlyoutDeleteItem, "ImageFlyoutDelete");
         SetPh(PhFlyoutReplaceItem, "ImageFlyoutReplace");
         SetPh(PhFlyoutCopyItem, "ImageFlyoutCopyImage");
-        SetPh(PhFlyoutCaptionItem, "ImageFlyoutCaption");
         SetPh(PhFlyoutDuplicateItem, "ImageFlyoutDuplicate");
         SetPh(PhFlyoutDeleteItem, "ImageFlyoutDelete");
 
@@ -544,11 +542,6 @@ public partial class ImageBlockComponent : BlockComponentBase
         }
     }
 
-    private void FlyoutCaption_Click(object? sender, RoutedEventArgs e)
-    {
-        CaptionBox.Focus();
-    }
-
     private void FlyoutDuplicate_Click(object? sender, RoutedEventArgs e)
     {
         ViewModel?.RequestDuplicateBlock();
@@ -695,26 +688,25 @@ public partial class ImageBlockComponent : BlockComponentBase
         RefreshCaptionWatermark();
     }
 
-    /// <summary>Full width of the block row in the list (item slot), not shrink-wrapped block bounds.</summary>
-    private double GetBlockRowConstraintWidth()
+    /// <summary>
+    /// Max width for the block body (star column), from the list item row width — not the shrink-wrapped
+    /// content chrome bounds (those match the current image width and would block scaling up).
+    /// </summary>
+    private double GetContentColumnConstraintWidth()
     {
         for (Visual? p = this.GetVisualParent(); p != null; p = p.GetVisualParent())
         {
-            // Image blocks use HA Left/Center/Right on EditableBlock — Bounds.Width is content, not the list column.
-            if (p is EditableBlock eb)
-            {
-                if (eb.GetVisualParent() is Control slot && slot.Bounds.Width > 0)
-                    return slot.Bounds.Width;
-            }
+            if (p is EditableBlock eb && eb.GetVisualParent() is Control slot && slot.Bounds.Width > 0)
+                return Math.Max(0, slot.Bounds.Width - BlockItemContentChromeInset);
 
             if (p is ItemsControl ic && string.Equals(ic.Name, "BlocksItemsControl", StringComparison.Ordinal)
                 && ic.Bounds.Width > 0)
-                return ic.Bounds.Width;
+                return Math.Max(0, ic.Bounds.Width - BlockItemContentChromeInset);
 
             if (p is BlockEditor be && be.Bounds.Width > 0)
             {
                 const double editorHorizontalPadding = 64; // BlockEditor.axaml Border Padding 32,0,32,0
-                return Math.Max(0, be.Bounds.Width - editorHorizontalPadding);
+                return Math.Max(0, be.Bounds.Width - editorHorizontalPadding - BlockItemContentChromeInset);
             }
         }
 
@@ -723,10 +715,10 @@ public partial class ImageBlockComponent : BlockComponentBase
 
     private double GetMaxImageDisplayWidth()
     {
-        double rowW = GetBlockRowConstraintWidth();
-        var chrome = BlockContentColumnChrome + ResizeColumnReserve;
-        var byViewport = rowW > 0
-            ? Math.Clamp(rowW - chrome, 80, MaxImageWidthCap)
+        double colW = GetContentColumnConstraintWidth();
+        var innerPad = LoadedImageRow.IsVisible ? LoadedImageHitPadding * 2 : 0;
+        var byViewport = colW > 0
+            ? Math.Clamp(colW - innerPad, 80, MaxImageWidthCap)
             : MaxImageWidthCap;
 
         // When the image has a taller-than-wide aspect ratio, the MaxHeight="600" constraint
