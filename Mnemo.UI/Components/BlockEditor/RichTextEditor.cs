@@ -713,6 +713,9 @@ public class RichTextEditor : Control
         SelectionEnd = newCaret;
     }
 
+    /// <summary>Inserts text at the caret (replacing selection), same as typed input.</summary>
+    public void InsertTextAtCaret(string text) => InsertText(text);
+
     // ── Run mutation helpers ─────────────────────────────────────────────────
 
     private static IReadOnlyList<InlineRun> ApplyTextDeletion(

@@ -93,6 +93,15 @@ public partial class EditableBlock : UserControl
         {
             var text = editor.Text;
             var caretIndex = Math.Clamp(editor.CaretIndex, 0, text.Length);
+            if (_viewModel.Type == BlockType.Quote
+                && QuoteEnterBehavior.TryGetSplitOnEmptyLineEnter(text, caretIndex, out var quoteBody, out var followingText))
+            {
+                _viewModel.NotifyStructuralChangeStarting();
+                _viewModel.Content = quoteBody;
+                _viewModel.RequestNewBlock(followingText);
+                return;
+            }
+
             var textBefore = text.Substring(0, caretIndex);
             var textAfter = text.Substring(caretIndex);
             _viewModel.NotifyStructuralChangeStarting();

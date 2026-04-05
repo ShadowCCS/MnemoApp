@@ -39,12 +39,12 @@ public class KeyboardHandler
         LastKey = e.Key;
         var text = editor.Text;
         var caretIndex = editor.CaretIndex;
-        var selectionLength = editor.SelectionEnd - editor.SelectionStart;
+        var selectionLength = Math.Abs(editor.SelectionEnd - editor.SelectionStart);
 
         switch (e.Key)
         {
             case Key.Enter when viewModel.Type != BlockType.Code:
-                HandleEnter(e, editor, viewModel);
+                HandleEnter(e, editor, viewModel, text, caretIndex, selectionLength);
                 break;
 
             case Key.Back:
@@ -68,9 +68,21 @@ public class KeyboardHandler
         }
     }
 
-    private void HandleEnter(KeyEventArgs e, RichTextEditor editor, BlockViewModel viewModel)
+    private void HandleEnter(KeyEventArgs e, RichTextEditor editor, BlockViewModel viewModel, string text, int caretIndex, int selectionLength)
     {
         e.Handled = true;
+        if (viewModel.Type == BlockType.Quote)
+        {
+            if (selectionLength == 0 && QuoteEnterBehavior.IsCaretOnWhitespaceOnlyLine(text, caretIndex))
+            {
+                EnterPressed?.Invoke();
+                return;
+            }
+
+            editor.InsertTextAtCaret("\n");
+            return;
+        }
+
         var hasContent = !string.IsNullOrWhiteSpace(editor.Text);
         if (viewModel.Type is BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist)
         {
