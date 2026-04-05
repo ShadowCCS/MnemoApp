@@ -60,6 +60,9 @@ public static class NoteClipboardMapper
                     _ => double.TryParse(w.ToString(), out var p) ? p : null
                 };
             }
+            var ia = MetaString(vm, "imageAlign");
+            if (!string.IsNullOrEmpty(ia))
+                dto.ImageAlign = ia;
         }
 
         dto.Content = vm.Content;
@@ -95,6 +98,8 @@ public static class NoteClipboardMapper
             vm.Meta["imagePath"] = dto.ImagePath ?? string.Empty;
             vm.Meta["imageAlt"] = dto.ImageAlt ?? string.Empty;
             vm.Meta["imageWidth"] = dto.ImageWidth is > 0 ? dto.ImageWidth.Value : 0.0;
+            if (!string.IsNullOrEmpty(dto.ImageAlign))
+                vm.Meta["imageAlign"] = dto.ImageAlign;
             vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
             return vm;
         }

@@ -21,13 +21,8 @@
             x:Name="BlockContainer"
             Padding="8"
             CornerRadius="4"
+            Background="Transparent"
             DragDrop.AllowDrop="True">
-            <Border.Background>
-                <MultiBinding Converter="{StaticResource BoolToSelectionBrushConverter}">
-                    <Binding Path="IsSelected" />
-                    <Binding RelativeSource="{RelativeSource Self}" Path="." />
-                </MultiBinding>
-            </Border.Background>
         <Grid ColumnDefinitions="24,*">
             <!--  Drag Handle  -->
             <Border
@@ -51,12 +46,23 @@
                     Stretch="Uniform" />
             </Border>
 
-            <!--  Block Content  -->
-            <ContentControl
-                x:Name="BlockContentControl"
+            <!--  Block Content: left-aligned so selection hugs content width (image blocks align via EditableBlock.HorizontalAlignment).  -->
+            <Border
+                x:Name="BlockContentChrome"
                 Grid.Column="1"
-                Content="{Binding Type, Converter={StaticResource BlockTypeConverter}}"
-                DataContext="{Binding}" />
+                HorizontalAlignment="Left"
+                CornerRadius="4">
+                <Border.Background>
+                    <MultiBinding Converter="{StaticResource BoolToSelectionBrushConverter}">
+                        <Binding Path="IsSelected" />
+                        <Binding RelativeSource="{RelativeSource Self}" Path="." />
+                    </MultiBinding>
+                </Border.Background>
+                <ContentControl
+                    x:Name="BlockContentControl"
+                    Content="{Binding Type, Converter={StaticResource BlockTypeConverter}}"
+                    DataContext="{Binding}" />
+            </Border>
         </Grid>
     </Border>
         <!-- Drop indicator line: overlays top of block, does not affect layout -->

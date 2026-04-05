@@ -516,6 +516,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         newVm.Meta["imagePath"] = result.Value;
         newVm.Meta["imageAlt"] = GetBlockMetaString(block, "imageAlt");
         newVm.Meta["imageWidth"] = GetBlockMetaDouble(block, "imageWidth");
+        var imageAlign = GetBlockMetaString(block, "imageAlign");
+        newVm.Meta["imageAlign"] = string.IsNullOrEmpty(imageAlign) ? "left" : imageAlign;
 
         SubscribeToBlock(newVm);
         Blocks.Insert(index + 1, newVm);
@@ -660,6 +662,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
              source.GetVisualAncestors().OfType<Border>().Any(b => b.Tag is "DragHandle"));
         if (hitIsDragHandle) return;
 
+        // Image block width resize strip — must not capture here or the first drag is eaten by cross-block selection.
+        bool hitIsImageResizeHandle = source != null &&
+            (source is Border { Tag: "ImageResizeHandle" } ||
+             source.GetVisualAncestors().OfType<Border>().Any(b => b.Tag is "ImageResizeHandle"));
+        if (hitIsImageResizeHandle) return;
+
         // Let native CheckBox handling run (checklist toggles) instead of capturing in editor tunnel.
         bool hitIsCheckBox = source is CheckBox || (source != null && source.GetVisualAncestors().Any(a => a is CheckBox));
         if (hitIsCheckBox) return;
@@ -742,18 +750,29 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Returns true if the point (in editor coordinates) falls within the rendered bounds of any block container.
+    /// Returns true if the point (in editor coordinates) falls within a block's interactive hit surface
+    /// (for image blocks: handle + content width, not full-row gutters beside a narrow image).
     /// </summary>
     private bool IsPointInsideAnyBlock(Point point)
     {
         var containers = GetBlockContainersInOrder();
         if (containers == null) return false;
-        foreach (var container in containers)
+        for (var i = 0; i < containers.Count; i++)
         {
+            var container = containers[i];
             var topLeft = container.TranslatePoint(new Point(0, 0), this);
             if (topLeft == null) continue;
             var bounds = new Rect(topLeft.Value.X, topLeft.Value.Y, container.Bounds.Width, container.Bounds.Height);
-            if (bounds.Contains(point)) return true;
+            if (!bounds.Contains(point)) continue;
+
+            var editable = GetEditableBlockAt(i);
+            if (editable == null)
+                return true;
+
+            var local = this.TranslatePoint(point, editable);
+            if (!local.HasValue) continue;
+            if (editable.IsPointerHitInsideBlock(local.Value))
+                return true;
         }
         return false;
     }
@@ -955,11 +974,22 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         for (int i = 0; i < containers.Count && i < Blocks.Count; i++)
         {
-            var container = containers[i];
-            var topLeft = container.TranslatePoint(new Point(0, 0), this);
-            if (topLeft == null) continue;
-            var bounds = new Rect(topLeft.Value.X, topLeft.Value.Y, container.Bounds.Width, container.Bounds.Height);
-            Blocks[i].IsSelected = selectionRect.Intersects(bounds);
+            var editable = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+            Rect bounds;
+            if (editable != null)
+                bounds = editable.GetBoxSelectIntersectionBoundsRelativeTo(this);
+            else
+            {
+                var container = containers[i];
+                var topLeft = container.TranslatePoint(new Point(0, 0), this);
+                if (topLeft == null) continue;
+                bounds = new Rect(topLeft.Value.X, topLeft.Value.Y, container.Bounds.Width, container.Bounds.Height);
+            }
+
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                Blocks[i].IsSelected = false;
+            else
+                Blocks[i].IsSelected = selectionRect.Intersects(bounds);
         }
     }
 

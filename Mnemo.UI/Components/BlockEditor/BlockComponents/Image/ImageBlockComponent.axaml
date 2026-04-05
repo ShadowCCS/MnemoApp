@@ -2,6 +2,7 @@
     x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Image.ImageBlockComponent"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:Mnemo.UI.Controls"
     HorizontalAlignment="Stretch"
     VerticalAlignment="Top"
     x:CompileBindings="False">
@@ -46,8 +47,12 @@
             Background="Transparent"
             RowDefinitions="Auto,Auto">
 
-            <!-- Row 0: placeholder full width OR centered image + pill -->
-            <Grid Grid.Row="0" HorizontalAlignment="Stretch" Background="Transparent">
+            <!-- Row 0: placeholder full width OR image + pill (shrink-wrapped when loaded) -->
+            <Grid
+                x:Name="ImageContentRow"
+                Grid.Row="0"
+                HorizontalAlignment="Stretch"
+                Background="Transparent">
 
                 <!-- Empty state: spans full editor column width -->
                 <Border
@@ -77,82 +82,87 @@
                                 Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                 Opacity="0.7" />
                         </StackPanel>
-                        <Button
-                            x:Name="FlyoutButtonPlaceholder"
+                        <StackPanel
+                            x:Name="PlaceholderToolbar"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
                             Margin="0,8,8,0"
-                            Padding="4"
+                            Spacing="4"
+                            Orientation="Horizontal"
                             Opacity="0"
                             IsVisible="False"
-                            ZIndex="2"
-                            Cursor="Hand"
-                            CornerRadius="4"
-                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-                            <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                    <MenuItem x:Name="PhFlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
-                                    <MenuItem x:Name="PhFlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
-                                    <MenuItem x:Name="PhFlyoutCaptionItem" Click="FlyoutCaption_Click" Cursor="Hand" />
-                                    <Separator />
-                                    <MenuItem x:Name="PhFlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
-                                    <MenuItem x:Name="PhFlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
-                                </MenuFlyout>
-                            </Button.Flyout>
-                            <PathIcon
-                                Width="14"
-                                Height="14"
-                                Data="M5 12C5 12.5523 4.55228 13 4 13C3.44772 13 3 12.5523 3 12C3 11.4477 3.44772 11 4 11C4.55228 11 5 11.4477 5 12ZM13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12ZM21 12C21 12.5523 20.5523 13 20 13C19.4477 13 19 12.5523 19 12C19 11.4477 19.4477 11 20 11C20.5523 11 21 11.4477 21 12Z"
-                                Foreground="{DynamicResource TextPrimaryBrush}" />
-                        </Button>
-                    </Grid>
-                </Border>
-
-                <!-- Loaded: image + resize, centered in row -->
-                <Grid
-                    x:Name="LoadedImageRow"
-                    HorizontalAlignment="Center"
-                    Background="Transparent"
-                    ColumnDefinitions="Auto,Auto"
-                    IsVisible="False">
-                    <Border
-                        Grid.Column="0"
-                        HorizontalAlignment="Left"
-                        Background="Transparent"
-                        ClipToBounds="True"
-                        CornerRadius="4">
-                        <Grid HorizontalAlignment="Left" Background="Transparent">
-                            <Border
-                                x:Name="ImageInnerBorder"
-                                HorizontalAlignment="Left"
-                                CornerRadius="4"
-                                ClipToBounds="True">
-                                <Image
-                                    x:Name="DisplayImage"
-                                    Stretch="Uniform"
-                                    MaxHeight="600"
-                                    HorizontalAlignment="Left" />
-                            </Border>
+                            ZIndex="2">
                             <Button
-                                x:Name="FlyoutButton"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Top"
-                                Margin="0,8,8,0"
+                                x:Name="AlignMenuButtonPlaceholder"
                                 Padding="4"
-                                Opacity="0"
-                                IsVisible="False"
-                                ZIndex="2"
+                                Cursor="Hand"
+                                CornerRadius="4"
+                                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                                <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedRight">
+                                        <Border
+                                            Padding="4"
+                                            CornerRadius="6"
+                                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                                <Button
+                                                    Padding="6"
+                                                    Cursor="Hand"
+                                                    Background="Transparent"
+                                                    Click="AlignPickLeft_Click">
+                                                    <controls:SvgIcon
+                                                        Width="16"
+                                                        Height="16"
+                                                        SvgPath="avares://Mnemo.UI/Icons/Editor/align-left.svg"
+                                                        Color="{DynamicResource TextPrimaryBrush}" />
+                                                </Button>
+                                                <Button
+                                                    Padding="6"
+                                                    Cursor="Hand"
+                                                    Background="Transparent"
+                                                    Click="AlignPickCenter_Click">
+                                                    <controls:SvgIcon
+                                                        Width="16"
+                                                        Height="16"
+                                                        SvgPath="avares://Mnemo.UI/Icons/Editor/align-center.svg"
+                                                        Color="{DynamicResource TextPrimaryBrush}" />
+                                                </Button>
+                                                <Button
+                                                    Padding="6"
+                                                    Cursor="Hand"
+                                                    Background="Transparent"
+                                                    Click="AlignPickRight_Click">
+                                                    <controls:SvgIcon
+                                                        Width="16"
+                                                        Height="16"
+                                                        SvgPath="avares://Mnemo.UI/Icons/Editor/align-right.svg"
+                                                        Color="{DynamicResource TextPrimaryBrush}" />
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+                                    </Flyout>
+                                </Button.Flyout>
+                                <controls:SvgIcon
+                                    x:Name="AlignButtonIconPlaceholder"
+                                    Width="14"
+                                    Height="14"
+                                    SvgPath="avares://Mnemo.UI/Icons/Editor/align-left.svg"
+                                    Color="{DynamicResource TextPrimaryBrush}" />
+                            </Button>
+                            <Button
+                                x:Name="FlyoutButtonPlaceholder"
+                                Padding="4"
                                 Cursor="Hand"
                                 CornerRadius="4"
                                 Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
                                 <Button.Flyout>
                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                        <MenuItem x:Name="FlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
-                                        <MenuItem x:Name="FlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
-                                        <MenuItem x:Name="FlyoutCaptionItem" Click="FlyoutCaption_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="PhFlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="PhFlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="PhFlyoutCaptionItem" Click="FlyoutCaption_Click" Cursor="Hand" />
                                         <Separator />
-                                        <MenuItem x:Name="FlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
-                                        <MenuItem x:Name="FlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="PhFlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="PhFlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
                                     </MenuFlyout>
                                 </Button.Flyout>
                                 <PathIcon
@@ -161,11 +171,134 @@
                                     Data="M5 12C5 12.5523 4.55228 13 4 13C3.44772 13 3 12.5523 3 12C3 11.4477 3.44772 11 4 11C4.55228 11 5 11.4477 5 12ZM13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12ZM21 12C21 12.5523 20.5523 13 20 13C19.4477 13 19 12.5523 19 12C19 11.4477 19.4477 11 20 11C20.5523 11 21 11.4477 21 12Z"
                                     Foreground="{DynamicResource TextPrimaryBrush}" />
                             </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Loaded: image + resize, centered in row -->
+                <Grid
+                    x:Name="LoadedImageRow"
+                    HorizontalAlignment="Left"
+                    Background="Transparent"
+                    ColumnDefinitions="Auto,Auto"
+                    IsVisible="False">
+                    <Border
+                        Grid.Column="0"
+                        HorizontalAlignment="Left"
+                        Background="Transparent"
+                        ClipToBounds="True"
+                        CornerRadius="4"
+                        Cursor="Arrow">
+                        <Grid HorizontalAlignment="Left" Background="Transparent">
+                            <Border
+                                x:Name="ImageInnerBorder"
+                                HorizontalAlignment="Left"
+                                CornerRadius="4"
+                                ClipToBounds="True"
+                                Cursor="Arrow">
+                                <Image
+                                    x:Name="DisplayImage"
+                                    Stretch="Uniform"
+                                    MaxHeight="600"
+                                    HorizontalAlignment="Left"
+                                    Cursor="Arrow" />
+                            </Border>
+                            <StackPanel
+                                x:Name="LoadedToolbar"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Margin="0,8,8,0"
+                                Spacing="4"
+                                Orientation="Horizontal"
+                                Opacity="0"
+                                IsVisible="False"
+                                ZIndex="2">
+                                <Button
+                                    x:Name="AlignMenuButton"
+                                    Padding="4"
+                                    Cursor="Hand"
+                                    CornerRadius="4"
+                                    Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                                    <Button.Flyout>
+                                        <Flyout Placement="BottomEdgeAlignedRight">
+                                            <Border
+                                                Padding="4"
+                                                CornerRadius="6"
+                                                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                                    <Button
+                                                        Padding="6"
+                                                        Cursor="Hand"
+                                                        Background="Transparent"
+                                                        Click="AlignPickLeft_Click">
+                                                        <controls:SvgIcon
+                                                            Width="16"
+                                                            Height="16"
+                                                            SvgPath="avares://Mnemo.UI/Icons/Editor/align-left.svg"
+                                                            Color="{DynamicResource TextPrimaryBrush}" />
+                                                    </Button>
+                                                    <Button
+                                                        Padding="6"
+                                                        Cursor="Hand"
+                                                        Background="Transparent"
+                                                        Click="AlignPickCenter_Click">
+                                                        <controls:SvgIcon
+                                                            Width="16"
+                                                            Height="16"
+                                                            SvgPath="avares://Mnemo.UI/Icons/Editor/align-center.svg"
+                                                            Color="{DynamicResource TextPrimaryBrush}" />
+                                                    </Button>
+                                                    <Button
+                                                        Padding="6"
+                                                        Cursor="Hand"
+                                                        Background="Transparent"
+                                                        Click="AlignPickRight_Click">
+                                                        <controls:SvgIcon
+                                                            Width="16"
+                                                            Height="16"
+                                                            SvgPath="avares://Mnemo.UI/Icons/Editor/align-right.svg"
+                                                            Color="{DynamicResource TextPrimaryBrush}" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Border>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                    <controls:SvgIcon
+                                        x:Name="AlignButtonIcon"
+                                        Width="14"
+                                        Height="14"
+                                        SvgPath="avares://Mnemo.UI/Icons/Editor/align-left.svg"
+                                        Color="{DynamicResource TextPrimaryBrush}" />
+                                </Button>
+                                <Button
+                                    x:Name="FlyoutButton"
+                                    Padding="4"
+                                    Cursor="Hand"
+                                    CornerRadius="4"
+                                    Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                                    <Button.Flyout>
+                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                            <MenuItem x:Name="FlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
+                                            <MenuItem x:Name="FlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
+                                            <MenuItem x:Name="FlyoutCaptionItem" Click="FlyoutCaption_Click" Cursor="Hand" />
+                                            <Separator />
+                                            <MenuItem x:Name="FlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
+                                            <MenuItem x:Name="FlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
+                                        </MenuFlyout>
+                                    </Button.Flyout>
+                                    <PathIcon
+                                        Width="14"
+                                        Height="14"
+                                        Data="M5 12C5 12.5523 4.55228 13 4 13C3.44772 13 3 12.5523 3 12C3 11.4477 3.44772 11 4 11C4.55228 11 5 11.4477 5 12ZM13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12ZM21 12C21 12.5523 20.5523 13 20 13C19.4477 13 19 12.5523 19 12C19 11.4477 19.4477 11 20 11C20.5523 11 21 11.4477 21 12Z"
+                                        Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </Border>
 
                     <Border
                         Grid.Column="1"
+                        Tag="ImageResizeHandle"
                         Background="Transparent"
                         Width="16"
                         Margin="4,0,0,0"
@@ -173,7 +306,10 @@
                         Cursor="SizeWestEast"
                         PointerEntered="ResizePill_PointerEntered"
                         PointerExited="ResizePill_PointerExited"
-                        PointerPressed="ResizePill_PointerPressed">
+                        PointerPressed="ResizePill_PointerPressed"
+                        PointerMoved="ResizeHitArea_PointerMoved"
+                        PointerReleased="ResizeHitArea_PointerReleased"
+                        PointerCaptureLost="ResizeHitArea_PointerCaptureLost">
                         <Border
                             x:Name="ResizePill"
                             Classes="resize-pill"

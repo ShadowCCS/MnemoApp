@@ -7,11 +7,13 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Mnemo.Core.Models;
@@ -31,15 +33,18 @@ public partial class ImageBlockComponent : BlockComponentBase
     private bool _isResizing;
     private double _resizeDragStartX;
     private double _resizeDragStartWidth;
-    private TopLevel? _resizeTopLevel;
-    private EventHandler<PointerEventArgs>? _resizePointerMoved;
-    private EventHandler<PointerReleasedEventArgs>? _resizePointerReleased;
 
-    /// <summary>Space reserved for resize hit column + margins so the pill stays in view.</summary>
+    /// <summary>EditableBlock inner row: BlockContainer horizontal padding (8*2) + drag grid column (24). See EditableBlock.axaml.</summary>
+    private const double BlockContentColumnChrome = 40;
+
+    /// <summary>HoverHost horizontal padding (6*2) + resize column (16) + pill margin (4). See ImageBlockComponent.axaml.</summary>
     private const double ResizeColumnReserve = 32;
 
     /// <summary>Hard cap so huge monitors do not allow absurd image widths.</summary>
     private const double MaxImageWidthCap = 1600;
+
+    /// <summary>Hit target and selection padding around the image when loaded (Host is a Border).</summary>
+    private const double LoadedImageHitPadding = 6;
 
     private string _captionWatermarkText = string.Empty;
 
@@ -87,7 +92,7 @@ public partial class ImageBlockComponent : BlockComponentBase
             CaptionBox.GotFocus -= CaptionBox_GotFocus;
             CaptionBox.LostFocus -= CaptionBox_LostFocus;
         }
-        UnsubscribeResizeTopLevel();
+        EndResizeSession();
         base.OnDetachedFromVisualTree(e);
         DisposeBitmap();
     }
@@ -148,6 +153,8 @@ public partial class ImageBlockComponent : BlockComponentBase
         {
             LoadBitmap(imagePath);
         }
+
+        UpdateAlignButtonIcons();
     }
 
     private void LoadBitmap(string path)
@@ -179,8 +186,9 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         PlaceholderBorder.IsVisible = true;
         LoadedImageRow.IsVisible = false;
-        FlyoutButton.IsVisible = false;
-        FlyoutButtonPlaceholder.IsVisible = false;
+        LoadedToolbar.IsVisible = false;
+        PlaceholderToolbar.IsVisible = false;
+        ApplyHorizontalLayoutForContentState();
         UpdateCaptionHostWidth();
     }
 
@@ -188,7 +196,8 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         PlaceholderBorder.IsVisible = false;
         LoadedImageRow.IsVisible = true;
-        FlyoutButtonPlaceholder.IsVisible = false;
+        PlaceholderToolbar.IsVisible = false;
+        ApplyHorizontalLayoutForContentState();
         UpdateCaptionHostWidth();
     }
 
@@ -198,12 +207,48 @@ public partial class ImageBlockComponent : BlockComponentBase
         if (LoadedImageRow.IsVisible && DisplayImage != null && DisplayImage.Bounds.Width > 0)
         {
             CaptionHost.Width = DisplayImage.Bounds.Width;
-            CaptionHost.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+            CaptionHost.HorizontalAlignment = HorizontalAlignment.Left; // caption hugs image
         }
         else
         {
             CaptionHost.Width = double.NaN;
-            CaptionHost.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            CaptionHost.HorizontalAlignment = HorizontalAlignment.Stretch;
+        }
+    }
+
+    private void ApplyHorizontalLayoutForContentState()
+    {
+        // Alignment is handled by the parent EditableBlock (this.HorizontalAlignment).
+        // Inner content stays shrink-wrapped so selection hugs the image.
+        var isLoadedImage = LoadedImageRow.IsVisible;
+
+        if (isLoadedImage)
+        {
+            HorizontalAlignment = HorizontalAlignment.Left; // shrink-wrap; parent EditableBlock aligns
+            if (HoverHost != null)
+            {
+                HoverHost.HorizontalAlignment = HorizontalAlignment.Left;
+                HoverHost.Padding = new Thickness(LoadedImageHitPadding);
+            }
+            if (RootGrid != null)
+                RootGrid.HorizontalAlignment = HorizontalAlignment.Left;
+            if (ImageContentRow != null)
+                ImageContentRow.HorizontalAlignment = HorizontalAlignment.Left;
+            if (LoadedImageRow != null)
+                LoadedImageRow.HorizontalAlignment = HorizontalAlignment.Left;
+        }
+        else
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch;
+            if (HoverHost != null)
+            {
+                HoverHost.HorizontalAlignment = HorizontalAlignment.Stretch;
+                HoverHost.Padding = default;
+            }
+            if (RootGrid != null)
+                RootGrid.HorizontalAlignment = HorizontalAlignment.Stretch;
+            if (ImageContentRow != null)
+                ImageContentRow.HorizontalAlignment = HorizontalAlignment.Stretch;
         }
     }
 
@@ -213,13 +258,13 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         if (LoadedImageRow.IsVisible)
         {
-            FlyoutButton.IsVisible = true;
-            FlyoutButton.Opacity = 1;
+            LoadedToolbar.IsVisible = true;
+            LoadedToolbar.Opacity = 1;
         }
         if (PlaceholderBorder.IsVisible)
         {
-            FlyoutButtonPlaceholder.IsVisible = true;
-            FlyoutButtonPlaceholder.Opacity = 1;
+            PlaceholderToolbar.IsVisible = true;
+            PlaceholderToolbar.Opacity = 1;
         }
         RefreshCaptionWatermark();
     }
@@ -228,12 +273,84 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         if (FlyoutButton.Flyout?.IsOpen == true || FlyoutButtonPlaceholder.Flyout?.IsOpen == true)
             return;
+        if (IsAnyAlignFlyoutOpen())
+            return;
 
-        FlyoutButton.Opacity = 0;
-        FlyoutButton.IsVisible = false;
-        FlyoutButtonPlaceholder.Opacity = 0;
-        FlyoutButtonPlaceholder.IsVisible = false;
+        LoadedToolbar.Opacity = 0;
+        LoadedToolbar.IsVisible = false;
+        PlaceholderToolbar.Opacity = 0;
+        PlaceholderToolbar.IsVisible = false;
         RefreshCaptionWatermark();
+    }
+
+    private bool IsAnyAlignFlyoutOpen() =>
+        AlignMenuButton.Flyout is { IsOpen: true } || AlignMenuButtonPlaceholder.Flyout is { IsOpen: true };
+
+    private void HideAlignFlyouts()
+    {
+        if (AlignMenuButton.Flyout is FlyoutBase f1 && f1.IsOpen)
+            f1.Hide();
+        if (AlignMenuButtonPlaceholder.Flyout is FlyoutBase f2 && f2.IsOpen)
+            f2.Hide();
+    }
+
+    private static string NormalizeImageAlign(string? value) =>
+        value?.Trim().ToLowerInvariant() switch
+        {
+            "center" => "center",
+            "right" => "right",
+            _ => "left",
+        };
+
+    private string GetImageAlignFromMeta()
+    {
+        var vm = ViewModel;
+        if (vm == null) return "left";
+        return NormalizeImageAlign(GetMetaString(vm, "imageAlign"));
+    }
+
+    private void UpdateAlignButtonIcons()
+    {
+        var align = GetImageAlignFromMeta();
+        var path = align switch
+        {
+            "center" => "avares://Mnemo.UI/Icons/Editor/align-center.svg",
+            "right" => "avares://Mnemo.UI/Icons/Editor/align-right.svg",
+            _ => "avares://Mnemo.UI/Icons/Editor/align-left.svg",
+        };
+        if (AlignButtonIcon != null)
+            AlignButtonIcon.SvgPath = path;
+        if (AlignButtonIconPlaceholder != null)
+            AlignButtonIconPlaceholder.SvgPath = path;
+    }
+
+    private void SetImageAlign(string value)
+    {
+        var vm = ViewModel;
+        if (vm == null) return;
+        var normalized = NormalizeImageAlign(value);
+        vm.Meta["imageAlign"] = normalized;
+        vm.NotifyContentChanged();
+        UpdateAlignButtonIcons();
+        // EditableBlock listens to Meta changes and updates its HorizontalAlignment
+    }
+
+    private void AlignPickLeft_Click(object? sender, RoutedEventArgs e)
+    {
+        SetImageAlign("left");
+        HideAlignFlyouts();
+    }
+
+    private void AlignPickCenter_Click(object? sender, RoutedEventArgs e)
+    {
+        SetImageAlign("center");
+        HideAlignFlyouts();
+    }
+
+    private void AlignPickRight_Click(object? sender, RoutedEventArgs e)
+    {
+        SetImageAlign("right");
+        HideAlignFlyouts();
     }
 
     private void HoverHost_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -488,34 +605,28 @@ public partial class ImageBlockComponent : BlockComponentBase
             e.Pointer.Capture(element);
         }
         e.Handled = true;
-
-        SubscribeResizeTopLevel();
     }
 
-    private void SubscribeResizeTopLevel()
+    private void ResizeHitArea_PointerMoved(object? sender, PointerEventArgs e)
     {
-        UnsubscribeResizeTopLevel();
-        _resizeTopLevel = TopLevel.GetTopLevel(this);
-        if (_resizeTopLevel == null) return;
-
-        _resizePointerMoved = (_, ev) => ResizeGlobal_PointerMoved(ev);
-        _resizePointerReleased = (_, ev) => ResizeGlobal_PointerReleased(ev);
-        _resizeTopLevel.AddHandler(InputElement.PointerMovedEvent, _resizePointerMoved, RoutingStrategies.Tunnel);
-        _resizeTopLevel.AddHandler(InputElement.PointerReleasedEvent, _resizePointerReleased, RoutingStrategies.Tunnel);
+        ResizeGlobal_PointerMoved(e);
     }
 
-    private void UnsubscribeResizeTopLevel()
+    private void ResizeHitArea_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (_resizeTopLevel != null)
-        {
-            if (_resizePointerMoved != null)
-                _resizeTopLevel.RemoveHandler(InputElement.PointerMovedEvent, _resizePointerMoved);
-            if (_resizePointerReleased != null)
-                _resizeTopLevel.RemoveHandler(InputElement.PointerReleasedEvent, _resizePointerReleased);
-        }
-        _resizeTopLevel = null;
-        _resizePointerMoved = null;
-        _resizePointerReleased = null;
+        ResizeGlobal_PointerReleased(e);
+    }
+
+    private void ResizeHitArea_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        EndResizeSession();
+    }
+
+    private void EndResizeSession()
+    {
+        if (!_isResizing) return;
+        _isResizing = false;
+        ResizePill.Opacity = 0.15;
     }
 
     private void ResizeGlobal_PointerMoved(PointerEventArgs e)
@@ -540,10 +651,8 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         if (!_isResizing) return;
 
-        _isResizing = false;
-        ResizePill.Opacity = 0.15;
         e.Pointer.Capture(null);
-        UnsubscribeResizeTopLevel();
+        EndResizeSession();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -555,15 +664,54 @@ public partial class ImageBlockComponent : BlockComponentBase
         RefreshCaptionWatermark();
     }
 
+    /// <summary>Full width of the block row in the list (item slot), not shrink-wrapped block bounds.</summary>
+    private double GetBlockRowConstraintWidth()
+    {
+        for (Visual? p = this.GetVisualParent(); p != null; p = p.GetVisualParent())
+        {
+            // Image blocks use HA Left/Center/Right on EditableBlock — Bounds.Width is content, not the list column.
+            if (p is EditableBlock eb)
+            {
+                if (eb.GetVisualParent() is Control slot && slot.Bounds.Width > 0)
+                    return slot.Bounds.Width;
+            }
+
+            if (p is ItemsControl ic && string.Equals(ic.Name, "BlocksItemsControl", StringComparison.Ordinal)
+                && ic.Bounds.Width > 0)
+                return ic.Bounds.Width;
+
+            if (p is BlockEditor be && be.Bounds.Width > 0)
+            {
+                const double editorHorizontalPadding = 64; // BlockEditor.axaml Border Padding 32,0,32,0
+                return Math.Max(0, be.Bounds.Width - editorHorizontalPadding);
+            }
+        }
+
+        return 0;
+    }
+
     private double GetMaxImageDisplayWidth()
     {
-        double avail = HoverHost?.Bounds.Width ?? 0;
-        if (avail <= 0)
-            avail = Bounds.Width;
-        if (avail <= 0)
-            return MaxImageWidthCap;
-        var byViewport = avail - ResizeColumnReserve;
-        return Math.Clamp(byViewport, 80, MaxImageWidthCap);
+        double rowW = GetBlockRowConstraintWidth();
+        var chrome = BlockContentColumnChrome + ResizeColumnReserve;
+        var byViewport = rowW > 0
+            ? Math.Clamp(rowW - chrome, 80, MaxImageWidthCap)
+            : MaxImageWidthCap;
+
+        // When the image has a taller-than-wide aspect ratio, the MaxHeight="600" constraint
+        // means the rendered width never reaches the full byViewport. Cap the drag accordingly.
+        if (_currentBitmap != null)
+        {
+            var px = _currentBitmap.PixelSize;
+            if (px.Height > 0 && px.Width > 0)
+            {
+                const double maxHeight = 600.0;
+                var aspectCap = maxHeight * ((double)px.Width / px.Height);
+                byViewport = Math.Min(byViewport, aspectCap);
+            }
+        }
+
+        return byViewport;
     }
 
     private void ClampImageWidthToViewport()

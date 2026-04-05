@@ -344,12 +344,51 @@ public partial class EditableBlock : UserControl
     {
         if (_viewModel == null) return;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _viewModel.ContentChanged += OnViewModelContentChanged;
+        UpdateEditableBlockAlignment();
     }
 
     private void UnsubscribeFromViewModel()
     {
         if (_viewModel == null) return;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _viewModel.ContentChanged -= OnViewModelContentChanged;
+    }
+
+    private void OnViewModelContentChanged(BlockViewModel sender)
+    {
+        // Image alignment stored in Meta; re-apply if changed
+        if (_viewModel?.Type == BlockType.Image)
+            UpdateEditableBlockAlignment();
+    }
+
+    /// <summary>
+    /// For image blocks, apply horizontal alignment to the entire EditableBlock (not inner content)
+    /// so the selection chrome hugs the image while the block itself moves left/center/right.
+    /// </summary>
+    private void UpdateEditableBlockAlignment()
+    {
+        if (_viewModel?.Type == BlockType.Image)
+        {
+            var align = ParseImageAlignFromMeta(_viewModel);
+            this.HorizontalAlignment = align;
+        }
+        else
+        {
+            this.HorizontalAlignment = HorizontalAlignment.Stretch;
+        }
+    }
+
+    private static HorizontalAlignment ParseImageAlignFromMeta(BlockViewModel vm)
+    {
+        if (!vm.Meta.TryGetValue("imageAlign", out var val) || val == null) return HorizontalAlignment.Left;
+        var s = val is string str ? str : val.ToString();
+        return s?.Trim().ToLowerInvariant() switch
+        {
+            "center" => HorizontalAlignment.Center,
+            "right" => HorizontalAlignment.Right,
+            _ => HorizontalAlignment.Left,
+        };
     }
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -359,6 +398,7 @@ public partial class EditableBlock : UserControl
         switch (e.PropertyName)
         {
             case nameof(BlockViewModel.Type):
+                UpdateEditableBlockAlignment();
                 // Block type changed, need to rewire component
                 Dispatcher.UIThread.Post(() => WireUpBlockComponent(), DispatcherPriority.Loaded);
                 break;
@@ -1319,6 +1359,59 @@ public partial class EditableBlock : UserControl
 
         editor.SelectionStart = selStart;
         editor.SelectionEnd = selEnd;
+    }
+
+    /// <summary>
+    /// For <see cref="BlockEditor"/> pointer tunneling: whether <paramref name="pointInThis"/> (in this control's coordinates)
+    /// lies on the block's interactive surface. Image blocks use the drag handle + content chrome only so horizontal gutters
+    /// beside a narrow image do not count — box-select and similar gestures can start there.
+    /// </summary>
+    public bool IsPointerHitInsideBlock(Point pointInThis)
+    {
+        if (_viewModel?.Type != BlockType.Image)
+            return new Rect(0, 0, Bounds.Width, Bounds.Height).Contains(pointInThis);
+
+        if (HitTestImageBlockTarget(DragHandleBorder, pointInThis))
+            return true;
+        if (HitTestImageBlockTarget(BlockContentControl, pointInThis))
+            return true;
+        return false;
+    }
+
+    private bool HitTestImageBlockTarget(Control? child, Point pointInThis)
+    {
+        if (child == null) return false;
+        var topLeft = child.TranslatePoint(new Point(0, 0), this);
+        if (!topLeft.HasValue) return false;
+        var rect = new Rect(topLeft.Value, child.Bounds.Size);
+        return rect.Contains(pointInThis);
+    }
+
+    /// <summary>
+    /// Axis-aligned bounds in <paramref name="relativeTo"/>'s space for box-selection intersection.
+    /// Image blocks use the union of handle + content (not the full row width).
+    /// </summary>
+    public Rect GetBoxSelectIntersectionBoundsRelativeTo(Visual relativeTo)
+    {
+        if (_viewModel?.Type != BlockType.Image)
+        {
+            var topLeft = this.TranslatePoint(new Point(0, 0), relativeTo);
+            if (!topLeft.HasValue) return default;
+            return new Rect(topLeft.Value, Bounds.Size);
+        }
+
+        Rect? union = null;
+        void Add(Control? c)
+        {
+            if (c == null) return;
+            var tl = c.TranslatePoint(new Point(0, 0), relativeTo);
+            if (!tl.HasValue) return;
+            var r = new Rect(tl.Value, c.Bounds.Size);
+            union = union.HasValue ? union.Value.Union(r) : r;
+        }
+        Add(DragHandleBorder);
+        Add(BlockContentControl);
+        return union ?? default;
     }
 
     public int GetCharacterIndexFromPoint(Point pointInBlock)

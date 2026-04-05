@@ -368,6 +368,11 @@ public class BlockViewModel : INotifyPropertyChanged
                     _meta["imageWidth"] = 0.0;
                     metaChanged = true;
                 }
+                if (!_meta.ContainsKey("imageAlign"))
+                {
+                    _meta["imageAlign"] = "left";
+                    metaChanged = true;
+                }
                 break;
         }
         

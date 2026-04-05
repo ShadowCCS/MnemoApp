@@ -22,4 +22,7 @@ public sealed class NoteClipboardBlockDto
 
     /// <summary>Display width in layout units; 0 means natural size.</summary>
     public double? ImageWidth { get; set; }
+
+    /// <summary>Horizontal layout for image blocks: left, center, or right.</summary>
+    public string? ImageAlign { get; set; }
 }
