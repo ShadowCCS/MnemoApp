@@ -8,7 +8,7 @@
         <TextBlock
             Grid.Column="0"
             Margin="0,0,8,0"
-            FontSize="14"
+            FontSize="16"
             Text="{Binding ListNumber}"
             VerticalAlignment="Top" />
         <editor:RichTextEditor
@@ -16,7 +16,7 @@
             Grid.Column="1"
             MinWidth="200"
             HorizontalAlignment="Stretch"
-            FontSize="14"
+            FontSize="16"
             Foreground="{DynamicResource TextPrimaryBrush}"
             CaretBrush="{DynamicResource TextPrimaryBrush}"
             SelectionBrush="{DynamicResource TextControlSelectionHighlightColorBrush}"

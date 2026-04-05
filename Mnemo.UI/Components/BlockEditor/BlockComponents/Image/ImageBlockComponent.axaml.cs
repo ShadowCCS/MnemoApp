@@ -69,6 +69,9 @@ public partial class ImageBlockComponent : BlockComponentBase
 
     public override Control? GetInputControl() => null;
 
+    /// <summary>Image/placeholder row used to vertically align the block gutter with the first visual line of the block.</summary>
+    public Grid? GutterAnchorRow => ImageContentRow;
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);

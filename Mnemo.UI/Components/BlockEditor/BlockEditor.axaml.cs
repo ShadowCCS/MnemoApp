@@ -1114,7 +1114,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     if (rect.Contains(_boxSelectStart))
                     {
                         // Don't add a new block if the block above (last block) is empty
-                        var lastIsEmpty = Blocks.Count > 0 && string.IsNullOrWhiteSpace(Blocks[Blocks.Count - 1].Content);
+                        var lastIsEmpty = IsLastBlockEmptyForBelowBlocksAreaClick(Blocks);
                         if (!lastIsEmpty)
                         {
                             AddBlock(BlockType.Text, Blocks.Count);
@@ -1871,6 +1871,23 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private IImageAssetService? ResolveImageAssetService() =>
         ImageAssetService ?? (Application.Current as App)?.Services?.GetService(typeof(IImageAssetService)) as IImageAssetService;
+
+    /// <summary>
+    /// Last-block guard for clicking the area below all blocks: avoid stacking duplicate empty text blocks.
+    /// Image blocks often have empty <see cref="BlockViewModel.Content"/> while caption/path live in meta.
+    /// </summary>
+    private static bool IsLastBlockEmptyForBelowBlocksAreaClick(IReadOnlyList<BlockViewModel> blocks)
+    {
+        if (blocks.Count == 0) return false;
+        var last = blocks[blocks.Count - 1];
+        if (last.Type == BlockType.Image)
+        {
+            if (!string.IsNullOrWhiteSpace(GetBlockMetaString(last, "imagePath"))) return false;
+            if (!string.IsNullOrWhiteSpace(GetBlockMetaString(last, "imageAlt"))) return false;
+        }
+
+        return string.IsNullOrWhiteSpace(last.Content);
+    }
 
     private static string GetBlockMetaString(BlockViewModel vm, string key)
     {

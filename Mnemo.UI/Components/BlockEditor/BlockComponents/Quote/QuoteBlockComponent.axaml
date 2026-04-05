@@ -19,7 +19,7 @@
                 x:Name="Editor"
                 MinWidth="200"
                 HorizontalAlignment="Stretch"
-                FontSize="14"
+                FontSize="16"
                 Foreground="{DynamicResource TextPrimaryBrush}"
                 CaretBrush="{DynamicResource TextPrimaryBrush}"
                 SelectionBrush="{DynamicResource TextControlSelectionHighlightColorBrush}"

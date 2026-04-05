@@ -14,6 +14,7 @@ using Mnemo.Core.Services;
 using Mnemo.Core.Models;
 using Mnemo.Core.Formatting;
 using Mnemo.UI.Components.BlockEditor.BlockComponents;
+using Mnemo.UI.Components.BlockEditor.BlockComponents.Image;
 using Mnemo.UI.Components.BlockEditor.FormattingToolbar;
 using System.Linq;
 
@@ -47,6 +48,11 @@ public partial class EditableBlock : UserControl
     /// <summary>True while the pointer is over the block chrome (gutter icons visible). Gutter borders stay hit-testable so hover works; handlers gate on this.</summary>
     private bool _blockGutterChromeVisible;
 
+    /// <summary>Matches gutter <see cref="Border"/> MinHeight in <c>EditableBlock.axaml</c>.</summary>
+    private const double GutterChromeHeight = 26;
+
+    private double _gutterMarginTopCache = double.NaN;
+
     public EditableBlock()
     {
         InitializeComponent();
@@ -54,7 +60,8 @@ public partial class EditableBlock : UserControl
         DataContextChanged += OnDataContextChanged;
         Loaded += OnControlLoaded;
         Unloaded += OnControlUnloaded;
-        
+        LayoutUpdated += (_, _) => UpdateGutterVerticalAlignment();
+
         SetupDragDrop();
         SetupKeyboardHandling();
     }
@@ -181,6 +188,8 @@ public partial class EditableBlock : UserControl
     
     private void WireUpBlockComponent()
     {
+        _gutterMarginTopCache = double.NaN;
+
         // Unwire previous component
         if (_currentBlockComponent != null)
         {
@@ -231,8 +240,61 @@ public partial class EditableBlock : UserControl
             _currentBlockComponent = null;
             _currentEditor = null;
         }
+
+        UpdateGutterVerticalAlignment();
     }
-    
+
+    /// <summary>
+    /// Offsets + / drag gutter from the top of the row so it lines up with the first line of real content
+    /// (not the padded block chrome), and vertically centers gutter chrome on that line.
+    /// </summary>
+    private void UpdateGutterVerticalAlignment()
+    {
+        if (AddBlockBelowBorder == null || DragHandleBorder == null || BlockLayoutGrid == null)
+            return;
+
+        double marginTop = 0;
+        var grid = BlockLayoutGrid;
+
+        if (_currentBlockComponent is ImageBlockComponent { GutterAnchorRow: { } imageRow })
+        {
+            var p = imageRow.TranslatePoint(new Point(0, 0), grid);
+            if (p.HasValue && imageRow.Bounds.Height > 0)
+                marginTop = Math.Max(0, p.Value.Y + (imageRow.Bounds.Height - GutterChromeHeight) * 0.5);
+        }
+        else if (_currentBlockComponent?.GetRichTextEditor() is RichTextEditor rte)
+        {
+            var line = rte.GetFirstLineBounds();
+            var p = rte.TranslatePoint(new Point(0, line.Y), grid);
+            if (p.HasValue && line.Height > 0)
+                marginTop = Math.Max(0, p.Value.Y + (line.Height - GutterChromeHeight) * 0.5);
+        }
+        else if (_currentBlockComponent?.GetLegacyTextBox() is TextBox tb)
+        {
+            var p = tb.TranslatePoint(new Point(0, 0), grid);
+            if (p.HasValue)
+            {
+                var lineH = tb.FontSize * 1.25;
+                marginTop = Math.Max(0, p.Value.Y + (lineH - GutterChromeHeight) * 0.5);
+            }
+        }
+        else if (_currentBlockComponent != null)
+        {
+            var c = _currentBlockComponent;
+            var p = c.TranslatePoint(new Point(0, 0), grid);
+            if (p.HasValue && c.Bounds.Height > 0)
+                marginTop = Math.Max(0, p.Value.Y + (c.Bounds.Height - GutterChromeHeight) * 0.5);
+        }
+
+        if (!double.IsNaN(_gutterMarginTopCache) && Math.Abs(marginTop - _gutterMarginTopCache) < 0.25)
+            return;
+        _gutterMarginTopCache = marginTop;
+
+        var m = new Thickness(0, marginTop, 2, 0);
+        AddBlockBelowBorder.Margin = m;
+        DragHandleBorder.Margin = m;
+    }
+
     private void RemoveBackspaceTunnelHandler()
     {
         if (_currentEditor != null)

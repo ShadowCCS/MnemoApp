@@ -18,13 +18,25 @@
             <Grid Background="Transparent">
                 <Grid x:Name="EditorRoot" RowDefinitions="Auto,*" Background="Transparent" ClipToBounds="False">
                     <ItemsControl x:Name="BlocksItemsControl" Grid.Row="0" ItemsSource="{Binding Blocks}" Background="Transparent">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Vertical" Spacing="6" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.Styles>
+                            <Style Selector="ContentPresenter">
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ItemsControl.Styles>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <local:EditableBlock />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <Border x:Name="BelowBlocksArea" Grid.Row="1" MinHeight="120" Background="Transparent" DragDrop.AllowDrop="True" />
+                    <!-- Hit target below last block; keep modest so the page does not show a huge empty band. -->
+                    <Border x:Name="BelowBlocksArea" Grid.Row="1" MinHeight="56" Background="Transparent" DragDrop.AllowDrop="True" />
                 </Grid>
                 <!-- Overlay inside padded Border so (0,0) = content area; selection box coords match GetPosition(overlay). -->
                 <local:LayoutOverlayPanel x:Name="SelectionBoxOverlay" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">

@@ -32,7 +32,7 @@ public class RichTextEditor : Control
         AvaloniaProperty.Register<RichTextEditor, string?>(nameof(Watermark));
 
     public static readonly StyledProperty<double> FontSizeProperty =
-        AvaloniaProperty.Register<RichTextEditor, double>(nameof(FontSize), defaultValue: 14.0);
+        AvaloniaProperty.Register<RichTextEditor, double>(nameof(FontSize), defaultValue: 16.0);
 
     public static readonly StyledProperty<FontWeight> FontWeightProperty =
         AvaloniaProperty.Register<RichTextEditor, FontWeight>(nameof(FontWeight), defaultValue: FontWeight.Normal);
@@ -409,6 +409,49 @@ public class RichTextEditor : Control
             var caretRect = GetCaretRect();
             context.FillRectangle(caretBrush, caretRect);
         }
+    }
+
+    /// <summary>Bounding rect of the first text line in local coordinates (Y/Height match the line box; width is at least one glyph wide).</summary>
+    public Rect GetFirstLineBounds()
+    {
+        var layoutWidth = Bounds.Width > 0 ? Bounds.Width : (_lastLayoutWidth > 0 ? _lastLayoutWidth : MinLayoutWidth);
+        if (layoutWidth <= 0 || double.IsNaN(layoutWidth))
+            layoutWidth = MinLayoutWidth;
+        var currentText = Text;
+        if (_textLayout == null || currentText != _lastBuiltText)
+            BuildLayout(layoutWidth);
+
+        if (_textLayout != null && !string.IsNullOrEmpty(currentText))
+        {
+            try
+            {
+                var charRect = _textLayout.HitTestTextPosition(0);
+                var h = charRect.Height > 0 ? charRect.Height : FontSize;
+                var w = charRect.Width > 0 ? charRect.Width : 1;
+                return new Rect(charRect.X, charRect.Y, w, h);
+            }
+            catch
+            {
+                // fall through
+            }
+        }
+
+        if (_watermarkLayout != null && string.IsNullOrEmpty(currentText))
+        {
+            try
+            {
+                var charRect = _watermarkLayout.HitTestTextPosition(0);
+                var h = charRect.Height > 0 ? charRect.Height : FontSize;
+                var w = charRect.Width > 0 ? charRect.Width : 1;
+                return new Rect(charRect.X, charRect.Y, w, h);
+            }
+            catch
+            {
+                // fall through
+            }
+        }
+
+        return new Rect(0, 0, Bounds.Width > 0 ? Bounds.Width : layoutWidth, FontSize);
     }
 
     /// <summary>Returns the bounding rect of the current selection in local coordinates, or null if no selection or layout not ready.</summary>

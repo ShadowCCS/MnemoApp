@@ -14,25 +14,35 @@
         <components:BlockTypeToComponentConverter x:Key="BlockTypeConverter" />
         <local:BoolToSelectionBrushConverter x:Key="BoolToSelectionBrushConverter" />
     </UserControl.Resources>
-    <Grid Margin="0,0,0,4">
-        <!-- Block content (fills cell) -->
+    <UserControl.Styles>
+        <!-- Avoid stretching the editor to the grid row: text draws at y=0 and looked vertically mis-centered. -->
+        <Style Selector="local|RichTextEditor">
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <!-- ~1 line; MinHeight tracks body size (16px) without forcing excess row height. -->
+            <Setter Property="MinHeight" Value="22" />
+        </Style>
+    </UserControl.Styles>
+    <Grid>
+        <!-- Horizontal inset + modest vertical padding; Spacing on editor ItemsControl separates blocks. -->
         <Border
             x:Name="BlockContainer"
-            Padding="8"
+            Padding="8,4"
             CornerRadius="4"
             Background="Transparent"
             DragDrop.AllowDrop="True"
             PointerEntered="BlockContainer_PointerEntered"
             PointerExited="BlockContainer_PointerExited">
-        <Grid ColumnDefinitions="Auto,Auto,*">
+        <Grid
+            x:Name="BlockLayoutGrid"
+            ColumnDefinitions="Auto,Auto,*">
             <!-- Insert block below -->
             <Border
                 x:Name="AddBlockBelowBorder"
                 Grid.Column="0"
                 Margin="0,0,2,0"
-                MinWidth="28"
-                MinHeight="28"
-                Padding="4"
+                MinWidth="26"
+                MinHeight="26"
+                Padding="3"
                 VerticalAlignment="Top"
                 ClipToBounds="True"
                 CornerRadius="4"
@@ -62,9 +72,9 @@
                 x:Name="DragHandleBorder"
                 Grid.Column="1"
                 Margin="0,0,2,0"
-                MinWidth="28"
-                MinHeight="28"
-                Padding="4"
+                MinWidth="26"
+                MinHeight="26"
+                Padding="3"
                 VerticalAlignment="Top"
                 ClipToBounds="True"
                 CornerRadius="4"
@@ -92,6 +102,7 @@
                 x:Name="BlockContentChrome"
                 Grid.Column="2"
                 HorizontalAlignment="Left"
+                VerticalAlignment="Top"
                 CornerRadius="4">
                 <Border.Background>
                     <MultiBinding Converter="{StaticResource BoolToSelectionBrushConverter}">
@@ -99,8 +110,10 @@
                         <Binding RelativeSource="{RelativeSource Self}" Path="." />
                     </MultiBinding>
                 </Border.Background>
+                <!-- Stretch vertically was expanding RichTextEditor to the full row height while glyphs stay at y=0. -->
                 <ContentControl
                     x:Name="BlockContentControl"
+                    VerticalContentAlignment="Top"
                     Content="{Binding Type, Converter={StaticResource BlockTypeConverter}}"
                     DataContext="{Binding}" />
             </Border>
