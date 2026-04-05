@@ -121,6 +121,19 @@ public partial class ImageBlockComponent : BlockComponentBase
         SetPh(PhFlyoutCaptionItem, "ImageFlyoutCaption");
         SetPh(PhFlyoutDuplicateItem, "ImageFlyoutDuplicate");
         SetPh(PhFlyoutDeleteItem, "ImageFlyoutDelete");
+
+        void SetAlignTip(Button? b, string key)
+        {
+            if (b != null)
+                ToolTip.SetTip(b, T(key));
+        }
+
+        SetAlignTip(PhAlignFlyoutLeftBtn, "ImageAlignLeftTooltip");
+        SetAlignTip(PhAlignFlyoutCenterBtn, "ImageAlignCenterTooltip");
+        SetAlignTip(PhAlignFlyoutRightBtn, "ImageAlignRightTooltip");
+        SetAlignTip(LdAlignFlyoutLeftBtn, "ImageAlignLeftTooltip");
+        SetAlignTip(LdAlignFlyoutCenterBtn, "ImageAlignCenterTooltip");
+        SetAlignTip(LdAlignFlyoutRightBtn, "ImageAlignRightTooltip");
     }
 
     private void RefreshCaptionWatermark()

@@ -2,7 +2,9 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Primitives;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Layout;
@@ -20,6 +22,18 @@ namespace Mnemo.UI;
 
 public partial class App : Application
 {
+    /// <summary>
+    /// Gap between anchor and flyout. Theme <c>Style</c> selectors do not hit <see cref="Flyout"/> / <see cref="MenuFlyout"/>
+    /// (they are not visual children until opened). Submenus use <see cref="Popup"/> in MenuItem templates, not <see cref="PopupFlyoutBase"/>.
+    /// </summary>
+    private const double FlyoutAnchorGap = 8;
+
+    static App()
+    {
+        PopupFlyoutBase.VerticalOffsetProperty.OverrideDefaultValue<PopupFlyoutBase>(FlyoutAnchorGap);
+        ContextMenu.VerticalOffsetProperty.OverrideDefaultValue<ContextMenu>(FlyoutAnchorGap);
+    }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);

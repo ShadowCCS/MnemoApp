@@ -29,6 +29,24 @@
         <Style Selector="Border.resize-pill:pointerover">
             <Setter Property="Opacity" Value="0.4" />
         </Style>
+        <Style Selector="Button.image-align-flyout-option">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="34" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.image-align-flyout-option:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundListLowBrush}" />
+        </Style>
+        <Style Selector="Button.image-align-flyout-option:first-child">
+            <Setter Property="CornerRadius" Value="5,0,0,5" />
+        </Style>
+        <Style Selector="Button.image-align-flyout-option:last-child">
+            <Setter Property="CornerRadius" Value="0,5,5,0" />
+        </Style>
     </UserControl.Styles>
 
     <Border
@@ -99,16 +117,12 @@
                                 CornerRadius="4"
                                 Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
                                 <Button.Flyout>
-                                    <Flyout Placement="BottomEdgeAlignedRight">
-                                        <Border
-                                            Padding="4"
-                                            CornerRadius="6"
-                                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-                                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <Flyout Placement="Bottom">
+                                        <Grid ColumnDefinitions="Auto,1,Auto,1,Auto" Margin="2">
                                                 <Button
-                                                    Padding="6"
-                                                    Cursor="Hand"
-                                                    Background="Transparent"
+                                                    x:Name="PhAlignFlyoutLeftBtn"
+                                                    Grid.Column="0"
+                                                    Classes="image-align-flyout-option"
                                                     Click="AlignPickLeft_Click">
                                                     <controls:SvgIcon
                                                         Width="16"
@@ -116,10 +130,17 @@
                                                         SvgPath="avares://Mnemo.UI/Icons/Editor/align-left.svg"
                                                         Color="{DynamicResource TextPrimaryBrush}" />
                                                 </Button>
+                                                <Border
+                                                    Grid.Column="1"
+                                                    Width="1"
+                                                    Margin="0,6"
+                                                    VerticalAlignment="Stretch"
+                                                    Background="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                                    Opacity="0.55" />
                                                 <Button
-                                                    Padding="6"
-                                                    Cursor="Hand"
-                                                    Background="Transparent"
+                                                    x:Name="PhAlignFlyoutCenterBtn"
+                                                    Grid.Column="2"
+                                                    Classes="image-align-flyout-option"
                                                     Click="AlignPickCenter_Click">
                                                     <controls:SvgIcon
                                                         Width="16"
@@ -127,10 +148,17 @@
                                                         SvgPath="avares://Mnemo.UI/Icons/Editor/align-center.svg"
                                                         Color="{DynamicResource TextPrimaryBrush}" />
                                                 </Button>
+                                                <Border
+                                                    Grid.Column="3"
+                                                    Width="1"
+                                                    Margin="0,6"
+                                                    VerticalAlignment="Stretch"
+                                                    Background="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                                    Opacity="0.55" />
                                                 <Button
-                                                    Padding="6"
-                                                    Cursor="Hand"
-                                                    Background="Transparent"
+                                                    x:Name="PhAlignFlyoutRightBtn"
+                                                    Grid.Column="4"
+                                                    Classes="image-align-flyout-option"
                                                     Click="AlignPickRight_Click">
                                                     <controls:SvgIcon
                                                         Width="16"
@@ -138,8 +166,7 @@
                                                         SvgPath="avares://Mnemo.UI/Icons/Editor/align-right.svg"
                                                         Color="{DynamicResource TextPrimaryBrush}" />
                                                 </Button>
-                                            </StackPanel>
-                                        </Border>
+                                        </Grid>
                                     </Flyout>
                                 </Button.Flyout>
                                 <controls:SvgIcon
@@ -220,16 +247,12 @@
                                     CornerRadius="4"
                                     Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
                                     <Button.Flyout>
-                                        <Flyout Placement="BottomEdgeAlignedRight">
-                                            <Border
-                                                Padding="4"
-                                                CornerRadius="6"
-                                                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-                                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <Flyout Placement="Bottom">
+                                            <Grid ColumnDefinitions="Auto,1,Auto,1,Auto" Margin="2">
                                                     <Button
-                                                        Padding="6"
-                                                        Cursor="Hand"
-                                                        Background="Transparent"
+                                                        x:Name="LdAlignFlyoutLeftBtn"
+                                                        Grid.Column="0"
+                                                        Classes="image-align-flyout-option"
                                                         Click="AlignPickLeft_Click">
                                                         <controls:SvgIcon
                                                             Width="16"
@@ -237,10 +260,17 @@
                                                             SvgPath="avares://Mnemo.UI/Icons/Editor/align-left.svg"
                                                             Color="{DynamicResource TextPrimaryBrush}" />
                                                     </Button>
+                                                    <Border
+                                                        Grid.Column="1"
+                                                        Width="1"
+                                                        Margin="0,6"
+                                                        VerticalAlignment="Stretch"
+                                                        Background="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                                        Opacity="0.55" />
                                                     <Button
-                                                        Padding="6"
-                                                        Cursor="Hand"
-                                                        Background="Transparent"
+                                                        x:Name="LdAlignFlyoutCenterBtn"
+                                                        Grid.Column="2"
+                                                        Classes="image-align-flyout-option"
                                                         Click="AlignPickCenter_Click">
                                                         <controls:SvgIcon
                                                             Width="16"
@@ -248,10 +278,17 @@
                                                             SvgPath="avares://Mnemo.UI/Icons/Editor/align-center.svg"
                                                             Color="{DynamicResource TextPrimaryBrush}" />
                                                     </Button>
+                                                    <Border
+                                                        Grid.Column="3"
+                                                        Width="1"
+                                                        Margin="0,6"
+                                                        VerticalAlignment="Stretch"
+                                                        Background="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                                        Opacity="0.55" />
                                                     <Button
-                                                        Padding="6"
-                                                        Cursor="Hand"
-                                                        Background="Transparent"
+                                                        x:Name="LdAlignFlyoutRightBtn"
+                                                        Grid.Column="4"
+                                                        Classes="image-align-flyout-option"
                                                         Click="AlignPickRight_Click">
                                                         <controls:SvgIcon
                                                             Width="16"
@@ -259,8 +296,7 @@
                                                             SvgPath="avares://Mnemo.UI/Icons/Editor/align-right.svg"
                                                             Color="{DynamicResource TextPrimaryBrush}" />
                                                     </Button>
-                                                </StackPanel>
-                                            </Border>
+                                            </Grid>
                                         </Flyout>
                                     </Button.Flyout>
                                     <controls:SvgIcon

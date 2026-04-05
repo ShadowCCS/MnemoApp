@@ -337,6 +337,9 @@
     "ImageFlyoutCaption": "Caption",
     "ImageFlyoutDuplicate": "Duplicate",
     "ImageFlyoutDelete": "Delete",
+    "ImageAlignLeftTooltip": "Align left",
+    "ImageAlignCenterTooltip": "Align center",
+    "ImageAlignRightTooltip": "Align right",
     "ImageImportFailed": "Could not import the image. Please try again.",
     "CloseMenu": "Close menu",
     "SlashMenuSearchPlaceholder": "Type to search"

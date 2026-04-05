@@ -337,6 +337,9 @@
     "ImageFlyoutCaption": "Pie de foto",
     "ImageFlyoutDuplicate": "Duplicar",
     "ImageFlyoutDelete": "Eliminar",
+    "ImageAlignLeftTooltip": "Alinear a la izquierda",
+    "ImageAlignCenterTooltip": "Centrar",
+    "ImageAlignRightTooltip": "Alinear a la derecha",
     "ImageImportFailed": "No se pudo importar la imagen. Por favor, inténtalo de nuevo.",
     "CloseMenu": "Cerrar menú",
     "SlashMenuSearchPlaceholder": "Escribe para buscar"

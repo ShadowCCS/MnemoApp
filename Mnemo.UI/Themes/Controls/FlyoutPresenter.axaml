@@ -2,10 +2,11 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     x:ClassModifier="internal"
                     x:CompileBindings="True">
+  <!-- Plain Flyout only (image align, etc.); padding/min width from theme keys (tight). -->
   <Thickness x:Key="FlyoutBorderThemeThickness">1</Thickness>
   <ControlTheme x:Key="{x:Type FlyoutPresenter}" TargetType="FlyoutPresenter">
-    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
     <Setter Property="Background" Value="{DynamicResource FlyoutPresenterBackground}" />
     <Setter Property="BorderBrush" Value="{DynamicResource FlyoutBorderThemeBrush}" />
     <Setter Property="BorderThickness" Value="{DynamicResource FlyoutBorderThemeThickness}" />
@@ -24,7 +25,8 @@
                 BorderBrush="{TemplateBinding BorderBrush}"
                 BorderThickness="{TemplateBinding BorderThickness}"
                 Padding="{DynamicResource FlyoutBorderThemePadding}"
-                CornerRadius="{TemplateBinding CornerRadius}">
+                CornerRadius="{TemplateBinding CornerRadius}"
+                BoxShadow="0 2 10 0 #18000000">
           <ScrollViewer HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                         VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
             <ContentPresenter x:Name="PART_ContentPresenter"
@@ -33,8 +35,8 @@
                               Margin="{TemplateBinding Padding}"
                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                              HorizontalContentAlignment="Stretch"
-                              VerticalContentAlignment="Stretch" />
+                              HorizontalContentAlignment="Left"
+                              VerticalContentAlignment="Top" />
           </ScrollViewer>
         </Border>
       </ControlTemplate>

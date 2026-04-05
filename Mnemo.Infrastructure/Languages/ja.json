@@ -336,6 +336,9 @@
       "ImageFlyoutCaption": "キャプション",
       "ImageFlyoutDuplicate": "複製",
       "ImageFlyoutDelete": "削除",
+      "ImageAlignLeftTooltip": "左寄せ",
+      "ImageAlignCenterTooltip": "中央",
+      "ImageAlignRightTooltip": "右寄せ",
       "ImageImportFailed": "画像をインポートできませんでした。もう一度お試しください。",
       "CloseMenu": "メニューを閉じる",
       "SlashMenuSearchPlaceholder": "検索するには入力"
