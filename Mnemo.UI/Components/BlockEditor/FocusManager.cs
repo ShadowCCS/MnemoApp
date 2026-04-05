@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
@@ -26,7 +28,8 @@ public class FocusManager
                 var imageHost = FindImageBlockHoverHost();
                 if (imageHost != null)
                 {
-                    imageHost.Focus();
+                    if (!ShouldSkipImageHoverHostFocus(imageHost))
+                        imageHost.Focus();
                     return;
                 }
 
@@ -38,7 +41,9 @@ public class FocusManager
                         ApplyFocus(e2, caretPosition);
                         return;
                     }
-                    FindImageBlockHoverHost()?.Focus();
+                    var h = FindImageBlockHoverHost();
+                    if (h != null && !ShouldSkipImageHoverHostFocus(h))
+                        h.Focus();
                 }, DispatcherPriority.Loaded);
                 return;
             }
@@ -102,5 +107,17 @@ public class FocusManager
         return _parentControl.GetVisualDescendants()
             .OfType<Control>()
             .FirstOrDefault(c => c.Name == "HoverHost" && c.Focusable && c.IsVisible && c.IsEffectivelyVisible);
+    }
+
+    /// <summary>
+    /// <see cref="FocusTextBox"/> is posted on <c>IsFocused</c>; by then toolbar/caption may already
+    /// have keyboard focus. Moving focus to HoverHost breaks the first Button press / Flyout open.
+    /// </summary>
+    private bool ShouldSkipImageHoverHostFocus(Visual imageHost)
+    {
+        var topLevel = TopLevel.GetTopLevel(_parentControl);
+        if (topLevel?.FocusManager?.GetFocusedElement() is not Visual focused)
+            return false;
+        return imageHost.IsVisualAncestorOf(focused);
     }
 }

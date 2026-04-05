@@ -56,7 +56,6 @@
         HorizontalAlignment="Stretch"
         PointerEntered="HoverHost_PointerEntered"
         PointerExited="HoverHost_PointerExited"
-        PointerPressed="HoverHost_PointerPressed"
         KeyDown="HoverHost_KeyDown">
 
         <Grid
@@ -222,7 +221,8 @@
                                 HorizontalAlignment="Left"
                                 CornerRadius="4"
                                 ClipToBounds="True"
-                                Cursor="Arrow">
+                                Cursor="Arrow"
+                                PointerPressed="ImageChrome_PointerPressed">
                                 <Image
                                     x:Name="DisplayImage"
                                     Stretch="Uniform"

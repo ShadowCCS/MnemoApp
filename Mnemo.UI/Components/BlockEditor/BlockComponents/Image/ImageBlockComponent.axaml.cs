@@ -366,7 +366,11 @@ public partial class ImageBlockComponent : BlockComponentBase
         HideAlignFlyouts();
     }
 
-    private void HoverHost_PointerPressed(object? sender, PointerPressedEventArgs e)
+    /// <summary>
+    /// Keyboard focus for Delete/Back — only from image chrome, not from <see cref="HoverHost"/>
+    /// (ancestor handlers run in the same route as toolbar <see cref="Button"/>s and break Flyout/MenuFlyout).
+    /// </summary>
+    private void ImageChrome_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         HoverHost?.Focus();
@@ -399,8 +403,22 @@ public partial class ImageBlockComponent : BlockComponentBase
     private async void Placeholder_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (IsVisualDescendantOf(e.Source as Visual, PlaceholderToolbar))
+            return;
         e.Handled = true;
         await ImportImageAsync();
+    }
+
+    private static bool IsVisualDescendantOf(Visual? node, Visual? ancestor)
+    {
+        if (node == null || ancestor == null) return false;
+        for (Visual? v = node; v != null; v = v.GetVisualParent())
+        {
+            if (ReferenceEquals(v, ancestor))
+                return true;
+        }
+
+        return false;
     }
 
     private async Task ImportImageAsync()

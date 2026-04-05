@@ -684,6 +684,17 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (editableBlock == null) return;
 
             var vm = Blocks[blockIndex];
+
+            // Image blocks have no RichTextEditor; the tunnel's capture+Handled would eat the first
+            // press on toolbar Buttons/Flyouts (and caption) while focusing the block.
+            if (vm.Type == BlockType.Image && !vm.IsFocused)
+            {
+                ClearBlockSelection();
+                ClearTextSelectionInAllBlocksExcept(-1);
+                vm.IsFocused = true;
+                return;
+            }
+
             // If this block already has focus, let the event reach RichTextEditor so it can set
             // the caret from the click (HitTestPoint). Otherwise we'd set Handled and the caret would never move.
             if (vm.IsFocused)
