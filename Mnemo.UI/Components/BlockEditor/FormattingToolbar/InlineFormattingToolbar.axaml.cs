@@ -28,6 +28,13 @@ public partial class InlineFormattingToolbar : UserControl
 
     private const string ActiveClass = "FormattingToolbarIconActive";
 
+    /// <summary>Headings use forced bold; the Bold control is non-interactive while this is false.</summary>
+    public void SetBoldButtonEnabled(bool enabled)
+    {
+        if (this.FindControl<Button>("BoldButton") is { } btn)
+            btn.IsEnabled = enabled;
+    }
+
     /// <summary>Updates toggle state of format buttons from the current selection.</summary>
     public void UpdateFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor)
     {

@@ -1,20 +1,11 @@
 using Avalonia.Input;
 using Mnemo.Core.Models;
 using System;
-using System.Collections.Generic;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
 public class KeyboardHandler
 {
-    private static readonly HashSet<BlockType> TextAndHeadingTypes = new()
-    {
-        BlockType.Text,
-        BlockType.Heading1,
-        BlockType.Heading2,
-        BlockType.Heading3
-    };
-
     private Key? _lastKey;
     public Key? LastKey { get => _lastKey; set => _lastKey = value; }
     public bool WasBackspace => _lastKey == Key.Back;
@@ -25,7 +16,6 @@ public class KeyboardHandler
 #pragma warning disable CS0067
     public event Action? RequestNewBlock;
 #pragma warning restore CS0067
-    public event Action<BlockType>? RequestNewBlockOfType;
     public event Action<BlockType>? ConvertToBlockType;
     public event Action? ConvertToTextPreservingContent;
     public event Action? EscapePressed;
@@ -109,7 +99,7 @@ public class KeyboardHandler
         if (viewModel.Type is BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist)
         {
             if (hasContent)
-                RequestNewBlockOfType?.Invoke(viewModel.Type);
+                EnterPressed?.Invoke();
             else
                 ConvertToBlockType?.Invoke(BlockType.Text);
         }

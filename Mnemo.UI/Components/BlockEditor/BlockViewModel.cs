@@ -20,6 +20,16 @@ public class BlockViewModel : INotifyPropertyChanged
     public static readonly DataFormat<BlockViewModel> BlockDragDataFormat =
         AvaloniaDataFormats.CreateApplicationFormat<BlockViewModel>("BlockViewModel");
 
+    /// <summary>Primary block (handle source) plus all blocks to move together (document order).</summary>
+    public sealed class BlockReorderDragPayload
+    {
+        public required BlockViewModel Primary { get; init; }
+        public required IReadOnlyList<BlockViewModel> BlocksInDocumentOrder { get; init; }
+
+        public static readonly DataFormat<BlockReorderDragPayload> Format =
+            AvaloniaDataFormats.CreateApplicationFormat<BlockReorderDragPayload>("BlockReorderDragPayload");
+    }
+
     private string _id;
     private BlockType _type;
     private List<InlineRun> _inlineRuns = new() { InlineRun.Plain(string.Empty) };
@@ -43,12 +53,17 @@ public class BlockViewModel : INotifyPropertyChanged
         { 
             if (_type != value)
             {
+                var wasHeading = _type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3;
                 _type = value;
                 if (value is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
                 {
                     EnsureHeadingBold();
                     OnPropertyChanged(nameof(Content));
                     OnPropertyChanged(nameof(Runs));
+                }
+                else if (wasHeading)
+                {
+                    StripHeadingBoldFromRuns();
                 }
                 EnsureMetaKeys();
                 OnPropertyChanged();
@@ -97,6 +112,19 @@ public class BlockViewModel : INotifyPropertyChanged
             _inlineRuns.Add(new InlineRun(string.Empty, new InlineStyle(Bold: true)));
     }
 
+    /// <summary>Removes bold from all runs when leaving a heading block (e.g. converting to plain text).</summary>
+    private void StripHeadingBoldFromRuns()
+    {
+        _inlineRuns = InlineRunFormatApplier.Normalize(
+            _inlineRuns.Select(r => new InlineRun(r.Text, r.Style.WithClear(InlineFormatKind.Bold))).ToList());
+        if (_inlineRuns.Count == 0)
+            _inlineRuns.Add(InlineRun.Plain(string.Empty));
+        _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(Runs));
+        ContentChanged?.Invoke(this);
+    }
+
     /// <summary>
     /// Replace the entire run list (e.g. for undo/redo or deserialization).
     /// Normalizes and refreshes Content. Does not raise ContentChanged.
@@ -136,6 +164,9 @@ public class BlockViewModel : INotifyPropertyChanged
     /// </summary>
     public (int Start, int End) ApplyFormat(int start, int end, InlineFormatKind kind, string? color = null)
     {
+        if (kind == InlineFormatKind.Bold && _type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+            return (start, end);
+
         _previousContent = _cachedFlatContent;
         _previousRuns = CloneRuns();
         _inlineRuns = InlineRunFormatApplier.Apply(_inlineRuns, start, end, kind, color);
@@ -321,7 +352,9 @@ public class BlockViewModel : INotifyPropertyChanged
     /// <summary>Duplicate this block (e.g. image: copy asset into a new block below).</summary>
     public event Action<BlockViewModel>? DuplicateBlockRequested;
     public event Action<BlockViewModel, string?>? NewBlockRequested;
-    public event Action<BlockViewModel, BlockType>? NewBlockOfTypeRequested;
+    /// <summary>Third argument is initial plain text for the new block (e.g. Enter split).</summary>
+    public event Action<BlockViewModel, BlockType, string?>? NewBlockOfTypeRequested;
+    public event Action<BlockViewModel, string?>? NewBlockAboveRequested;
     public event Action<BlockViewModel>? DeleteAndFocusAboveRequested;
     public event Action<BlockViewModel>? FocusPreviousRequested;
     public event Action<BlockViewModel>? FocusNextRequested;
@@ -465,9 +498,15 @@ public class BlockViewModel : INotifyPropertyChanged
         NewBlockRequested?.Invoke(this, initialContentForNewBlock);
     }
 
-    public void RequestNewBlockOfType(BlockType type)
+    public void RequestNewBlockOfType(BlockType type, string? initialContentForNewBlock = null)
     {
-        NewBlockOfTypeRequested?.Invoke(this, type);
+        NewBlockOfTypeRequested?.Invoke(this, type, initialContentForNewBlock);
+    }
+
+    /// <summary>Inserts an empty text block above this block (e.g. Enter at start of line).</summary>
+    public void RequestNewBlockAbove(string? initialContentForNewBlock = null)
+    {
+        NewBlockAboveRequested?.Invoke(this, initialContentForNewBlock);
     }
 
     public void RequestDeleteAndFocusAbove()

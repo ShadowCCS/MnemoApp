@@ -47,6 +47,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private Point _boxSelectStartInOverlay; // overlay space (for drawing); set when arming
     private Border? _selectionBoxBorder;
     private const double BoxSelectThreshold = 6.0; // pixels to move before box appears
+    /// <summary>Anchor for Shift+click range on drag handles; reset when block selection is cleared.</summary>
+    private int _blockDragHandleSelectionAnchorIndex = -1;
     private bool _isColumnSplitResizing;
     /// <summary>Horizontal padding on EditorRoot; selection box Margin is relative to the padded content area.</summary>
     private const double EditorContentPaddingX = 32.0;
@@ -214,7 +216,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private void Editor_DragOver_BlockGhost(object? sender, DragEventArgs e)
     {
         if (_blockDragGhostBorder == null || _blockDragGhostOverlay == null) return;
-        if (!e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat)) return;
+        if (!e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat)
+            && !e.DataTransfer.Contains(BlockViewModel.BlockReorderDragPayload.Format)) return;
         var pos = e.GetPosition(this);
         UpdateBlockDragGhostFromEditorPoint(pos);
     }
@@ -328,6 +331,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.DuplicateBlockRequested += OnDuplicateBlockRequested;
         block.NewBlockRequested += OnNewBlockRequested;
         block.NewBlockOfTypeRequested += OnNewBlockOfTypeRequested;
+        block.NewBlockAboveRequested += OnNewBlockAboveRequested;
         block.DeleteAndFocusAboveRequested += OnDeleteAndFocusAboveRequested;
         block.FocusPreviousRequested += OnFocusPreviousRequested;
         block.FocusNextRequested += OnFocusNextRequested;
@@ -343,6 +347,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.DuplicateBlockRequested -= OnDuplicateBlockRequested;
         block.NewBlockRequested -= OnNewBlockRequested;
         block.NewBlockOfTypeRequested -= OnNewBlockOfTypeRequested;
+        block.NewBlockAboveRequested -= OnNewBlockAboveRequested;
         block.DeleteAndFocusAboveRequested -= OnDeleteAndFocusAboveRequested;
         block.FocusPreviousRequested -= OnFocusPreviousRequested;
         block.FocusNextRequested -= OnFocusNextRequested;
@@ -526,6 +531,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (newBlockIndex < Blocks.Count)
         {
             var newBlock = Blocks[newBlockIndex];
+            newBlock.PendingCaretIndex = 0;
             Dispatcher.UIThread.Post(
                 () => newBlock.IsFocused = true, 
                 DispatcherPriority.Render);
@@ -535,18 +541,48 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         BlocksChanged?.Invoke();
     }
 
-    private void OnNewBlockOfTypeRequested(BlockViewModel block, BlockType type)
+    private void OnNewBlockAboveRequested(BlockViewModel block, string? initialContent)
+    {
+        if (_pendingSnapshot == null)
+            BeginStructuralChange();
+
+        var index = Blocks.IndexOf(block);
+        if (index < 0) return;
+        AddBlock(BlockType.Text, index, initialContent);
+
+        // `block` is still the same instance, now at index+1. If the guard failed before, we never focused.
+        if (Blocks.IndexOf(block) < 0) return;
+
+        if (!block.PendingCaretIndex.HasValue)
+            block.PendingCaretIndex = 0;
+
+        CommitStructuralChange("Insert block above");
+        BlocksChanged?.Invoke();
+
+        // After BlockRows rebuild, focus the shifted block. VM only notifies IsFocused when value *changes*;
+        // if LostFocus hasn't cleared yet, IsFocused=true is a no-op — toggle false→true so FocusTextBox runs.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!block.PendingCaretIndex.HasValue)
+                block.PendingCaretIndex = 0;
+            block.IsFocused = false;
+            block.IsFocused = true;
+        }, DispatcherPriority.Loaded);
+    }
+
+    private void OnNewBlockOfTypeRequested(BlockViewModel block, BlockType type, string? initialContent)
     {
         BeginStructuralChange();
 
         var index = Blocks.IndexOf(block);
         if (index < 0) return;
-        AddBlock(type, index + 1);
+        AddBlock(type, index + 1, initialContent);
 
         var newBlockIndex = index + 1;
         if (newBlockIndex < Blocks.Count)
         {
             var newBlock = Blocks[newBlockIndex];
+            newBlock.PendingCaretIndex = 0;
             Dispatcher.UIThread.Post(
                 () => newBlock.IsFocused = true, 
                 DispatcherPriority.Render);
@@ -698,6 +734,70 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         foreach (var block in Blocks)
             block.IsSelected = false;
+        _blockDragHandleSelectionAnchorIndex = -1;
+    }
+
+    /// <summary>Selects exactly one block (e.g. click on drag handle). Clears all text selection.</summary>
+    public void SelectSingleBlock(BlockViewModel vm)
+    {
+        if (!Blocks.Contains(vm)) return;
+        ClearTextSelectionInAllBlocksExcept(-1);
+        foreach (var block in Blocks)
+            block.IsSelected = ReferenceEquals(block, vm);
+        _blockDragHandleSelectionAnchorIndex = Blocks.IndexOf(vm);
+    }
+
+    /// <summary>
+    /// Drag handle release (no drag): plain = single; Ctrl/Meta = toggle; Shift = range from anchor;
+    /// Ctrl+Shift+range = add that range to the current selection.
+    /// </summary>
+    public void SelectBlockFromDragHandle(BlockViewModel vm, KeyModifiers modifiers)
+    {
+        if (!Blocks.Contains(vm)) return;
+        ClearTextSelectionInAllBlocksExcept(-1);
+        int idx = Blocks.IndexOf(vm);
+        if (idx < 0) return;
+
+        bool toggle = (modifiers & (KeyModifiers.Control | KeyModifiers.Meta)) != 0;
+        bool shift = modifiers.HasFlag(KeyModifiers.Shift);
+
+        if (toggle && !shift)
+        {
+            vm.IsSelected = !vm.IsSelected;
+            _blockDragHandleSelectionAnchorIndex = idx;
+            return;
+        }
+
+        if (shift)
+        {
+            int anchor = _blockDragHandleSelectionAnchorIndex >= 0 ? _blockDragHandleSelectionAnchorIndex : GetShiftRangeAnchorIndex(idx);
+            int lo = Math.Min(anchor, idx);
+            int hi = Math.Max(anchor, idx);
+            if (toggle)
+            {
+                for (int i = lo; i <= hi; i++)
+                    Blocks[i].IsSelected = true;
+            }
+            else
+            {
+                for (int i = 0; i < Blocks.Count; i++)
+                    Blocks[i].IsSelected = i >= lo && i <= hi;
+            }
+            _blockDragHandleSelectionAnchorIndex = anchor;
+            return;
+        }
+
+        SelectSingleBlock(vm);
+    }
+
+    private int GetShiftRangeAnchorIndex(int clickedIndex)
+    {
+        for (int i = 0; i < Blocks.Count; i++)
+        {
+            if (Blocks[i].IsFocused)
+                return i;
+        }
+        return clickedIndex;
     }
 
     /// <summary>
@@ -1070,9 +1170,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         // Already armed and captured in Tunnel for cross-block selection
         if (_crossBlockArmed) return;
 
+        var source = e.Source as Visual;
+        // Drag handle uses press+move threshold; selection is applied on release — do not clear here.
+        bool hitIsDragHandle = source != null &&
+            (source is Border { Tag: "DragHandle" } ||
+             source.GetVisualAncestors().OfType<Border>().Any(b => b.Tag is "DragHandle"));
+        if (hitIsDragHandle) return;
+
         ClearBlockSelection();
 
-        var source = e.Source as Visual;
         bool hitIsInTextBox = source is TextBox || source is RichTextEditor || (source != null && source.GetVisualAncestors().Any(a => a is TextBox || a is RichTextEditor));
         if (!hitIsInTextBox || source == null) return;
 
@@ -2270,15 +2376,18 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// Called by EditableBlock on DragOver. Computes insert index from cursor Y using
     /// snap-band boundaries with hysteresis and updates the drop indicator line.
     /// </summary>
-    public void HandleBlockDragOver(Point cursorPosInEditor, BlockViewModel? draggedBlock)
+    public void HandleBlockDragOver(Point cursorPosInEditor, BlockViewModel.BlockReorderDragPayload payload)
     {
-        if (draggedBlock == null || Blocks.Count == 0)
+        if (payload.BlocksInDocumentOrder.Count == 0 || Blocks.Count == 0)
         {
             ClearDropIndicator();
             return;
         }
 
-        if (TryUpdateSplitDropIndicator(cursorPosInEditor, draggedBlock))
+        var primary = payload.Primary;
+
+        if (payload.BlocksInDocumentOrder.Count == 1
+            && TryUpdateSplitDropIndicator(cursorPosInEditor, primary))
             return;
 
         _splitDropTargetBlock = null;
@@ -2290,23 +2399,46 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        // Suppress the indicator for positions that would leave the block where it already is.
-        var draggedIndex = Blocks.IndexOf(draggedBlock);
-        if (draggedIndex >= 0 && insertIndex == draggedIndex)
+        var sortedIndices = payload.BlocksInDocumentOrder
+            .Select(b => Blocks.IndexOf(b))
+            .Where(i => i >= 0)
+            .OrderBy(i => i)
+            .ToList();
+        if (sortedIndices.Count == 0)
         {
             ClearDropIndicator();
             return;
         }
 
-        // insertIndex == draggedIndex+1 means "before the next list item". For a lone block that's "after self" (no-op).
-        // For the right cell of a pair, draggedIndex+1 is the slot *after* the row — leaving the split — must show.
-        if (draggedIndex >= 0 && insertIndex == draggedIndex + 1)
+        int gMin = sortedIndices[0];
+        int gMax = sortedIndices[^1];
+        bool contiguous = sortedIndices.Count == gMax - gMin + 1;
+
+        if (contiguous && insertIndex >= gMin && insertIndex <= gMax + 1)
         {
-            var sib = draggedBlock.GetColumnSibling(Blocks);
-            if (sib == null || Blocks.IndexOf(sib) == draggedIndex + 1)
+            ClearDropIndicator();
+            return;
+        }
+
+        // Single-block: suppress when dropping on the same slot as now (pair split edge cases preserved).
+        if (payload.BlocksInDocumentOrder.Count == 1)
+        {
+            var draggedBlock = primary;
+            var draggedIndex = Blocks.IndexOf(draggedBlock);
+            if (draggedIndex >= 0 && insertIndex == draggedIndex)
             {
                 ClearDropIndicator();
                 return;
+            }
+
+            if (draggedIndex >= 0 && insertIndex == draggedIndex + 1)
+            {
+                var sib = draggedBlock.GetColumnSibling(Blocks);
+                if (sib == null || Blocks.IndexOf(sib) == draggedIndex + 1)
+                {
+                    ClearDropIndicator();
+                    return;
+                }
             }
         }
 
@@ -2391,18 +2523,132 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         NotifyBlocksChanged();
     }
 
+    /// <summary>Build reorder payload: Ctrl/Meta + multi-selection moves all selected (column pairs expanded).</summary>
+    internal BlockViewModel.BlockReorderDragPayload CreateBlockReorderPayload(BlockViewModel handleVm, KeyModifiers mods)
+    {
+        bool group = (mods & (KeyModifiers.Control | KeyModifiers.Meta)) != 0;
+        if (!group || !handleVm.IsSelected)
+        {
+            return new BlockViewModel.BlockReorderDragPayload
+            {
+                Primary = handleVm,
+                BlocksInDocumentOrder = new[] { handleVm }
+            };
+        }
+
+        var selected = Blocks.Where(b => b.IsSelected).ToList();
+        if (selected.Count < 2)
+        {
+            return new BlockViewModel.BlockReorderDragPayload
+            {
+                Primary = handleVm,
+                BlocksInDocumentOrder = new[] { handleVm }
+            };
+        }
+
+        var expanded = new HashSet<BlockViewModel>(selected);
+        bool changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var vm in expanded.ToList())
+            {
+                var sib = vm.GetColumnSibling(Blocks);
+                if (sib != null && expanded.Add(sib))
+                    changed = true;
+            }
+        }
+
+        var ordered = expanded.OrderBy(b => Blocks.IndexOf(b)).ToList();
+        return new BlockViewModel.BlockReorderDragPayload
+        {
+            Primary = handleVm,
+            BlocksInDocumentOrder = ordered
+        };
+    }
+
     /// <summary>
-    /// Perform the drop: split into columns, or move draggedBlock to CurrentDropInsertIndex.
+    /// Perform the drop: split into columns, or move block(s) to CurrentDropInsertIndex.
     /// </summary>
-    public bool TryPerformDrop(BlockViewModel draggedBlock)
+    public bool TryPerformDrop(BlockViewModel draggedBlock) =>
+        TryPerformDrop(new BlockViewModel.BlockReorderDragPayload
+        {
+            Primary = draggedBlock,
+            BlocksInDocumentOrder = new[] { draggedBlock }
+        });
+
+    /// <summary>Reorder using payload from drag (single or multi-block).</summary>
+    public bool TryPerformDrop(BlockViewModel.BlockReorderDragPayload payload)
     {
         if (_splitDropTargetBlock != null)
         {
-            var ok = TryPerformSplitDrop(draggedBlock, _splitDropTargetBlock, _splitDropLeftEdge);
+            if (payload.BlocksInDocumentOrder.Count != 1)
+            {
+                ClearDropIndicator();
+                return false;
+            }
+
+            var ok = TryPerformSplitDrop(payload.Primary, _splitDropTargetBlock, _splitDropLeftEdge);
             ClearDropIndicator();
             return ok;
         }
 
+        if (payload.BlocksInDocumentOrder.Count == 1)
+            return TryPerformDropSingle(payload.Primary);
+
+        return TryPerformMultiBlockReorder(payload);
+    }
+
+    private bool TryPerformMultiBlockReorder(BlockViewModel.BlockReorderDragPayload payload)
+    {
+        if (_currentDropInsertIndex < 0 || _currentDropInsertIndex > Blocks.Count)
+            return false;
+
+        var move = payload.BlocksInDocumentOrder.ToList();
+        if (move.Count < 2)
+            return false;
+
+        var indices = new List<int>();
+        foreach (var b in move)
+        {
+            int i = Blocks.IndexOf(b);
+            if (i < 0)
+                return false;
+            indices.Add(i);
+        }
+
+        indices.Sort();
+        if (indices.Distinct().Count() != indices.Count)
+            return false;
+
+        int insertGapOriginal = _currentDropInsertIndex;
+
+        BeginStructuralChange();
+        foreach (var idx in indices.OrderByDescending(i => i))
+        {
+            var vm = Blocks[idx];
+            UnsubscribeFromBlock(vm);
+            Blocks.RemoveAt(idx);
+        }
+
+        int removedBefore = indices.Count(i => i < insertGapOriginal);
+        int newInsert = insertGapOriginal - removedBefore;
+        newInsert = Math.Clamp(newInsert, 0, Blocks.Count);
+
+        foreach (var vm in move)
+        {
+            SubscribeToBlock(vm);
+            Blocks.Insert(newInsert++, vm);
+        }
+
+        ReorderBlocks();
+        CommitStructuralChange("Move blocks");
+        NotifyBlocksChanged();
+        return true;
+    }
+
+    private bool TryPerformDropSingle(BlockViewModel draggedBlock)
+    {
         if (_currentDropInsertIndex < 0 || _currentDropInsertIndex > Blocks.Count)
             return false;
         var draggedIndex = Blocks.IndexOf(draggedBlock);

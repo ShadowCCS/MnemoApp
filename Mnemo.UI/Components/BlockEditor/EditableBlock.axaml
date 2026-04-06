@@ -83,7 +83,10 @@
                 Tag="DragHandle"
                 PointerEntered="BlockGutterBorder_PointerEntered"
                 PointerExited="BlockGutterBorder_PointerExited"
-                PointerPressed="DragHandle_PointerPressed">
+                PointerPressed="DragHandle_PointerPressed"
+                PointerMoved="DragHandle_PointerMoved"
+                PointerReleased="DragHandle_PointerReleased"
+                PointerCaptureLost="DragHandle_PointerCaptureLost">
                 <Path
                     x:Name="DragHandleGripPath"
                     Width="16"

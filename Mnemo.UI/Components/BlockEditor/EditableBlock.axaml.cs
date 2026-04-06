@@ -17,6 +17,7 @@ using Mnemo.UI.Components.BlockEditor.BlockComponents;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Image;
 using Mnemo.UI.Components.BlockEditor.FormattingToolbar;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
@@ -47,6 +48,12 @@ public partial class EditableBlock : UserControl
 
     /// <summary>True while the pointer is over the block chrome (gutter icons visible). Gutter borders stay hit-testable so hover works; handlers gate on this.</summary>
     private bool _blockGutterChromeVisible;
+
+    /// <summary>Device-independent px before a press on the drag handle becomes a block reorder drag (matches image chrome).</summary>
+    private const double DragHandleReorderDragThresholdPixels = 6;
+
+    private Point? _dragHandleReorderPressPoint;
+    private bool _dragHandleReorderDragLaunched;
 
     /// <summary>Matches gutter <see cref="Border"/> MinHeight in <c>EditableBlock.axaml</c>.</summary>
     private const double GutterChromeHeight = 26;
@@ -112,7 +119,6 @@ public partial class EditableBlock : UserControl
         _keyboardHandler.RequestFocusPrevious += HandleRequestFocusPrevious;
         _keyboardHandler.RequestFocusNext += HandleRequestFocusNext;
         _keyboardHandler.EnterPressed += HandleEnterPressed;
-        _keyboardHandler.RequestNewBlockOfType += HandleRequestNewBlockOfType;
         _keyboardHandler.ConvertToBlockType += ConvertToBlockType;
         _keyboardHandler.ConvertToTextPreservingContent += HandleConvertToTextPreservingContent;
         _keyboardHandler.EscapePressed += OnEscapePressed;
@@ -132,7 +138,15 @@ public partial class EditableBlock : UserControl
         if (editor != null)
         {
             var text = editor.Text;
-            var caretIndex = Math.Clamp(editor.CaretIndex, 0, text.Length);
+            var selA = editor.SelectionStart;
+            var selB = editor.SelectionEnd;
+            var selStart = Math.Min(selA, selB);
+            var selEnd = Math.Max(selA, selB);
+            var selectionLength = selEnd - selStart;
+            if (selectionLength > 0)
+                text = text.Remove(selStart, selectionLength);
+            var caretIndex = Math.Clamp(selectionLength > 0 ? selStart : editor.CaretIndex, 0, text.Length);
+
             if (_viewModel.Type == BlockType.Quote
                 && QuoteEnterBehavior.TryGetSplitOnEmptyLineEnter(text, caretIndex, out var quoteBody, out var followingText))
             {
@@ -142,11 +156,24 @@ public partial class EditableBlock : UserControl
                 return;
             }
 
+            var isNonEmpty = !BlockEditorContentPolicy.IsVisuallyEmpty(text);
+            if (selectionLength == 0 && caretIndex <= 1 && isNonEmpty)
+            {
+                _viewModel.NotifyStructuralChangeStarting();
+                _viewModel.PendingCaretIndex = caretIndex;
+                _viewModel.RequestNewBlockAbove();
+                return;
+            }
+
             var textBefore = text.Substring(0, caretIndex);
             var textAfter = text.Substring(caretIndex);
             _viewModel.NotifyStructuralChangeStarting();
             _viewModel.Content = textBefore;
-            _viewModel.RequestNewBlock(textAfter);
+
+            if (_viewModel.Type is BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist)
+                _viewModel.RequestNewBlockOfType(_viewModel.Type, textAfter);
+            else
+                _viewModel.RequestNewBlock(textAfter);
         }
         else
         {
@@ -154,7 +181,6 @@ public partial class EditableBlock : UserControl
             _viewModel.RequestNewBlock();
         }
     }
-    private void HandleRequestNewBlockOfType(BlockType type) => _viewModel?.RequestNewBlockOfType(type);
     private void OnMarkdownShortcutDetected(BlockType type, System.Collections.Generic.Dictionary<string, object>? meta) => SetBlockType(type, meta);
 
     private void OnControlUnloaded(object? sender, RoutedEventArgs e)
@@ -194,7 +220,6 @@ public partial class EditableBlock : UserControl
             _keyboardHandler.RequestFocusPrevious -= HandleRequestFocusPrevious;
             _keyboardHandler.RequestFocusNext -= HandleRequestFocusNext;
             _keyboardHandler.EnterPressed -= HandleEnterPressed;
-            _keyboardHandler.RequestNewBlockOfType -= HandleRequestNewBlockOfType;
             _keyboardHandler.ConvertToBlockType -= ConvertToBlockType;
             _keyboardHandler.ConvertToTextPreservingContent -= HandleConvertToTextPreservingContent;
             _keyboardHandler.EscapePressed -= OnEscapePressed;
@@ -773,6 +798,10 @@ public partial class EditableBlock : UserControl
         if (kind == null)
             return false;
 
+        if (kind == InlineFormatKind.Bold
+            && _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+            return false;
+
         string? color = null;
         if (kind == InlineFormatKind.Highlight
             && Application.Current?.TryFindResource("InlineHighlightColor", out var res) == true
@@ -1205,6 +1234,8 @@ public partial class EditableBlock : UserControl
         var (start, end) = _cachedSelectionRange.Value;
         var state = GetFormatStateForRange(_viewModel.Runs, start, end);
         _currentFormattingToolbar.UpdateFormatState(state.bold, state.italic, state.underline, state.strikethrough, state.highlight, state.backgroundColor);
+        var heading = _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3;
+        _currentFormattingToolbar.SetBoldButtonEnabled(!heading);
     }
 
     private static (bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor) GetFormatStateForRange(IReadOnlyList<InlineRun> runs, int start, int end)
@@ -1263,6 +1294,10 @@ public partial class EditableBlock : UserControl
     {
         var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
         if (editor == null || _viewModel == null) return;
+
+        if (kind == InlineFormatKind.Bold
+            && _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+            return;
 
         var range = GetSelectionRange() ?? _cachedSelectionRange;
         if (range == null) return;
@@ -1406,10 +1441,75 @@ public partial class EditableBlock : UserControl
         _viewModel.RequestNewBlock();
     }
 
-    private async void DragHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
+    private void DragHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!_blockGutterChromeVisible || _viewModel == null) return;
-        await BeginBlockReorderDragCoreAsync(e).ConfigureAwait(true);
+        if (!_blockGutterChromeVisible || _viewModel == null || DragHandleBorder == null) return;
+        if (!e.GetCurrentPoint(DragHandleBorder).Properties.IsLeftButtonPressed) return;
+
+        _dragHandleReorderDragLaunched = false;
+        _dragHandleReorderPressPoint = e.GetPosition(DragHandleBorder);
+        e.Pointer.Capture(DragHandleBorder);
+        e.Handled = true;
+    }
+
+    private void DragHandle_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (DragHandleBorder == null || !_dragHandleReorderPressPoint.HasValue || _dragHandleReorderDragLaunched) return;
+        if (!ReferenceEquals(e.Pointer.Captured, DragHandleBorder)) return;
+        if (!e.GetCurrentPoint(DragHandleBorder).Properties.IsLeftButtonPressed) return;
+
+        var p = e.GetPosition(DragHandleBorder);
+        var origin = _dragHandleReorderPressPoint.Value;
+        var dx = p.X - origin.X;
+        var dy = p.Y - origin.Y;
+        if (Math.Sqrt(dx * dx + dy * dy) >= DragHandleReorderDragThresholdPixels)
+        {
+            _dragHandleReorderDragLaunched = true;
+            _ = RunDragReorderFromHandleAsync(e);
+        }
+    }
+
+    private void DragHandle_PointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (DragHandleBorder == null) return;
+        if (e.GetCurrentPoint(DragHandleBorder).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonReleased) return;
+
+        if (!_dragHandleReorderDragLaunched && _dragHandleReorderPressPoint.HasValue && _viewModel != null)
+            FindParentBlockEditor()?.SelectBlockFromDragHandle(_viewModel, e.KeyModifiers);
+
+        if (ReferenceEquals(e.Pointer.Captured, DragHandleBorder))
+            e.Pointer.Capture(null);
+
+        ClearDragHandleReorderGestureState();
+    }
+
+    private void DragHandle_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        // Releasing capture to start DoDragDrop fires this — do not clear; RunDragReorderFromHandleAsync clears after drop.
+        if (_dragHandleReorderDragLaunched)
+            return;
+        ClearDragHandleReorderGestureState();
+    }
+
+    private void ClearDragHandleReorderGestureState()
+    {
+        _dragHandleReorderPressPoint = null;
+        _dragHandleReorderDragLaunched = false;
+    }
+
+    private async Task RunDragReorderFromHandleAsync(PointerEventArgs e)
+    {
+        try
+        {
+            if (DragHandleBorder != null && ReferenceEquals(e.Pointer.Captured, DragHandleBorder))
+                e.Pointer.Capture(null);
+
+            await BeginBlockReorderDragCoreAsync(e).ConfigureAwait(true);
+        }
+        finally
+        {
+            ClearDragHandleReorderGestureState();
+        }
     }
 
     /// <summary>Gutter handle or image chrome (after move threshold) — same payload and ghost as the drag handle.</summary>
@@ -1418,24 +1518,58 @@ public partial class EditableBlock : UserControl
         if (_viewModel == null) return;
 
         var editor = FindParentBlockEditor();
-        editor?.ClearBlockSelection();
+        if (editor == null) return;
+
+        var payload = editor.CreateBlockReorderPayload(_viewModel, e.KeyModifiers);
+        editor.ClearBlockSelection();
 
         var transfer = new DataTransfer();
-        transfer.Add(DataTransferItem.Create(BlockViewModel.BlockDragDataFormat, _viewModel));
-        editor?.BeginBlockDragGhost(this, e);
+        transfer.Add(DataTransferItem.Create(BlockViewModel.BlockDragDataFormat, payload.Primary));
+        transfer.Add(DataTransferItem.Create(BlockViewModel.BlockReorderDragPayload.Format, payload));
+
+        editor.BeginBlockDragGhost(this, e);
         try
         {
             await DragDrop.DoDragDropAsync(e, transfer, DragDropEffects.Move).ConfigureAwait(true);
         }
         finally
         {
-            editor?.EndBlockDragGhost();
+            editor.EndBlockDragGhost();
         }
+    }
+
+    private static bool TryResolveBlockReorderPayload(DragEventArgs e, out BlockViewModel.BlockReorderDragPayload? payload)
+    {
+        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockReorderDragPayload.Format) is BlockViewModel.BlockReorderDragPayload p)
+        {
+            payload = p;
+            return true;
+        }
+
+        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } vm)
+        {
+            payload = null;
+            return false;
+        }
+
+        payload = new BlockViewModel.BlockReorderDragPayload
+        {
+            Primary = vm,
+            BlocksInDocumentOrder = new[] { vm }
+        };
+        return true;
     }
 
     private void Block_DragOver(object? sender, DragEventArgs e)
     {
-        if (!e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat))
+        if (!e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat)
+            && !e.DataTransfer.Contains(BlockViewModel.BlockReorderDragPayload.Format))
+        {
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+
+        if (!TryResolveBlockReorderPayload(e, out var payload) || payload == null)
         {
             e.DragEffects = DragDropEffects.None;
             return;
@@ -1446,18 +1580,11 @@ public partial class EditableBlock : UserControl
         if (parent != null)
             parent.UpdateBlockDragGhostFromEditorPoint(cursorInEditor);
 
-        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } draggedBlock)
-        {
-            e.DragEffects = DragDropEffects.Move;
-            return;
-        }
-
-        // Self-hover normally skips drop feedback (single block). In a split row we still need insert-from-Y
-        // so e.g. the right cell can show "below the pair" while the pointer is over the dragged block.
-        if (draggedBlock == _viewModel)
+        // Self-hover normally skips drop feedback (single block). Multi-block drags still need insert-from-Y.
+        if (payload.BlocksInDocumentOrder.Count == 1 && ReferenceEquals(payload.Primary, _viewModel))
         {
             var blocks = parent?.Blocks;
-            if (blocks == null || draggedBlock.GetColumnSibling(blocks) == null)
+            if (blocks == null || payload.Primary.GetColumnSibling(blocks) == null)
             {
                 e.DragEffects = DragDropEffects.Move;
                 return;
@@ -1468,7 +1595,7 @@ public partial class EditableBlock : UserControl
 
         if (parent == null) return;
 
-        parent.HandleBlockDragOver(cursorInEditor, draggedBlock);
+        parent.HandleBlockDragOver(cursorInEditor, payload);
     }
 
     public void ShowDropLineAtLeft()
@@ -1503,14 +1630,14 @@ public partial class EditableBlock : UserControl
     private void Block_Drop(object? sender, DragEventArgs e)
     {
         if (_viewModel == null) return;
-        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } draggedBlock) return;
+        if (!TryResolveBlockReorderPayload(e, out var payload) || payload == null) return;
 
         var parent = FindParentBlockEditor();
         if (parent == null) return;
 
         try
         {
-            if (!parent.TryPerformDrop(draggedBlock))
+            if (!parent.TryPerformDrop(payload))
                 BlockEditorLogger.LogError("Drop failed: invalid insert index or block", null);
         }
         catch (Exception ex)
