@@ -149,7 +149,7 @@ public class RichTextEditor : Control
         get => _selectionStart;
         set
         {
-            var clamped = Math.Clamp(value, 0, TextLength);
+            var clamped = Math.Clamp(value, 0, SelectionIndexUpperBound);
             if (SetAndRaise(SelectionStartProperty, ref _selectionStart, clamped))
                 InvalidateVisual();
         }
@@ -160,7 +160,7 @@ public class RichTextEditor : Control
         get => _selectionEnd;
         set
         {
-            var clamped = Math.Clamp(value, 0, TextLength);
+            var clamped = Math.Clamp(value, 0, SelectionIndexUpperBound);
             if (SetAndRaise(SelectionEndProperty, ref _selectionEnd, clamped))
                 InvalidateVisual();
         }
@@ -170,6 +170,12 @@ public class RichTextEditor : Control
     public string Text => FlattenRuns(Runs ?? Array.Empty<InlineRun>());
 
     public int TextLength => Text.Length;
+
+    /// <summary>
+    /// Max selection index (half-open range). Empty text uses 1 so cross-block drag can highlight blank
+    /// paragraphs; <see cref="CaretIndex"/> still clamps to <see cref="TextLength"/> (0).
+    /// </summary>
+    public int SelectionIndexUpperBound => TextLength == 0 ? 1 : TextLength;
 
     // ── Initialisation ───────────────────────────────────────────────────────
 
@@ -336,8 +342,9 @@ public class RichTextEditor : Control
         InvalidateLayout();
         var len = TextLength;
         if (_caretIndex > len) CaretIndex = len;
-        if (_selectionStart > len) SelectionStart = len;
-        if (_selectionEnd > len) SelectionEnd = len;
+        int selMax = SelectionIndexUpperBound;
+        if (_selectionStart > selMax) SelectionStart = selMax;
+        if (_selectionEnd > selMax) SelectionEnd = selMax;
         RaiseEvent(new TextChangedEventArgs(TextChangedEvent));
     }
 
@@ -391,16 +398,51 @@ public class RichTextEditor : Control
         if (selEnd > selStart && _textLayout != null)
         {
             var selBrush = SelectionBrush ?? new SolidColorBrush(Colors.CornflowerBlue, 0.4);
-            var rects = _textLayout.HitTestTextRange(selStart, selEnd - selStart);
-            foreach (var rect in rects)
-                context.FillRectangle(selBrush, rect.Translate(origin));
+            if (string.IsNullOrEmpty(Text))
+            {
+                double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
+                double w = Math.Max(3.0, FontSize * 0.45);
+                context.FillRectangle(selBrush, new Rect(0, 0, w, h));
+            }
+            else
+            {
+                var rects = _textLayout.HitTestTextRange(selStart, selEnd - selStart).ToList();
+                bool hasDrawable = rects.Any(r => r.Width > 0.5 && r.Height > 0.5);
+                if (!hasDrawable)
+                {
+                    // U+200B and other zero-advance glyphs often yield no range rects; draw a caret-sized chip.
+                    try
+                    {
+                        int idx = TextLength > 0 ? Math.Clamp(selStart, 0, TextLength - 1) : 0;
+                        var pos = _textLayout.HitTestTextPosition(idx);
+                        double h = pos.Height > 0 ? pos.Height : (_textLayout.Height > 0 ? _textLayout.Height : FontSize);
+                        double chipW = pos.Width > 0.5 ? pos.Width : Math.Max(3.0, FontSize * 0.45);
+                        context.FillRectangle(selBrush, new Rect(pos.X, pos.Y, chipW, h));
+                    }
+                    catch
+                    {
+                        double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
+                        double chipW = Math.Max(3.0, FontSize * 0.45);
+                        context.FillRectangle(selBrush, new Rect(0, 0, chipW, h));
+                    }
+                }
+                else
+                {
+                    foreach (var rect in rects)
+                        context.FillRectangle(selBrush, rect.Translate(origin));
+                }
+            }
         }
 
-        // Watermark (when empty and unfocused)
-        if (_textLayout != null && string.IsNullOrEmpty(Text))
-            _watermarkLayout?.Draw(context, origin);
-        else
-            _textLayout?.Draw(context, origin);
+        // Always draw the text layout first so removing the watermark repaints the line (avoids stale glyphs).
+        if (_textLayout != null)
+        {
+            _textLayout.Draw(context, origin);
+            // Do not trust VM-only focus: several blocks can briefly (or stuck) have IsFocused while only
+            // one RichTextEditor has keyboard focus. Image captions also show watermark on pointer-hover without focus.
+            if (string.IsNullOrEmpty(Text) && _watermarkLayout != null && (IsFocused || IsPointerOver))
+                _watermarkLayout.Draw(context, origin);
+        }
 
         // Caret
         if (IsFocused && _caretVisible && selEnd == selStart && _textLayout != null)
@@ -436,7 +478,7 @@ public class RichTextEditor : Control
             }
         }
 
-        if (_watermarkLayout != null && string.IsNullOrEmpty(currentText))
+        if (_watermarkLayout != null && string.IsNullOrEmpty(currentText) && (IsFocused || IsPointerOver))
         {
             try
             {
@@ -460,14 +502,28 @@ public class RichTextEditor : Control
         int selStart = Math.Min(_selectionStart, _selectionEnd);
         int selEnd = Math.Max(_selectionStart, _selectionEnd);
         if (selEnd <= selStart || _textLayout == null) return null;
+        if (string.IsNullOrEmpty(Text))
+        {
+            double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
+            double w = Math.Max(3.0, FontSize * 0.45);
+            return new Rect(0, 0, w, h);
+        }
         try
         {
             var rects = _textLayout.HitTestTextRange(selStart, selEnd - selStart).ToList();
-            if (rects.Count == 0) return null;
-            var r = rects[0];
-            for (int i = 1; i < rects.Count; i++)
-                r = r.Union(rects[i]);
-            return r;
+            bool hasDrawable = rects.Any(r => r.Width > 0.5 && r.Height > 0.5);
+            if (hasDrawable)
+            {
+                var r = rects[0];
+                for (int i = 1; i < rects.Count; i++)
+                    r = r.Union(rects[i]);
+                return r;
+            }
+            int idx = TextLength > 0 ? Math.Clamp(selStart, 0, TextLength - 1) : 0;
+            var pos = _textLayout.HitTestTextPosition(idx);
+            double h = pos.Height > 0 ? pos.Height : (_textLayout.Height > 0 ? _textLayout.Height : FontSize);
+            double chipW = pos.Width > 0.5 ? pos.Width : Math.Max(3.0, FontSize * 0.45);
+            return new Rect(pos.X, pos.Y, chipW, h);
         }
         catch
         {
@@ -552,6 +608,20 @@ public class RichTextEditor : Control
         _isDragging = true;
         pointer.Capture(this);
         ResetCaretBlink();
+    }
+
+    protected override void OnPointerEntered(PointerEventArgs e)
+    {
+        base.OnPointerEntered(e);
+        if (string.IsNullOrEmpty(Text) && !string.IsNullOrEmpty(Watermark))
+            InvalidateVisual();
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        if (string.IsNullOrEmpty(Text) && !string.IsNullOrEmpty(Watermark))
+            InvalidateVisual();
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -739,6 +809,14 @@ public class RichTextEditor : Control
     /// <summary>Delete characters [start, end) and notify via TextChanged.</summary>
     private void DeleteRange(int start, int end)
     {
+        var flat = FlattenRuns(Runs ?? Array.Empty<InlineRun>());
+        if (flat.Length == 0 && start == 0 && end == 1)
+        {
+            SelectionStart = 0;
+            SelectionEnd = 0;
+            CaretIndex = 0;
+            return;
+        }
         var runs = ApplyTextDeletion(Runs ?? Array.Empty<InlineRun>(), start, end);
         Runs = runs;
     }
@@ -747,6 +825,8 @@ public class RichTextEditor : Control
     {
         int start = Math.Min(_selectionStart, _selectionEnd);
         int end = Math.Max(_selectionStart, _selectionEnd);
+        if (TextLength == 0 && start == 0 && end == 1)
+            end = 0;
 
         var runs = ApplyTextInsertion(Runs ?? Array.Empty<InlineRun>(), start, end, text);
         int newCaret = start + text.Length;

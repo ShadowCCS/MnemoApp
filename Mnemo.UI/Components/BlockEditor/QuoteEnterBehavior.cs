@@ -8,7 +8,7 @@ internal static class QuoteEnterBehavior
     {
         GetLineBounds(text, caretIndex, out var lineStart, out var lineEndExclusive);
         var line = text[lineStart..lineEndExclusive];
-        return string.IsNullOrWhiteSpace(line);
+        return BlockEditorContentPolicy.IsVisuallyEmpty(line);
     }
 
     /// <summary>
@@ -21,7 +21,7 @@ internal static class QuoteEnterBehavior
         GetLineBounds(text, caretIndex, out var lineStart, out var lineEndExclusive);
 
         var line = text[lineStart..lineEndExclusive];
-        if (!string.IsNullOrWhiteSpace(line))
+        if (!BlockEditorContentPolicy.IsVisuallyEmpty(line))
             return false;
 
         quoteBody = text[..lineStart].TrimEnd('\r', '\n');

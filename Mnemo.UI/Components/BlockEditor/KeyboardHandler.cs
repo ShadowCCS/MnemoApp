@@ -105,7 +105,7 @@ public class KeyboardHandler
             return;
         }
 
-        var hasContent = !string.IsNullOrWhiteSpace(editor.Text);
+        var hasContent = !BlockEditorContentPolicy.IsVisuallyEmpty(editor.Text);
         if (viewModel.Type is BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist)
         {
             if (hasContent)
@@ -130,7 +130,7 @@ public class KeyboardHandler
 
         if (caretIndex == 0)
         {
-            var isEmpty = string.IsNullOrWhiteSpace(text);
+            var isEmpty = BlockEditorContentPolicy.IsVisuallyEmpty(text);
             if (isEmpty)
             {
                 if (viewModel.Type == BlockType.Image)

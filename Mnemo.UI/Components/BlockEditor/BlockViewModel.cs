@@ -270,13 +270,13 @@ public class BlockViewModel : INotifyPropertyChanged
             var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
             string T(string key, string ns = "NotesEditor") => loc?.T(key, ns) ?? key;
 
-            // Only show the slash command hint for empty, focused Text blocks
-            if (Type == BlockType.Text && IsFocused && string.IsNullOrEmpty(Content))
-                return T("TypeSlashForCommands");
+            // Placeholders only on the empty block that has keyboard focus (avoids ghost watermarks when adding blocks).
+            if (!IsFocused || !BlockEditorContentPolicy.IsVisuallyEmpty(Content))
+                return string.Empty;
 
             return Type switch
             {
-                BlockType.Text => string.Empty,
+                BlockType.Text => T("TypeSlashForCommands"),
                 BlockType.Heading1 => T("Heading1"),
                 BlockType.Heading2 => T("Heading2"),
                 BlockType.Heading3 => T("Heading3"),

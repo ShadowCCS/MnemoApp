@@ -485,9 +485,20 @@ public partial class EditableBlock : UserControl
     /// <summary>
     /// For image blocks, apply horizontal alignment to the entire EditableBlock (not inner content)
     /// so the selection chrome hugs the image while the block itself moves left/center/right.
+    /// Divider uses a full-width line: stretch the content column so the line spans the * grid cell.
     /// </summary>
     private void UpdateEditableBlockAlignment()
     {
+        var isDivider = _viewModel?.Type == BlockType.Divider;
+        if (BlockContentChrome != null)
+            BlockContentChrome.HorizontalAlignment = isDivider ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+        if (BlockContentControl != null)
+        {
+            BlockContentControl.HorizontalAlignment = isDivider ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+            BlockContentControl.HorizontalContentAlignment =
+                isDivider ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+        }
+
         if (_viewModel?.Type == BlockType.Image)
         {
             var align = ParseImageAlignFromMeta(_viewModel);
@@ -687,14 +698,15 @@ public partial class EditableBlock : UserControl
                 _markdownDetector?.TryDetectShortcut(editor);
 
             var isSlashKey = e.Key == Key.Divide || e.Key == Key.OemQuestion || e.Key == Key.Oem2;
-            if (isSlashKey && string.IsNullOrWhiteSpace(editor.Text) && _stateManager != null && _slashMenuOverlayId == null)
+            if (isSlashKey && BlockEditorContentPolicy.IsVisuallyEmpty(editor.Text) && _stateManager != null && _slashMenuOverlayId == null)
             {
                 Dispatcher.UIThread.Post(() =>
                 {
                     var currentText = editor.Text;
-                    if (currentText == "/" && _slashMenuOverlayId == null)
+                    var stripped = BlockEditorContentPolicy.WithoutLegacySentinel(currentText);
+                    if (stripped == "/" && _slashMenuOverlayId == null)
                     {
-                        ShowSlashMenu(editor, currentText);
+                        ShowSlashMenu(editor, stripped);
                         _stateManager?.SetShowingSlashMenu();
                     }
                 }, DispatcherPriority.Input);
@@ -746,20 +758,20 @@ public partial class EditableBlock : UserControl
             return;
         }
 
-        // Check if text starts with "/" and is a valid slash command pattern
-        var isSlashCommand = text.StartsWith("/");
+        var filterSource = BlockEditorContentPolicy.WithoutLegacySentinel(text);
+        var isSlashCommand = filterSource.StartsWith("/");
         var menuIsVisible = _slashMenuOverlayId != null;
 
         // Always ensure state matches reality - correct any mismatches
         if (isSlashCommand && !menuIsVisible)
         {
-            ShowSlashMenu(textBox, text);
+            ShowSlashMenu(textBox, filterSource);
             _stateManager.SetShowingSlashMenu();
         }
         else if (isSlashCommand && menuIsVisible && _currentSlashMenu != null)
         {
             // Update filter if menu is already visible
-            _currentSlashMenu.UpdateFilter(text);
+            _currentSlashMenu.UpdateFilter(filterSource);
         }
         else if (!isSlashCommand && menuIsVisible)
         {
@@ -1454,8 +1466,9 @@ public partial class EditableBlock : UserControl
         }
     }
 
+    /// <summary>This block's RTE only — never the globally focused editor (cross-block selection must paint on each block).</summary>
     private RichTextEditor? GetEditor() =>
-        _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+        _currentBlockComponent?.GetRichTextEditor();
 
     /// <summary>Live rich-text control when this block is not using a plain <see cref="TextBox"/>.</summary>
     public RichTextEditor? TryGetRichTextEditor() => GetEditor() as RichTextEditor;
@@ -1514,7 +1527,15 @@ public partial class EditableBlock : UserControl
         if (editor == null) return false;
         string text = editor.Text;
         int start = range.Value.start;
-        int len = range.Value.end - start;
+        int end = range.Value.end;
+        int len = end - start;
+        if (text.Length == 0 && start == 0 && end == 1)
+        {
+            editor.SelectionStart = 0;
+            editor.SelectionEnd = 0;
+            editor.CaretIndex = 0;
+            return true;
+        }
         if (len <= 0 || start < 0 || start + len > text.Length) return false;
         // Let RichTextEditor handle the run-aware deletion
         editor.SelectionStart = start;
@@ -1552,11 +1573,29 @@ public partial class EditableBlock : UserControl
         return true;
     }
 
+    /// <summary>Flat text length for clamping caret/anchor when starting a cross-block gesture (trailing edge = length).</summary>
+    public int GetAnchorCharClampMax()
+    {
+        var rte = TryGetRichTextEditor();
+        if (rte != null) return rte.TextLength;
+        return _viewModel?.Content?.Length ?? 0;
+    }
+
+    /// <summary>
+    /// Length used when extending cross-block selection through a block; empty rich blocks count as 1 logical char.
+    /// </summary>
+    public int GetLogicalTextLengthForCrossBlockSelection()
+    {
+        var rte = TryGetRichTextEditor();
+        if (rte != null) return rte.SelectionIndexUpperBound;
+        return _viewModel?.Content?.Length ?? 0;
+    }
+
     public void ApplyTextSelection(int start, int end)
     {
         var editor = GetEditor();
         if (editor == null) return;
-        var len = editor.TextLength;
+        int len = editor is RichTextEditor rte ? rte.SelectionIndexUpperBound : editor.TextLength;
         int selStart = Math.Clamp(Math.Min(start, end), 0, len);
         int selEnd = Math.Clamp(Math.Max(start, end), 0, len);
 

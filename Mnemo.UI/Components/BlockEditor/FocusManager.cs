@@ -22,7 +22,16 @@ public class FocusManager
     {
         Dispatcher.UIThread.Post(() =>
         {
-            var editor = FindFocusableEditor();
+            var imageCaption = FindImageCaptionEditor();
+            // Image caption is optional chrome: default block focus is HoverHost (keyboard delete, etc.).
+            // Only move caret into the caption when a concrete index was requested (e.g. PendingCaretIndex).
+            if (caretPosition.HasValue && imageCaption != null)
+            {
+                ApplyFocus(imageCaption, caretPosition);
+                return;
+            }
+
+            var editor = FindFocusableEditor(excludeImageCaption: imageCaption != null);
             if (editor == null)
             {
                 var imageHost = FindImageBlockHoverHost();
@@ -35,7 +44,8 @@ public class FocusManager
 
                 Dispatcher.UIThread.Post(() =>
                 {
-                    var e2 = FindFocusableEditor();
+                    var cap = FindImageCaptionEditor();
+                    var e2 = FindFocusableEditor(excludeImageCaption: cap != null);
                     if (e2 != null)
                     {
                         ApplyFocus(e2, caretPosition);
@@ -92,15 +102,28 @@ public class FocusManager
 
     public void ClearCache() => _cachedEditor = null;
 
-    private RichTextEditor? FindFocusableEditor()
+    private static bool IsImageCaptionEditor(RichTextEditor e) =>
+        e.Tag is string t && t == "BlockEditorImageCaption";
+
+    private RichTextEditor? FindImageCaptionEditor()
     {
         return _parentControl.GetVisualDescendants()
             .OfType<RichTextEditor>()
-            .FirstOrDefault(e => e.IsVisible && e.IsEffectivelyVisible);
+            .FirstOrDefault(e => e.IsVisible && e.IsEffectivelyVisible && IsImageCaptionEditor(e));
+    }
+
+    private RichTextEditor? FindFocusableEditor(bool excludeImageCaption = false)
+    {
+        return _parentControl.GetVisualDescendants()
+            .OfType<RichTextEditor>()
+            .FirstOrDefault(e =>
+                e.IsVisible
+                && e.IsEffectivelyVisible
+                && (!excludeImageCaption || !IsImageCaptionEditor(e)));
     }
 
     /// <summary>
-    /// Image blocks use a named <c>HoverHost</c> border instead of <see cref="RichTextEditor"/>; focus it for keyboard delete/menu.
+    /// Image blocks: default keyboard focus target (caption is focused only on click or explicit <c>PendingCaretIndex</c>).
     /// </summary>
     private Control? FindImageBlockHoverHost()
     {

@@ -2,11 +2,16 @@
     x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Divider.DividerBlockComponent"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    HorizontalAlignment="Stretch"
     x:CompileBindings="False">
-    <Border
-        Height="1"
-        Background="{DynamicResource BorderBrush}"
-        Margin="0,8" />
+    <!-- Full width comes from EditableBlock stretching BlockContentChrome for Divider; keep inner line stretched. -->
+    <Grid Height="17" HorizontalAlignment="Stretch">
+        <Border
+            Height="1"
+            VerticalAlignment="Center"
+            HorizontalAlignment="Stretch"
+            Background="{DynamicResource RichTextSeparationLineBrush}" />
+    </Grid>
 </UserControl>
 
 

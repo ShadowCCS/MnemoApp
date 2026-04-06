@@ -76,7 +76,7 @@ public static class BlockMarkdownSerializer
     {
         if (block.Type is BlockType.Code or BlockType.Divider)
             return block.Content ?? string.Empty;
-        return InlineMarkdownSerializer.SerializeRuns(block.Runs);
+        return BlockEditorContentPolicy.WithoutLegacySentinel(InlineMarkdownSerializer.SerializeRuns(block.Runs));
     }
 
     /// <summary>

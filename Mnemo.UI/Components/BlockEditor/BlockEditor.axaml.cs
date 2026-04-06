@@ -381,6 +381,18 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (block.IsFocused)
         {
             var idx = Blocks.IndexOf(block);
+            // Posted focus (e.g. new block after Enter) can run before the previous editor's LostFocus, so two
+            // VMs may briefly have IsFocused. Clear only the last known owner — O(1); avoids N× EditableBlock
+            // teardown (slash menu, toolbar posts) when the document has many blocks. RichTextEditor still
+            // gates watermark paint on real keyboard/pointer focus.
+            if (_focusedBlockIndex >= 0 && _focusedBlockIndex < Blocks.Count
+                && _focusedBlockIndex != idx)
+            {
+                var prev = Blocks[_focusedBlockIndex];
+                if (prev.IsFocused)
+                    prev.IsFocused = false;
+            }
+
             _focusedBlockIndex = idx;
 
             // During cross-block text selection the editor controls which blocks have text
@@ -446,7 +458,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         var previousBlock = Blocks[index - 1];
         var insertionPoint = previousBlock.Content?.Length ?? 0;
-        previousBlock.Content = (previousBlock.Content ?? string.Empty) + (block.Content ?? string.Empty);
+        var suffix = BlockEditorContentPolicy.MergeSuffixFromFollowingBlock(block.Content);
+        previousBlock.Content = (previousBlock.Content ?? string.Empty) + suffix;
 
         UnsubscribeFromBlock(block);
         Blocks.Remove(block);
@@ -924,8 +937,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
             var vm = Blocks[blockIndex];
 
-            // Image blocks have no RichTextEditor; the tunnel's capture+Handled would eat the first
-            // press on toolbar Buttons/Flyouts (and caption) while focusing the block.
+            // Image block: avoid capturing on first press so toolbar/flyouts and caption clicks work;
+            // programmatic focus uses HoverHost unless PendingCaretIndex targets the caption.
             if (vm.Type == BlockType.Image && !vm.IsFocused)
             {
                 ClearBlockSelection();
@@ -944,19 +957,24 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 // If the press landed outside the RichTextEditor itself (e.g. in block padding),
                 // the editor won't receive OnPointerPressed. Initiate drag-select manually so the
                 // full block width acts as a hit target for starting text selection.
-                var richEditor = editableBlock.TryGetRichTextEditor();
-                if (richEditor != null)
+                // Image blocks: caption is the only RTE — clicks on the bitmap/toolbar/resize are not
+                // "padding"; mapping them into StartDragSelect marks Handled and breaks align/menu/reorder.
+                if (vm.Type != BlockType.Image)
                 {
-                    bool pointerIsOverEditor = richEditor.IsPointerOver;
-                    if (!pointerIsOverEditor)
+                    var richEditor = editableBlock.TryGetRichTextEditor();
+                    if (richEditor != null)
                     {
-                        var pointInFocusedBlock = this.TranslatePoint(pos, editableBlock);
-                        if (pointInFocusedBlock.HasValue)
+                        bool pointerIsOverEditor = richEditor.IsPointerOver;
+                        if (!pointerIsOverEditor)
                         {
-                            var paddingCharIndex = editableBlock.GetCharacterIndexFromPoint(pointInFocusedBlock.Value);
-                            paddingCharIndex = Math.Clamp(paddingCharIndex, 0, vm.Content?.Length ?? 0);
-                            richEditor.StartDragSelect(paddingCharIndex, e.Pointer);
-                            e.Handled = true;
+                            var pointInFocusedBlock = this.TranslatePoint(pos, editableBlock);
+                            if (pointInFocusedBlock.HasValue)
+                            {
+                                var paddingCharIndex = editableBlock.GetCharacterIndexFromPoint(pointInFocusedBlock.Value);
+                                paddingCharIndex = Math.Clamp(paddingCharIndex, 0, editableBlock.GetAnchorCharClampMax());
+                                richEditor.StartDragSelect(paddingCharIndex, e.Pointer);
+                                e.Handled = true;
+                            }
                         }
                     }
                 }
@@ -971,7 +989,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             ClearBlockSelection();
             _crossBlockAnchorBlock = vm;
             _crossBlockAnchorBlockIndex = blockIndex;
-            _crossBlockAnchorCharIndex = Math.Clamp(charIndex, 0, vm.Content?.Length ?? 0);
+            _crossBlockAnchorCharIndex = Math.Clamp(charIndex, 0, editableBlock.GetAnchorCharClampMax());
             _crossBlockArmed = true;
             _isCrossBlockSelecting = false;
 
@@ -1493,7 +1511,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var emptyIndices = new List<int>();
         for (int i = 0; i < Blocks.Count; i++)
         {
-            if (string.IsNullOrWhiteSpace(Blocks[i].Content ?? string.Empty))
+            if (BlockEditorContentPolicy.IsVisuallyEmpty(Blocks[i].Content))
                 emptyIndices.Add(i);
         }
         var toRemove = emptyIndices.Where(i => i != firstBlockInDeletion).ToList();
@@ -1955,7 +1973,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (!string.IsNullOrWhiteSpace(GetBlockMetaString(last, "imageAlt"))) return false;
         }
 
-        return string.IsNullOrWhiteSpace(last.Content);
+        return BlockEditorContentPolicy.IsVisuallyEmpty(last.Content);
     }
 
     private static string GetBlockMetaString(BlockViewModel vm, string key)
@@ -2171,7 +2189,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
 
             var block = Blocks[i];
-            int len = block.Content?.Length ?? 0;
+            int len = editableBlock.GetLogicalTextLengthForCrossBlockSelection();
 
             if (anchorIndex == currentIndex)
             {
@@ -2496,6 +2514,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         target = null;
         leftEdge = false;
+        if (dragged.Type == BlockType.Divider)
+            return false;
         if (!TryGetSplitIntentFromEditorX(cursor.X, out leftEdge))
             return false;
 
@@ -2513,7 +2533,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 BlockViewModel? hit = null;
                 foreach (var vm in new[] { splitRow.Left, splitRow.Right })
                 {
-                    if (ReferenceEquals(vm, dragged)) continue;
+                    if (ReferenceEquals(vm, dragged) || vm.Type == BlockType.Divider) continue;
                     var rect = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
                     if (rect.Width <= 0) continue;
                     if (cursor.Y < rect.Y || cursor.Y >= rect.Bottom) continue;
@@ -2528,7 +2548,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     double best = double.MaxValue;
                     foreach (var vm in new[] { splitRow.Left, splitRow.Right })
                     {
-                        if (ReferenceEquals(vm, dragged)) continue;
+                        if (ReferenceEquals(vm, dragged) || vm.Type == BlockType.Divider) continue;
                         var rect = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
                         if (rect.Width <= 0) continue;
                         if (cursor.Y < rect.Y || cursor.Y >= rect.Bottom) continue;
@@ -2549,7 +2569,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (row is SingleBlockRowViewModel single)
             {
                 var vm = single.Block;
-                if (ReferenceEquals(vm, dragged)) return false;
+                if (ReferenceEquals(vm, dragged) || vm.Type == BlockType.Divider) return false;
 
                 var rect = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
                 if (rect.Width <= 0) return false;
@@ -2578,6 +2598,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private bool TryPerformSplitDrop(BlockViewModel dragged, BlockViewModel target, bool dropOnLeftEdge)
     {
+        if (dragged.Type == BlockType.Divider || target.Type == BlockType.Divider)
+            return false;
+
         var targetIdx = Blocks.IndexOf(target);
         if (targetIdx < 0) return false;
 
