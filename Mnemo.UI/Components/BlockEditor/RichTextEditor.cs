@@ -1059,6 +1059,34 @@ public class RichTextEditor : Control
         return pos;
     }
 
+    /// <summary>
+    /// Non-empty [start, end) span of the word at the caret, or null if the caret is on whitespace only.
+    /// Used for format shortcuts when there is no active selection.
+    /// </summary>
+    public (int Start, int End)? TryGetWordRangeAtCaret()
+    {
+        var text = Text ?? string.Empty;
+        if (text.Length == 0) return null;
+
+        int idx = Math.Clamp(_caretIndex, 0, text.Length);
+
+        if (idx < text.Length && char.IsWhiteSpace(text[idx]))
+            return null;
+
+        if (idx == text.Length)
+        {
+            if (!char.IsWhiteSpace(text[idx - 1]))
+                idx = idx - 1;
+            else
+                return null;
+        }
+
+        int start = FindWordStart(idx);
+        int end = FindWordEnd(idx);
+        if (start >= end) return null;
+        return (start, end);
+    }
+
     private void SelectWord(int pos)
     {
         SelectionStart = FindWordStart(pos);

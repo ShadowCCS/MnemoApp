@@ -692,6 +692,9 @@ public partial class EditableBlock : UserControl
         if (e.Key != Key.Back)
             _backspaceHandledInTunnel = false;
 
+        if (TryHandleInlineFormatShortcut(e, editor))
+            return;
+
         if (_viewModel.Type != BlockType.Image)
         {
             if (e.Key == Key.Space)
@@ -744,6 +747,60 @@ public partial class EditableBlock : UserControl
     #endregion
 
     #region Keyboard and Input Handling
+
+    /// <summary>
+    /// Ctrl+B/I/U, Ctrl+Shift+S (strikethrough), Ctrl+Shift+H (highlight). With no selection, toggles format on the word at the caret.
+    /// </summary>
+    private bool TryHandleInlineFormatShortcut(KeyEventArgs e, RichTextEditor editor)
+    {
+        if (e.Handled || _viewModel == null || _viewModel.Type == BlockType.Code)
+            return false;
+
+        var mods = e.KeyModifiers;
+        if ((mods & KeyModifiers.Control) == 0 || (mods & KeyModifiers.Alt) != 0)
+            return false;
+
+        bool shift = (mods & KeyModifiers.Shift) != 0;
+        InlineFormatKind? kind = e.Key switch
+        {
+            Key.B when !shift => InlineFormatKind.Bold,
+            Key.I when !shift => InlineFormatKind.Italic,
+            Key.U when !shift => InlineFormatKind.Underline,
+            Key.S when shift => InlineFormatKind.Strikethrough,
+            Key.H when shift => InlineFormatKind.Highlight,
+            _ => null
+        };
+        if (kind == null)
+            return false;
+
+        string? color = null;
+        if (kind == InlineFormatKind.Highlight
+            && Application.Current?.TryFindResource("InlineHighlightColor", out var res) == true
+            && res is Color c)
+            color = c.ToString();
+
+        var blockEditor = FindParentBlockEditor();
+        if (blockEditor?.HasCrossBlockTextSelection() == true)
+        {
+            ApplyInlineFormat(kind.Value, color);
+            e.Handled = true;
+            return true;
+        }
+
+        if (GetSelectionRange() == null)
+        {
+            var word = editor.TryGetWordRangeAtCaret();
+            if (word == null)
+                return false;
+            editor.SelectionStart = word.Value.Start;
+            editor.SelectionEnd = word.Value.End;
+            editor.CaretIndex = word.Value.End;
+        }
+
+        ApplyInlineFormat(kind.Value, color);
+        e.Handled = true;
+        return true;
+    }
 
     private void HandleBackspaceOnEmptyBlock()
     {
