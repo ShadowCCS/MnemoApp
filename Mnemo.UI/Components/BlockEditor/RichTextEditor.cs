@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -95,6 +97,12 @@ public class RichTextEditor : Control
         add => AddHandler(TextChangedEvent, value);
         remove => RemoveHandler(TextChangedEvent, value);
     }
+
+    /// <summary>
+    /// When set, Ctrl+click on a link invokes this instead of <see cref="OpenExternalUrl"/>.
+    /// Use for confirmation before leaving the app (e.g. browser / mail client).
+    /// </summary>
+    public Func<string, Task>? ExternalLinkNavigationRequested { get; set; }
 
     // ── Public API ───────────────────────────────────────────────────────────
 
@@ -312,14 +320,20 @@ public class RichTextEditor : Control
             var typeface = new Typeface(ff, fs, fw);
 
             TextDecorationCollection? decorations = null;
-            if (style.Underline || style.Strikethrough)
+            if (style.Underline || style.Strikethrough || !string.IsNullOrEmpty(style.LinkUrl))
             {
                 decorations = new TextDecorationCollection();
-                if (style.Underline)
+                if (style.Underline || !string.IsNullOrEmpty(style.LinkUrl))
                     decorations.Add(new TextDecoration { Location = TextDecorationLocation.Underline });
                 if (style.Strikethrough)
                     decorations.Add(new TextDecoration { Location = TextDecorationLocation.Strikethrough });
             }
+
+            IBrush runForeground = defaultForeground;
+            if (!string.IsNullOrEmpty(style.LinkUrl)
+                && Application.Current?.TryFindResource("LinksBrush", out var linkRes) == true
+                && linkRes is IBrush linkBrush)
+                runForeground = linkBrush;
 
             IBrush? background = null;
             if (!string.IsNullOrEmpty(style.BackgroundColor))
@@ -342,7 +356,7 @@ public class RichTextEditor : Control
                 typeface,
                 fontRenderingEmSize: FontSize,
                 textDecorations: decorations,
-                foregroundBrush: defaultForeground,
+                foregroundBrush: runForeground,
                 backgroundBrush: background);
 
             spans.Add(new ValueSpan<TextRunProperties>(offset, run.Text.Length, props));
@@ -648,9 +662,22 @@ public class RichTextEditor : Control
         base.OnPointerPressed(e);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
-        Focus();
         var pos = e.GetPosition(this);
         var idx = HitTestPoint(pos);
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            && TryGetLinkUrlAt(idx, out var linkUrl)
+            && !string.IsNullOrEmpty(linkUrl))
+        {
+            e.Handled = true;
+            if (ExternalLinkNavigationRequested != null)
+                _ = ExternalLinkNavigationRequested.Invoke(linkUrl);
+            else
+                OpenExternalUrl(linkUrl, this);
+            return;
+        }
+
+        Focus();
 
         if (e.ClickCount == 1)
         {
@@ -888,6 +915,60 @@ public class RichTextEditor : Control
     }
 
     // ── Hit-testing ──────────────────────────────────────────────────────────
+
+    /// <summary>Returns true if <paramref name="index"/> falls inside a linked run; outputs the href.</summary>
+    public bool TryGetLinkUrlAt(int index, out string? url)
+    {
+        url = null;
+        var runs = Runs ?? Array.Empty<InlineRun>();
+        if (runs.Count == 0) return false;
+        int len = TextLength;
+        if (len == 0) return false;
+        int i = Math.Clamp(index, 0, len - 1);
+        int pos = 0;
+        foreach (var run in runs)
+        {
+            int end = pos + run.Text.Length;
+            if (i < end && i >= pos)
+            {
+                url = run.Style.LinkUrl;
+                return url != null;
+            }
+
+            pos = end;
+        }
+
+        return false;
+    }
+
+    /// <summary>Opens http(s) or mailto in the system browser / mail client.</summary>
+    public static void OpenExternalUrl(string url, Control? anchor)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return;
+        if (uri.Scheme is not ("http" or "https" or "mailto")) return;
+        try
+        {
+            var top = anchor != null ? TopLevel.GetTopLevel(anchor) : null;
+            if (top?.Launcher != null)
+            {
+                _ = top.Launcher.LaunchUriAsync(uri);
+                return;
+            }
+        }
+        catch
+        {
+            // fall through to shell
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+            // ignore
+        }
+    }
 
     public int HitTestPoint(Point point)
     {

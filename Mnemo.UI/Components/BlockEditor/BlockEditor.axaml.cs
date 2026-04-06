@@ -96,6 +96,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private const int TypingBatchIdleMs = 300;
 
     /// <summary>
+    /// While true, <see cref="UnsubscribeFromBlock"/> does not delete app-local image files (e.g. full document reload).
+    /// </summary>
+    private bool _skipImageDeletionOnUnsubscribe;
+
+    /// <summary>
     /// Set by the owning view to enable document-wide undo/redo.
     /// Cleared on document switch so history does not leak between notes.
     /// </summary>
@@ -241,10 +246,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _pendingCaretBefore = null;
         _history?.Clear();
 
-        // Unsubscribe from old blocks
-        foreach (var block in Blocks)
+        // Unsubscribe from old blocks (do not delete image assets — they may still belong to the note on disk)
+        _skipImageDeletionOnUnsubscribe = true;
+        try
         {
-            UnsubscribeFromBlock(block);
+            foreach (var block in Blocks)
+                UnsubscribeFromBlock(block);
+        }
+        finally
+        {
+            _skipImageDeletionOnUnsubscribe = false;
         }
 
         // Create new collection to ensure proper UI notification
@@ -438,6 +449,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void UnsubscribeFromBlock(BlockViewModel block)
     {
+        QueueDeleteOrphanImageForRemovedBlock(block);
         block.ContentChanged -= OnBlockContentChanged;
         block.PropertyChanged -= OnBlockPropertyChanged;
         block.DeleteRequested -= OnBlockDeleteRequested;
@@ -713,6 +725,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         if (Blocks.Count == 1)
         {
+            if (block.Type == BlockType.Image)
+                QueueDeleteOrphanImageForRemovedBlock(block);
             block.Content = string.Empty;
             block.Type = BlockType.Text;
             block.IsFocused = true;
@@ -2080,6 +2094,44 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return false;
     }
 
+    /// <summary>True if any block in the cross-block text selection overlaps linked text.</summary>
+    public bool CrossBlockTextSelectionHasLink()
+    {
+        foreach (var vm in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+        {
+            var eb = GetEditableBlockForViewModel(vm);
+            if (eb?.GetSelectionRange() == null) continue;
+            if (eb.DoesSelectionHaveLink()) return true;
+        }
+        return false;
+    }
+
+    /// <summary>First <c>LinkUrl</c> found in any block that has a text selection (cross-block link edit).</summary>
+    public string? TryGetFirstLinkUrlInCrossBlockSelection()
+    {
+        foreach (var vm in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+        {
+            var eb = GetEditableBlockForViewModel(vm);
+            if (eb?.GetSelectionRange() is not { } sel) continue;
+            var url = GetLinkUrlInRuns(vm.Runs, sel.start, sel.end);
+            if (!string.IsNullOrEmpty(url)) return url;
+        }
+        return null;
+    }
+
+    private static string? GetLinkUrlInRuns(IReadOnlyList<InlineRun> runs, int start, int end)
+    {
+        int pos = 0;
+        foreach (var run in runs)
+        {
+            int re = pos + run.Text.Length;
+            if (re > start && pos < end && run.Style.LinkUrl != null)
+                return run.Style.LinkUrl;
+            pos = re;
+        }
+        return null;
+    }
+
     public void ApplyInlineFormatToCrossBlockSelection(Mnemo.Core.Formatting.InlineFormatKind kind, string? color = null)
     {
         BeginStructuralChange();
@@ -2684,6 +2736,62 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (val is string s) return s;
         if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
         return val.ToString() ?? string.Empty;
+    }
+
+    private static string? NormalizePathForImageCompare(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        try
+        {
+            return Path.GetFullPath(path);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private bool AnyOtherImageBlockUsesPath(string path, BlockViewModel excludeBlock)
+    {
+        var norm = NormalizePathForImageCompare(path);
+        if (norm == null) return false;
+        foreach (var b in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+        {
+            if (ReferenceEquals(b, excludeBlock)) continue;
+            if (b.Type != BlockType.Image) continue;
+            var other = NormalizePathForImageCompare(GetBlockMetaString(b, "imagePath"));
+            if (other != null && string.Equals(other, norm, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private void QueueDeleteOrphanImageForRemovedBlock(BlockViewModel removedBlock)
+    {
+        if (_skipImageDeletionOnUnsubscribe) return;
+        if (removedBlock.Type != BlockType.Image) return;
+        var path = GetBlockMetaString(removedBlock, "imagePath");
+        if (string.IsNullOrWhiteSpace(path)) return;
+        if (!MnemoAppPaths.IsPathUnderImagesDirectory(path)) return;
+        if (AnyOtherImageBlockUsesPath(path, removedBlock)) return;
+
+        var svc = ResolveImageAssetService();
+        if (svc == null) return;
+        var pathCopy = path;
+        _ = DeleteOrphanImageFileAsync(svc, pathCopy);
+    }
+
+    private static async Task DeleteOrphanImageFileAsync(IImageAssetService svc, string path)
+    {
+        try
+        {
+            await svc.DeleteStoredFileAsync(path).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Best-effort; avoid surfacing IO errors from background cleanup.
+        }
     }
 
     private static double GetBlockMetaDouble(BlockViewModel vm, string key)

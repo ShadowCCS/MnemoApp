@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Mnemo.UI.Modules.Onboarding.ViewModels"
+             xmlns:onboardingViews="using:Mnemo.UI.Modules.Onboarding.Views"
              xmlns:settings="using:Mnemo.UI.Modules.Settings.ViewModels"
              xmlns:model="using:Mnemo.Core.Models"
              xmlns:components="using:Mnemo.UI.Components"
@@ -244,49 +245,8 @@
               </StackPanel>
 
               <!-- AI setup -->
-              <StackPanel IsVisible="{Binding IsAISetupStep}" Spacing="24" VerticalAlignment="Center">
-                <!-- Hero Icon Replacement -->
-                <Border Width="120" Height="120" CornerRadius="60"
-                        Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                        HorizontalAlignment="Center">
-                  <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/sparkles-2.svg"
-                                    Color="{DynamicResource CardAccentBrush}"
-                                    Width="56" Height="56"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"/>
-                </Border>
-
-                <StackPanel Spacing="12" HorizontalAlignment="Center">
-                  <Button Content="{markup:T Ns=Onboarding, Key=DownloadModels}"
-                          Command="{Binding DownloadModelsCommand}"
-                          IsEnabled="{Binding !IsDownloading}"
-                          IsVisible="{Binding !IsDownloadComplete}"
-                          Padding="24,10"
-                          HorizontalAlignment="Center"/>
-                  
-                  <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="1"
-                               IsVisible="{Binding IsDownloading}"
-                               Width="240" Height="6"/>
-                  
-                  <TextBlock Text="{Binding DownloadStatusMessage}"
-                             FontSize="{DynamicResource FontSize.Body.Small}"
-                             Foreground="{DynamicResource TextSecondaryBrush}"
-                             TextAlignment="Center"
-                             IsVisible="{Binding IsDownloading}"/>
-                  
-                  <TextBlock Text="{Binding DownloadError}"
-                             FontSize="{DynamicResource FontSize.Body.Small}"
-                             Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
-                             TextAlignment="Center"
-                             IsVisible="{Binding ShowDownloadError}"/>
-                  
-                  <TextBlock Text="{Binding DownloadStatusMessage}"
-                             FontSize="{DynamicResource FontSize.Body.Medium}"
-                             FontFamily="{DynamicResource Font.Medium}"
-                             Foreground="{DynamicResource TextPrimaryBrush}"
-                             TextAlignment="Center"
-                             IsVisible="{Binding IsDownloadComplete}"/>
-                </StackPanel>
+              <StackPanel IsVisible="{Binding IsAISetupStep}">
+                <onboardingViews:AiModelSetupPanel DataContext="{Binding AiSetup}"/>
               </StackPanel>
             </StackPanel>
           </ScrollViewer>

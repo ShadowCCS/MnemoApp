@@ -16,16 +16,25 @@ public partial class StepSliderSettingViewModel : ViewModelBase
     [ObservableProperty] private string _description;
     
     [ObservableProperty] private int _selectedIndex;
+    [ObservableProperty] private bool _isInteractionEnabled = true;
 
     public ObservableCollection<string> Options { get; }
     public int MaxIndex => Options.Count - 1;
 
-    public StepSliderSettingViewModel(ISettingsService settingsService, string settingsKey, string title, string description, string[] options, string? defaultValue = null)
+    public StepSliderSettingViewModel(
+        ISettingsService settingsService,
+        string settingsKey,
+        string title,
+        string description,
+        string[] options,
+        string? defaultValue = null,
+        bool isInteractionEnabled = true)
     {
         _settingsService = settingsService;
         _settingsKey = settingsKey;
         _title = title;
         _description = description;
+        _isInteractionEnabled = isInteractionEnabled;
         Options = new ObservableCollection<string>(options);
         
         // Initialize value from settings

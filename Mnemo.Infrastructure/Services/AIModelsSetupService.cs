@@ -22,9 +22,8 @@ public class AIModelsSetupService : IAIModelsSetupService
     private const double DownloadPhaseProgressWeight = 0.65;
 
     /// <summary>
-    /// Release zips: <c>manager.zip</c>, <c>low.zip</c>, <c>middle.zip</c>, <c>high.zip</c>, <c>high-image.zip</c>.
-    /// <c>high</c> / <c>high-image</c> both extract into <c>text/high</c> (GGUF vs mmproj for vision); see <see cref="ModelRegistry"/>.
-    /// Text bundles per hardware tier: Low → manager + low; Mid → + middle; High → + high + high-image (not middle).
+    /// Release zips: <c>manager.zip</c>, <c>low.zip</c>, <c>low-image.zip</c>, <c>middle.zip</c>, <c>middle-image.zip</c>,
+    /// <c>high.zip</c>, <c>high-image.zip</c>. Text/vision pairs share the same folder (GGUF + optional mmproj); see <see cref="ModelRegistry"/>.
     /// </summary>
     private static readonly (string Name, string FileName, string RelativePath)[] Entries =
     {
@@ -32,7 +31,9 @@ public class AIModelsSetupService : IAIModelsSetupService
         ("server", "server.zip", "llamaServer"),
         ("manager", "manager.zip", Path.Combine("text", "manager")),
         ("low", "low.zip", Path.Combine("text", "low")),
+        ("low-image", "low-image.zip", Path.Combine("text", "low")),
         ("mid", "middle.zip", Path.Combine("text", "mid")),
+        ("middle-image", "middle-image.zip", Path.Combine("text", "mid")),
         ("high", "high.zip", Path.Combine("text", "high")),
         ("high-image", "high-image.zip", Path.Combine("text", "high")),
         ("stt", "stt.zip", Path.Combine("audio", "STT")),
@@ -68,7 +69,8 @@ public class AIModelsSetupService : IAIModelsSetupService
         var tier = _hardwareTierEvaluator.EvaluateTier(_hardwareDetector.Detect());
 
         var installed = new List<string>();
-        var missing = new List<string>();
+        var requiredMissing = new List<string>();
+        var optionalImageMissing = new List<string>();
 
         foreach (var (name, _, relativePath) in Entries)
         {
@@ -76,31 +78,73 @@ public class AIModelsSetupService : IAIModelsSetupService
             if (IsComponentInstalled(name, targetDir))
                 installed.Add(name);
             else if (IsRequiredForTier(name, tier))
-                missing.Add(name);
+                requiredMissing.Add(name);
+            else if (IsOptionalImageForTier(name, tier))
+                optionalImageMissing.Add(name);
         }
 
-        var status = new AIModelsSetupStatus { Installed = installed, Missing = missing };
+        var status = new AIModelsSetupStatus
+        {
+            HardwareTier = tier,
+            Installed = installed,
+            RequiredMissing = requiredMissing,
+            OptionalImageMissing = optionalImageMissing
+        };
         return Task.FromResult(status);
     }
 
+    public async Task<IReadOnlyDictionary<string, long>> GetComponentDownloadSizesAsync(CancellationToken cancellationToken = default)
+    {
+        var dict = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, fileName, _) in Entries)
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Head, ReleaseBaseUrl + fileName);
+                using var resp = await _httpClient.SendAsync(req, cancellationToken).ConfigureAwait(false);
+                if (resp.IsSuccessStatusCode && resp.Content.Headers.ContentLength is long len && len > 0)
+                    dict[name] = len;
+            }
+            catch
+            {
+                // ignore per-file
+            }
+        }
+
+        return dict;
+    }
+
     /// <summary>
-    /// Embedding, server, manager, STT, and <c>low</c> chat are always required.
-    /// <c>middle.zip</c> only for <see cref="HardwarePerformanceTier.Mid"/>.
-    /// <c>high.zip</c> / <c>high-image.zip</c> only for <see cref="HardwarePerformanceTier.High"/>.
+    /// Embedding, server, manager, STT, and the <c>low</c> chat bundle are always required (base layer for routing/orchestration).
+    /// <c>middle.zip</c> additionally for <see cref="HardwarePerformanceTier.Mid"/>; <c>high.zip</c> additionally for <see cref="HardwarePerformanceTier.High"/>.
+    /// Vision zips (<c>*-image</c>) are optional and selected in the UI.
     /// </summary>
     private static bool IsRequiredForTier(string name, HardwarePerformanceTier tier)
     {
         return name switch
         {
+            "low-image" or "middle-image" or "high-image" => false,
+            "low" => true,
             "mid" => tier == HardwarePerformanceTier.Mid,
-            "high" or "high-image" => tier == HardwarePerformanceTier.High,
+            "high" => tier == HardwarePerformanceTier.High,
             _ => true
+        };
+    }
+
+    private static bool IsOptionalImageForTier(string name, HardwarePerformanceTier tier)
+    {
+        return name switch
+        {
+            "low-image" => tier == HardwarePerformanceTier.Low,
+            "middle-image" => tier == HardwarePerformanceTier.Mid,
+            "high-image" => tier == HardwarePerformanceTier.High,
+            _ => false
         };
     }
 
     /// <summary>
     /// Server is installed if llama-server.exe exists; STT if ggml-tiny.bin exists;
-    /// other components if the directory exists and has files.
+    /// text tiers use *.gguf; vision attachments use *.mmproj in the same folder as the tier chat model.
     /// </summary>
     private static bool IsComponentInstalled(string name, string targetDir)
     {
@@ -119,29 +163,65 @@ public class AIModelsSetupService : IAIModelsSetupService
             return File.Exists(modelPath);
         }
 
-        if (string.Equals(name, "high", StringComparison.OrdinalIgnoreCase))
-            return Directory.Exists(targetDir) &&
-                   Directory.EnumerateFiles(targetDir, "*.gguf", SearchOption.AllDirectories).Any();
+        if (string.Equals(name, "low", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "mid", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "high", StringComparison.OrdinalIgnoreCase))
+        {
+            return Directory.EnumerateFiles(targetDir, "*.gguf", SearchOption.AllDirectories).Any();
+        }
 
-        if (string.Equals(name, "high-image", StringComparison.OrdinalIgnoreCase))
-            return Directory.Exists(targetDir) &&
-                   Directory.EnumerateFiles(targetDir, "*.mmproj", SearchOption.AllDirectories).Any();
+        if (string.Equals(name, "low-image", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "middle-image", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "high-image", StringComparison.OrdinalIgnoreCase))
+        {
+            return Directory.EnumerateFiles(targetDir, "*.mmproj", SearchOption.AllDirectories).Any();
+        }
 
         return Directory.EnumerateFileSystemEntries(targetDir, "*", SearchOption.AllDirectories).Any();
     }
 
+    private static (string Name, string FileName, string RelativePath)[] BuildInstallList(
+        AIModelsSetupStatus status,
+        IReadOnlySet<string>? optionalAdditionalComponents)
+    {
+        var installed = new HashSet<string>(status.Installed, StringComparer.OrdinalIgnoreCase);
+        var requiredMissing = new HashSet<string>(status.RequiredMissing, StringComparer.OrdinalIgnoreCase);
+        var optionalMissing = new HashSet<string>(status.OptionalImageMissing, StringComparer.OrdinalIgnoreCase);
+        var optional = optionalAdditionalComponents != null
+            ? new HashSet<string>(optionalAdditionalComponents, StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var list = new List<(string Name, string FileName, string RelativePath)>();
+        foreach (var e in Entries)
+        {
+            if (installed.Contains(e.Name))
+                continue;
+            if (requiredMissing.Contains(e.Name))
+            {
+                list.Add(e);
+                continue;
+            }
+
+            if (optional.Contains(e.Name) && optionalMissing.Contains(e.Name))
+                list.Add(e);
+        }
+
+        return list.ToArray();
+    }
+
     public async Task<Result<AIModelsSetupResult>> DownloadAndExtractMissingAsync(
         IProgress<AIModelsSetupProgress>? progress,
+        IReadOnlySet<string>? optionalAdditionalComponents,
         CancellationToken cancellationToken = default)
     {
         var status = await GetSetupStatusAsync(cancellationToken).ConfigureAwait(false);
-        if (status.AllInstalled)
+        var toInstall = BuildInstallList(status, optionalAdditionalComponents);
+        if (toInstall.Length == 0)
         {
-            progress?.Report(new AIModelsSetupProgress { Progress = 1.0, Message = "All models already installed." });
+            progress?.Report(new AIModelsSetupProgress { Progress = 1.0, Message = "All selected models already installed." });
             return Result<AIModelsSetupResult>.Success(new AIModelsSetupResult { Installed = Array.Empty<string>() });
         }
 
-        var toInstall = Entries.Where(e => status.Missing.Contains(e.Name)).ToArray();
         var installed = new List<string>();
         var n = toInstall.Length;
 

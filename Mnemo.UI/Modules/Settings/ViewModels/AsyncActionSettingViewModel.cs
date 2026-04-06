@@ -15,6 +15,9 @@ public partial class AsyncActionSettingViewModel : ViewModelBase
     [ObservableProperty] private string _actionText;
     [ObservableProperty] private string _statusText = string.Empty;
     [ObservableProperty] private bool _isRunning;
+    [ObservableProperty] private bool _isInteractionEnabled = true;
+
+    public bool CanClick => IsInteractionEnabled && !IsRunning;
 
     public ICommand ActionCommand { get; }
 
@@ -22,14 +25,28 @@ public partial class AsyncActionSettingViewModel : ViewModelBase
         string title,
         string description,
         string actionText,
-        Func<AsyncActionSettingViewModel, Task> onAction)
+        Func<AsyncActionSettingViewModel, Task> onAction,
+        bool isInteractionEnabled = true)
     {
         _title = title;
         _description = description;
         _actionText = actionText;
+        _isInteractionEnabled = isInteractionEnabled;
         ActionCommand = new AsyncRelayCommand(
             () => RunAsync(onAction),
-            () => !IsRunning);
+            () => CanClick);
+    }
+
+    partial void OnIsRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanClick));
+        ((AsyncRelayCommand)ActionCommand).NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsInteractionEnabledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanClick));
+        ((AsyncRelayCommand)ActionCommand).NotifyCanExecuteChanged();
     }
 
     private async Task RunAsync(Func<AsyncActionSettingViewModel, Task> action)
@@ -48,6 +65,7 @@ public partial class AsyncActionSettingViewModel : ViewModelBase
         finally
         {
             IsRunning = false;
+            OnPropertyChanged(nameof(CanClick));
             ((AsyncRelayCommand)ActionCommand).NotifyCanExecuteChanged();
         }
     }

@@ -109,13 +109,23 @@ public static class InlineMarkdownParser
                 break;
 
             case LinkInline link:
+            {
+                var href = link.Url ?? string.Empty;
+                var linkedStyle = string.IsNullOrEmpty(href)
+                    ? style
+                    : style.WithSet(InlineFormatKind.Link, InlineAutoLink.NormalizeUrl(href));
                 foreach (var c in link)
-                    VisitInlines(c, style, runs);
+                    VisitInlines(c, linkedStyle, runs);
                 break;
+            }
 
             case AutolinkInline auto:
-                runs.Add(new InlineRun(auto.Url ?? string.Empty, style));
+            {
+                var raw = auto.Url ?? string.Empty;
+                var href = InlineAutoLink.NormalizeUrl(raw);
+                runs.Add(new InlineRun(raw, style.WithSet(InlineFormatKind.Link, href)));
                 break;
+            }
 
             case HtmlInline:
                 break;

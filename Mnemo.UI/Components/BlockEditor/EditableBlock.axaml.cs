@@ -16,8 +16,12 @@ using Mnemo.Core.Formatting;
 using Mnemo.UI.Components.BlockEditor.BlockComponents;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Image;
 using Mnemo.UI.Components.BlockEditor.FormattingToolbar;
+using Mnemo.UI.Components.Overlays;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Mnemo.UI;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
@@ -290,6 +294,7 @@ public partial class EditableBlock : UserControl
             if (editor != null)
             {
                 _currentEditor = editor;
+                editor.ExternalLinkNavigationRequested = OnExternalLinkNavigationRequestedAsync;
                 _backspaceTunnelHandler = OnBackspaceTunnelKeyDown;
                 editor.AddHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler, Avalonia.Interactivity.RoutingStrategies.Tunnel);
 
@@ -366,6 +371,7 @@ public partial class EditableBlock : UserControl
     {
         if (_currentEditor != null)
         {
+            _currentEditor.ExternalLinkNavigationRequested = null;
             if (_backspaceTunnelHandler != null)
                 _currentEditor.RemoveHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler);
             _currentEditor.PointerReleased -= OnTextBoxPointerReleasedForToolbar;
@@ -739,8 +745,18 @@ public partial class EditableBlock : UserControl
 
         if (_viewModel.Type != BlockType.Image)
         {
+            // Run after TextInput so "* " / "- " is in the buffer (KeyDown runs before the space is inserted).
             if (e.Key == Key.Space)
-                _markdownDetector?.TryDetectShortcut(editor);
+            {
+                var typeForShortcut = _viewModel.Type;
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (_viewModel == null || _viewModel.Type != typeForShortcut) return;
+                    var ed = _currentBlockComponent?.GetRichTextEditor();
+                    if (ed == null) return;
+                    _markdownDetector?.TryDetectShortcut(ed, _viewModel.Type);
+                }, DispatcherPriority.Input);
+            }
 
             var isSlashKey = e.Key == Key.Divide || e.Key == Key.OemQuestion || e.Key == Key.Oem2;
             if (isSlashKey && BlockEditorContentPolicy.IsVisuallyEmpty(editor.Text) && _stateManager != null && _slashMenuOverlayId == null)
@@ -791,7 +807,8 @@ public partial class EditableBlock : UserControl
     #region Keyboard and Input Handling
 
     /// <summary>
-    /// Ctrl+B/I/U, Ctrl+Shift+S (strikethrough), Ctrl+Shift+H (highlight). With no selection, toggles format on the word at the caret.
+    /// Ctrl+B/I/U, Ctrl+Shift+S (strikethrough), Ctrl+Shift+H (highlight), Ctrl+Shift+L (link / unlink).
+    /// With no selection, toggles format on the word at the caret except for links (caret must be inside a link span to unlink, or select text to add a link).
     /// </summary>
     private bool TryHandleInlineFormatShortcut(KeyEventArgs e, RichTextEditor editor)
     {
@@ -803,6 +820,14 @@ public partial class EditableBlock : UserControl
             return false;
 
         bool shift = (mods & KeyModifiers.Shift) != 0;
+
+        if (e.Key == Key.L && shift)
+        {
+            e.Handled = true;
+            _ = HandleLinkShortcutAsync(editor);
+            return true;
+        }
+
         InlineFormatKind? kind = e.Key switch
         {
             Key.B when !shift => InlineFormatKind.Bold,
@@ -846,6 +871,37 @@ public partial class EditableBlock : UserControl
         ApplyInlineFormat(kind.Value, color);
         e.Handled = true;
         return true;
+    }
+
+    private static (int start, int end)? TryGetContiguousLinkSpanAtCaret(RichTextEditor editor, IReadOnlyList<InlineRun> runs)
+    {
+        var flatLen = InlineRunFormatApplier.Flatten(runs).Length;
+        if (flatLen == 0) return null;
+        int caret = Math.Clamp(editor.CaretIndex, 0, flatLen);
+        int idx = caret >= flatLen ? flatLen - 1 : caret;
+        string? url = GetLinkUrlAtCharIndex(runs, idx);
+        if (string.IsNullOrEmpty(url)) return null;
+        int s = idx;
+        while (s > 0 && string.Equals(GetLinkUrlAtCharIndex(runs, s - 1), url, StringComparison.OrdinalIgnoreCase))
+            s--;
+        int end = idx + 1;
+        while (end < flatLen && string.Equals(GetLinkUrlAtCharIndex(runs, end), url, StringComparison.OrdinalIgnoreCase))
+            end++;
+        return (s, end);
+    }
+
+    private static string? GetLinkUrlAtCharIndex(IReadOnlyList<InlineRun> runs, int index)
+    {
+        int pos = 0;
+        foreach (var run in runs)
+        {
+            int end = pos + run.Text.Length;
+            if (index < end && index >= pos)
+                return run.Style.LinkUrl;
+            pos = end;
+        }
+
+        return null;
     }
 
     private void HandleBackspaceOnEmptyBlock()
@@ -934,14 +990,23 @@ public partial class EditableBlock : UserControl
         using (_stateManager.BeginUpdate())
         {
             _viewModel.Type = blockType;
-            _viewModel.Content = string.Empty;
-            _stateManager.PreviousText = string.Empty;
+            if (meta != null
+                && meta.TryGetValue(MarkdownShortcutDetector.ShortcutReplacementContentKey, out var repl)
+                && repl is string replacementText)
+            {
+                _viewModel.Content = replacementText;
+            }
+            else
+                _viewModel.Content = string.Empty;
+            _stateManager.PreviousText = _viewModel.Content ?? string.Empty;
             _focusManager?.ClearCache();
             
             if (meta != null)
             {
                 foreach (var kvp in meta)
                 {
+                    if (kvp.Key == MarkdownShortcutDetector.ShortcutReplacementContentKey)
+                        continue;
                     _viewModel.Meta[kvp.Key] = kvp.Value;
                 }
             }
@@ -1270,17 +1335,18 @@ public partial class EditableBlock : UserControl
         if (_currentFormattingToolbar == null || _cachedSelectionRange == null || _viewModel == null) return;
         var (start, end) = _cachedSelectionRange.Value;
         var state = GetFormatStateForRange(_viewModel.Runs, start, end);
-        _currentFormattingToolbar.UpdateFormatState(state.bold, state.italic, state.underline, state.strikethrough, state.highlight, state.backgroundColor);
+        _currentFormattingToolbar.UpdateFormatState(state.bold, state.italic, state.underline, state.strikethrough, state.highlight, state.backgroundColor, state.hasLink);
         var heading = _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3;
         _currentFormattingToolbar.SetBoldButtonEnabled(!heading);
     }
 
-    private static (bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor) GetFormatStateForRange(IReadOnlyList<InlineRun> runs, int start, int end)
+    private static (bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor, bool hasLink) GetFormatStateForRange(IReadOnlyList<InlineRun> runs, int start, int end)
     {
-        if (runs.Count == 0 || start >= end) return (false, false, false, false, false, null);
+        if (runs.Count == 0 || start >= end) return (false, false, false, false, false, null, false);
         bool bold = true, italic = true, underline = true, strikethrough = true, highlight = true;
         string? backgroundColor = null;
         bool anyOverlap = false;
+        bool hasLink = false;
         int pos = 0;
         foreach (var run in runs)
         {
@@ -1294,18 +1360,287 @@ public partial class EditableBlock : UserControl
             if (run.Style.BackgroundColor == null) highlight = false;
             else if (backgroundColor == null) backgroundColor = run.Style.BackgroundColor;
             else if (backgroundColor != run.Style.BackgroundColor) highlight = false;
+            if (run.Style.LinkUrl != null) hasLink = true;
             pos = runEnd;
         }
-        if (!anyOverlap) return (false, false, false, false, false, null);
-        return (bold, italic, underline, strikethrough, highlight, backgroundColor);
+        if (!anyOverlap) return (false, false, false, false, false, null, false);
+        return (bold, italic, underline, strikethrough, highlight, backgroundColor, hasLink);
     }
 
     private void OnFormatRequested(InlineFormatKind kind)
     {
+        if (kind == InlineFormatKind.Link)
+        {
+            _ = HandleLinkFormatRequestedAsync();
+            return;
+        }
+
         string? color = null;
         if (kind == InlineFormatKind.Highlight && Application.Current?.TryFindResource("InlineHighlightColor", out var res) == true && res is Color c)
             color = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
         ApplyInlineFormat(kind, color);
+    }
+
+    private async Task HandleLinkFormatRequestedAsync(bool expandWordWhenNoSelection = true)
+    {
+        var blockEditor = FindParentBlockEditor();
+        var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+
+        if (editor != null && blockEditor?.HasCrossBlockTextSelection() != true && _viewModel != null)
+        {
+            if (GetSelectionRange() == null && _cachedSelectionRange == null)
+            {
+                var linkSpan = TryGetContiguousLinkSpanAtCaret(editor, _viewModel.Runs);
+                if (linkSpan != null)
+                {
+                    editor.SelectionStart = linkSpan.Value.start;
+                    editor.SelectionEnd = linkSpan.Value.end;
+                    editor.CaretIndex = linkSpan.Value.end;
+                    _cachedSelectionRange = (linkSpan.Value.start, linkSpan.Value.end);
+                }
+                else if (expandWordWhenNoSelection)
+                {
+                    var word = editor.TryGetWordRangeAtCaret();
+                    if (word != null)
+                    {
+                        editor.SelectionStart = word.Value.Start;
+                        editor.SelectionEnd = word.Value.End;
+                        editor.CaretIndex = word.Value.End;
+                        _cachedSelectionRange = (word.Value.Start, word.Value.End);
+                    }
+                }
+            }
+        }
+
+        if (blockEditor?.HasCrossBlockTextSelection() == true)
+        {
+            bool hasLink = blockEditor.CrossBlockTextSelectionHasLink();
+            string? crossUrl = hasLink ? blockEditor.TryGetFirstLinkUrlInCrossBlockSelection() : null;
+            var result = await ShowLinkEditDialogAsync(
+                initialUrl: crossUrl ?? string.Empty,
+                initialDisplay: string.Empty,
+                showDisplaySection: false,
+                showCrossBlockHint: true,
+                showRemoveLink: hasLink,
+                wasEditingLink: hasLink,
+                titleKey: hasLink ? "EditLinkTitle" : "InsertLinkTitle");
+            if (result == null) return;
+            if (result.RemoveLinkRequested)
+            {
+                ApplyInlineFormat(InlineFormatKind.Link, null);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(result.Url)) return;
+            ApplyInlineFormat(InlineFormatKind.Link, NormalizeUrlInput(result.Url.Trim()));
+            return;
+        }
+
+        var range = GetSelectionRange() ?? _cachedSelectionRange;
+        if (range == null || _viewModel == null) return;
+
+        var flat = InlineRunFormatApplier.Flatten(_viewModel.Runs);
+        var (a, b) = range.Value;
+        if (a >= b || b > flat.Length) return;
+        string selectedText = flat.Substring(a, b - a);
+        bool hasLinkSel = GetFormatStateForRange(_viewModel.Runs, a, b).hasLink;
+        string? initialUrl = hasLinkSel ? GetLinkUrlForRange(_viewModel.Runs, a, b) : null;
+
+        var dlgResult = await ShowLinkEditDialogAsync(
+            initialUrl: initialUrl ?? string.Empty,
+            initialDisplay: selectedText,
+            showDisplaySection: true,
+            showCrossBlockHint: false,
+            showRemoveLink: hasLinkSel,
+            wasEditingLink: hasLinkSel,
+            titleKey: hasLinkSel ? "EditLinkTitle" : "InsertLinkTitle");
+        if (dlgResult == null) return;
+
+        if (dlgResult.RemoveLinkRequested)
+        {
+            ApplyInlineFormat(InlineFormatKind.Link, null);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(dlgResult.Url))
+        {
+            if (hasLinkSel)
+                ApplyInlineFormat(InlineFormatKind.Link, null);
+            return;
+        }
+
+        var normalized = NormalizeUrlInput(dlgResult.Url.Trim());
+        CommitSingleBlockLinkApply(range.Value, dlgResult.DisplayText, normalized);
+    }
+
+    private void CommitSingleBlockLinkApply((int start, int end) range, string displayText, string normalizedUrl)
+    {
+        var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+        if (editor == null || _viewModel == null) return;
+
+        var (newStart, newEnd) = _viewModel.ApplyLinkEdit(range.start, range.end, displayText, normalizedUrl, removeLink: false);
+
+        _stateManager?.SetUpdatingFromViewModel();
+        editor.Runs = _viewModel.Runs;
+        editor.SelectionStart = newStart;
+        editor.SelectionEnd = newEnd;
+        editor.CaretIndex = newEnd;
+        if (_stateManager != null)
+            _stateManager.PreviousText = _viewModel.Content;
+        _stateManager?.SetNormal();
+        _cachedSelectionRange = (newStart, newEnd);
+        UpdateFormattingToolbarState();
+        editor.Focus();
+    }
+
+    private static string? GetLinkUrlForRange(IReadOnlyList<InlineRun> runs, int start, int end)
+    {
+        int pos = 0;
+        foreach (var run in runs)
+        {
+            int re = pos + run.Text.Length;
+            if (re > start && pos < end && run.Style.LinkUrl != null)
+                return run.Style.LinkUrl;
+            pos = re;
+        }
+        return null;
+    }
+
+    private Task<LinkEditDialogResult?> ShowLinkEditDialogAsync(
+        string initialUrl,
+        string initialDisplay,
+        bool showDisplaySection,
+        bool showCrossBlockHint,
+        bool showRemoveLink,
+        bool wasEditingLink,
+        string titleKey)
+    {
+        var tcs = new TaskCompletionSource<LinkEditDialogResult?>();
+        var overlaySvc = _overlayService ?? (Application.Current as App)?.Services?.GetService<IOverlayService>();
+        if (overlaySvc == null)
+        {
+            tcs.SetResult(null);
+            return tcs.Task;
+        }
+
+        var loc = (Application.Current as App)?.Services?.GetService<ILocalizationService>();
+        string T(string key, string ns = "NotesEditor") => loc?.T(key, ns) ?? key;
+
+        var dialog = new LinkInsertDialogOverlay
+        {
+            Title = T(titleKey),
+            UrlLabel = T("InsertLinkUrlLabel"),
+            Url = initialUrl,
+            UrlPlaceholder = T("InsertLinkUrlPlaceholder"),
+            DisplayLabel = T("InsertLinkDisplayLabel"),
+            DisplayText = initialDisplay,
+            DisplayPlaceholder = T("InsertLinkDisplayPlaceholder"),
+            ShowDisplaySection = showDisplaySection,
+            ShowCrossBlockHint = showCrossBlockHint,
+            CrossBlockHint = showCrossBlockHint ? T("CrossBlockLinkHint") : null,
+            ShowRemoveLink = showRemoveLink,
+            RemoveLinkText = T("InsertLinkRemoveLink"),
+            ConfirmText = loc?.T("OK", "Common") ?? "OK",
+            CancelText = loc?.T("Cancel", "Common") ?? "Cancel",
+            RequireUrlForConfirm = !wasEditingLink
+        };
+
+        var id = overlaySvc.CreateOverlay(dialog, new OverlayOptions
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true,
+            CloseOnEscape = true
+        }, "LinkInsert");
+
+        dialog.OnResult = result =>
+        {
+            overlaySvc.CloseOverlay(id);
+            tcs.TrySetResult(result);
+        };
+
+        return tcs.Task;
+    }
+
+    /// <summary>Ctrl+Shift+L: same dialog as toolbar; only expands selection to a contiguous link span (no word expansion).</summary>
+    private async Task HandleLinkShortcutAsync(RichTextEditor editor)
+    {
+        var blockEditor = FindParentBlockEditor();
+        if (blockEditor == null || _viewModel == null) return;
+
+        if (blockEditor.HasCrossBlockTextSelection())
+        {
+            await HandleLinkFormatRequestedAsync(expandWordWhenNoSelection: false);
+            return;
+        }
+
+        if (GetSelectionRange() == null)
+        {
+            var span = TryGetContiguousLinkSpanAtCaret(editor, _viewModel.Runs);
+            if (span == null)
+                return;
+            editor.SelectionStart = span.Value.start;
+            editor.SelectionEnd = span.Value.end;
+            editor.CaretIndex = span.Value.end;
+            _cachedSelectionRange = (span.Value.start, span.Value.end);
+        }
+
+        await HandleLinkFormatRequestedAsync(expandWordWhenNoSelection: false);
+    }
+
+    private static string NormalizeUrlInput(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return input;
+        if (Uri.TryCreate(input, UriKind.Absolute, out var abs))
+            return abs.ToString();
+        if (input.Contains('@', StringComparison.Ordinal) && !input.Contains("://", StringComparison.Ordinal))
+            return "mailto:" + input;
+        if (!input.Contains("://", StringComparison.Ordinal))
+            return "https://" + input;
+        return input;
+    }
+
+    private async Task OnExternalLinkNavigationRequestedAsync(string url)
+    {
+        if (await ConfirmExternalNavigationAsync(url))
+            RichTextEditor.OpenExternalUrl(url, this);
+    }
+
+    private async Task<bool> ConfirmExternalNavigationAsync(string url)
+    {
+        var overlaySvc = _overlayService ?? (Application.Current as App)?.Services?.GetService<IOverlayService>();
+        if (overlaySvc == null)
+            return true;
+
+        var loc = (Application.Current as App)?.Services?.GetService<ILocalizationService>();
+        string T(string key, string ns = "NotesEditor") => loc?.T(key, ns) ?? key;
+        var continueLabel = loc?.T("Continue", "Common") ?? "Continue";
+        var cancelLabel = loc?.T("Cancel", "Common") ?? "Cancel";
+
+        var tcs = new TaskCompletionSource<bool>();
+        var dialog = new DialogOverlay
+        {
+            Title = T("ExternalLinkTitle"),
+            Description = string.Format(T("ExternalLinkMessage"), url),
+            PrimaryText = continueLabel,
+            SecondaryText = cancelLabel
+        };
+
+        var id = overlaySvc.CreateOverlay(dialog, new OverlayOptions
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = false,
+            CloseOnEscape = true
+        }, "ExternalLinkConfirm");
+
+        dialog.OnChoose = choice =>
+        {
+            overlaySvc.CloseOverlay(id);
+            tcs.TrySetResult(string.Equals(choice, continueLabel, StringComparison.Ordinal));
+        };
+
+        return await tcs.Task;
     }
 
     private void OnBackgroundColorRequested(string hex)
@@ -1713,6 +2048,15 @@ public partial class EditableBlock : UserControl
         int end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
         if (start >= end) return null;
         return (start, end);
+    }
+
+    /// <summary>True if the current non-empty selection overlaps any linked run.</summary>
+    internal bool DoesSelectionHaveLink()
+    {
+        if (_viewModel == null) return false;
+        var range = GetSelectionRange();
+        if (range == null) return false;
+        return GetFormatStateForRange(_viewModel.Runs, range.Value.start, range.Value.end).hasLink;
     }
 
     public int? GetCaretIndex()

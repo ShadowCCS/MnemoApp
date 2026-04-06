@@ -38,7 +38,8 @@
         <DataTemplate x:Key="ToggleSettingTemplate" x:DataType="vm:ToggleSettingViewModel">
             <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
                 <components:SettingsCard.RightContent>
-                    <ToggleSwitch IsChecked="{Binding Value}" 
+                    <ToggleSwitch IsChecked="{Binding Value}"
+                                  IsEnabled="{Binding IsInteractionEnabled}"
                                   OnContent="" 
                                   OffContent=""
                                   MinWidth="0"/>
@@ -52,6 +53,7 @@
                 <components:SettingsCard.RightContent>
                     <controls:ModernComboBox ItemsSource="{Binding Options}" 
                               SelectedItem="{Binding SelectedOption}" 
+                              IsEnabled="{Binding IsInteractionEnabled}"
                               Width="180"
                               Height="36"
                               VerticalContentAlignment="Center"/>
@@ -110,7 +112,7 @@
                     <StackPanel Spacing="6" HorizontalAlignment="Right">
                         <Button Content="{Binding ActionText}"
                                 Command="{Binding ActionCommand}"
-                                IsEnabled="{Binding !IsRunning}"
+                                IsEnabled="{Binding CanClick}"
                                 Padding="16,8"
                                 CornerRadius="6"
                                 Background="{DynamicResource SecondaryButtonBackgroundBrush}"
@@ -404,6 +406,7 @@
                         <Slider Minimum="0" 
                                 Maximum="{Binding MaxIndex}" 
                                 Value="{Binding SelectedIndex}" 
+                                IsEnabled="{Binding IsInteractionEnabled}"
                                 TickFrequency="1" 
                                 IsSnapToTickEnabled="True"
                                 MinHeight="30"

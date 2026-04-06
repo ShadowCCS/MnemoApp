@@ -105,6 +105,17 @@
                     Color="{DynamicResource TextPrimaryBrush}" />
             </Button>
 
+            <!-- Link (add / remove) -->
+            <Button
+                x:Name="UnlinkButton"
+                Classes="FormattingToolbarButton FormattingToolbarIcon"
+                Click="OnUnlinkClick">
+                <controls:SvgIcon
+                    Width="16" Height="16"
+                    SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg"
+                    Color="{DynamicResource TextPrimaryBrush}" />
+            </Button>
+
             <!-- Strikethrough -->
             <Button
                 x:Name="StrikethroughButton"

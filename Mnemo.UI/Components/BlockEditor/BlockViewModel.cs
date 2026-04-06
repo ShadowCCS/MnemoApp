@@ -89,6 +89,16 @@ public class BlockViewModel : INotifyPropertyChanged
             _previousRuns = CloneRuns();
             _inlineRuns = InlineRunFormatApplier.ApplyTextEdit(_inlineRuns, _cachedFlatContent, newText);
             EnsureHeadingBold();
+            if (_type != BlockType.Code)
+            {
+                var autolinked = InlineRunFormatApplier.Normalize(InlineAutoLink.Apply(_inlineRuns));
+                if (!RunsListContentEqual(_inlineRuns, autolinked))
+                {
+                    _inlineRuns = autolinked;
+                    EnsureHeadingBold();
+                }
+            }
+
             _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
             OnPropertyChanged();
             OnPropertyChanged(nameof(Watermark));
@@ -155,7 +165,33 @@ public class BlockViewModel : INotifyPropertyChanged
         _previousContent = _cachedFlatContent;
         _previousRuns = CloneRuns();
         SetRuns(newRuns);
+        if (_type != BlockType.Code)
+        {
+            var autolinked = InlineRunFormatApplier.Normalize(InlineAutoLink.Apply(_inlineRuns));
+            if (!RunsListContentEqual(_inlineRuns, autolinked))
+            {
+                _inlineRuns = autolinked;
+                EnsureHeadingBold();
+                _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
+                OnPropertyChanged(nameof(Content));
+                OnPropertyChanged(nameof(Runs));
+                OnPropertyChanged(nameof(Watermark));
+            }
+        }
+
         ContentChanged?.Invoke(this);
+    }
+
+    private static bool RunsListContentEqual(IReadOnlyList<InlineRun> a, IReadOnlyList<InlineRun> b)
+    {
+        if (a.Count != b.Count) return false;
+        for (int i = 0; i < a.Count; i++)
+        {
+            if (a[i].Text != b[i].Text || a[i].Style != b[i].Style)
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -175,6 +211,58 @@ public class BlockViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(Runs));
         ContentChanged?.Invoke(this);
         return (start, end);
+    }
+
+    /// <summary>
+    /// Sets or clears a link on <c>[start, end)</c>, optionally replacing that range with <paramref name="displayText"/> first.
+    /// When <paramref name="removeLink"/> is true, clears link formatting on the range (ignores <paramref name="url"/>).
+    /// </summary>
+    public (int Start, int End) ApplyLinkEdit(int start, int end, string displayText, string url, bool removeLink)
+    {
+        _previousContent = _cachedFlatContent;
+        _previousRuns = CloneRuns();
+
+        if (removeLink)
+        {
+            _inlineRuns = InlineRunFormatApplier.Apply(_inlineRuns, start, end, InlineFormatKind.Link, null);
+            _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
+            OnPropertyChanged(nameof(Content));
+            OnPropertyChanged(nameof(Runs));
+            ContentChanged?.Invoke(this);
+            return (start, end);
+        }
+
+        var flat = InlineRunFormatApplier.Flatten(_inlineRuns);
+        if (start < 0 || end > flat.Length || start > end)
+            return (start, end);
+
+        if (end > start)
+        {
+            var slice = flat.Substring(start, end - start);
+            if (slice != displayText)
+            {
+                var newFlat = flat.Substring(0, start) + displayText + flat.Substring(end);
+                _inlineRuns = InlineRunFormatApplier.ApplyTextEdit(_inlineRuns, flat, newFlat);
+            }
+        }
+
+        flat = InlineRunFormatApplier.Flatten(_inlineRuns);
+        int linkEnd = start + displayText.Length;
+        if (linkEnd > flat.Length) linkEnd = flat.Length;
+        if (linkEnd <= start)
+        {
+            OnPropertyChanged(nameof(Content));
+            OnPropertyChanged(nameof(Runs));
+            ContentChanged?.Invoke(this);
+            return (start, start);
+        }
+
+        _inlineRuns = InlineRunFormatApplier.Apply(_inlineRuns, start, linkEnd, InlineFormatKind.Link, url);
+        _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
+        OnPropertyChanged(nameof(Content));
+        OnPropertyChanged(nameof(Runs));
+        ContentChanged?.Invoke(this);
+        return (start, linkEnd);
     }
 
     /// <summary>
@@ -460,7 +548,16 @@ public class BlockViewModel : INotifyPropertyChanged
                 }
                 break;
         }
-        
+
+        if (_type != BlockType.Image)
+        {
+            foreach (var k in new[] { "imagePath", "imageAlt", "imageWidth", "imageAlign" })
+            {
+                if (_meta.Remove(k))
+                    metaChanged = true;
+            }
+        }
+
         if (metaChanged)
         {
             OnPropertyChanged(nameof(Meta));

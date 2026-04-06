@@ -152,6 +152,8 @@ public abstract class BlockComponentBase : UserControl
         _suppressSync = true;
         ViewModel.CommitRunsFromEditor(_editor.Runs);
         _suppressSync = false;
+        // Commit may normalize or auto-link; sync VM → editor after suppress ends.
+        SyncFromViewModel();
 
         EditorTextChanged?.Invoke(this, e);
         TextBoxTextChanged?.Invoke(this, e);

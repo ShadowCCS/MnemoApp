@@ -10,7 +10,9 @@ public readonly record struct InlineStyle(
     bool Underline = false,
     bool Strikethrough = false,
     bool Code = false,
-    string? BackgroundColor = null)
+    string? BackgroundColor = null,
+    string? LinkUrl = null,
+    bool SuppressAutoLink = false)
 {
     public static readonly InlineStyle Default = new();
 
@@ -24,6 +26,9 @@ public readonly record struct InlineStyle(
         Formatting.InlineFormatKind.Code => this with { Code = !Code },
         Formatting.InlineFormatKind.Highlight => this with { BackgroundColor = BackgroundColor != null ? null : (color ?? "#FFFF00") },
         Formatting.InlineFormatKind.BackgroundColor => this with { BackgroundColor = BackgroundColor == color ? null : color },
+        Formatting.InlineFormatKind.Link => LinkUrl != null
+            ? this with { LinkUrl = null, SuppressAutoLink = true }
+            : this,
         _ => this
     };
 
@@ -37,6 +42,7 @@ public readonly record struct InlineStyle(
         Formatting.InlineFormatKind.Code => this with { Code = true },
         Formatting.InlineFormatKind.Highlight => this with { BackgroundColor = color ?? "#FFFF00" },
         Formatting.InlineFormatKind.BackgroundColor => this with { BackgroundColor = color },
+        Formatting.InlineFormatKind.Link => this with { LinkUrl = color, SuppressAutoLink = false },
         _ => this
     };
 
@@ -50,6 +56,9 @@ public readonly record struct InlineStyle(
         Formatting.InlineFormatKind.Code => this with { Code = false },
         Formatting.InlineFormatKind.Highlight => this with { BackgroundColor = null },
         Formatting.InlineFormatKind.BackgroundColor => this with { BackgroundColor = null },
+        Formatting.InlineFormatKind.Link => LinkUrl != null
+            ? this with { LinkUrl = null, SuppressAutoLink = true }
+            : this,
         _ => this
     };
 
@@ -63,6 +72,7 @@ public readonly record struct InlineStyle(
         Formatting.InlineFormatKind.Code => Code,
         Formatting.InlineFormatKind.Highlight => BackgroundColor != null,
         Formatting.InlineFormatKind.BackgroundColor => BackgroundColor != null,
+        Formatting.InlineFormatKind.Link => LinkUrl != null,
         _ => false
     };
 }

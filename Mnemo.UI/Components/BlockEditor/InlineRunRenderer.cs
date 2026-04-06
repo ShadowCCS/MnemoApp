@@ -46,12 +46,17 @@ public static class InlineRunRenderer
             run.FontFamily = MonoFont;
 
         var decorations = new TextDecorationCollection();
-        if (style.Underline)
+        if (style.Underline || !string.IsNullOrEmpty(style.LinkUrl))
             decorations.Add(new TextDecoration { Location = TextDecorationLocation.Underline });
         if (style.Strikethrough)
             decorations.Add(new TextDecoration { Location = TextDecorationLocation.Strikethrough });
         if (decorations.Count > 0)
             run.TextDecorations = decorations;
+
+        if (!string.IsNullOrEmpty(style.LinkUrl)
+            && Application.Current?.TryFindResource("LinksBrush", out var linkRes) == true
+            && linkRes is IBrush linkBrush)
+            run.Foreground = linkBrush;
 
         if (!string.IsNullOrEmpty(style.BackgroundColor))
         {

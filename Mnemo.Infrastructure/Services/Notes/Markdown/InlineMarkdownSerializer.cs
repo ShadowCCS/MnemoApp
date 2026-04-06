@@ -34,7 +34,15 @@ public static class InlineMarkdownSerializer
             s = "*" + s + "*";
         if (r.Style.Strikethrough)
             s = "~~" + s + "~~";
+        if (!string.IsNullOrEmpty(r.Style.LinkUrl))
+            s = "[" + s + "](" + EscapeMarkdownLinkDestination(r.Style.LinkUrl) + ")";
         return s;
+    }
+
+    private static string EscapeMarkdownLinkDestination(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return url;
+        return url.Replace("\\", "\\\\", StringComparison.Ordinal).Replace(")", "\\)", StringComparison.Ordinal);
     }
 
     private static string SerializeCodeSpan(string text)

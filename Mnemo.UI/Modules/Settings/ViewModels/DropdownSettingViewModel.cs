@@ -17,6 +17,7 @@ public partial class DropdownSettingViewModel : ViewModelBase
     [ObservableProperty] private string _title;
     [ObservableProperty] private string _description;
     [ObservableProperty] private string _selectedOption;
+    [ObservableProperty] private bool _isInteractionEnabled = true;
     public ObservableCollection<string> Options { get; }
 
     /// <summary>
@@ -31,7 +32,8 @@ public partial class DropdownSettingViewModel : ViewModelBase
         string[] storageValues,
         string[]? displayLabels = null,
         string? defaultStorageValue = null,
-        Func<string, string?>? normalizeStoredValue = null)
+        Func<string, string?>? normalizeStoredValue = null,
+        bool isInteractionEnabled = true)
     {
         if (storageValues.Length == 0)
             throw new ArgumentException("At least one option is required.");
@@ -48,6 +50,7 @@ public partial class DropdownSettingViewModel : ViewModelBase
 
         _title = title;
         _description = description;
+        _isInteractionEnabled = isInteractionEnabled;
         Options = new ObservableCollection<string>(display);
 
         var defaultStorage = defaultStorageValue ?? storageValues[0];

@@ -38,7 +38,13 @@ public static class InlineRunFormatApplier
             if (isInRange)
             {
                 InlineStyle newStyle;
-                if (kind == InlineFormatKind.BackgroundColor)
+                if (kind == InlineFormatKind.Link)
+                {
+                    newStyle = color == null
+                        ? run.Style.WithClear(InlineFormatKind.Link)
+                        : run.Style.WithSet(InlineFormatKind.Link, color);
+                }
+                else if (kind == InlineFormatKind.BackgroundColor)
                     newStyle = allHaveFormat
                         ? run.Style.WithClear(kind)
                         : run.Style.WithSet(kind, color);

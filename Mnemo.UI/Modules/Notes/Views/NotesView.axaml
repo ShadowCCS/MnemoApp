@@ -61,25 +61,15 @@
                         </Style>
                     </Grid.Styles>
                     <!-- Header -->
-                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="10,12,10,8">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,12,10,8">
                         <TextBlock Text="{markup:T Ns=Notes, Key=Notes}"
                                    FontSize="{DynamicResource FontSize.Heading2}"
                                    FontFamily="{DynamicResource Font.Bold}"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
-                        
-                        <!-- New Note Button -->
-                        <Button Grid.Column="1" Command="{Binding NewNoteCommand}"
-                                Background="Transparent" BorderThickness="0"
-                                Padding="6" Margin="8,0,4,0"
-                                Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=NewNote}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg"
-                                              Width="20" Height="20"
-                                              Color="{DynamicResource TextPrimaryBrush}"/>
-                        </Button>
 
                         <!-- Collapse Button -->
-                        <Button Grid.Column="2" Command="{Binding ToggleSidebarCommand}"
+                        <Button Grid.Column="1" Command="{Binding ToggleSidebarCommand}"
                                 Background="Transparent" BorderThickness="0"
                                 Padding="6"
                                 Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=ToggleSidebar}">
@@ -113,17 +103,24 @@
                             </StackPanel>
 
                             <!-- My Notes (Folders + Notes) -->
-                            <Grid ColumnDefinitions="*,Auto" Margin="4,2,4,2">
+                            <Grid ColumnDefinitions="*,Auto,Auto" Margin="4,2,4,2">
                                 <TextBlock Text="{markup:T Ns=Notes, Key=MyNotes}"
                                            FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                            FontFamily="{DynamicResource Font.SemiBold}"
                                            Foreground="{DynamicResource TextTertiaryBrush}"
                                            VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Command="{Binding NewFolderCommand}"
+                                <Button Grid.Column="1" Command="{Binding NewNoteCommand}"
+                                        Background="Transparent" BorderThickness="0" Padding="4" Margin="0,0,2,0"
+                                        Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=NewNote}">
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg"
+                                                      Width="16" Height="16"
+                                                      Color="{DynamicResource TextTertiaryBrush}"/>
+                                </Button>
+                                <Button Grid.Column="2" Command="{Binding NewFolderCommand}"
                                         Background="Transparent" BorderThickness="0" Padding="4"
                                         Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=NewFolder}">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg"
-                                                      Width="14" Height="14"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder-plus-corner.svg"
+                                                      Width="16" Height="16"
                                                       Color="{DynamicResource TextTertiaryBrush}"/>
                                 </Button>
                             </Grid>

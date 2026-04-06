@@ -28,5 +28,31 @@ public static class MnemoAppPaths
     /// </summary>
     public static string GetImagesDirectory()
         => Path.Combine(GetLocalUserDataRoot(), "images");
+
+    /// <summary>
+    /// True when <paramref name="absolutePath"/> resolves to a file under <see cref="GetImagesDirectory"/>.
+    /// Used so we only delete managed copies, never arbitrary user-selected paths.
+    /// </summary>
+    public static bool IsPathUnderImagesDirectory(string absolutePath)
+    {
+        if (string.IsNullOrWhiteSpace(absolutePath))
+            return false;
+
+        try
+        {
+            var fullFile = Path.GetFullPath(absolutePath);
+            var dir = Path.GetFullPath(GetImagesDirectory());
+            if (fullFile.Length <= dir.Length)
+                return false;
+            if (!fullFile.StartsWith(dir, StringComparison.OrdinalIgnoreCase))
+                return false;
+            var sep = fullFile[dir.Length];
+            return sep == Path.DirectorySeparatorChar || sep == Path.AltDirectorySeparatorChar;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
 

@@ -49,6 +49,8 @@ public static class Bootstrapper
         services.AddSingleton<HardwareDetector>();
         services.AddSingleton<IAIModelRegistry, ModelRegistry>();
         services.AddSingleton<IAIModelsSetupService, AIModelsSetupService>();
+        services.AddSingleton<IAIModelInstallCoordinator, AIModelInstallCoordinator>();
+        services.AddSingleton<IAiSetupOverlayPresenter, AiSetupOverlayPresenter>();
         services.AddSingleton<IResourceGovernor, ResourceGovernor>();
         services.AddSingleton<LlamaCppServerManager>();
         services.AddSingleton<IAIServerManager>(sp => sp.GetRequiredService<LlamaCppServerManager>());
@@ -150,6 +152,18 @@ public static class Bootstrapper
         }
 
         var serviceProvider = services.BuildServiceProvider();
+
+        try
+        {
+            WelcomeNoteFirstRunSeed.TrySeedIfNeededAsync(
+                serviceProvider.GetRequiredService<INoteService>(),
+                serviceProvider.GetRequiredService<IStorageProvider>(),
+                serviceProvider.GetRequiredService<ILoggerService>()).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            serviceProvider.GetRequiredService<ILoggerService>().Error("Bootstrapper", "Welcome note seed failed.", ex);
+        }
 
         serviceProvider.GetRequiredService<HardwareDetector>().Initialize();
 

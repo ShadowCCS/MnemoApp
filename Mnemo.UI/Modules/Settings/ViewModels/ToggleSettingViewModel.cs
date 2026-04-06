@@ -12,14 +12,22 @@ public partial class ToggleSettingViewModel : ViewModelBase
     [ObservableProperty] private string _title;
     [ObservableProperty] private string _description;
     [ObservableProperty] private bool _value;
+    [ObservableProperty] private bool _isInteractionEnabled = true;
 
-    public ToggleSettingViewModel(ISettingsService settingsService, string settingsKey, string title, string description, bool defaultValue = false)
+    public ToggleSettingViewModel(
+        ISettingsService settingsService,
+        string settingsKey,
+        string title,
+        string description,
+        bool defaultValue = false,
+        bool isInteractionEnabled = true)
     {
         _settingsService = settingsService;
         _settingsKey = settingsKey;
         _title = title;
         _description = description;
-        
+        _isInteractionEnabled = isInteractionEnabled;
+
         // Initialize value from settings
         _value = _settingsService.GetAsync(_settingsKey, defaultValue).GetAwaiter().GetResult();
     }

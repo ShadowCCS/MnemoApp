@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Mnemo.UI.Modules.Onboarding.Views"
+             xmlns:vm="using:Mnemo.UI.Modules.Onboarding.ViewModels"
+             xmlns:markup="using:Mnemo.UI.Markup"
+             x:Class="Mnemo.UI.Modules.Onboarding.Views.AiModelsSetupOverlay"
+             x:DataType="vm:AiModelSetupViewModel">
+
+  <Border Background="{DynamicResource CardBackgroundBrush}"
+          BorderBrush="{DynamicResource SidebarBorderBrush}"
+          BorderThickness="1"
+          CornerRadius="12"
+          ClipToBounds="True"
+          MaxWidth="640"
+          MaxHeight="620">
+    <Grid RowDefinitions="Auto,*" Margin="24">
+      <Button Grid.Row="0"
+              Content="{markup:T Ns=Common, Key=Close}"
+              HorizontalAlignment="Right"
+              Classes="Subtle"
+              Padding="12,6"
+              Click="Close_Click"/>
+      <ScrollViewer Grid.Row="1"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled"
+                    Margin="0,16,0,0">
+        <views:AiModelSetupPanel DataContext="{Binding}"/>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</UserControl>

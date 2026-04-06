@@ -7,12 +7,18 @@ namespace Mnemo.Core.Models;
 /// </summary>
 public class AIModelsSetupStatus
 {
+    /// <summary>Hardware tier used to decide which text bundle (low / mid / high) is required.</summary>
+    public HardwarePerformanceTier HardwareTier { get; init; }
+
     /// <summary>Names of components that are already installed (e.g. "manager", "low", "bge-small", "server").</summary>
     public IReadOnlyList<string> Installed { get; init; } = [];
 
-    /// <summary>Names of components that are missing and required for the current machine tier (mid vs high chat + vision bundles per tier).</summary>
-    public IReadOnlyList<string> Missing { get; init; } = [];
+    /// <summary>Names of tier-required components that are not installed yet (excludes optional vision zips).</summary>
+    public IReadOnlyList<string> RequiredMissing { get; init; } = [];
 
-    /// <summary>True when all tier-required components are installed; onboarding can show "finished".</summary>
-    public bool AllInstalled => Missing.Count == 0;
+    /// <summary>Optional vision bundle(s) for this tier that are not installed (e.g. low-image on Low tier).</summary>
+    public IReadOnlyList<string> OptionalImageMissing { get; init; } = [];
+
+    /// <summary>True when every required component for this machine is present.</summary>
+    public bool AllRequiredInstalled => RequiredMissing.Count == 0;
 }

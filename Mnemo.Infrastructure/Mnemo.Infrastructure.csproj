@@ -26,6 +26,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Languages\*.json" />
+    <EmbeddedResource Include="Seed\WelcomeNote.json" />
+    <EmbeddedResource Include="Seed\welcome-mitochondrion.png" />
     <Content Include="skills\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

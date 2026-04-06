@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services.AI;
+using Mnemo.UI.Services;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules.Settings.ViewModels;
@@ -22,7 +23,12 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly DatasetExporter _datasetExporter;
     private readonly IChatHistoryClearService _chatHistoryClearService;
     private readonly IOverlayService _overlayService;
+    private readonly IAIModelsSetupService _aiModelsSetupService;
+    private readonly IAIModelInstallCoordinator _aiInstallCoordinator;
+    private readonly IAiSetupOverlayPresenter _aiSetupOverlay;
+    private readonly IMainThreadDispatcher _mainThreadDispatcher;
 
+    private bool _aiRuntimeInstalled;
     private bool _developerGateUnlocked;
     private bool _developerMode;
     private int _secretTitleTapCount;
@@ -82,7 +88,11 @@ public partial class SettingsViewModel : ViewModelBase
         ILocalizationService localizationService,
         DatasetExporter datasetExporter,
         IChatHistoryClearService chatHistoryClearService,
-        IOverlayService overlayService)
+        IOverlayService overlayService,
+        IAIModelsSetupService aiModelsSetupService,
+        IAIModelInstallCoordinator aiInstallCoordinator,
+        IAiSetupOverlayPresenter aiSetupOverlay,
+        IMainThreadDispatcher mainThreadDispatcher)
     {
         _settingsService = settingsService;
         _themeService = themeService;
@@ -90,12 +100,40 @@ public partial class SettingsViewModel : ViewModelBase
         _datasetExporter = datasetExporter;
         _chatHistoryClearService = chatHistoryClearService;
         _overlayService = overlayService;
+        _aiModelsSetupService = aiModelsSetupService;
+        _aiInstallCoordinator = aiInstallCoordinator;
+        _aiSetupOverlay = aiSetupOverlay;
+        _mainThreadDispatcher = mainThreadDispatcher;
+
+        _aiInstallCoordinator.Completed += OnAiInstallCompleted;
 
         AttachSettingsHandlers();
         _ = LoadInitialSettingsAsync();
 
         _localizationService.LanguageChanged += OnLanguageChanged;
         RebuildCategories();
+    }
+
+    private void OnAiInstallCompleted(Result<AIModelsSetupResult> result)
+    {
+        _ = _mainThreadDispatcher.InvokeAsync(async () =>
+        {
+            await RefreshAiInstallStateAsync().ConfigureAwait(false);
+            RebuildCategories(SelectedCategory?.CategoryId);
+        });
+    }
+
+    private async Task RefreshAiInstallStateAsync()
+    {
+        try
+        {
+            var status = await _aiModelsSetupService.GetSetupStatusAsync().ConfigureAwait(false);
+            _aiRuntimeInstalled = status.AllRequiredInstalled;
+        }
+        catch
+        {
+            _aiRuntimeInstalled = false;
+        }
     }
 
     private void AttachSettingsHandlers()
@@ -124,12 +162,14 @@ public partial class SettingsViewModel : ViewModelBase
     {
         _developerGateUnlocked = await _settingsService.GetAsync(DeveloperModeGateUnlockedKey, false).ConfigureAwait(false);
         _developerMode = await _settingsService.GetAsync(DeveloperModeKey, false).ConfigureAwait(false);
+        await RefreshAiInstallStateAsync().ConfigureAwait(false);
         var id = SelectedCategory?.CategoryId;
         RebuildCategories(id);
     }
 
-    private void OnLanguageChanged(object? sender, EventArgs e)
+    private async void OnLanguageChanged(object? sender, EventArgs e)
     {
+        await RefreshAiInstallStateAsync().ConfigureAwait(false);
         var selectedId = SelectedCategory?.CategoryId;
         RebuildCategories(selectedId);
         OnPropertyChanged(nameof(CategorySubtitleText));
@@ -140,6 +180,7 @@ public partial class SettingsViewModel : ViewModelBase
         await LoadUserProfileAsync().ConfigureAwait(false);
         _developerGateUnlocked = await _settingsService.GetAsync(DeveloperModeGateUnlockedKey, false).ConfigureAwait(false);
         _developerMode = await _settingsService.GetAsync(DeveloperModeKey, false).ConfigureAwait(false);
+        await RefreshAiInstallStateAsync().ConfigureAwait(false);
         RebuildCategories(SelectedCategory?.CategoryId);
     }
 
@@ -195,9 +236,25 @@ public partial class SettingsViewModel : ViewModelBase
 
         var aiTools = new SettingsCategoryViewModel(T("AITools"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg", "AITools");
 
+        var aiInstalled = _aiRuntimeInstalled;
+
         var aiGroup = new SettingsGroupViewModel(T("Intelligence"));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", T("EnableAIAssistant"), T("EnableAIAssistantDescription"), true));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Chat.WipeInputForDictation", T("WipeInputForDictation"), T("WipeInputForDictationDescription"), false));
+        if (!aiInstalled)
+        {
+            aiGroup.Items.Add(new AsyncActionSettingViewModel(
+                T("InstallLocalAI"),
+                T("InstallLocalAIDescription"),
+                T("InstallNow"),
+                async vm =>
+                {
+                    await _aiSetupOverlay.ShowAsync().ConfigureAwait(false);
+                    vm.StatusText = string.Empty;
+                },
+                isInteractionEnabled: true));
+        }
+
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", T("EnableAIAssistant"), T("EnableAIAssistantDescription"), true, aiInstalled));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Chat.WipeInputForDictation", T("WipeInputForDictation"), T("WipeInputForDictationDescription"), false, aiInstalled));
         aiGroup.Items.Add(new DropdownSettingViewModel(
             _settingsService,
             "Chat.StreamingReveal",
@@ -205,9 +262,11 @@ public partial class SettingsViewModel : ViewModelBase
             T("ChatStreamingRevealDescription"),
             new[] { "instant", "balanced", "smooth" },
             new[] { T("StreamingInstant"), T("StreamingBalanced"), T("StreamingSmooth") },
-            "balanced"));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartUnitGeneration", T("SmartUnitGeneration"), T("SmartUnitGenerationDescription")));
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", T("GpuAcceleration"), T("GpuAccelerationDescription")));
+            "balanced",
+            null,
+            aiInstalled));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.SmartUnitGeneration", T("SmartUnitGeneration"), T("SmartUnitGenerationDescription"), false, aiInstalled));
+        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.GpuAcceleration", T("GpuAcceleration"), T("GpuAccelerationDescription"), false, aiInstalled));
         aiGroup.Items.Add(new DropdownSettingViewModel(
             _settingsService,
             "AI.UnloadTimeout",
@@ -216,7 +275,8 @@ public partial class SettingsViewModel : ViewModelBase
             new[] { UnloadTimeoutPolicy.Never, UnloadTimeoutPolicy.FiveMinutes, UnloadTimeoutPolicy.FifteenMinutes, UnloadTimeoutPolicy.OneHour },
             new[] { T("Never"), T("FiveMinutes"), T("FifteenMinutes"), T("OneHour") },
             UnloadTimeoutPolicy.FifteenMinutes,
-            UnloadTimeoutPolicy.TryNormalizeToCanonicalKey));
+            UnloadTimeoutPolicy.TryNormalizeToCanonicalKey,
+            aiInstalled));
         var clearChatLabel = T("ClearAllChatHistory");
         aiGroup.Items.Add(new AsyncActionSettingViewModel(
             T("ClearChatHistory"),
@@ -235,11 +295,12 @@ public partial class SettingsViewModel : ViewModelBase
                 vm.StatusText = result.IsSuccess
                     ? T("ClearChatHistoryDone")
                     : result.ErrorMessage ?? "Failed";
-            }));
+            },
+            aiInstalled));
 
         var ragGroup = new SettingsGroupViewModel(T("LocalKnowledge"));
-        ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", T("EnableRAG"), T("EnableRAGDescription"), true));
-        ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", T("EmbeddingModel"), T("EmbeddingModelDescription"), new[] { T("BgeSmallFast") }));
+        ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", T("EnableRAG"), T("EnableRAGDescription"), true, aiInstalled));
+        ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", T("EmbeddingModel"), T("EmbeddingModelDescription"), new[] { T("BgeSmallFast") }, null, null, null, aiInstalled));
 
         aiTools.Groups.Add(aiGroup);
         aiTools.Groups.Add(ragGroup);

@@ -36,11 +36,12 @@ public partial class InlineFormattingToolbar : UserControl
     }
 
     /// <summary>Updates toggle state of format buttons from the current selection.</summary>
-    public void UpdateFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor)
+    public void UpdateFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor, bool hasLink)
     {
         SetButtonActive("BoldButton", bold);
         SetButtonActive("ItalicButton", italic);
         SetButtonActive("UnderlineButton", underline);
+        SetButtonActive("UnlinkButton", hasLink);
         SetButtonActive("StrikethroughButton", strikethrough);
         SetButtonActive("HighlightButton", highlight);
         if (this.FindControl<Ellipse>("ColorSwatch") is { } swatch && backgroundColor != null)
@@ -123,6 +124,9 @@ public partial class InlineFormattingToolbar : UserControl
         var colorLabel = this.FindControl<TextBlock>("ColorLabel");
         if (colorLabel != null) colorLabel.Text = T("Color");
 
+        if (this.FindControl<Button>("UnlinkButton") is { } linkBtn)
+            ToolTip.SetTip(linkBtn, T("LinkTooltip"));
+
         Loaded -= OnLoaded;
     }
 
@@ -194,6 +198,7 @@ public partial class InlineFormattingToolbar : UserControl
     private void OnBoldClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Bold);
     private void OnItalicClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Italic);
     private void OnUnderlineClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Underline);
+    private void OnUnlinkClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Link);
     private void OnStrikethroughClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Strikethrough);
     private void OnHighlightClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Highlight);
     private void OnSubscriptClick(object? sender, RoutedEventArgs e) { }

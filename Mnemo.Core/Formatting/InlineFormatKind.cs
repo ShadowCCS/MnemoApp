@@ -10,5 +10,7 @@ public enum InlineFormatKind
     BackgroundColor,
     Code,
     Subscript,
-    Superscript
+    Superscript,
+    /// <summary>Hyperlink; set URL via apply with string parameter, or null to remove.</summary>
+    Link
 }
