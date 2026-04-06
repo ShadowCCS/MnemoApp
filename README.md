@@ -1,4 +1,9 @@
-<img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExNmFuYWZwOXFzNHlmOWQzZjJwYWM3czJka2F3dGQweWxkdHk3M3B1MyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/96bvdlba25M2hrewuc/giphy.gif" width="100%">
+<!-- <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExNmFuYWZwOXFzNHlmOWQzZjJwYWM3czJka2F3dGQweWxkdHk3M3B1MyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/96bvdlba25M2hrewuc/giphy.gif" width="100%"> -->
+
+<p align="center">
+  <img width="600" alt="logo" src="https://github.com/user-attachments/assets/7e52d41a-f3d9-42fe-ada7-d44c6b3da574" />
+</p>
+
 
 <div align="center">
 
