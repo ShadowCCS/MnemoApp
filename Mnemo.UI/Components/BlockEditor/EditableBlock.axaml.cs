@@ -53,6 +53,39 @@ public partial class EditableBlock : UserControl
 
     private double _gutterMarginTopCache = double.NaN;
 
+    private bool _isNestedInColumn;
+
+    /// <summary>Column cells hide the add/drag gutter; the parent row keeps the handle.</summary>
+    public bool IsNestedInColumn
+    {
+        get => _isNestedInColumn;
+        set
+        {
+            if (_isNestedInColumn == value) return;
+            _isNestedInColumn = value;
+            ApplyNestedColumnLayout();
+        }
+    }
+
+    private void ApplyNestedColumnLayout()
+    {
+        if (BlockLayoutGrid == null) return;
+        if (_isNestedInColumn)
+        {
+            BlockLayoutGrid.ColumnDefinitions[0].Width = new GridLength(0);
+            BlockLayoutGrid.ColumnDefinitions[1].Width = new GridLength(0);
+            if (AddBlockBelowBorder != null) AddBlockBelowBorder.IsVisible = false;
+            if (DragHandleBorder != null) DragHandleBorder.IsVisible = false;
+        }
+        else
+        {
+            BlockLayoutGrid.ColumnDefinitions[0].Width = GridLength.Auto;
+            BlockLayoutGrid.ColumnDefinitions[1].Width = GridLength.Auto;
+            if (AddBlockBelowBorder != null) AddBlockBelowBorder.IsVisible = true;
+            if (DragHandleBorder != null) DragHandleBorder.IsVisible = true;
+        }
+    }
+
     public EditableBlock()
     {
         InitializeComponent();
@@ -316,6 +349,19 @@ public partial class EditableBlock : UserControl
         var text = textBox.Text ?? string.Empty;
         var caretIndex = textBox.CaretIndex;
         var selectionLength = Math.Abs(textBox.SelectionEnd - textBox.SelectionStart);
+
+        if (_viewModel.Type == BlockType.Image)
+        {
+            if (caretIndex != 0 || selectionLength != 0) return;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                _viewModel.NotifyStructuralChangeStarting();
+                _backspaceHandledInTunnel = true;
+                e.Handled = true;
+                _viewModel.RequestDeleteAndFocusAbove();
+            }
+            return;
+        }
 
         // Only intercept when caret is at position 0 with no selection
         if (caretIndex != 0 || selectionLength != 0)
@@ -635,46 +681,49 @@ public partial class EditableBlock : UserControl
         if (e.Key != Key.Back)
             _backspaceHandledInTunnel = false;
 
-        if (e.Key == Key.Space)
-            _markdownDetector?.TryDetectShortcut(editor);
-
-        var isSlashKey = e.Key == Key.Divide || e.Key == Key.OemQuestion || e.Key == Key.Oem2;
-        if (isSlashKey && string.IsNullOrWhiteSpace(editor.Text) && _stateManager != null && _slashMenuOverlayId == null)
+        if (_viewModel.Type != BlockType.Image)
         {
-            Dispatcher.UIThread.Post(() =>
+            if (e.Key == Key.Space)
+                _markdownDetector?.TryDetectShortcut(editor);
+
+            var isSlashKey = e.Key == Key.Divide || e.Key == Key.OemQuestion || e.Key == Key.Oem2;
+            if (isSlashKey && string.IsNullOrWhiteSpace(editor.Text) && _stateManager != null && _slashMenuOverlayId == null)
             {
-                var currentText = editor.Text;
-                if (currentText == "/" && _slashMenuOverlayId == null)
+                Dispatcher.UIThread.Post(() =>
                 {
-                    ShowSlashMenu(editor, currentText);
-                    _stateManager?.SetShowingSlashMenu();
-                }
-            }, DispatcherPriority.Input);
-        }
+                    var currentText = editor.Text;
+                    if (currentText == "/" && _slashMenuOverlayId == null)
+                    {
+                        ShowSlashMenu(editor, currentText);
+                        _stateManager?.SetShowingSlashMenu();
+                    }
+                }, DispatcherPriority.Input);
+            }
 
-        if (e.Key == Key.Enter && _slashMenuOverlayId != null && _currentSlashMenu != null)
-        {
-            _currentSlashMenu.HandleEnter();
-            e.Handled = true;
-            return;
-        }
-
-        if (_slashMenuOverlayId != null && _currentSlashMenu != null)
-        {
-            if (e.Key == Key.Up) { _currentSlashMenu.HandleUp(); e.Handled = true; return; }
-            if (e.Key == Key.Down) { _currentSlashMenu.HandleDown(); e.Handled = true; return; }
-        }
-
-        if (_slashMenuOverlayId != null && !isSlashKey && e.Key != Key.Escape && e.Key != Key.Enter && e.Key != Key.Up && e.Key != Key.Down)
-        {
-            Dispatcher.UIThread.Post(() =>
+            if (e.Key == Key.Enter && _slashMenuOverlayId != null && _currentSlashMenu != null)
             {
-                if (editor.Text != "/" && _stateManager != null)
+                _currentSlashMenu.HandleEnter();
+                e.Handled = true;
+                return;
+            }
+
+            if (_slashMenuOverlayId != null && _currentSlashMenu != null)
+            {
+                if (e.Key == Key.Up) { _currentSlashMenu.HandleUp(); e.Handled = true; return; }
+                if (e.Key == Key.Down) { _currentSlashMenu.HandleDown(); e.Handled = true; return; }
+            }
+
+            if (_slashMenuOverlayId != null && e.Key != Key.Divide && e.Key != Key.OemQuestion && e.Key != Key.Oem2 && e.Key != Key.Escape && e.Key != Key.Enter && e.Key != Key.Up && e.Key != Key.Down)
+            {
+                Dispatcher.UIThread.Post(() =>
                 {
-                    CloseSlashMenu();
-                    _stateManager.SetNormal();
-                }
-            }, DispatcherPriority.Input);
+                    if (editor.Text != "/" && _stateManager != null)
+                    {
+                        CloseSlashMenu();
+                        _stateManager.SetNormal();
+                    }
+                }, DispatcherPriority.Input);
+            }
         }
 
         _keyboardHandler.HandleKeyDown(e, editor, _viewModel);
@@ -1291,8 +1340,14 @@ public partial class EditableBlock : UserControl
     private async void DragHandle_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!_blockGutterChromeVisible || _viewModel == null) return;
+        await BeginBlockReorderDragCoreAsync(e).ConfigureAwait(true);
+    }
 
-        // Clear block selection when user starts dragging to reorder
+    /// <summary>Gutter handle or image chrome (after move threshold) — same payload and ghost as the drag handle.</summary>
+    internal async Task BeginBlockReorderDragCoreAsync(PointerEventArgs e)
+    {
+        if (_viewModel == null) return;
+
         var editor = FindParentBlockEditor();
         editor?.ClearBlockSelection();
 
@@ -1301,7 +1356,7 @@ public partial class EditableBlock : UserControl
         editor?.BeginBlockDragGhost(this, e);
         try
         {
-            await DragDrop.DoDragDropAsync(e, transfer, DragDropEffects.Move);
+            await DragDrop.DoDragDropAsync(e, transfer, DragDropEffects.Move).ConfigureAwait(true);
         }
         finally
         {
@@ -1322,11 +1377,24 @@ public partial class EditableBlock : UserControl
         if (parent != null)
             parent.UpdateBlockDragGhostFromEditorPoint(cursorInEditor);
 
-        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } draggedBlock || draggedBlock == _viewModel)
+        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } draggedBlock)
         {
             e.DragEffects = DragDropEffects.Move;
             return;
         }
+
+        // Self-hover normally skips drop feedback (single block). In a split row we still need insert-from-Y
+        // so e.g. the right cell can show "below the pair" while the pointer is over the dragged block.
+        if (draggedBlock == _viewModel)
+        {
+            var blocks = parent?.Blocks;
+            if (blocks == null || draggedBlock.GetColumnSibling(blocks) == null)
+            {
+                e.DragEffects = DragDropEffects.Move;
+                return;
+            }
+        }
+
         e.DragEffects = DragDropEffects.Move;
 
         if (parent == null) return;
@@ -1334,24 +1402,26 @@ public partial class EditableBlock : UserControl
         parent.HandleBlockDragOver(cursorInEditor, draggedBlock);
     }
 
-    public void ShowDropLineAtTop()
+    public void ShowDropLineAtLeft()
     {
-        if (DropIndicatorLine == null) return;
-        DropIndicatorLine.VerticalAlignment = VerticalAlignment.Top;
-        DropIndicatorLine.IsVisible = true;
+        if (DropIndicatorLineVerticalRight != null) DropIndicatorLineVerticalRight.IsVisible = false;
+        if (DropIndicatorLineVerticalLeft != null)
+            DropIndicatorLineVerticalLeft.IsVisible = true;
     }
 
-    public void ShowDropLineAtBottom()
+    public void ShowDropLineAtRight()
     {
-        if (DropIndicatorLine == null) return;
-        DropIndicatorLine.VerticalAlignment = VerticalAlignment.Bottom;
-        DropIndicatorLine.IsVisible = true;
+        if (DropIndicatorLineVerticalLeft != null) DropIndicatorLineVerticalLeft.IsVisible = false;
+        if (DropIndicatorLineVerticalRight != null)
+            DropIndicatorLineVerticalRight.IsVisible = true;
     }
 
     public void HideDropLine()
     {
-        if (DropIndicatorLine != null)
-            DropIndicatorLine.IsVisible = false;
+        if (DropIndicatorLineVerticalLeft != null)
+            DropIndicatorLineVerticalLeft.IsVisible = false;
+        if (DropIndicatorLineVerticalRight != null)
+            DropIndicatorLineVerticalRight.IsVisible = false;
     }
 
     private void Block_DragLeave(object? sender, DragEventArgs e)

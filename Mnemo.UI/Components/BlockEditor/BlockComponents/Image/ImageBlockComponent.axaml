@@ -3,6 +3,7 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="clr-namespace:Mnemo.UI.Controls"
+    xmlns:editor="using:Mnemo.UI.Components.BlockEditor"
     HorizontalAlignment="Stretch"
     VerticalAlignment="Top"
     x:CompileBindings="False">
@@ -205,7 +206,9 @@
                     x:Name="LoadedImageRow"
                     HorizontalAlignment="Left"
                     Background="Transparent"
-                    IsVisible="False">
+                    IsVisible="False"
+                    PointerEntered="LoadedImageRow_PointerEntered"
+                    PointerExited="LoadedImageRow_PointerExited">
                     <Border
                         HorizontalAlignment="Left"
                         Background="Transparent"
@@ -219,7 +222,10 @@
                                 CornerRadius="4"
                                 ClipToBounds="True"
                                 Cursor="Arrow"
-                                PointerPressed="ImageChrome_PointerPressed">
+                                PointerPressed="ImageChrome_PointerPressed"
+                                PointerMoved="ImageChrome_PointerMoved"
+                                PointerReleased="ImageChrome_PointerReleased"
+                                PointerCaptureLost="ImageChrome_PointerCaptureLost">
                                 <Image
                                     x:Name="DisplayImage"
                                     Stretch="Uniform"
@@ -334,6 +340,7 @@
                                 VerticalAlignment="Stretch"
                                 Background="Transparent"
                                 Cursor="SizeWestEast"
+                                IsVisible="False"
                                 PointerEntered="ResizePill_PointerEntered"
                                 PointerExited="ResizePill_PointerExited"
                                 PointerPressed="ResizePill_PointerPressed"
@@ -360,19 +367,12 @@
                     x:Name="CaptionHost"
                     HorizontalAlignment="Stretch"
                     Background="Transparent">
-                    <TextBox
-                        x:Name="CaptionBox"
+                    <editor:RichTextEditor
+                        x:Name="CaptionRichTextEditor"
+                        Tag="BlockEditorImageCaption"
                         HorizontalAlignment="Stretch"
-                        Padding="0"
                         FontSize="12"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Opacity="0.6"
-                        TextWrapping="Wrap"
-                        GotFocus="CaptionBox_GotFocus"
-                        LostFocus="CaptionBox_LostFocus"
-                        TextChanged="Caption_TextChanged"
-                        KeyDown="Caption_KeyDown" />
+                        Opacity="0.6" />
                 </Border>
             </Grid>
 

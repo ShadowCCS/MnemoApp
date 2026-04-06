@@ -834,6 +834,135 @@ public class RichTextEditor : Control
         }
     }
 
+    /// <summary>
+    /// Up/Down to the adjacent <see cref="TextLayout"/> line (soft wrap and hard newlines).
+    /// Returns false on the first/last visual line so the block editor can move focus.
+    /// </summary>
+    public bool TryVerticalLogicalNavigation(bool shift, bool up)
+    {
+        if (!TryMoveCaretOneVisualLine(up, out var newPos))
+            return false;
+        MoveOrExtend(shift, newPos);
+        ResetCaretBlink();
+        return true;
+    }
+
+    private void EnsureLayoutForVerticalNavigation()
+    {
+        var w = Bounds.Width > 0 && !double.IsNaN(Bounds.Width)
+            ? Bounds.Width
+            : (_lastLayoutWidth > 0 ? _lastLayoutWidth : MinLayoutWidth);
+        var needRebuild = _textLayout == null || Text != _lastBuiltText;
+        if (!needRebuild && Bounds.Width > 0 && _textLayout != null
+            && Math.Abs(Bounds.Width - _textLayout.MaxWidth) > 0.5)
+            needRebuild = true;
+        if (needRebuild)
+            BuildLayout(w);
+    }
+
+    /// <summary>
+    /// Moves the caret to the same horizontal aim on the adjacent visual line.
+    /// </summary>
+    private bool TryMoveCaretOneVisualLine(bool up, out int newCaretIndex)
+    {
+        newCaretIndex = _caretIndex;
+        EnsureLayoutForVerticalNavigation();
+        var layout = _textLayout;
+        if (layout == null)
+            return false;
+
+        var lines = layout.TextLines;
+        if (lines.Count == 0 || TextLength == 0)
+            return false;
+
+        var trailingEdge = _caretIndex >= TextLength;
+        var idxForLineLookup = Math.Clamp(_caretIndex, 0, TextLength);
+        var oldLine = layout.GetLineIndexFromCharacterIndex(idxForLineLookup, trailingEdge);
+
+        if (up)
+        {
+            if (oldLine <= 0)
+                return false;
+        }
+        else if (oldLine >= lines.Count - 1)
+        {
+            return false;
+        }
+
+        var targetVisualLine = up ? oldLine - 1 : oldLine + 1;
+        var targetTextLine = lines[targetVisualLine];
+        var yTop = GetAccumulatedLineTop(layout, targetVisualLine);
+        var probeY = yTop + targetTextLine.Height * 0.5;
+
+        var hitPos = Math.Clamp(_caretIndex, 0, TextLength);
+        Rect caretRect;
+        try
+        {
+            caretRect = layout.HitTestTextPosition(hitPos);
+        }
+        catch
+        {
+            caretRect = default;
+        }
+
+        var probeX = caretRect.Width > 0.01
+            ? caretRect.X + caretRect.Width * 0.5
+            : caretRect.X + 1;
+        var maxX = Math.Max(targetTextLine.WidthIncludingTrailingWhitespace, 1);
+        probeX = Math.Clamp(probeX, 0, maxX);
+
+        newCaretIndex = HitTestLayoutAt(layout, new Point(probeX, probeY));
+
+        var newLine = layout.GetLineIndexFromCharacterIndex(
+            Math.Clamp(newCaretIndex, 0, TextLength),
+            newCaretIndex >= TextLength);
+
+        if (newLine != targetVisualLine)
+        {
+            var col = Math.Max(0, _caretIndex - lines[oldLine].FirstTextSourceIndex);
+            newCaretIndex = FallbackCaretSameColumn(lines[targetVisualLine], col);
+        }
+
+        newCaretIndex = Math.Clamp(newCaretIndex, 0, TextLength);
+        return true;
+    }
+
+    private static double GetAccumulatedLineTop(TextLayout layout, int lineIndex)
+    {
+        double y = 0;
+        for (var i = 0; i < lineIndex; i++)
+            y += layout.TextLines[i].Height;
+        return y;
+    }
+
+    private int HitTestLayoutAt(TextLayout layout, Point point)
+    {
+        try
+        {
+            var result = layout.HitTestPoint(point);
+            var pos = result.TextPosition;
+            if (result.IsTrailing && pos < TextLength)
+                pos++;
+            return Math.Clamp(pos, 0, TextLength);
+        }
+        catch
+        {
+            return _caretIndex;
+        }
+    }
+
+    /// <summary>Character count on the line excluding mandatory newline at end, if any.</summary>
+    private static int LineContentCharCount(TextLine line) =>
+        Math.Max(0, line.Length - line.NewLineLength);
+
+    private static int FallbackCaretSameColumn(TextLine line, int columnFromLineStart)
+    {
+        var start = line.FirstTextSourceIndex;
+        var content = LineContentCharCount(line);
+        var off = Math.Clamp(columnFromLineStart, 0, content);
+        return start + off;
+    }
+
     private int FindWordStart(int pos)
     {
         var text = Text;

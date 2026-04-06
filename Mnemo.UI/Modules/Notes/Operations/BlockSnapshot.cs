@@ -15,32 +15,45 @@ public sealed class BlockSnapshot
     public List<InlineRun> InlineRuns { get; }
     public Dictionary<string, object> Meta { get; }
     public int Order { get; }
+    /// <summary>Nested blocks (e.g. <see cref="BlockType.TwoColumn"/>).</summary>
+    public BlockSnapshot[]? Children { get; }
 
-    public BlockSnapshot(string id, BlockType type, List<InlineRun> inlineRuns, Dictionary<string, object> meta, int order)
+    public BlockSnapshot(string id, BlockType type, List<InlineRun> inlineRuns, Dictionary<string, object> meta, int order, BlockSnapshot[]? children = null)
     {
         Id = id;
         Type = type;
         InlineRuns = new List<InlineRun>(inlineRuns);
         Meta = new Dictionary<string, object>(meta);
         Order = order;
+        Children = children;
     }
 
     public static BlockSnapshot From(Block block)
     {
         block.EnsureInlineRuns();
+        BlockSnapshot[]? children = null;
+        if (block.Children is { Count: > 0 })
+            children = block.Children.Select(From).ToArray();
+
         return new(block.Id, block.Type,
             new List<InlineRun>(block.InlineRuns!),
-            block.Meta ?? new Dictionary<string, object>(), block.Order);
+            block.Meta ?? new Dictionary<string, object>(), block.Order, children);
     }
 
-    public Block ToBlock() => new()
+    public Block ToBlock()
     {
-        Id = Id,
-        Type = Type,
-        InlineRuns = new List<InlineRun>(InlineRuns),
-        Meta = new Dictionary<string, object>(Meta),
-        Order = Order
-    };
+        var b = new Block
+        {
+            Id = Id,
+            Type = Type,
+            InlineRuns = new List<InlineRun>(InlineRuns),
+            Meta = new Dictionary<string, object>(Meta),
+            Order = Order
+        };
+        if (Children is { Length: > 0 })
+            b.Children = Children.Select(c => c.ToBlock()).ToList();
+        return b;
+    }
 
     public static BlockSnapshot[] SnapshotAll(IEnumerable<Block> blocks) =>
         blocks.Select(From).ToArray();

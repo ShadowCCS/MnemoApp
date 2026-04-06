@@ -11,6 +11,7 @@ using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -32,6 +33,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 {
     private ObservableCollection<BlockViewModel> _blocks = new();
 
+    /// <summary>Visual rows (one item per stack row; split pairs are one row with two <see cref="EditableBlock"/>s).</summary>
+    public ObservableCollection<BlockRowViewModelBase> BlockRows { get; } = new();
+
     /// <summary>Index of the currently focused block, or -1. Kept in sync by <see cref="OnBlockPropertyChanged"/>.</summary>
     private int _focusedBlockIndex = -1;
 
@@ -42,6 +46,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private Point _boxSelectStartInOverlay; // overlay space (for drawing); set when arming
     private Border? _selectionBoxBorder;
     private const double BoxSelectThreshold = 6.0; // pixels to move before box appears
+    private bool _isColumnSplitResizing;
     /// <summary>Horizontal padding on EditorRoot; selection box Margin is relative to the padded content area.</summary>
     private const double EditorContentPaddingX = 32.0;
 
@@ -108,8 +113,28 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         get => _blocks;
         set
         {
-            _blocks = value;
+            if (ReferenceEquals(_blocks, value)) return;
+            _blocks.CollectionChanged -= OnBlocksCollectionChanged;
+            _blocks = value ?? new ObservableCollection<BlockViewModel>();
+            _blocks.CollectionChanged += OnBlocksCollectionChanged;
             OnPropertyChanged();
+            RebuildBlockRows();
+        }
+    }
+
+    private void OnBlocksCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RebuildBlockRows();
+
+    private void RebuildBlockRows()
+    {
+        BlockRows.Clear();
+        for (var i = 0; i < Blocks.Count; i++)
+        {
+            var b = Blocks[i];
+            if (ColumnPairHelper.IsPairedRight(b, i, Blocks)) continue;
+            if (ColumnPairHelper.IsPairedLeft(b, i, Blocks))
+                BlockRows.Add(new SplitBlockRowViewModel(b, Blocks[i + 1], i));
+            else
+                BlockRows.Add(new SingleBlockRowViewModel(b, i));
         }
     }
 
@@ -121,6 +146,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     public BlockEditor()
     {
         InitializeComponent();
+        _blocks.CollectionChanged += OnBlocksCollectionChanged;
         DataContext = this;
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragOverEvent, Editor_DragOver_BlockGhost, RoutingStrategies.Bubble);
@@ -226,15 +252,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         else
         {
-            // Use HashSet to track block IDs and prevent duplicates
+            var expanded = ColumnPairHelper.ExpandLegacyTwoColumnBlocks(blocks.Where(b => b != null));
             var seenIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var block in blocks.Where(b => b != null).OrderBy(b => b.Order))
+            foreach (var block in expanded.OrderBy(b => b.Order))
             {
-                // Skip duplicate blocks with the same ID
                 if (!string.IsNullOrEmpty(block.Id) && !seenIds.Add(block.Id))
-                {
                     continue;
-                }
 
                 var viewModel = new BlockViewModel(block);
                 SubscribeToBlock(viewModel);
@@ -482,6 +505,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             BeginStructuralChange();
 
         var index = Blocks.IndexOf(block);
+        if (index < 0) return;
         AddBlock(BlockType.Text, index + 1, initialContent);
 
         var newBlockIndex = index + 1;
@@ -502,6 +526,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         BeginStructuralChange();
 
         var index = Blocks.IndexOf(block);
+        if (index < 0) return;
         AddBlock(type, index + 1);
 
         var newBlockIndex = index + 1;
@@ -541,10 +566,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         BeginStructuralChange();
 
         newVm.Meta["imagePath"] = result.Value;
-        newVm.Meta["imageAlt"] = GetBlockMetaString(block, "imageAlt");
         newVm.Meta["imageWidth"] = GetBlockMetaDouble(block, "imageWidth");
         var imageAlign = GetBlockMetaString(block, "imageAlign");
         newVm.Meta["imageAlign"] = string.IsNullOrEmpty(imageAlign) ? "left" : imageAlign;
+        newVm.SetRuns(new List<InlineRun> { InlineRun.Plain(GetBlockMetaString(block, "imageAlt")) });
 
         SubscribeToBlock(newVm);
         Blocks.Insert(index + 1, newVm);
@@ -558,6 +583,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnFocusPreviousRequested(BlockViewModel block)
     {
+        if (ColumnPairHelper.GetColumnSide(block) == ColumnPairHelper.Right
+            && block.GetColumnSibling(Blocks) is { } leftOfPair)
+        {
+            block.IsFocused = false;
+            Dispatcher.UIThread.Post(
+                () => leftOfPair.IsFocused = true,
+                DispatcherPriority.Input);
+            return;
+        }
+
         var index = GetFocusedBlockIndex();
         if (index < 0) index = Blocks.IndexOf(block);
         if (index > 0)
@@ -572,6 +607,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnFocusNextRequested(BlockViewModel block)
     {
+        if (ColumnPairHelper.GetColumnSide(block) == ColumnPairHelper.Left
+            && block.GetColumnSibling(Blocks) is { } rightOfPair)
+        {
+            block.IsFocused = false;
+            Dispatcher.UIThread.Post(
+                () => rightOfPair.IsFocused = true,
+                DispatcherPriority.Input);
+            return;
+        }
+
         var index = GetFocusedBlockIndex();
         if (index < 0) index = Blocks.IndexOf(block);
         var nextIndex = index + 1;
@@ -856,6 +901,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
              source.GetVisualAncestors().OfType<Border>().Any(b => b.Tag is "ImageResizeHandle"));
         if (hitIsImageResizeHandle) return;
 
+        // Column splitter sits in the gutter between cells; not inside EditableBlock hit — would otherwise arm box-select and steal capture.
+        bool hitIsColumnSplitHandle = source != null &&
+            (source is Border { Tag: "ColumnSplitHandle" } ||
+             source.GetVisualAncestors().OfType<Border>().Any(b => Equals(b.Tag, "ColumnSplitHandle")));
+        if (hitIsColumnSplitHandle) return;
+
         // Let native CheckBox handling run (checklist toggles) instead of capturing in editor tunnel.
         bool hitIsCheckBox = source is CheckBox || (source != null && source.GetVisualAncestors().Any(a => a is CheckBox));
         if (hitIsCheckBox) return;
@@ -868,7 +919,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var blockIndex = GetBlockIndexAtPoint(pos);
             if (blockIndex < 0 || blockIndex >= Blocks.Count) return;
 
-            var editableBlock = GetEditableBlockAt(blockIndex);
+            var editableBlock = GetEditableBlockForViewModel(Blocks[blockIndex]);
             if (editableBlock == null) return;
 
             var vm = Blocks[blockIndex];
@@ -954,20 +1005,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private bool IsPointInsideAnyBlock(Point point)
     {
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return false;
-        for (var i = 0; i < containers.Count; i++)
+        for (var i = 0; i < Blocks.Count; i++)
         {
-            var container = containers[i];
-            var topLeft = container.TranslatePoint(new Point(0, 0), this);
-            if (topLeft == null) continue;
-            var bounds = new Rect(topLeft.Value.X, topLeft.Value.Y, container.Bounds.Width, container.Bounds.Height);
-            if (!bounds.Contains(point)) continue;
-
-            var editable = GetEditableBlockAt(i);
-            if (editable == null)
-                return true;
-
+            var editable = GetEditableBlockForViewModel(Blocks[i]);
+            if (editable == null) continue;
             var local = this.TranslatePoint(point, editable);
             if (!local.HasValue) continue;
             if (editable.IsPointerHitInsideBlock(local.Value))
@@ -1000,6 +1041,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if ((textBox == null && richTextEditor == null) || editableBlock == null || editableBlock.DataContext is not BlockViewModel vm || !Blocks.Contains(vm))
             return;
 
+        // Image caption editor; arming cross-block breaks drag-select and steals PointerMoved.
+        if (vm.Type == BlockType.Image
+            && ((textBox?.Tag is string t1 && t1 == "BlockEditorImageCaption")
+                || (richTextEditor?.Tag is string t2 && t2 == "BlockEditorImageCaption")))
+            return;
+
         int caretIndex = textBox?.CaretIndex ?? richTextEditor?.CaretIndex ?? 0;
         int textLength = textBox?.Text?.Length ?? richTextEditor?.TextLength ?? 0;
 
@@ -1015,6 +1062,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void Editor_PointerMoved(object? sender, PointerEventArgs e)
     {
+        if (_isColumnSplitResizing)
+            return;
+
         if (_blockDragGhostBorder != null && _blockDragGhostOverlay != null)
         {
             var pos = e.GetPosition(_blockDragGhostOverlay);
@@ -1065,8 +1115,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         // Cross-block text selection: on first move we enter selecting mode (we already have capture from Tunnel).
         if (_crossBlockArmed && _crossBlockAnchorBlock != null)
         {
+            if (_crossBlockAnchorBlock.Type != BlockType.Image)
+                _isCrossBlockSelecting = true;
             _crossBlockArmed = false;
-            _isCrossBlockSelecting = true;
         }
 
         if (_isCrossBlockSelecting && _crossBlockAnchorBlock != null)
@@ -1139,7 +1190,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 var anchorIndex = Blocks.IndexOf(clickAnchorBlock);
                 if (anchorIndex >= 0)
                 {
-                    var anchorBlock = GetEditableBlockAt(anchorIndex);
+                    var anchorBlock = GetEditableBlockForViewModel(Blocks[anchorIndex]);
                     anchorBlock?.NotifySelectionChangedByEditor();
                 }
             }
@@ -1176,22 +1227,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         double maxY = Math.Max(start.Y, end.Y);
         var selectionRect = new Rect(minX, minY, maxX - minX, maxY - minY);
 
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return;
-
-        for (int i = 0; i < containers.Count && i < Blocks.Count; i++)
+        for (int i = 0; i < Blocks.Count; i++)
         {
-            var editable = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+            var editable = GetEditableBlockForViewModel(Blocks[i]);
             Rect bounds;
             if (editable != null)
                 bounds = editable.GetBoxSelectIntersectionBoundsRelativeTo(this);
             else
-            {
-                var container = containers[i];
-                var topLeft = container.TranslatePoint(new Point(0, 0), this);
-                if (topLeft == null) continue;
-                bounds = new Rect(topLeft.Value.X, topLeft.Value.Y, container.Bounds.Width, container.Bounds.Height);
-            }
+                continue;
 
             if (bounds.Width <= 0 || bounds.Height <= 0)
                 Blocks[i].IsSelected = false;
@@ -1229,11 +1272,39 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             target.IsChecked = pastedFirst.IsChecked;
     }
 
+    /// <summary>
+    /// Nested <see cref="TextBox"/> (e.g. code) uses OS copy/cut/paste and undo; we must not steal those shortcuts.
+    /// Image caption uses <see cref="RichTextEditor"/> — it has no built-in undo/clipboard, so those stay on the editor.
+    /// </summary>
+    private bool IsFocusInsideNestedTextBox()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top?.FocusManager?.GetFocusedElement() is not TextBox tb)
+            return false;
+        return this.IsVisualAncestorOf(tb);
+    }
+
+    private bool IsImageCaptionRichEditorFocused()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top?.FocusManager?.GetFocusedElement() is not Visual v)
+            return false;
+        if (!this.IsVisualAncestorOf(v)) return false;
+        var rte = v as RichTextEditor ?? v.GetVisualAncestors().OfType<RichTextEditor>().FirstOrDefault();
+        return rte != null && rte.Tag is string tag && tag == "BlockEditorImageCaption";
+    }
+
+    /// <summary>Ctrl+A should select all <em>blocks</em> unless focus is in a nested text field or image caption.</summary>
+    private bool ShouldDeferSelectAllBlocksShortcut() =>
+        IsFocusInsideNestedTextBox() || IsImageCaptionRichEditorFocused();
+
     private void Editor_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Handled) return;
 
         var hasBlockSelection = Blocks.Any(b => b.IsSelected);
+        bool deferClipboardToNestedTextBox = IsFocusInsideNestedTextBox();
+        bool deferUndoRedoToNestedTextBox = IsFocusInsideNestedTextBox();
 
         // 1. Backspace: delete all selected blocks, or delete text selection (including cross-block)
         if (e.Key == Key.Back && hasBlockSelection)
@@ -1253,7 +1324,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         // Mark handled immediately: clipboard writes are async and may yield; if Handled stays false,
         // routing continues and the OS / other handlers can put plain text on the clipboard and wipe our payload.
         bool ctrlC = e.Key == Key.C && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
-        if (ctrlC)
+        if (ctrlC && !deferClipboardToNestedTextBox)
         {
             e.Handled = true;
             _ = TryCopySelectionToClipboardAsync();
@@ -1261,7 +1332,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
 
         bool ctrlX = e.Key == Key.X && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
-        if (ctrlX)
+        if (ctrlX && !deferClipboardToNestedTextBox)
         {
             e.Handled = true;
             _ = TryCutSelectionAsync();
@@ -1270,7 +1341,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         // 3. Ctrl+V: paste markdown as blocks (replacing block selection when present)
         bool ctrlV = e.Key == Key.V && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
-        if (ctrlV)
+        if (ctrlV && !deferClipboardToNestedTextBox)
         {
             e.Handled = true;
             _ = TryPasteFromClipboardAsync(hasBlockSelection);
@@ -1280,7 +1351,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         // 4. Ctrl+Z: undo
         bool ctrlZ = e.Key == Key.Z && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control
                                      && (e.KeyModifiers & KeyModifiers.Shift) == 0;
-        if (ctrlZ)
+        if (ctrlZ && !deferUndoRedoToNestedTextBox)
         {
             _ = UndoAsync();
             e.Handled = true;
@@ -1291,7 +1362,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         bool ctrlY = e.Key == Key.Y && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
         bool ctrlShiftZ = e.Key == Key.Z && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control
                                           && (e.KeyModifiers & KeyModifiers.Shift) != 0;
-        if (ctrlY || ctrlShiftZ)
+        if ((ctrlY || ctrlShiftZ) && !deferUndoRedoToNestedTextBox)
         {
             _ = RedoAsync();
             e.Handled = true;
@@ -1305,7 +1376,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         // 6. Ctrl+A: select all blocks
         bool ctrlA = e.Key == Key.A && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
-        if (ctrlA)
+        if (ctrlA && !ShouldDeferSelectAllBlocksShortcut())
         {
             ClearTextSelectionInAllBlocksExcept(-1);
             foreach (var block in Blocks)
@@ -1367,32 +1438,24 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     public bool HasCrossBlockTextSelection()
     {
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return false;
-        for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+        for (int i = 0; i < Blocks.Count; i++)
         {
-            var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
-            if (editableBlock?.GetSelectionRange() != null) return true;
+            if (GetEditableBlockForViewModel(Blocks[i])?.GetSelectionRange() != null) return true;
         }
         return false;
     }
 
     public void ApplyInlineFormatToCrossBlockSelection(Mnemo.Core.Formatting.InlineFormatKind kind, string? color = null)
     {
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return;
-
         BeginStructuralChange();
         _isApplyingCrossBlockFormat = true;
         try
         {
-            for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+            for (int i = 0; i < Blocks.Count; i++)
             {
-                var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+                var editableBlock = GetEditableBlockForViewModel(Blocks[i]);
                 if (editableBlock?.GetSelectionRange() != null)
-                {
                     editableBlock.ApplyInlineFormatInternal(kind, color);
-                }
             }
         }
         finally
@@ -1405,13 +1468,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void TryDeleteTextSelection()
     {
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return;
-
         int? firstAffectedIndex = null;
-        for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+        for (int i = 0; i < Blocks.Count; i++)
         {
-            var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+            var editableBlock = GetEditableBlockForViewModel(Blocks[i]);
             if (editableBlock?.GetSelectionRange() != null)
             {
                 if (firstAffectedIndex == null) firstAffectedIndex = i;
@@ -1496,7 +1556,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         int fi = GetFocusedBlockIndex();
         if (fi < 0) return;
-        var ed = GetEditableBlockAt(fi);
+        var ed = GetEditableBlockForViewModel(Blocks[fi]);
         if (ed?.GetSelectionRange() is { } range && range.start < range.end)
             ed.DeleteSelection();
     }
@@ -1514,29 +1574,26 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return true;
         }
 
-        // Mode 1: cross-block text selection (gather blocks that have text selection)
-        var containers = GetBlockContainersInOrder();
         var toCopy = new List<BlockViewModel>();
-        if (containers != null)
+        for (int i = 0; i < Blocks.Count; i++)
         {
-            for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
-            {
-                var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
-                if (editableBlock == null) continue;
-                var range = editableBlock.GetSelectionRange();
-                if (range == null || range.Value.start >= range.Value.end) continue;
-                var block = Blocks[i];
-                int start = range.Value.start, end = range.Value.end;
-                var liveRuns = GetLiveRunsForBlockIndex(i);
-                var sliceRuns = InlineRunFormatApplier.SliceRuns(liveRuns, start, end);
-                var vm = BlockFactory.CreateBlock(block.Type, toCopy.Count);
-                vm.SetRuns(sliceRuns);
-                if (block.Type == BlockType.Checklist)
-                    vm.IsChecked = block.IsChecked;
-                if (block.Type == BlockType.NumberedList)
-                    vm.ListNumberIndex = block.ListNumberIndex;
-                toCopy.Add(vm);
-            }
+            var editableBlock = GetEditableBlockForViewModel(Blocks[i]);
+            if (editableBlock == null) continue;
+            var range = editableBlock.GetSelectionRange();
+            if (range == null || range.Value.start >= range.Value.end) continue;
+            var block = Blocks[i];
+            int start = range.Value.start, end = range.Value.end;
+            var liveRuns = GetLiveRunsForBlockIndex(i);
+            var sliceRuns = InlineRunFormatApplier.SliceRuns(liveRuns, start, end);
+            // Slices from image captions are plain text; never emit a pseudo-Image block (would serialize as full image).
+            var exportType = block.Type == BlockType.Image ? BlockType.Text : block.Type;
+            var vm = BlockFactory.CreateBlock(exportType, toCopy.Count);
+            vm.SetRuns(sliceRuns);
+            if (block.Type == BlockType.Checklist)
+                vm.IsChecked = block.IsChecked;
+            if (block.Type == BlockType.NumberedList)
+                vm.ListNumberIndex = block.ListNumberIndex;
+            toCopy.Add(vm);
         }
 
         if (toCopy.Count > 0)
@@ -1550,6 +1607,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (fi >= 0 && fi < Blocks.Count)
         {
             var b = Blocks[fi];
+            if (b.Type == BlockType.Image)
+            {
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel?.Clipboard == null) return false;
+                SyncViewModelsFromRichEditors(new[] { b });
+                await topLevel.Clipboard.SetTextAsync(b.Content ?? string.Empty).ConfigureAwait(true);
+                return true;
+            }
             if (b.Type != BlockType.Divider)
             {
                 await WriteBlocksToClipboardAsync(new List<BlockViewModel> { b });
@@ -1564,7 +1629,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (index < 0 || index >= Blocks.Count)
             return Array.Empty<InlineRun>();
-        var rte = GetEditableBlockAt(index)?.TryGetRichTextEditor();
+        var rte = GetEditableBlockForViewModel(Blocks[index])?.TryGetRichTextEditor();
         if (rte?.Runs != null)
             return InlineRunFormatApplier.Normalize(new List<InlineRun>(rte.Runs));
         return Blocks[index].Runs;
@@ -1577,7 +1642,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             int idx = Blocks.IndexOf(b);
             if (idx < 0) continue;
-            var rte = GetEditableBlockAt(idx)?.TryGetRichTextEditor();
+            var rte = GetEditableBlockForViewModel(Blocks[idx])?.TryGetRichTextEditor();
             if (rte == null) continue;
             b.SetRuns(InlineRunFormatApplier.Normalize(new List<InlineRun>(rte.Runs)));
         }
@@ -1691,10 +1756,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 if (focusedIndex >= 0 && focusedIndex < Blocks.Count)
                 {
                     var focusedVm = Blocks[focusedIndex];
-                    if (focusedVm.Type != BlockType.Divider && focusedVm.Type != BlockType.Image
-                        && !PasteFirstBlockRequiresBlockInsert(pasted))
+                    var canInlinePaste = focusedVm.Type != BlockType.Divider && !PasteFirstBlockRequiresBlockInsert(pasted);
+                    // Image caption: only merge plain text; never turn the image into a heading/list via structural paste.
+                    if (focusedVm.Type == BlockType.Image)
+                        canInlinePaste = canInlinePaste && pasted.Length == 1 && pasted[0].Type == BlockType.Text;
+
+                    if (canInlinePaste)
                     {
-                        var editableBlock = GetEditableBlockAt(focusedIndex);
+                        var editableBlock = GetEditableBlockForViewModel(Blocks[focusedIndex]);
                         var range = editableBlock?.GetSelectionOrCaretRange();
                         if (range.HasValue)
                         {
@@ -2033,15 +2102,18 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private int GetBlockIndexAtPoint(Point point)
     {
-        var bounds = GetBlockBoundsInEditorOrder();
-        for (int i = 0; i < bounds.Count; i++)
+        for (int i = 0; i < Blocks.Count; i++)
         {
-            var (top, bottom) = bounds[i];
-            if (point.Y >= top && point.Y < bottom)
+            var rect = GetControlBoundsInEditor(GetEditableBlockForViewModel(Blocks[i]));
+            if (rect.Width > 0 && rect.Height > 0 && rect.Contains(point))
                 return i;
         }
-        if (bounds.Count > 0 && point.Y >= bounds[^1].Bottom)
-            return bounds.Count;
+        if (Blocks.Count > 0)
+        {
+            var lastRect = GetControlBoundsInEditor(GetEditableBlockForViewModel(Blocks[^1]));
+            if (lastRect.Height > 0 && point.Y >= lastRect.Y + lastRect.Height)
+                return Blocks.Count;
+        }
         return -1;
     }
 
@@ -2051,13 +2123,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private void ClearTextSelectionInAllBlocksExcept(int exceptBlockIndex)
     {
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return;
-        for (int i = 0; i < Blocks.Count && i < containers.Count; i++)
+        for (int i = 0; i < Blocks.Count; i++)
         {
             if (exceptBlockIndex >= 0 && i == exceptBlockIndex) continue;
-            var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
-            editableBlock?.ApplyTextSelection(0, 0);
+            GetEditableBlockForViewModel(Blocks[i])?.ApplyTextSelection(0, 0);
         }
     }
 
@@ -2070,13 +2139,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (rawIndex < 0) return;
         rawIndex = Math.Clamp(rawIndex, 0, Blocks.Count - 1);
 
-        // Hysteresis: keep last endpoint block until pointer has clearly left its bounds to avoid boundary flicker
         int currentIndex = rawIndex;
-        var bounds = GetBlockBoundsInEditorOrder();
-        if (bounds.Count > 0 && _lastCrossBlockCurrentIndex >= 0 && _lastCrossBlockCurrentIndex < bounds.Count)
+        if (_lastCrossBlockCurrentIndex >= 0 && _lastCrossBlockCurrentIndex < Blocks.Count)
         {
-            var (top, bottom) = bounds[_lastCrossBlockCurrentIndex];
-            if (currentPoint.Y >= top && currentPoint.Y < bottom)
+            var rect = GetControlBoundsInEditor(GetEditableBlockForViewModel(Blocks[_lastCrossBlockCurrentIndex]));
+            if (rect.Width > 0 && rect.Height > 0 && rect.Contains(currentPoint))
                 currentIndex = _lastCrossBlockCurrentIndex;
         }
         _lastCrossBlockCurrentIndex = currentIndex;
@@ -2090,12 +2157,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         for (int i = 0; i < Blocks.Count; i++)
             Blocks[i].IsSelected = false;
 
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return;
-
-        for (int i = 0; i < containers.Count && i < Blocks.Count; i++)
+        for (int i = 0; i < Blocks.Count; i++)
         {
-            var editableBlock = GetEditableBlockAt(i) ?? (containers[i] as EditableBlock);
+            var editableBlock = GetEditableBlockForViewModel(Blocks[i]);
             if (editableBlock == null) continue;
 
             // Blocks outside the selection range must be explicitly cleared so that shrinking
@@ -2151,12 +2215,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private int _currentDropInsertIndex = -1;
     private EditableBlock? _currentDropIndicatorBlock;
+    private BlockViewModel? _splitDropTargetBlock;
+    private bool _splitDropLeftEdge;
 
     // Fraction of block height that acts as a "snap-to-boundary" zone.
     // Only the top/bottom portion triggers an insert-before/after decision;
     // the middle portion keeps the current indicator to prevent flicker on
     // multi-line blocks where the midpoint sits inside visible text.
     private const double SnapBandFraction = 0.25;
+    private const double HorizontalDropLineHeight = 3;
 
     /// <summary>
     /// Called by EditableBlock on DragOver. Computes insert index from cursor Y using
@@ -2170,6 +2237,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
+        if (TryUpdateSplitDropIndicator(cursorPosInEditor, draggedBlock))
+            return;
+
+        _splitDropTargetBlock = null;
+
         var insertIndex = GetInsertIndex(cursorPosInEditor.Y);
         if (insertIndex < 0)
         {
@@ -2178,30 +2250,65 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
 
         // Suppress the indicator for positions that would leave the block where it already is.
-        // Inserting at draggedIndex or draggedIndex+1 is a no-op move.
         var draggedIndex = Blocks.IndexOf(draggedBlock);
-        if (draggedIndex >= 0 && (insertIndex == draggedIndex || insertIndex == draggedIndex + 1))
+        if (draggedIndex >= 0 && insertIndex == draggedIndex)
         {
             ClearDropIndicator();
             return;
         }
 
-        if (insertIndex == _currentDropInsertIndex && _currentDropIndicatorBlock != null)
-            return; // already showing correct line — nothing to do
+        // insertIndex == draggedIndex+1 means "before the next list item". For a lone block that's "after self" (no-op).
+        // For the right cell of a pair, draggedIndex+1 is the slot *after* the row — leaving the split — must show.
+        if (draggedIndex >= 0 && insertIndex == draggedIndex + 1)
+        {
+            var sib = draggedBlock.GetColumnSibling(Blocks);
+            if (sib == null || Blocks.IndexOf(sib) == draggedIndex + 1)
+            {
+                ClearDropIndicator();
+                return;
+            }
+        }
+
+        if (_splitDropTargetBlock == null
+            && insertIndex == _currentDropInsertIndex
+            && this.FindControl<Border>("BlockReorderDropLineOverlay") is { IsVisible: true })
+            return;
 
         ClearDropIndicator();
         _currentDropInsertIndex = insertIndex;
 
-        var blockVisual = GetEditableBlockAt(insertIndex);
-        if (blockVisual == null) return;
+        ShowHorizontalReorderDropLineInOverlay(insertIndex);
+    }
 
-        _currentDropIndicatorBlock = blockVisual;
+    /// <summary>
+    /// Horizontal insert-before/after line in <see cref="BlockDragGhostOverlay"/> space (full row width, including split rows).
+    /// </summary>
+    private void ShowHorizontalReorderDropLineInOverlay(int insertIndex)
+    {
+        var overlay = this.FindControl<LayoutOverlayPanel>("BlockDragGhostOverlay");
+        var line = this.FindControl<Border>("BlockReorderDropLineOverlay");
+        if (overlay == null || line == null) return;
 
-        // Show at top of the block we're inserting before; for append-after-last show at bottom.
-        if (insertIndex < Blocks.Count)
-            blockVisual.ShowDropLineAtTop();
-        else
-            blockVisual.ShowDropLineAtBottom();
+        var rowContainer = GetRowContainerForInsertIndex(insertIndex);
+        if (rowContainer == null) return;
+
+        var origin = rowContainer.TranslatePoint(new Point(0, 0), overlay);
+        if (!origin.HasValue) return;
+
+        double w = rowContainer.Bounds.Width;
+        double rowH = rowContainer.Bounds.Height;
+        if (w <= 0 || rowH <= 0) return;
+
+        double y = insertIndex < Blocks.Count
+            ? origin.Value.Y
+            : origin.Value.Y + rowH - HorizontalDropLineHeight;
+
+        line.Width = w;
+        line.Height = HorizontalDropLineHeight;
+        Canvas.SetLeft(line, origin.Value.X);
+        Canvas.SetTop(line, y);
+        line.IsVisible = true;
+        overlay.InvalidateArrange();
     }
 
     /// <summary>
@@ -2214,6 +2321,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     public void ClearDropIndicator()
     {
+        _splitDropTargetBlock = null;
+        if (this.FindControl<Border>("BlockReorderDropLineOverlay") is { } dropLine)
+        {
+            dropLine.IsVisible = false;
+            this.FindControl<LayoutOverlayPanel>("BlockDragGhostOverlay")?.InvalidateArrange();
+        }
         if (_currentDropIndicatorBlock != null)
         {
             _currentDropIndicatorBlock.HideDropLine();
@@ -2222,15 +2335,78 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _currentDropInsertIndex = -1;
     }
 
+    /// <summary>Begin undo group for dragging the column splitter (pointer down).</summary>
+    public void BeginColumnSplitResize()
+    {
+        _isColumnSplitResizing = true;
+        BeginStructuralChange();
+    }
+
+    /// <summary>Commit undo group after column splitter release.</summary>
+    public void CommitColumnSplitResize()
+    {
+        _isColumnSplitResizing = false;
+        CommitStructuralChange("Resize columns");
+        NotifyBlocksChanged();
+    }
+
     /// <summary>
-    /// Perform the drop: move draggedBlock to CurrentDropInsertIndex.
+    /// Perform the drop: split into columns, or move draggedBlock to CurrentDropInsertIndex.
     /// </summary>
     public bool TryPerformDrop(BlockViewModel draggedBlock)
     {
+        if (_splitDropTargetBlock != null)
+        {
+            var ok = TryPerformSplitDrop(draggedBlock, _splitDropTargetBlock, _splitDropLeftEdge);
+            ClearDropIndicator();
+            return ok;
+        }
+
         if (_currentDropInsertIndex < 0 || _currentDropInsertIndex > Blocks.Count)
             return false;
         var draggedIndex = Blocks.IndexOf(draggedBlock);
-        if (draggedIndex < 0) return false;
+        if (draggedIndex < 0)
+        {
+            if (draggedBlock.GetColumnSibling(Blocks) == null)
+                return false;
+            BeginStructuralChange();
+            DetachColumnCell(draggedBlock);
+            var insertT = Math.Clamp(_currentDropInsertIndex, 0, Blocks.Count);
+            SubscribeToBlock(draggedBlock);
+            Blocks.Insert(insertT, draggedBlock);
+            ReorderBlocks();
+            CommitStructuralChange("Move block");
+            NotifyBlocksChanged();
+            return true;
+        }
+
+        // Side-by-side pair: Blocks.Move does not unpair / adjust meta; detach then insert at target gap.
+        if (draggedBlock.GetColumnSibling(Blocks) != null)
+        {
+            var rawInsert = _currentDropInsertIndex;
+            if (rawInsert < 0 || rawInsert > Blocks.Count)
+                return false;
+            if (rawInsert == draggedIndex)
+                return false;
+            if (rawInsert == draggedIndex + 1)
+            {
+                var sib = draggedBlock.GetColumnSibling(Blocks);
+                var sibIdx = sib != null ? Blocks.IndexOf(sib) : -1;
+                if (sibIdx == draggedIndex + 1)
+                    return false;
+            }
+
+            BeginStructuralChange();
+            DetachColumnCell(draggedBlock);
+            var insertAt = draggedIndex < rawInsert ? rawInsert - 1 : rawInsert;
+            insertAt = Math.Clamp(insertAt, 0, Blocks.Count);
+            SubscribeToBlock(draggedBlock);
+            Blocks.Insert(insertAt, draggedBlock);
+            ReorderBlocks();
+            CommitStructuralChange("Move block");
+            NotifyBlocksChanged();
+            return true;
+        }
 
         var insertIndex = Math.Min(_currentDropInsertIndex, Blocks.Count - 1);
         var targetIndex = draggedIndex < insertIndex ? insertIndex - 1 : insertIndex;
@@ -2246,47 +2422,250 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return true;
     }
 
+    private bool TryUpdateSplitDropIndicator(Point cursorPosInEditor, BlockViewModel draggedBlock)
+    {
+        if (!TryGetSplitDropTarget(cursorPosInEditor, draggedBlock, out var target, out var leftEdge))
+            return false;
+
+        if (ReferenceEquals(_splitDropTargetBlock, target) && _splitDropLeftEdge == leftEdge && _currentDropIndicatorBlock != null)
+            return true;
+
+        ClearDropIndicator();
+        _splitDropTargetBlock = target;
+        _splitDropLeftEdge = leftEdge;
+        _currentDropInsertIndex = -1;
+
+        var blockVisual = GetEditableBlockForViewModel(target!);
+        if (blockVisual == null) return true;
+        _currentDropIndicatorBlock = blockVisual;
+        if (leftEdge)
+            blockVisual.ShowDropLineAtLeft();
+        else
+            blockVisual.ShowDropLineAtRight();
+        return true;
+    }
+
+    /// <summary>Horizontal strip width (each side) for split-into-columns; only active near editor content edges.</summary>
+    private static double GetSplitDropSideBandWidth(double contentWidth)
+    {
+        if (contentWidth <= 0) return 0;
+        // ~10% of content, clamped — keeps most width for vertical reorder only.
+        double band = contentWidth * 0.10;
+        band = Math.Clamp(band, 52, 96);
+        double maxHalf = Math.Max(0, (contentWidth - 24) * 0.5);
+        return maxHalf > 0 ? Math.Min(band, maxHalf) : band;
+    }
+
+    private bool TryGetEditorBlocksContentXRange(out double left, out double right)
+    {
+        left = 0;
+        right = 0;
+        if (BlocksItemsControl == null) return false;
+        var tl = BlocksItemsControl.TranslatePoint(new Point(0, 0), this);
+        if (!tl.HasValue) return false;
+        double w = BlocksItemsControl.Bounds.Width;
+        if (w <= 0) return false;
+        left = tl.Value.X;
+        right = tl.Value.X + w;
+        return true;
+    }
+
+    /// <returns>True if cursor is in a side band; <paramref name="leftEdge"/> = split with dragged as left column when in the left band.</returns>
+    private bool TryGetSplitIntentFromEditorX(double cursorX, out bool leftEdge)
+    {
+        leftEdge = false;
+        if (!TryGetEditorBlocksContentXRange(out var contentLeft, out var contentRight))
+            return false;
+        double contentW = contentRight - contentLeft;
+        double band = GetSplitDropSideBandWidth(contentW);
+        if (band <= 0) return false;
+        if (cursorX < contentLeft + band)
+        {
+            leftEdge = true;
+            return true;
+        }
+        if (cursorX > contentRight - band)
+        {
+            leftEdge = false;
+            return true;
+        }
+        return false;
+    }
+
+    private bool TryGetSplitDropTarget(Point cursor, BlockViewModel dragged, out BlockViewModel? target, out bool leftEdge)
+    {
+        target = null;
+        leftEdge = false;
+        if (!TryGetSplitIntentFromEditorX(cursor.X, out leftEdge))
+            return false;
+
+        var boundsList = GetBlockBoundsInEditorOrder();
+        if (boundsList.Count == 0 || boundsList.Count != BlockRows.Count) return false;
+
+        for (int r = 0; r < boundsList.Count; r++)
+        {
+            var (top, bottom) = boundsList[r];
+            if (cursor.Y < top || cursor.Y >= bottom) continue;
+
+            var row = BlockRows[r];
+            if (row is SplitBlockRowViewModel splitRow)
+            {
+                BlockViewModel? hit = null;
+                foreach (var vm in new[] { splitRow.Left, splitRow.Right })
+                {
+                    if (ReferenceEquals(vm, dragged)) continue;
+                    var rect = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
+                    if (rect.Width <= 0) continue;
+                    if (cursor.Y < rect.Y || cursor.Y >= rect.Bottom) continue;
+                    if (cursor.X >= rect.X && cursor.X < rect.Right)
+                    {
+                        hit = vm;
+                        break;
+                    }
+                }
+                if (hit == null)
+                {
+                    double best = double.MaxValue;
+                    foreach (var vm in new[] { splitRow.Left, splitRow.Right })
+                    {
+                        if (ReferenceEquals(vm, dragged)) continue;
+                        var rect = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
+                        if (rect.Width <= 0) continue;
+                        if (cursor.Y < rect.Y || cursor.Y >= rect.Bottom) continue;
+                        double cx = rect.X + rect.Width * 0.5;
+                        double d = Math.Abs(cursor.X - cx);
+                        if (d < best)
+                        {
+                            best = d;
+                            hit = vm;
+                        }
+                    }
+                }
+                if (hit == null) return false;
+                target = hit;
+                return true;
+            }
+
+            if (row is SingleBlockRowViewModel single)
+            {
+                var vm = single.Block;
+                if (ReferenceEquals(vm, dragged)) return false;
+
+                var rect = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
+                if (rect.Width <= 0) return false;
+
+                target = vm;
+                return true;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /// <summary>Remove <paramref name="cell"/> from the document; sibling becomes a normal unpaired block.</summary>
+    private void DetachColumnCell(BlockViewModel cell)
+    {
+        var sibling = cell.GetColumnSibling(Blocks);
+        if (sibling == null) return;
+        UnsubscribeFromBlock(cell);
+        var idx = Blocks.IndexOf(cell);
+        if (idx < 0) return;
+        Blocks.RemoveAt(idx);
+        ColumnPairHelper.ClearPair(cell, sibling);
+    }
+
+    private bool TryPerformSplitDrop(BlockViewModel dragged, BlockViewModel target, bool dropOnLeftEdge)
+    {
+        var targetIdx = Blocks.IndexOf(target);
+        if (targetIdx < 0) return false;
+
+        BeginStructuralChange();
+
+        if (dragged.GetColumnSibling(Blocks) != null)
+            DetachColumnCell(dragged);
+
+        targetIdx = Blocks.IndexOf(target);
+        if (targetIdx < 0) return false;
+
+        var targetSib = target.GetColumnSibling(Blocks);
+        if (targetSib != null)
+        {
+            var tIdxBefore = Blocks.IndexOf(target);
+            var sIdx = Blocks.IndexOf(targetSib);
+            UnsubscribeFromBlock(targetSib);
+            Blocks.RemoveAt(sIdx);
+            ColumnPairHelper.ClearPair(target, targetSib);
+            SubscribeToBlock(targetSib);
+            var newTIdx = Blocks.IndexOf(target);
+            if (sIdx < tIdxBefore)
+                Blocks.Insert(newTIdx, targetSib);
+            else
+                Blocks.Insert(newTIdx + 1, targetSib);
+            targetIdx = Blocks.IndexOf(target);
+        }
+
+        var draggedIdx = Blocks.IndexOf(dragged);
+        if (draggedIdx >= 0)
+        {
+            UnsubscribeFromBlock(dragged);
+            Blocks.RemoveAt(draggedIdx);
+            if (draggedIdx < targetIdx) targetIdx--;
+        }
+
+        UnsubscribeFromBlock(target);
+        Blocks.RemoveAt(targetIdx);
+
+        var left = dropOnLeftEdge ? dragged : target;
+        var right = dropOnLeftEdge ? target : dragged;
+
+        ColumnPairHelper.WirePair(left, right, Guid.NewGuid().ToString());
+        Blocks.Insert(targetIdx, left);
+        SubscribeToBlock(left);
+        Blocks.Insert(targetIdx + 1, right);
+        SubscribeToBlock(right);
+
+        ReorderBlocks();
+        CommitStructuralChange("Split into columns");
+        NotifyBlocksChanged();
+
+        Dispatcher.UIThread.Post(() => left.IsFocused = true, DispatcherPriority.Input);
+        return true;
+    }
+
     private int GetInsertIndex(double cursorY)
     {
-        var blockBounds = GetBlockBoundsInEditorOrder();
-        if (blockBounds.Count == 0)
+        var rowBounds = GetBlockBoundsInEditorOrder();
+        if (rowBounds.Count == 0 || BlockRows.Count != rowBounds.Count)
             return -1;
 
-        // Each block is divided into three vertical zones:
-        //   top snap-band    → insert before this block   (insertIndex = i)
-        //   bottom snap-band → insert after this block    (insertIndex = i + 1)
-        //   middle dead zone → keep the current index (hysteresis — prevents the indicator
-        //                      from jumping while moving through a tall/multi-line block)
-        //
-        // The indicator is ALWAYS shown at the TOP of the block at insertIndex
-        // (or the bottom of the last block when insertIndex == Count).
-        // This guarantees one insert index → one visual location with no ambiguity.
-
-        for (int i = 0; i < blockBounds.Count; i++)
+        for (int r = 0; r < rowBounds.Count; r++)
         {
-            var (top, bottom) = blockBounds[i];
-            if (cursorY < top || cursorY >= bottom) continue; // cursor not in this block
+            var (top, bottom) = rowBounds[r];
+            if (cursorY < top || cursorY >= bottom) continue;
+
+            var row = BlockRows[r];
+            int insertBeforeTop = row.StartBlockIndex;
+            int insertAfterBottom = row.StartBlockIndex + row.BlockSpan;
 
             var height = bottom - top;
             var snapBand = Math.Max(4, height * SnapBandFraction);
 
             if (cursorY < top + snapBand)
-                return i; // top snap-band → insert before block i
+                return insertBeforeTop;
 
             if (cursorY >= bottom - snapBand)
-                return i + 1; // bottom snap-band → insert after block i
+                return insertAfterBottom;
 
-            // Middle dead zone: preserve the current index if it is adjacent to this block.
-            if (_currentDropInsertIndex == i || _currentDropInsertIndex == i + 1)
+            if (_currentDropInsertIndex == insertBeforeTop || _currentDropInsertIndex == insertAfterBottom)
                 return _currentDropInsertIndex;
 
-            // No prior index or it jumped far — fall back to the closer boundary.
             var midY = (top + bottom) / 2.0;
-            return cursorY < midY ? i : i + 1;
+            return cursorY < midY ? insertBeforeTop : insertAfterBottom;
         }
 
-        // Cursor is below all blocks → append at end.
-        return blockBounds.Count;
+        return Blocks.Count;
     }
 
     private List<(double Top, double Bottom)> GetBlockBoundsInEditorOrder()
@@ -2318,17 +2697,53 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return containers.Count > 0 ? containers : null;
     }
 
-    private EditableBlock? GetEditableBlockAt(int insertIndex)
+    private EditableBlock? GetEditableBlockForViewModel(BlockViewModel? vm)
+    {
+        if (vm == null) return null;
+        var containers = GetBlockContainersInOrder();
+        if (containers == null) return null;
+        for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
+        {
+            var row = BlockRows[r];
+            var c = containers[r];
+            if (row is SingleBlockRowViewModel s && ReferenceEquals(s.Block, vm))
+            {
+                return c as EditableBlock
+                    ?? c.GetVisualDescendants().OfType<EditableBlock>().FirstOrDefault(e => ReferenceEquals(e.DataContext, vm));
+            }
+            if (row is SplitBlockRowViewModel sp
+                && (ReferenceEquals(sp.Left, vm) || ReferenceEquals(sp.Right, vm)))
+            {
+                return c.GetVisualDescendants().OfType<EditableBlock>().FirstOrDefault(e => ReferenceEquals(e.DataContext, vm));
+            }
+        }
+        return null;
+    }
+
+    private Rect GetEditableBlockBoundsInEditor(EditableBlock? eb) => GetControlBoundsInEditor(eb);
+
+    private Rect GetControlBoundsInEditor(Control? c)
+    {
+        if (c == null) return default;
+        var tl = c.TranslatePoint(new Point(0, 0), this);
+        if (!tl.HasValue) return default;
+        return new Rect(tl.Value, c.Bounds.Size);
+    }
+
+    /// <summary>Items row container (ContentPresenter) for the row where horizontal insert <paramref name="insertIndex"/> applies.</summary>
+    private Control? GetRowContainerForInsertIndex(int insertIndex)
     {
         var containers = GetBlockContainersInOrder();
         if (containers == null || containers.Count == 0) return null;
-
-        // insertIndex == Count means "append after last" — attach indicator to the last block.
-        var index = Math.Min(insertIndex, containers.Count - 1);
-        if (index < 0) return null;
-
-        var container = containers[index];
-        return container as EditableBlock ?? container.GetVisualDescendants().OfType<EditableBlock>().FirstOrDefault();
+        if (insertIndex >= Blocks.Count)
+            return containers[^1];
+        for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
+        {
+            var row = BlockRows[r];
+            if (insertIndex >= row.StartBlockIndex && insertIndex < row.StartBlockIndex + row.BlockSpan)
+                return containers[r];
+        }
+        return null;
     }
 
     #endregion
@@ -2342,12 +2757,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         var snapshots = new BlockSnapshot[Blocks.Count];
         for (int i = 0; i < Blocks.Count; i++)
-        {
-            var b = Blocks[i];
-            snapshots[i] = new BlockSnapshot(
-                b.Id, b.Type, b.CloneRuns(),
-                b.Meta ?? new Dictionary<string, object>(), i);
-        }
+            snapshots[i] = BlockSnapshot.From(Blocks[i].ToBlock());
         return snapshots;
     }
 
@@ -2355,7 +2765,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         int idx = GetFocusedBlockIndex();
         if (idx < 0) return null;
-        var editableBlock = GetEditableBlockAt(idx);
+        var editableBlock = GetEditableBlockForViewModel(Blocks[idx]);
         var caretIdx = editableBlock?.GetCaretIndex();
         return new CaretState { BlockIndex = idx, CaretPosition = caretIdx ?? 0 };
     }
@@ -2406,14 +2816,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         try
         {
             var targetBlocks = blocks ?? Array.Empty<Block>();
+            var flattened = ColumnPairHelper.ExpandLegacyTwoColumnBlocks(targetBlocks.OrderBy(b => b.Order));
             var existingById = new Dictionary<string, BlockViewModel>();
             foreach (var b in Blocks)
                 existingById[b.Id] = b;
 
-            var newList = new List<BlockViewModel>(targetBlocks.Length);
+            var newList = new List<BlockViewModel>(flattened.Count);
             var usedIds = new HashSet<string>();
 
-            foreach (var blk in targetBlocks.OrderBy(b => b.Order))
+            foreach (var blk in flattened)
             {
                 if (existingById.TryGetValue(blk.Id, out var existing) && usedIds.Add(blk.Id))
                 {
@@ -2637,7 +3048,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var textAfter = vm.Content ?? string.Empty;
 
         var idx = Blocks.IndexOf(vm);
-        var editableBlock = GetEditableBlockAt(idx);
+        var editableBlock = GetEditableBlockForViewModel(vm);
         var caretIdx = editableBlock?.GetCaretIndex();
         var caretAfter = new CaretState { BlockIndex = idx, CaretPosition = caretIdx ?? 0 };
 

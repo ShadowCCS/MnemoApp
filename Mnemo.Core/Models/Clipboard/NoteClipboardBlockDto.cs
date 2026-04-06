@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Mnemo.Core.Models;
 
 namespace Mnemo.Core.Models.Clipboard;
@@ -25,4 +26,15 @@ public sealed class NoteClipboardBlockDto
 
     /// <summary>Horizontal layout for image blocks: left, center, or right.</summary>
     public string? ImageAlign { get; set; }
+
+    /// <summary>Legacy clipboard: nested blocks for <see cref="BlockType.TwoColumn"/>.</summary>
+    public List<NoteClipboardBlockDto>? Children { get; set; }
+
+    /// <summary>Side-by-side pair id (left block carries <see cref="ColumnSplitRatio"/>).</summary>
+    public string? ColumnPairId { get; set; }
+
+    public string? ColumnSide { get; set; }
+
+    /// <summary>Left column width fraction when <see cref="ColumnSide"/> is Left.</summary>
+    public double? ColumnSplitRatio { get; set; }
 }

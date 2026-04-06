@@ -16,6 +16,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.UI;
@@ -33,6 +34,12 @@ public partial class ImageBlockComponent : BlockComponentBase
     private bool _isResizing;
     private double _resizeDragStartX;
     private double _resizeDragStartWidth;
+
+    private Point? _imageReorderPressPoint;
+    private bool _imageReorderDragLaunched;
+
+    /// <summary>Device-independent px before a press on the bitmap becomes a block reorder drag.</summary>
+    private const double ImageReorderDragThresholdPixels = 6;
 
     /// <summary>
     /// BlockContainer padding (16) + add column (30) + drag column (30). Content column = list row width minus this.
@@ -56,6 +63,9 @@ public partial class ImageBlockComponent : BlockComponentBase
 
         InitializeComponent();
 
+        WireRichTextEditor(CaptionRichTextEditor);
+        EditorTextChanged += (_, _) => RefreshCaptionWatermark();
+
         DataContextChanged += OnDataContextChanged;
     }
 
@@ -67,7 +77,7 @@ public partial class ImageBlockComponent : BlockComponentBase
 
     private string T(string key) => _loc?.T(key, "NotesEditor") ?? key;
 
-    public override Control? GetInputControl() => null;
+    public override Control? GetInputControl() => CaptionRichTextEditor;
 
     /// <summary>Image/placeholder row used to vertically align the block gutter with the first visual line of the block.</summary>
     public Grid? GutterAnchorRow => ImageContentRow;
@@ -77,11 +87,6 @@ public partial class ImageBlockComponent : BlockComponentBase
         base.OnAttachedToVisualTree(e);
         if (HoverHost != null)
             HoverHost.LayoutUpdated += OnHoverHostLayoutUpdated;
-        if (CaptionBox != null)
-        {
-            CaptionBox.GotFocus += CaptionBox_GotFocus;
-            CaptionBox.LostFocus += CaptionBox_LostFocus;
-        }
         SetLocalizationStrings();
         SyncFromViewModel();
     }
@@ -90,11 +95,6 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         if (HoverHost != null)
             HoverHost.LayoutUpdated -= OnHoverHostLayoutUpdated;
-        if (CaptionBox != null)
-        {
-            CaptionBox.GotFocus -= CaptionBox_GotFocus;
-            CaptionBox.LostFocus -= CaptionBox_LostFocus;
-        }
         EndResizeSession();
         base.OnDetachedFromVisualTree(e);
         DisposeBitmap();
@@ -139,9 +139,9 @@ public partial class ImageBlockComponent : BlockComponentBase
 
     private void RefreshCaptionWatermark()
     {
-        if (CaptionBox == null) return;
+        if (CaptionRichTextEditor == null) return;
         var over = HoverHost?.IsPointerOver == true;
-        CaptionBox.Watermark = over && string.IsNullOrEmpty(CaptionBox.Text)
+        CaptionRichTextEditor.Watermark = over && string.IsNullOrEmpty(CaptionRichTextEditor.Text)
             ? _captionWatermarkText
             : null;
     }
@@ -155,7 +155,8 @@ public partial class ImageBlockComponent : BlockComponentBase
         var imageAlt = GetMetaString(vm, "imageAlt");
         var imageWidth = GetMetaDouble(vm, "imageWidth");
 
-        UpdateCaptionBox(imageAlt);
+        if ((vm.Content ?? string.Empty) != imageAlt)
+            vm.SetRuns(new List<InlineRun> { InlineRun.Plain(imageAlt) });
         ApplyImageWidth(imageWidth);
         ClampImageWidthToViewport();
 
@@ -204,6 +205,7 @@ public partial class ImageBlockComponent : BlockComponentBase
         PlaceholderToolbar.IsVisible = false;
         ApplyHorizontalLayoutForContentState();
         UpdateCaptionHostWidth();
+        UpdateResizeChromeVisibility();
     }
 
     private void ShowImageArea()
@@ -213,6 +215,23 @@ public partial class ImageBlockComponent : BlockComponentBase
         PlaceholderToolbar.IsVisible = false;
         ApplyHorizontalLayoutForContentState();
         UpdateCaptionHostWidth();
+        UpdateResizeChromeVisibility();
+    }
+
+    private void LoadedImageRow_PointerEntered(object? sender, PointerEventArgs e) => UpdateResizeChromeVisibility();
+
+    private void LoadedImageRow_PointerExited(object? sender, PointerEventArgs e) => UpdateResizeChromeVisibility();
+
+    /// <summary>Resize affordance only while pointer is over the image row (not the caption).</summary>
+    private void UpdateResizeChromeVisibility()
+    {
+        if (ResizeHitBorder == null || LoadedImageRow == null) return;
+        if (!LoadedImageRow.IsVisible)
+        {
+            ResizeHitBorder.IsVisible = false;
+            return;
+        }
+        ResizeHitBorder.IsVisible = _isResizing || LoadedImageRow.IsPointerOver;
     }
 
     private void UpdateCaptionHostWidth()
@@ -375,6 +394,68 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         HoverHost?.Focus();
+
+        if (sender is not Border border || !ReferenceEquals(border, ImageInnerBorder)) return;
+
+        _imageReorderDragLaunched = false;
+        _imageReorderPressPoint = e.GetPosition(ImageInnerBorder);
+        e.Pointer.Capture(ImageInnerBorder);
+    }
+
+    private void ImageChrome_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_imageReorderPressPoint.HasValue || _imageReorderDragLaunched) return;
+        if (!ReferenceEquals(e.Pointer.Captured, ImageInnerBorder)) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var p = e.GetPosition(ImageInnerBorder);
+        var origin = _imageReorderPressPoint.Value;
+        var dist = Math.Sqrt((p.X - origin.X) * (p.X - origin.X) + (p.Y - origin.Y) * (p.Y - origin.Y));
+        if (dist >= ImageReorderDragThresholdPixels)
+        {
+            _imageReorderDragLaunched = true;
+            // No StandardCursorType.Grab on all platforms; DragMove is the reorder-drag affordance.
+            ImageInnerBorder.Cursor = new Cursor(StandardCursorType.DragMove);
+            _ = RunImageReorderDragAsync(e);
+        }
+    }
+
+    private void ImageChrome_PointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (ReferenceEquals(e.Pointer.Captured, ImageInnerBorder))
+            e.Pointer.Capture(null);
+        ClearImageReorderGestureState();
+    }
+
+    private void ImageChrome_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        ClearImageReorderGestureState();
+    }
+
+    private void ClearImageReorderGestureState()
+    {
+        _imageReorderPressPoint = null;
+        _imageReorderDragLaunched = false;
+        if (ImageInnerBorder != null)
+            ImageInnerBorder.Cursor = Cursor.Default;
+    }
+
+    private async Task RunImageReorderDragAsync(PointerEventArgs e)
+    {
+        try
+        {
+            // DoDragDrop expects no prior capture (same as gutter drag handle).
+            if (ReferenceEquals(e.Pointer.Captured, ImageInnerBorder))
+                e.Pointer.Capture(null);
+
+            var eb = this.GetVisualAncestors().OfType<EditableBlock>().FirstOrDefault();
+            if (eb != null)
+                await eb.BeginBlockReorderDragCoreAsync(e).ConfigureAwait(true);
+        }
+        finally
+        {
+            ClearImageReorderGestureState();
+        }
     }
 
     private void HoverHost_KeyDown(object? sender, KeyEventArgs e)
@@ -382,6 +463,26 @@ public partial class ImageBlockComponent : BlockComponentBase
         if (e.Handled) return;
         if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0)
             return;
+
+        // Image block often focuses HoverHost (see FocusManager); same vertical-arrow rules as KeyboardHandler
+        // so Avalonia's window XY navigation does not eat Up/Down before the caption editor runs.
+        if ((e.Key == Key.Up || e.Key == Key.Down) && CaptionRichTextEditor != null)
+        {
+            e.Handled = true;
+            CaptionRichTextEditor.Focus();
+            var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+            if (e.Key == Key.Up)
+            {
+                if (!CaptionRichTextEditor.TryVerticalLogicalNavigation(shift, up: true))
+                    ViewModel?.RequestFocusPrevious();
+            }
+            else if (!CaptionRichTextEditor.TryVerticalLogicalNavigation(shift, up: false))
+            {
+                ViewModel?.RequestFocusNext();
+            }
+
+            return;
+        }
 
         if (e.Key == Key.Delete)
         {
@@ -556,49 +657,6 @@ public partial class ImageBlockComponent : BlockComponentBase
         ViewModel?.RequestDelete();
     }
 
-    // ── Caption ───────────────────────────────────────────────────────────────
-
-    private void CaptionBox_GotFocus(object? sender, GotFocusEventArgs e)
-    {
-        if (ViewModel != null)
-            ViewModel.IsFocused = true;
-    }
-
-    private void CaptionBox_LostFocus(object? sender, RoutedEventArgs e)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (CaptionBox?.IsFocused == true || HoverHost?.IsFocused == true)
-                return;
-            if (ViewModel == null) return;
-            ViewModel.IsFocused = false;
-            var editor = this.GetVisualAncestors().OfType<BlockEditor>().FirstOrDefault();
-            editor?.FlushTypingBatch();
-            editor?.NotifyBlocksChanged();
-        }, DispatcherPriority.Input);
-    }
-
-    private void Caption_TextChanged(object? sender, TextChangedEventArgs e)
-    {
-        var vm = ViewModel;
-        if (vm == null) return;
-
-        vm.Meta["imageAlt"] = CaptionBox.Text ?? string.Empty;
-        vm.NotifyContentChanged();
-        RefreshCaptionWatermark();
-    }
-
-    private void Caption_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Back || e.Handled) return;
-        if (string.IsNullOrEmpty(CaptionBox.Text))
-        {
-            ViewModel?.NotifyStructuralChangeStarting();
-            ViewModel?.RequestDeleteAndFocusAbove();
-            e.Handled = true;
-        }
-    }
-
     // ── Resize handle (global pointer tracking while dragging) ────────────────
 
     private void ResizePill_PointerEntered(object? sender, PointerEventArgs e)
@@ -653,7 +711,9 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         if (!_isResizing) return;
         _isResizing = false;
-        ResizePill.Opacity = 0.15;
+        if (ResizePill != null)
+            ResizePill.Opacity = 0.15;
+        UpdateResizeChromeVisibility();
     }
 
     private void ResizeGlobal_PointerMoved(PointerEventArgs e)
@@ -683,13 +743,6 @@ public partial class ImageBlockComponent : BlockComponentBase
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private void UpdateCaptionBox(string text)
-    {
-        if (CaptionBox != null && CaptionBox.Text != text)
-            CaptionBox.Text = text;
-        RefreshCaptionWatermark();
-    }
 
     /// <summary>
     /// Max width for the block body (star column), from the list item row width — not the shrink-wrapped

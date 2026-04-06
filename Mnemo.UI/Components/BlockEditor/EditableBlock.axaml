@@ -119,17 +119,25 @@
             </Border>
         </Grid>
     </Border>
-        <!-- Drop indicator line: overlays top of block, does not affect layout -->
+        <!-- Vertical split-into-columns cue (horizontal reorder line lives on BlockEditor overlay). -->
         <Border
-            x:Name="DropIndicatorLine"
-            Height="3"
-            VerticalAlignment="Top"
-            HorizontalAlignment="Stretch"
+            x:Name="DropIndicatorLineVerticalLeft"
+            Width="3"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Stretch"
             Background="{DynamicResource BlockEditorDropLineBrush}"
             CornerRadius="1"
             IsHitTestVisible="False"
-            IsVisible="False"
-            Opacity="1" />
+            IsVisible="False" />
+        <Border
+            x:Name="DropIndicatorLineVerticalRight"
+            Width="3"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Stretch"
+            Background="{DynamicResource BlockEditorDropLineBrush}"
+            CornerRadius="1"
+            IsHitTestVisible="False"
+            IsVisible="False" />
     </Grid>
 </UserControl>
 

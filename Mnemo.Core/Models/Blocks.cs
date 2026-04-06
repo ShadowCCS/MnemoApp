@@ -17,7 +17,9 @@ public enum BlockType
     Quote,
     Code,
     Divider,
-    Image
+    Image,
+    /// <summary>Side-by-side columns; child blocks are in <see cref="Block.Children"/> (exactly two).</summary>
+    TwoColumn
 }
 
 public class Block
@@ -56,6 +58,9 @@ public class Block
 
     public Dictionary<string, object> Meta { get; set; } = new();
     public int Order { get; set; }
+
+    /// <summary>When <see cref="Type"/> is <see cref="BlockType.TwoColumn"/>, the left and right column blocks (in order).</summary>
+    public List<Block>? Children { get; set; }
 
     /// <summary>
     /// Ensures InlineRuns is populated. Call after deserialization when InlineRuns might be null

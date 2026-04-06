@@ -51,14 +51,14 @@ public class KeyboardHandler
                 HandleBackspace(e, editor, text, caretIndex, selectionLength, viewModel);
                 break;
 
-            case Key.Up when caretIndex == 0 || IsOnFirstLine(editor):
-                e.Handled = true;
-                RequestFocusPrevious?.Invoke();
+            case Key.Up:
+                if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) == 0)
+                    HandleVerticalArrow(e, editor, up: true);
                 break;
 
-            case Key.Down when caretIndex == text.Length || IsOnLastLine(editor):
-                e.Handled = true;
-                RequestFocusNext?.Invoke();
+            case Key.Down:
+                if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) == 0)
+                    HandleVerticalArrow(e, editor, up: false);
                 break;
 
             case Key.Escape:
@@ -68,9 +68,31 @@ public class KeyboardHandler
         }
     }
 
+    /// <summary>
+    /// Owns Up/Down for <see cref="RichTextEditor"/> so <c>e.Handled</c> is always set; otherwise
+    /// Avalonia's window-level directional navigation moves XY focus instead of editing.
+    /// </summary>
+    private void HandleVerticalArrow(KeyEventArgs e, RichTextEditor editor, bool up)
+    {
+        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        e.Handled = true;
+        if (!editor.TryVerticalLogicalNavigation(shift, up))
+        {
+            if (up)
+                RequestFocusPrevious?.Invoke();
+            else
+                RequestFocusNext?.Invoke();
+        }
+    }
+
     private void HandleEnter(KeyEventArgs e, RichTextEditor editor, BlockViewModel viewModel, string text, int caretIndex, int selectionLength)
     {
         e.Handled = true;
+        if (viewModel.Type == BlockType.Image)
+        {
+            editor.InsertTextAtCaret("\n");
+            return;
+        }
         if (viewModel.Type == BlockType.Quote)
         {
             if (selectionLength == 0 && QuoteEnterBehavior.IsCaretOnWhitespaceOnlyLine(text, caretIndex))
@@ -111,8 +133,20 @@ public class KeyboardHandler
             var isEmpty = string.IsNullOrWhiteSpace(text);
             if (isEmpty)
             {
+                if (viewModel.Type == BlockType.Image)
+                {
+                    e.Handled = true;
+                    viewModel.NotifyStructuralChangeStarting();
+                    viewModel.RequestDeleteAndFocusAbove();
+                    return;
+                }
                 e.Handled = true;
                 BackspaceOnEmpty?.Invoke();
+            }
+            else if (viewModel.Type == BlockType.Image)
+            {
+                // Caption: backspace at start of non-empty text — do not merge into previous block.
+                return;
             }
             else if (viewModel.Type != BlockType.Text)
             {
@@ -138,20 +172,4 @@ public class KeyboardHandler
 
     public bool IsSlashKeyPress(Key key, string text) =>
         text == "/" || key == Key.Divide || key == Key.OemQuestion || key == Key.Oem2;
-
-    private static bool IsOnFirstLine(RichTextEditor editor)
-    {
-        var text = editor.Text;
-        var caretIndex = editor.CaretIndex;
-        if (caretIndex == 0) return true;
-        return !text[..caretIndex].Contains('\n');
-    }
-
-    private static bool IsOnLastLine(RichTextEditor editor)
-    {
-        var text = editor.Text;
-        var caretIndex = editor.CaretIndex;
-        if (caretIndex >= text.Length) return true;
-        return !text[caretIndex..].Contains('\n');
-    }
 }

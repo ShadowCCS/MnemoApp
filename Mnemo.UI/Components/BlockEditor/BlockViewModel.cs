@@ -111,6 +111,11 @@ public class BlockViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(Runs));
         OnPropertyChanged(nameof(Watermark));
+        if (_type == BlockType.Image)
+        {
+            _meta["imageAlt"] = _cachedFlatContent ?? string.Empty;
+            OnPropertyChanged(nameof(Meta));
+        }
     }
 
     /// <summary>
@@ -286,6 +291,31 @@ public class BlockViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Left column width fraction (0.1–0.9) for the left block of a column pair (see <see cref="ColumnPairHelper"/>).</summary>
+    public double ColumnSplitRatio
+    {
+        get
+        {
+            if (_meta.TryGetValue("columnSplitRatio", out var v))
+            {
+                if (v is double d) return Math.Clamp(d, 0.1, 0.9);
+                if (v is JsonElement je && je.ValueKind == JsonValueKind.Number)
+                    return Math.Clamp(je.GetDouble(), 0.1, 0.9);
+            }
+            return 0.5;
+        }
+        set
+        {
+            var r = Math.Clamp(value, 0.1, 0.9);
+            _meta["columnSplitRatio"] = r;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Other block in the same side-by-side pair, if any (uses <c>columnPairId</c> meta).</summary>
+    public BlockViewModel? GetColumnSibling(IReadOnlyList<BlockViewModel> document) =>
+        ColumnPairHelper.GetSibling(this, document);
+
     public event Action<BlockViewModel>? ContentChanged;
     public event Action<BlockViewModel>? DeleteRequested;
     /// <summary>Duplicate this block (e.g. image: copy asset into a new block below).</summary>
@@ -328,8 +358,22 @@ public class BlockViewModel : INotifyPropertyChanged
             _inlineRuns.Add(InlineRun.Plain(string.Empty));
         EnsureHeadingBold();
         _cachedFlatContent = InlineRunFormatApplier.Flatten(_inlineRuns);
-        
+
         EnsureMetaKeys();
+
+        if (_type == BlockType.Image)
+        {
+            var alt = ReadMetaString(_meta, "imageAlt");
+            SetRuns(new List<InlineRun> { InlineRun.Plain(alt) });
+        }
+    }
+
+    private static string ReadMetaString(Dictionary<string, object> meta, string key)
+    {
+        if (!meta.TryGetValue(key, out var val) || val == null) return string.Empty;
+        if (val is string s) return s;
+        if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
+        return val.ToString() ?? string.Empty;
     }
     
     private void EnsureMetaKeys()
@@ -385,7 +429,7 @@ public class BlockViewModel : INotifyPropertyChanged
 
     public Block ToBlock()
     {
-        return new Block
+        var block = new Block
         {
             Id = Id,
             Type = Type,
@@ -393,6 +437,7 @@ public class BlockViewModel : INotifyPropertyChanged
             Meta = Meta,
             Order = Order
         };
+        return block;
     }
 
     public void NotifyContentChanged()

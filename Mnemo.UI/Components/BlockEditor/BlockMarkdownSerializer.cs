@@ -227,9 +227,9 @@ public static class BlockMarkdownSerializer
             {
                 var vm = BlockFactory.CreateBlock(BlockType.Image, order++);
                 vm.Meta["imagePath"] = UnescapeMarkdownImageTarget(imgMatch.Groups[2].Value.Trim());
-                vm.Meta["imageAlt"] = UnescapeMarkdownImageAlt(imgMatch.Groups[1].Value);
                 vm.Meta["imageWidth"] = 0.0;
-                vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+                var alt = UnescapeMarkdownImageAlt(imgMatch.Groups[1].Value);
+                vm.SetRuns(new List<InlineRun> { InlineRun.Plain(alt) });
                 result.Add(vm);
                 i++;
                 continue;

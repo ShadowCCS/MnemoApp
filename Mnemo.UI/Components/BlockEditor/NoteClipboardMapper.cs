@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -26,6 +27,18 @@ public static class NoteClipboardMapper
         int order = firstOrder;
         foreach (var dto in document.Blocks)
         {
+            if (dto.Type == BlockType.TwoColumn && dto.Children is { Count: >= 2 })
+            {
+                var left = BuildViewModelFromDto(dto.Children[0], order);
+                var right = BuildViewModelFromDto(dto.Children[1], order + 1);
+                ColumnPairHelper.WirePair(left, right, Guid.NewGuid().ToString(),
+                    dto.ColumnSplitRatio is > 0 and < 1 ? dto.ColumnSplitRatio.Value : 0.5);
+                list.Add(left);
+                list.Add(right);
+                order += 2;
+                continue;
+            }
+
             list.Add(ToViewModel(dto, order++));
         }
 
@@ -65,6 +78,13 @@ public static class NoteClipboardMapper
                 dto.ImageAlign = ia;
         }
 
+        if (vm.Meta.TryGetValue(ColumnPairHelper.PairIdKey, out var pairId) && pairId != null)
+            dto.ColumnPairId = pairId.ToString();
+        if (vm.Meta.TryGetValue(ColumnPairHelper.SideKey, out var colSide) && colSide != null)
+            dto.ColumnSide = colSide.ToString();
+        if (ColumnPairHelper.GetColumnSide(vm) == ColumnPairHelper.Left)
+            dto.ColumnSplitRatio = vm.ColumnSplitRatio;
+
         dto.Content = vm.Content;
         return dto;
     }
@@ -81,7 +101,10 @@ public static class NoteClipboardMapper
             BackgroundColor = run.Style.BackgroundColor
         };
 
-    private static BlockViewModel ToViewModel(NoteClipboardBlockDto dto, int order)
+    private static BlockViewModel ToViewModel(NoteClipboardBlockDto dto, int order) =>
+        BuildViewModelFromDto(dto, order);
+
+    private static BlockViewModel BuildViewModelFromDto(NoteClipboardBlockDto dto, int order)
     {
         var vm = BlockFactory.CreateBlock(dto.Type, order);
         if (!string.IsNullOrEmpty(dto.CodeLanguage))
@@ -96,11 +119,12 @@ public static class NoteClipboardMapper
         if (dto.Type == BlockType.Image)
         {
             vm.Meta["imagePath"] = dto.ImagePath ?? string.Empty;
-            vm.Meta["imageAlt"] = dto.ImageAlt ?? string.Empty;
             vm.Meta["imageWidth"] = dto.ImageWidth is > 0 ? dto.ImageWidth.Value : 0.0;
             if (!string.IsNullOrEmpty(dto.ImageAlign))
                 vm.Meta["imageAlign"] = dto.ImageAlign;
-            vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+            var alt = dto.ImageAlt ?? string.Empty;
+            vm.SetRuns(new List<InlineRun> { InlineRun.Plain(alt) });
+            ApplyColumnClipboardMeta(vm, dto);
             return vm;
         }
 
@@ -114,7 +138,18 @@ public static class NoteClipboardMapper
         else
             vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
 
+        ApplyColumnClipboardMeta(vm, dto);
         return vm;
+    }
+
+    private static void ApplyColumnClipboardMeta(BlockViewModel vm, NoteClipboardBlockDto dto)
+    {
+        if (!string.IsNullOrEmpty(dto.ColumnPairId))
+            vm.Meta[ColumnPairHelper.PairIdKey] = dto.ColumnPairId;
+        if (!string.IsNullOrEmpty(dto.ColumnSide))
+            vm.Meta[ColumnPairHelper.SideKey] = dto.ColumnSide;
+        if (dto.ColumnSplitRatio is > 0 and < 1 && ColumnPairHelper.GetColumnSide(vm) == ColumnPairHelper.Left)
+            vm.Meta["columnSplitRatio"] = dto.ColumnSplitRatio.Value;
     }
 
     private static string MetaString(BlockViewModel vm, string key)

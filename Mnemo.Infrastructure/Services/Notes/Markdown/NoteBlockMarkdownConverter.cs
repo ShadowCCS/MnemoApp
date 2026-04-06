@@ -50,6 +50,9 @@ public static class NoteBlockMarkdownConverter
             BlockType.Quote => "> " + body.Replace("\n", "\n> ", StringComparison.Ordinal),
             BlockType.Code => "```\n" + (block.Content ?? string.Empty) + "\n```",
             BlockType.Divider => "---",
+            BlockType.TwoColumn => block.Children is { Count: >= 2 }
+                ? SerializeBlock(block.Children[0]) + "\n\n---\n\n" + SerializeBlock(block.Children[1])
+                : string.Empty,
             _ => body
         };
     }

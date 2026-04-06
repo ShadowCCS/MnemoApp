@@ -17,7 +17,7 @@
         <Border Background="Transparent" ClipToBounds="False" Padding="32,0,32,0" DragDrop.AllowDrop="True">
             <Grid Background="Transparent">
                 <Grid x:Name="EditorRoot" RowDefinitions="Auto,*" Background="Transparent" ClipToBounds="False">
-                    <ItemsControl x:Name="BlocksItemsControl" Grid.Row="0" ItemsSource="{Binding Blocks}" Background="Transparent">
+                    <ItemsControl x:Name="BlocksItemsControl" Grid.Row="0" ItemsSource="{Binding BlockRows}" Background="Transparent">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Orientation="Vertical" Spacing="6" />
@@ -29,11 +29,14 @@
                                 <Setter Property="Padding" Value="0" />
                             </Style>
                         </ItemsControl.Styles>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <local:EditableBlock />
+                        <ItemsControl.DataTemplates>
+                            <DataTemplate DataType="local:SingleBlockRowViewModel">
+                                <local:EditableBlock DataContext="{Binding Block}" />
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="local:SplitBlockRowViewModel">
+                                <local:SplitBlockRowView />
+                            </DataTemplate>
+                        </ItemsControl.DataTemplates>
                     </ItemsControl>
                     <!-- Hit target below last block; keep modest so the page does not show a huge empty band. -->
                     <Border x:Name="BelowBlocksArea" Grid.Row="1" MinHeight="56" Background="Transparent" DragDrop.AllowDrop="True" />
@@ -49,7 +52,16 @@
                         IsVisible="False"
                         IsHitTestVisible="False" />
                 </local:LayoutOverlayPanel>
-                <local:LayoutOverlayPanel x:Name="BlockDragGhostOverlay" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                <local:LayoutOverlayPanel x:Name="BlockDragGhostOverlay" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <!-- Horizontal reorder insert line: positioned in overlay space (same as drag ghost). -->
+                    <Border
+                        x:Name="BlockReorderDropLineOverlay"
+                        Height="3"
+                        CornerRadius="1"
+                        Background="{DynamicResource BlockEditorDropLineBrush}"
+                        IsHitTestVisible="False"
+                        IsVisible="False" />
+                </local:LayoutOverlayPanel>
             </Grid>
         </Border>
     </Grid>
