@@ -1,12 +1,12 @@
 namespace Mnemo.UI.Components.BlockEditor;
 
-/// <summary>One visual row in the block list (single block or a side-by-side pair).</summary>
+/// <summary>One visual row in the block list (single block or a nested split row).</summary>
 public abstract class BlockRowViewModelBase
 {
     /// <summary>Index of the first <see cref="BlockViewModel"/> in <see cref="BlockEditor.Blocks"/> for this row.</summary>
     public int StartBlockIndex { get; protected init; }
 
-    /// <summary>1 or 2 — how many consecutive document blocks this row consumes.</summary>
+    /// <summary>How many consecutive top-level <see cref="BlockEditor.Blocks"/> entries this row consumes (always 1 for a split; columns are nested).</summary>
     public int BlockSpan { get; protected init; }
 }
 
@@ -24,14 +24,12 @@ public sealed class SingleBlockRowViewModel : BlockRowViewModelBase
 
 public sealed class SplitBlockRowViewModel : BlockRowViewModelBase
 {
-    public BlockViewModel Left { get; }
-    public BlockViewModel Right { get; }
+    public TwoColumnBlockViewModel TwoColumn { get; }
 
-    public SplitBlockRowViewModel(BlockViewModel left, BlockViewModel right, int startBlockIndex)
+    public SplitBlockRowViewModel(TwoColumnBlockViewModel twoColumn, int startBlockIndex)
     {
-        Left = left;
-        Right = right;
+        TwoColumn = twoColumn;
         StartBlockIndex = startBlockIndex;
-        BlockSpan = 2;
+        BlockSpan = 1;
     }
 }

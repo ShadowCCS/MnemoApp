@@ -27,6 +27,14 @@ public static class NoteClipboardMapper
         int order = firstOrder;
         foreach (var dto in document.Blocks)
         {
+            if (dto.Type == BlockType.TwoColumn && dto.Children is { Count: >= 2 }
+                && dto.Children[0].Type == BlockType.ColumnGroup && dto.Children[1].Type == BlockType.ColumnGroup)
+            {
+                list.Add(BuildViewModelFromDto(dto, order));
+                order += 1;
+                continue;
+            }
+
             if (dto.Type == BlockType.TwoColumn && dto.Children is { Count: >= 2 })
             {
                 var left = BuildViewModelFromDto(dto.Children[0], order);
@@ -47,6 +55,33 @@ public static class NoteClipboardMapper
 
     private static NoteClipboardBlockDto ToDto(BlockViewModel vm)
     {
+        if (vm is TwoColumnBlockViewModel tc)
+        {
+            double ratio = 0.5;
+            if (tc.Meta.TryGetValue("columnSplitRatio", out var r) && r is double d && d > 0 && d < 1)
+                ratio = d;
+            return new NoteClipboardBlockDto
+            {
+                Type = BlockType.TwoColumn,
+                Content = string.Empty,
+                Runs = new List<NoteClipboardRunDto>(),
+                ColumnSplitRatio = ratio,
+                Children =
+                [
+                    new NoteClipboardBlockDto
+                    {
+                        Type = BlockType.ColumnGroup,
+                        Children = tc.LeftColumnBlocks.Select(ToDto).ToList()
+                    },
+                    new NoteClipboardBlockDto
+                    {
+                        Type = BlockType.ColumnGroup,
+                        Children = tc.RightColumnBlocks.Select(ToDto).ToList()
+                    }
+                ]
+            };
+        }
+
         var dto = new NoteClipboardBlockDto
         {
             Type = vm.Type,
@@ -106,6 +141,43 @@ public static class NoteClipboardMapper
 
     private static BlockViewModel BuildViewModelFromDto(NoteClipboardBlockDto dto, int order)
     {
+        if (dto.Type == BlockType.TwoColumn && dto.Children is { Count: >= 2 }
+            && dto.Children[0].Type == BlockType.ColumnGroup && dto.Children[1].Type == BlockType.ColumnGroup)
+        {
+            var tc = new TwoColumnBlockViewModel(order);
+            if (dto.ColumnSplitRatio is > 0 and < 1)
+                tc.Meta["columnSplitRatio"] = dto.ColumnSplitRatio.Value;
+            else
+                tc.Meta["columnSplitRatio"] = 0.5;
+
+            int o = order;
+            foreach (var ch in dto.Children[0].Children ?? new List<NoteClipboardBlockDto>())
+            {
+                var childVm = BuildViewModelFromDto(ch, o++);
+                BlockHierarchy.WireChildOwnership(tc, childVm, true);
+                tc.LeftColumnBlocks.Add(childVm);
+            }
+            foreach (var ch in dto.Children[1].Children ?? new List<NoteClipboardBlockDto>())
+            {
+                var childVm = BuildViewModelFromDto(ch, o++);
+                BlockHierarchy.WireChildOwnership(tc, childVm, false);
+                tc.RightColumnBlocks.Add(childVm);
+            }
+            if (tc.LeftColumnBlocks.Count == 0)
+            {
+                var ph = BlockFactory.CreateBlock(BlockType.Text, o++);
+                BlockHierarchy.WireChildOwnership(tc, ph, true);
+                tc.LeftColumnBlocks.Add(ph);
+            }
+            if (tc.RightColumnBlocks.Count == 0)
+            {
+                var ph = BlockFactory.CreateBlock(BlockType.Text, o++);
+                BlockHierarchy.WireChildOwnership(tc, ph, false);
+                tc.RightColumnBlocks.Add(ph);
+            }
+            return tc;
+        }
+
         var vm = BlockFactory.CreateBlock(dto.Type, order);
         if (!string.IsNullOrEmpty(dto.CodeLanguage))
             vm.Meta["language"] = dto.CodeLanguage;

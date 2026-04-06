@@ -359,6 +359,8 @@ public class BlockViewModel : INotifyPropertyChanged
     public event Action<BlockViewModel>? FocusPreviousRequested;
     public event Action<BlockViewModel>? FocusNextRequested;
     public event Action<BlockViewModel>? MergeWithPreviousRequested;
+    /// <summary>Empty line in a split column: new block below the split (like quote exit).</summary>
+    public event Action<BlockViewModel, string?>? ExitSplitBelowRequested;
     /// <summary>
     /// Raised before a structural change (Enter split, backspace merge, type change)
     /// so the editor can snapshot the document while VMs are still unmodified.
@@ -460,7 +462,13 @@ public class BlockViewModel : INotifyPropertyChanged
         }
     }
 
-    public Block ToBlock()
+    /// <summary>When non-null, this block lives inside a <see cref="TwoColumnBlockViewModel"/> column (not a top-level row).</summary>
+    public TwoColumnBlockViewModel? OwnerTwoColumn { get; internal set; }
+
+    /// <summary>Which column of <see cref="OwnerTwoColumn"/> this block belongs to.</summary>
+    public bool IsLeftColumn { get; internal set; }
+
+    public virtual Block ToBlock()
     {
         var block = new Block
         {
@@ -527,6 +535,11 @@ public class BlockViewModel : INotifyPropertyChanged
     public void RequestMergeWithPrevious()
     {
         MergeWithPreviousRequested?.Invoke(this);
+    }
+
+    public void RequestExitSplitBelow(string? followingText)
+    {
+        ExitSplitBelowRequested?.Invoke(this, followingText);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

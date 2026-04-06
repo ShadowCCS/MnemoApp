@@ -37,8 +37,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// <summary>Visual rows (one item per stack row; split pairs are one row with two <see cref="EditableBlock"/>s).</summary>
     public ObservableCollection<BlockRowViewModelBase> BlockRows { get; } = new();
 
-    /// <summary>Index of the currently focused block, or -1. Kept in sync by <see cref="OnBlockPropertyChanged"/>.</summary>
+    /// <summary>Top-level <see cref="Blocks"/> index for the row containing keyboard focus (split row = one index).</summary>
     private int _focusedBlockIndex = -1;
+
+    /// <summary>Leaf block id with keyboard focus (including nested split cells).</summary>
+    private string? _focusedBlockId;
 
     // Drag-box block selection (Mode 2)
     private bool _isBoxSelecting;
@@ -133,9 +136,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         for (var i = 0; i < Blocks.Count; i++)
         {
             var b = Blocks[i];
-            if (ColumnPairHelper.IsPairedRight(b, i, Blocks)) continue;
-            if (ColumnPairHelper.IsPairedLeft(b, i, Blocks))
-                BlockRows.Add(new SplitBlockRowViewModel(b, Blocks[i + 1], i));
+            if (b is TwoColumnBlockViewModel tc)
+                BlockRows.Add(new SplitBlockRowViewModel(tc, i));
             else
                 BlockRows.Add(new SingleBlockRowViewModel(b, i));
         }
@@ -263,10 +265,22 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 if (!string.IsNullOrEmpty(block.Id) && !seenIds.Add(block.Id))
                     continue;
 
-                var viewModel = new BlockViewModel(block);
-                SubscribeToBlock(viewModel);
+                BlockViewModel viewModel;
+                if (ColumnPairHelper.IsNestedTwoColumnBlock(block))
+                {
+                    var tc = new TwoColumnBlockViewModel(block);
+                    SubscribeToBlock(tc);
+                    viewModel = tc;
+                }
+                else
+                {
+                    viewModel = new BlockViewModel(block);
+                    SubscribeToBlock(viewModel);
+                }
                 newBlocks.Add(viewModel);
             }
+
+            ColumnPairHelper.MergeConsecutiveColumnPairs(newBlocks);
             
             // If no valid blocks were added, add a default one
             if (newBlocks.Count == 0)
@@ -279,6 +293,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         
         // Replace entire collection to trigger UI update
         _focusedBlockIndex = -1;
+        _focusedBlockId = null;
         Blocks = newBlocks;
         
         // Update list numbers after loading
@@ -323,6 +338,31 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         ReorderBlocks();
     }
 
+    /// <summary>Replaces a top-level block with a two-column row (empty text in each column). No-op if the block is not in <see cref="Blocks"/> or is inside a column.</summary>
+    public void ReplaceBlockWithTwoColumn(BlockViewModel block)
+    {
+        if (block.OwnerTwoColumn != null) return;
+
+        var index = Blocks.IndexOf(block);
+        if (index < 0) return;
+
+        BeginStructuralChange();
+
+        UnsubscribeFromBlock(block);
+        Blocks.RemoveAt(index);
+
+        var tc = (TwoColumnBlockViewModel)BlockFactory.CreateBlock(BlockType.TwoColumn, block.Order);
+        SubscribeToBlock(tc);
+        Blocks.Insert(index, tc);
+        ReorderBlocks();
+        CommitStructuralChange("Two columns");
+        NotifyBlocksChanged();
+
+        var left = tc.LeftColumnBlocks[0];
+        left.PendingCaretIndex = 0;
+        Dispatcher.UIThread.Post(() => left.IsFocused = true, DispatcherPriority.Render);
+    }
+
     private void SubscribeToBlock(BlockViewModel block)
     {
         block.ContentChanged += OnBlockContentChanged;
@@ -336,7 +376,41 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.FocusPreviousRequested += OnFocusPreviousRequested;
         block.FocusNextRequested += OnFocusNextRequested;
         block.MergeWithPreviousRequested += OnMergeWithPreviousRequested;
+        block.ExitSplitBelowRequested += OnExitSplitBelowRequested;
         block.StructuralChangeStarting += OnStructuralChangeStarting;
+        if (block is TwoColumnBlockViewModel tc)
+        {
+            tc.ColumnChildrenChanged += OnTwoColumnColumnChildrenChanged;
+            foreach (var c in tc.LeftColumnBlocks)
+            {
+                BlockHierarchy.WireChildOwnership(tc, c, true);
+                SubscribeToBlock(c);
+            }
+            foreach (var c in tc.RightColumnBlocks)
+            {
+                BlockHierarchy.WireChildOwnership(tc, c, false);
+                SubscribeToBlock(c);
+            }
+        }
+    }
+
+    private void OnTwoColumnColumnChildrenChanged(TwoColumnBlockViewModel tc, bool leftColumn, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems != null)
+        {
+            foreach (BlockViewModel n in e.NewItems)
+            {
+                BlockHierarchy.WireChildOwnership(tc, n, leftColumn);
+                SubscribeToBlock(n);
+            }
+        }
+        if (e.OldItems != null)
+        {
+            foreach (BlockViewModel o in e.OldItems)
+                UnsubscribeFromBlock(o);
+        }
+        UpdateListNumbers();
+        NotifyBlocksChanged();
     }
 
     private void UnsubscribeFromBlock(BlockViewModel block)
@@ -352,7 +426,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.FocusPreviousRequested -= OnFocusPreviousRequested;
         block.FocusNextRequested -= OnFocusNextRequested;
         block.MergeWithPreviousRequested -= OnMergeWithPreviousRequested;
+        block.ExitSplitBelowRequested -= OnExitSplitBelowRequested;
         block.StructuralChangeStarting -= OnStructuralChangeStarting;
+        if (block is TwoColumnBlockViewModel tc)
+        {
+            tc.ColumnChildrenChanged -= OnTwoColumnColumnChildrenChanged;
+            foreach (var c in tc.LeftColumnBlocks.ToList())
+                UnsubscribeFromBlock(c);
+            foreach (var c in tc.RightColumnBlocks.ToList())
+                UnsubscribeFromBlock(c);
+        }
     }
 
     private void OnStructuralChangeStarting()
@@ -386,20 +469,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         if (block.IsFocused)
         {
-            var idx = Blocks.IndexOf(block);
+            var topIdx = BlockHierarchy.GetTopLevelIndex(Blocks, block);
             // Posted focus (e.g. new block after Enter) can run before the previous editor's LostFocus, so two
             // VMs may briefly have IsFocused. Clear only the last known owner — O(1); avoids N× EditableBlock
             // teardown (slash menu, toolbar posts) when the document has many blocks. RichTextEditor still
             // gates watermark paint on real keyboard/pointer focus.
-            if (_focusedBlockIndex >= 0 && _focusedBlockIndex < Blocks.Count
-                && _focusedBlockIndex != idx)
+            if (!string.IsNullOrEmpty(_focusedBlockId) && _focusedBlockId != block.Id)
             {
-                var prev = Blocks[_focusedBlockIndex];
-                if (prev.IsFocused)
+                var prev = BlockHierarchy.FindById(Blocks, _focusedBlockId);
+                if (prev?.IsFocused == true)
                     prev.IsFocused = false;
             }
 
-            _focusedBlockIndex = idx;
+            _focusedBlockId = block.Id;
+            _focusedBlockIndex = topIdx;
 
             // During cross-block text selection the editor controls which blocks have text
             // selection. Clearing it here (triggered by IsFocused changes on each block we
@@ -409,11 +492,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (_isApplyingCrossBlockFormat) return;
 
             ClearBlockSelection();
-            if (idx >= 0)
-                ClearTextSelectionInAllBlocksExcept(idx);
+            ClearTextSelectionInAllBlocksExcept(block);
         }
-        else if (_focusedBlockIndex >= 0 && _focusedBlockIndex < Blocks.Count && ReferenceEquals(Blocks[_focusedBlockIndex], block))
+        else if (!string.IsNullOrEmpty(_focusedBlockId) && _focusedBlockId == block.Id)
         {
+            _focusedBlockId = null;
             _focusedBlockIndex = -1;
         }
     }
@@ -456,19 +539,34 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnMergeWithPreviousRequested(BlockViewModel block)
     {
-        var index = Blocks.IndexOf(block);
-        if (index <= 0) return;
+        var previousBlock = BlockHierarchy.FindPreviousInDocumentOrder(Blocks, block);
+        if (previousBlock == null) return;
 
         if (_pendingSnapshot == null)
             BeginStructuralChange();
-
-        var previousBlock = Blocks[index - 1];
         var insertionPoint = previousBlock.Content?.Length ?? 0;
         var suffix = BlockEditorContentPolicy.MergeSuffixFromFollowingBlock(block.Content);
         previousBlock.Content = (previousBlock.Content ?? string.Empty) + suffix;
 
-        UnsubscribeFromBlock(block);
-        Blocks.Remove(block);
+        if (block.OwnerTwoColumn is TwoColumnBlockViewModel tc)
+        {
+            var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+            col.Remove(block);
+            BlockHierarchy.ClearChildOwnership(block);
+            UnsubscribeFromBlock(block);
+            if (col.Count == 0)
+            {
+                var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
+                BlockHierarchy.WireChildOwnership(tc, ph, block.IsLeftColumn);
+                col.Add(ph);
+                SubscribeToBlock(ph);
+            }
+        }
+        else
+        {
+            UnsubscribeFromBlock(block);
+            Blocks.Remove(block);
+        }
 
         ReorderBlocks();
         CommitStructuralChange("Merge blocks");
@@ -484,13 +582,111 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             DispatcherPriority.Input);
     }
 
-    private void DeleteBlock(BlockViewModel block)
+    private void OnExitSplitBelowRequested(BlockViewModel block, string? followingText)
     {
-        var index = Blocks.IndexOf(block);
-        if (index == -1) return;
+        if (block.OwnerTwoColumn is not TwoColumnBlockViewModel tc) return;
+        var topIdx = Blocks.IndexOf(tc);
+        if (topIdx < 0) return;
 
         if (_pendingSnapshot == null)
             BeginStructuralChange();
+
+        var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+        var bodyEmpty = BlockEditorContentPolicy.IsVisuallyEmpty(block.Content ?? "");
+        if (bodyEmpty && col.Contains(block))
+        {
+            col.Remove(block);
+            BlockHierarchy.ClearChildOwnership(block);
+            UnsubscribeFromBlock(block);
+            if (col.Count == 0)
+            {
+                var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
+                BlockHierarchy.WireChildOwnership(tc, ph, block.IsLeftColumn);
+                col.Add(ph);
+                SubscribeToBlock(ph);
+            }
+        }
+
+        var nb = BlockFactory.CreateBlock(BlockType.Text, 0);
+        if (!string.IsNullOrEmpty(followingText))
+            nb.Content = followingText;
+        SubscribeToBlock(nb);
+        Blocks.Insert(topIdx + 1, nb);
+        ReorderBlocks();
+        CommitStructuralChange("Exit split");
+        BlocksChanged?.Invoke();
+        Dispatcher.UIThread.Post(() => nb.IsFocused = true, DispatcherPriority.Input);
+    }
+
+    private void DeleteBlock(BlockViewModel block)
+    {
+        if (_pendingSnapshot == null)
+            BeginStructuralChange();
+
+        if (block.OwnerTwoColumn is TwoColumnBlockViewModel tc)
+        {
+            var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+            var ci = col.IndexOf(block);
+            if (ci < 0) return;
+
+            if (ShouldUnwrapTwoColumnBecauseAllCellsEmpty(tc, block))
+            {
+                var topIdx = Blocks.IndexOf(tc);
+                if (topIdx < 0) return;
+                UnsubscribeFromBlock(tc);
+                Blocks.RemoveAt(topIdx);
+                var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
+                SubscribeToBlock(placeholder);
+                Blocks.Insert(topIdx, placeholder);
+                ReorderBlocks();
+                CommitStructuralChange("Unwrap split");
+                BlocksChanged?.Invoke();
+                Dispatcher.UIThread.Post(() => placeholder.IsFocused = true, DispatcherPriority.Input);
+                return;
+            }
+
+            if (ShouldUnwrapTwoColumnBecauseOneColumnEmptyOtherHasContent(tc, block))
+            {
+                var filledColumnIsLeft = !ColumnIsEntirelyVisuallyEmpty(tc, true) &&
+                    ColumnIsEntirelyVisuallyEmpty(tc, false);
+                UnwrapTwoColumnPromotingFilledColumn(tc, filledColumnIsLeft);
+                CommitStructuralChange("Unwrap split");
+                BlocksChanged?.Invoke();
+                return;
+            }
+
+            if (col.Count == 1 && tc.LeftColumnBlocks.Count + tc.RightColumnBlocks.Count == 1)
+            {
+                var topIdx = Blocks.IndexOf(tc);
+                if (topIdx < 0) return;
+                UnsubscribeFromBlock(tc);
+                Blocks.RemoveAt(topIdx);
+                var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
+                SubscribeToBlock(placeholder);
+                Blocks.Insert(topIdx, placeholder);
+                ReorderBlocks();
+                CommitStructuralChange("Delete block");
+                BlocksChanged?.Invoke();
+                Dispatcher.UIThread.Post(() => placeholder.IsFocused = true, DispatcherPriority.Input);
+                return;
+            }
+
+            if (RemoveCellFromTwoColumnOrUnwrap(tc, block))
+            {
+                CommitStructuralChange("Unwrap split");
+                BlocksChanged?.Invoke();
+                return;
+            }
+
+            CommitStructuralChange("Delete block");
+            BlocksChanged?.Invoke();
+            var focusIdx = Math.Max(0, Math.Min(ci, col.Count - 1));
+            Dispatcher.UIThread.Post(() => col[focusIdx].IsFocused = true, DispatcherPriority.Input);
+            return;
+        }
+
+        var index = Blocks.IndexOf(block);
+        if (index == -1) return;
 
         if (Blocks.Count == 1)
         {
@@ -518,10 +714,185 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         BlocksChanged?.Invoke();
     }
 
+    /// <summary>
+    /// When every cell in the split is visually empty (including <paramref name="block"/>), backspace
+    /// removes the whole TwoColumn and restores a single top-level paragraph.
+    /// </summary>
+    private static bool ShouldUnwrapTwoColumnBecauseAllCellsEmpty(TwoColumnBlockViewModel tc, BlockViewModel block)
+    {
+        if (!BlockEditorContentPolicy.IsVisuallyEmpty(block.Content)) return false;
+        foreach (var b in tc.LeftColumnBlocks)
+        {
+            if (ReferenceEquals(b, block)) continue;
+            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content)) return false;
+        }
+        foreach (var b in tc.RightColumnBlocks)
+        {
+            if (ReferenceEquals(b, block)) continue;
+            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content)) return false;
+        }
+        return true;
+    }
+
+    private static bool ColumnIsEntirelyVisuallyEmpty(TwoColumnBlockViewModel tc, bool leftColumn)
+    {
+        var col = leftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+        foreach (var b in col)
+        {
+            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// One column is only empty paragraphs; the other has real content — backspace in the empty column
+    /// removes the split and promotes the filled column to top-level blocks.
+    /// </summary>
+    private static bool ShouldUnwrapTwoColumnBecauseOneColumnEmptyOtherHasContent(TwoColumnBlockViewModel tc,
+        BlockViewModel block)
+    {
+        if (!BlockEditorContentPolicy.IsVisuallyEmpty(block.Content)) return false;
+        if (ColumnIsEntirelyVisuallyEmpty(tc, true) && !ColumnIsEntirelyVisuallyEmpty(tc, false) && block.IsLeftColumn)
+            return true;
+        if (ColumnIsEntirelyVisuallyEmpty(tc, false) && !ColumnIsEntirelyVisuallyEmpty(tc, true) && !block.IsLeftColumn)
+            return true;
+        return false;
+    }
+
+    private void UnwrapTwoColumnPromotingFilledColumn(TwoColumnBlockViewModel tc, bool filledColumnIsLeft)
+    {
+        var topIdx = Blocks.IndexOf(tc);
+        if (topIdx < 0) return;
+
+        var filledCol = filledColumnIsLeft ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+        var emptyCol = filledColumnIsLeft ? tc.RightColumnBlocks : tc.LeftColumnBlocks;
+
+        var promoted = filledCol.ToList();
+        foreach (var b in emptyCol.ToList())
+        {
+            UnsubscribeFromBlock(b);
+            emptyCol.Remove(b);
+        }
+        foreach (var b in promoted)
+        {
+            UnsubscribeFromBlock(b);
+            filledCol.Remove(b);
+            BlockHierarchy.ClearChildOwnership(b);
+        }
+
+        UnsubscribeFromBlock(tc);
+        Blocks.RemoveAt(topIdx);
+
+        int insertAt = topIdx;
+        foreach (var b in promoted)
+        {
+            SubscribeToBlock(b);
+            Blocks.Insert(insertAt++, b);
+        }
+
+        ReorderBlocks();
+        var focus = promoted.Count > 0 ? promoted[0] : null;
+        if (focus != null)
+            Dispatcher.UIThread.Post(() => focus.IsFocused = true, DispatcherPriority.Input);
+    }
+
+    /// <summary>Removes a cell from a split. If that column becomes empty and the other column has blocks, unwraps to top-level.
+    /// Returns true when the split was removed via unwrap.</summary>
+    private bool RemoveCellFromTwoColumnOrUnwrap(TwoColumnBlockViewModel tc, BlockViewModel block)
+    {
+        var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+        var ci = col.IndexOf(block);
+        if (ci < 0) return false;
+
+        UnsubscribeFromBlock(block);
+        col.RemoveAt(ci);
+        BlockHierarchy.ClearChildOwnership(block);
+
+        if (col.Count == 0)
+        {
+            var other = block.IsLeftColumn ? tc.RightColumnBlocks : tc.LeftColumnBlocks;
+            if (other.Count > 0)
+            {
+                UnwrapTwoColumnPromotingFilledColumn(tc, !block.IsLeftColumn);
+                return true;
+            }
+
+            var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
+            BlockHierarchy.WireChildOwnership(tc, ph, block.IsLeftColumn);
+            col.Add(ph);
+            SubscribeToBlock(ph);
+        }
+
+        ReorderBlocks();
+        return false;
+    }
+
+    /// <summary>
+    /// After the last non-empty block is dragged out, only empty placeholders remain — replace the split with one empty paragraph.
+    /// </summary>
+    private void TryCollapseSplitToSingleEmptyIfAllLeavesEmpty(TwoColumnBlockViewModel tc)
+    {
+        if (Blocks.IndexOf(tc) < 0) return;
+        foreach (var b in tc.LeftColumnBlocks)
+        {
+            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content))
+                return;
+        }
+        foreach (var b in tc.RightColumnBlocks)
+        {
+            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content))
+                return;
+        }
+        var topIdx = Blocks.IndexOf(tc);
+        if (topIdx < 0) return;
+        UnsubscribeFromBlock(tc);
+        Blocks.RemoveAt(topIdx);
+        var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
+        SubscribeToBlock(placeholder);
+        Blocks.Insert(topIdx, placeholder);
+        ReorderBlocks();
+    }
+
+    /// <summary>
+    /// Run after a block was detached to top-level so the split row can collapse (only empty cells left,
+    /// or one column entirely empty and the other still has content — unwrap to a single column stack).
+    /// Must run after <see cref="Blocks.Insert"/> for the dragged block so indices and subscriptions are consistent.
+    /// </summary>
+    private void TryCollapseSplitAfterDragOut(TwoColumnBlockViewModel? tc)
+    {
+        if (tc == null || Blocks.IndexOf(tc) < 0) return;
+        TryCollapseSplitToSingleEmptyIfAllLeavesEmpty(tc);
+        if (Blocks.IndexOf(tc) < 0) return;
+        if (ColumnIsEntirelyVisuallyEmpty(tc, true) && !ColumnIsEntirelyVisuallyEmpty(tc, false))
+            UnwrapTwoColumnPromotingFilledColumn(tc, false);
+        else if (ColumnIsEntirelyVisuallyEmpty(tc, false) && !ColumnIsEntirelyVisuallyEmpty(tc, true))
+            UnwrapTwoColumnPromotingFilledColumn(tc, true);
+    }
+
     private void OnNewBlockRequested(BlockViewModel block, string? initialContent)
     {
         if (_pendingSnapshot == null)
             BeginStructuralChange();
+
+        if (block.OwnerTwoColumn is TwoColumnBlockViewModel tc)
+        {
+            var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+            var i = col.IndexOf(block);
+            if (i < 0) return;
+            var newBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
+            if (initialContent != null)
+                newBlock.Content = initialContent;
+            BlockHierarchy.WireChildOwnership(tc, newBlock, block.IsLeftColumn);
+            col.Insert(i + 1, newBlock);
+            SubscribeToBlock(newBlock);
+            ReorderBlocks();
+            CommitStructuralChange("Split block");
+            BlocksChanged?.Invoke();
+            newBlock.PendingCaretIndex = 0;
+            Dispatcher.UIThread.Post(() => newBlock.IsFocused = true, DispatcherPriority.Render);
+            return;
+        }
 
         var index = Blocks.IndexOf(block);
         if (index < 0) return;
@@ -545,6 +916,29 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (_pendingSnapshot == null)
             BeginStructuralChange();
+
+        if (block.OwnerTwoColumn is TwoColumnBlockViewModel tc)
+        {
+            var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+            var i = col.IndexOf(block);
+            if (i < 0) return;
+            var newBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
+            if (initialContent != null)
+                newBlock.Content = initialContent;
+            BlockHierarchy.WireChildOwnership(tc, newBlock, block.IsLeftColumn);
+            col.Insert(i, newBlock);
+            SubscribeToBlock(newBlock);
+            ReorderBlocks();
+            CommitStructuralChange("Insert block above");
+            BlocksChanged?.Invoke();
+            newBlock.PendingCaretIndex = 0;
+            Dispatcher.UIThread.Post(() =>
+            {
+                newBlock.IsFocused = false;
+                newBlock.IsFocused = true;
+            }, DispatcherPriority.Loaded);
+            return;
+        }
 
         var index = Blocks.IndexOf(block);
         if (index < 0) return;
@@ -573,6 +967,25 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private void OnNewBlockOfTypeRequested(BlockViewModel block, BlockType type, string? initialContent)
     {
         BeginStructuralChange();
+
+        if (block.OwnerTwoColumn is TwoColumnBlockViewModel tc)
+        {
+            var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+            var i = col.IndexOf(block);
+            if (i < 0) return;
+            var newBlock = BlockFactory.CreateBlock(type, 0);
+            if (initialContent != null)
+                newBlock.Content = initialContent;
+            BlockHierarchy.WireChildOwnership(tc, newBlock, block.IsLeftColumn);
+            col.Insert(i + 1, newBlock);
+            SubscribeToBlock(newBlock);
+            ReorderBlocks();
+            CommitStructuralChange("New block");
+            BlocksChanged?.Invoke();
+            newBlock.PendingCaretIndex = 0;
+            Dispatcher.UIThread.Post(() => newBlock.IsFocused = true, DispatcherPriority.Render);
+            return;
+        }
 
         var index = Blocks.IndexOf(block);
         if (index < 0) return;
@@ -633,86 +1046,52 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnFocusPreviousRequested(BlockViewModel block)
     {
-        if (ColumnPairHelper.GetColumnSide(block) == ColumnPairHelper.Right
-            && block.GetColumnSibling(Blocks) is { } leftOfPair)
-        {
-            block.IsFocused = false;
-            Dispatcher.UIThread.Post(
-                () => leftOfPair.IsFocused = true,
-                DispatcherPriority.Input);
-            return;
-        }
-
-        var index = GetFocusedBlockIndex();
-        if (index < 0) index = Blocks.IndexOf(block);
-        if (index > 0)
-        {
-            block.IsFocused = false;
-            var previousIndex = index - 1;
-            Avalonia.Threading.Dispatcher.UIThread.Post(
-                () => Blocks[previousIndex].IsFocused = true,
-                Avalonia.Threading.DispatcherPriority.Input);
-        }
+        var prev = BlockHierarchy.FindPreviousInDocumentOrder(Blocks, block);
+        if (prev == null) return;
+        block.IsFocused = false;
+        Dispatcher.UIThread.Post(() => prev.IsFocused = true, DispatcherPriority.Input);
     }
 
     private void OnFocusNextRequested(BlockViewModel block)
     {
-        if (ColumnPairHelper.GetColumnSide(block) == ColumnPairHelper.Left
-            && block.GetColumnSibling(Blocks) is { } rightOfPair)
-        {
-            block.IsFocused = false;
-            Dispatcher.UIThread.Post(
-                () => rightOfPair.IsFocused = true,
-                DispatcherPriority.Input);
-            return;
-        }
-
-        var index = GetFocusedBlockIndex();
-        if (index < 0) index = Blocks.IndexOf(block);
-        var nextIndex = index + 1;
-        if (nextIndex < Blocks.Count)
-        {
-            block.IsFocused = false;
-            Avalonia.Threading.Dispatcher.UIThread.Post(
-                () => Blocks[nextIndex].IsFocused = true,
-                Avalonia.Threading.DispatcherPriority.Input);
-        }
+        var next = BlockHierarchy.FindNextInDocumentOrder(Blocks, block);
+        if (next == null) return;
+        block.IsFocused = false;
+        Dispatcher.UIThread.Post(() => next.IsFocused = true, DispatcherPriority.Input);
     }
 
     private void ReorderBlocks()
     {
-        bool hasNumberedLists = false;
         for (int i = 0; i < Blocks.Count; i++)
         {
             Blocks[i].Order = i;
-            if (Blocks[i].Type == BlockType.NumberedList)
-                hasNumberedLists = true;
+            if (Blocks[i] is TwoColumnBlockViewModel tc)
+            {
+                for (int j = 0; j < tc.LeftColumnBlocks.Count; j++)
+                    tc.LeftColumnBlocks[j].Order = j;
+                for (int j = 0; j < tc.RightColumnBlocks.Count; j++)
+                    tc.RightColumnBlocks[j].Order = j;
+            }
         }
-        
-        if (hasNumberedLists)
+
+        if (BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.Type == BlockType.NumberedList))
             UpdateListNumbers();
     }
 
     private void UpdateListNumbers()
     {
         int listNumber = 1;
-        for (int i = 0; i < Blocks.Count; i++)
+        var ordered = BlockHierarchy.EnumerateInDocumentOrder(Blocks).ToList();
+        for (int i = 0; i < ordered.Count; i++)
         {
-            if (Blocks[i].Type == BlockType.NumberedList)
+            if (ordered[i].Type == BlockType.NumberedList)
             {
-                // Check if this is the start of a new list (previous block is not a numbered list)
-                if (i == 0 || Blocks[i - 1].Type != BlockType.NumberedList)
-                {
+                if (i == 0 || ordered[i - 1].Type != BlockType.NumberedList)
                     listNumber = 1;
-                }
-                
-                Blocks[i].ListNumberIndex = listNumber++;
+                ordered[i].ListNumberIndex = listNumber++;
             }
             else
-            {
-                // Reset counter when we encounter a non-numbered list block
                 listNumber = 1;
-            }
         }
     }
 
@@ -732,7 +1111,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     public void ClearBlockSelection()
     {
-        foreach (var block in Blocks)
+        foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
             block.IsSelected = false;
         _blockDragHandleSelectionAnchorIndex = -1;
     }
@@ -740,11 +1119,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// <summary>Selects exactly one block (e.g. click on drag handle). Clears all text selection.</summary>
     public void SelectSingleBlock(BlockViewModel vm)
     {
-        if (!Blocks.Contains(vm)) return;
-        ClearTextSelectionInAllBlocksExcept(-1);
-        foreach (var block in Blocks)
+        if (BlockHierarchy.FindById(Blocks, vm.Id) == null) return;
+        ClearTextSelectionInAllBlocksExcept(null);
+        foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
             block.IsSelected = ReferenceEquals(block, vm);
-        _blockDragHandleSelectionAnchorIndex = Blocks.IndexOf(vm);
+        _blockDragHandleSelectionAnchorIndex = GetDocumentOrderBlocks().IndexOf(vm);
     }
 
     /// <summary>
@@ -753,9 +1132,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     public void SelectBlockFromDragHandle(BlockViewModel vm, KeyModifiers modifiers)
     {
-        if (!Blocks.Contains(vm)) return;
-        ClearTextSelectionInAllBlocksExcept(-1);
-        int idx = Blocks.IndexOf(vm);
+        if (BlockHierarchy.FindById(Blocks, vm.Id) == null) return;
+        ClearTextSelectionInAllBlocksExcept(null);
+        var doc = GetDocumentOrderBlocks();
+        int idx = doc.IndexOf(vm);
         if (idx < 0) return;
 
         bool toggle = (modifiers & (KeyModifiers.Control | KeyModifiers.Meta)) != 0;
@@ -776,12 +1156,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (toggle)
             {
                 for (int i = lo; i <= hi; i++)
-                    Blocks[i].IsSelected = true;
+                    doc[i].IsSelected = true;
             }
             else
             {
-                for (int i = 0; i < Blocks.Count; i++)
-                    Blocks[i].IsSelected = i >= lo && i <= hi;
+                for (int i = 0; i < doc.Count; i++)
+                    doc[i].IsSelected = i >= lo && i <= hi;
             }
             _blockDragHandleSelectionAnchorIndex = anchor;
             return;
@@ -792,9 +1172,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private int GetShiftRangeAnchorIndex(int clickedIndex)
     {
-        for (int i = 0; i < Blocks.Count; i++)
+        var doc = GetDocumentOrderBlocks();
+        for (int i = 0; i < doc.Count; i++)
         {
-            if (Blocks[i].IsFocused)
+            if (doc[i].IsFocused)
                 return i;
         }
         return clickedIndex;
@@ -970,7 +1351,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _boxSelectArmed = true;
         _isBoxSelecting = false;
         ClearBlockSelection();
-        ClearTextSelectionInAllBlocksExcept(-1);
+        ClearTextSelectionInAllBlocksExcept(null);
         pointer.Capture(this);
         return true;
     }
@@ -991,7 +1372,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (IsPointInsideAnyBlock(pt))
             {
                 ClearBlockSelection();
-                ClearTextSelectionInAllBlocksExcept(-1);
+                ClearTextSelectionInAllBlocksExcept(null);
             }
             return;
         }
@@ -1030,20 +1411,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (IsPointInsideAnyBlock(pos))
         {
             // Press inside a block: arm cross-block selection and capture so we get PointerMoved
+            var docList = GetDocumentOrderBlocks();
             var blockIndex = GetBlockIndexAtPoint(pos);
-            if (blockIndex < 0 || blockIndex >= Blocks.Count) return;
+            if (blockIndex < 0 || blockIndex >= docList.Count) return;
 
-            var editableBlock = GetEditableBlockForViewModel(Blocks[blockIndex]);
+            var vm = docList[blockIndex];
+            var editableBlock = GetEditableBlockForViewModel(vm);
             if (editableBlock == null) return;
-
-            var vm = Blocks[blockIndex];
 
             // Image block: avoid capturing on first press so toolbar/flyouts and caption clicks work;
             // programmatic focus uses HoverHost unless PendingCaretIndex targets the caption.
             if (vm.Type == BlockType.Image && !vm.IsFocused)
             {
                 ClearBlockSelection();
-                ClearTextSelectionInAllBlocksExcept(-1);
+                ClearTextSelectionInAllBlocksExcept(null);
                 if (TryFindImageCaptionRichEditor(source, out var captionRte))
                 {
                     var idx = captionRte.HitTestPoint(e.GetPosition(captionRte));
@@ -1057,7 +1438,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             // the caret from the click (HitTestPoint). Otherwise we'd set Handled and the caret would never move.
             if (vm.IsFocused)
             {
-                ClearTextSelectionInAllBlocksExcept(-1);
+                ClearTextSelectionInAllBlocksExcept(null);
                 ClearBlockSelection();
 
                 // If the press landed outside the RichTextEditor itself (e.g. in block padding),
@@ -1100,7 +1481,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             _isCrossBlockSelecting = false;
 
             // Clear all blocks first so the other block's selection always breaks; then set this block's caret.
-            ClearTextSelectionInAllBlocksExcept(-1);
+            ClearTextSelectionInAllBlocksExcept(null);
             editableBlock.ApplyTextSelection(_crossBlockAnchorCharIndex, _crossBlockAnchorCharIndex);
             // Set PendingCaretIndex before IsFocused so FocusTextBox lands at the click position
             // directly — without this it would snap to the end first, causing a visible flicker.
@@ -1119,7 +1500,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _isBoxSelecting = false;
 
         ClearBlockSelection();
-        ClearTextSelectionInAllBlocksExcept(-1);
+        ClearTextSelectionInAllBlocksExcept(null);
         e.Pointer.Capture(this);
     }
 
@@ -1146,9 +1527,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private bool IsPointInsideAnyBlock(Point point)
     {
-        for (var i = 0; i < Blocks.Count; i++)
+        foreach (var vm in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
         {
-            var editable = GetEditableBlockForViewModel(Blocks[i]);
+            var editable = GetEditableBlockForViewModel(vm);
             if (editable == null) continue;
             var local = this.TranslatePoint(point, editable);
             if (!local.HasValue) continue;
@@ -1157,6 +1538,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         return false;
     }
+
+    private List<BlockViewModel> GetDocumentOrderBlocks() =>
+        BlockHierarchy.EnumerateInDocumentOrder(Blocks).ToList();
 
     /// <summary>
     /// Bubble: clear selection; arm cross-block text selection when press is inside a TextBox.
@@ -1185,7 +1569,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var textBox = source as TextBox ?? source.GetVisualAncestors().OfType<TextBox>().FirstOrDefault();
         var richTextEditor = source as RichTextEditor ?? source.GetVisualAncestors().OfType<RichTextEditor>().FirstOrDefault();
         var editableBlock = source as EditableBlock ?? source.GetVisualAncestors().OfType<EditableBlock>().FirstOrDefault();
-        if ((textBox == null && richTextEditor == null) || editableBlock == null || editableBlock.DataContext is not BlockViewModel vm || !Blocks.Contains(vm))
+        if ((textBox == null && richTextEditor == null) || editableBlock == null || editableBlock.DataContext is not BlockViewModel vm || BlockHierarchy.FindById(Blocks, vm.Id) == null)
             return;
 
         // Image caption editor; arming cross-block breaks drag-select and steals PointerMoved.
@@ -1199,7 +1583,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         // Arm cross-block select — capture happens in PointerMoved once drag leaves the source block
         _crossBlockAnchorBlock = vm;
-        _crossBlockAnchorBlockIndex = Blocks.IndexOf(vm);
+        _crossBlockAnchorBlockIndex = GetDocumentOrderBlocks().IndexOf(vm);
         _crossBlockAnchorCharIndex = Math.Clamp(caretIndex, 0, textLength);
         _crossBlockStartPoint = e.GetPosition(this);
         _crossBlockArmed = true;
@@ -1374,9 +1758,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         double maxY = Math.Max(start.Y, end.Y);
         var selectionRect = new Rect(minX, minY, maxX - minX, maxY - minY);
 
-        for (int i = 0; i < Blocks.Count; i++)
+        var doc = GetDocumentOrderBlocks();
+        for (int i = 0; i < doc.Count; i++)
         {
-            var editable = GetEditableBlockForViewModel(Blocks[i]);
+            var editable = GetEditableBlockForViewModel(doc[i]);
             Rect bounds;
             if (editable != null)
                 bounds = editable.GetBoxSelectIntersectionBoundsRelativeTo(this);
@@ -1384,9 +1769,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 continue;
 
             if (bounds.Width <= 0 || bounds.Height <= 0)
-                Blocks[i].IsSelected = false;
+                doc[i].IsSelected = false;
             else
-                Blocks[i].IsSelected = selectionRect.Intersects(bounds);
+                doc[i].IsSelected = selectionRect.Intersects(bounds);
         }
     }
 
@@ -1449,12 +1834,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (e.Handled) return;
 
-        var hasBlockSelection = Blocks.Any(b => b.IsSelected);
+        var hasBlockSelection = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.IsSelected);
         bool deferClipboardToNestedTextBox = IsFocusInsideNestedTextBox();
         bool deferUndoRedoToNestedTextBox = IsFocusInsideNestedTextBox();
 
-        // 1. Backspace: delete all selected blocks, or delete text selection (including cross-block)
-        if (e.Key == Key.Back && hasBlockSelection)
+        // 1. Backspace / Delete: delete all selected blocks, or delete text selection (including cross-block)
+        if ((e.Key == Key.Back || e.Key == Key.Delete) && hasBlockSelection)
         {
             DeleteSelectedBlocks();
             e.Handled = true;
@@ -1525,11 +1910,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         bool ctrlA = e.Key == Key.A && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
         if (ctrlA && !ShouldDeferSelectAllBlocksShortcut())
         {
-            ClearTextSelectionInAllBlocksExcept(-1);
-            foreach (var block in Blocks)
-            {
+            ClearTextSelectionInAllBlocksExcept(null);
+            foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
                 block.IsSelected = true;
-            }
             e.Handled = true;
         }
     }
@@ -1539,23 +1922,87 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private void DeleteSelectedBlocks()
     {
-        var selectedIndices = new List<int>();
-        for (int i = 0; i < Blocks.Count; i++)
-        {
-            if (Blocks[i].IsSelected)
-                selectedIndices.Add(i);
-        }
-        if (selectedIndices.Count == 0) return;
+        var doc = GetDocumentOrderBlocks();
+        var toRemove = doc.Where(b => b.IsSelected).ToList();
+        if (toRemove.Count == 0) return;
 
         BeginStructuralChange();
 
-        int firstIndex = selectedIndices.Min();
-        var toRemove = selectedIndices.OrderByDescending(x => x).ToList();
-        foreach (int i in toRemove)
+        var topLevel = toRemove.Where(b => b.OwnerTwoColumn == null).OrderByDescending(b => Blocks.IndexOf(b)).ToList();
+        foreach (var block in topLevel)
         {
-            var block = Blocks[i];
             UnsubscribeFromBlock(block);
-            Blocks.RemoveAt(i);
+            Blocks.Remove(block);
+        }
+
+        var bySplit = new Dictionary<TwoColumnBlockViewModel, List<BlockViewModel>>();
+        foreach (var block in toRemove.Where(b => b.OwnerTwoColumn is TwoColumnBlockViewModel))
+        {
+            var tc = (TwoColumnBlockViewModel)block.OwnerTwoColumn!;
+            if (!bySplit.TryGetValue(tc, out var list))
+            {
+                list = new List<BlockViewModel>();
+                bySplit[tc] = list;
+            }
+            list.Add(block);
+        }
+
+        foreach (var kv in bySplit)
+        {
+            var tc = kv.Key;
+            var parts = kv.Value;
+            if (Blocks.IndexOf(tc) < 0)
+                continue;
+
+            var hasLeft = parts.Any(b => b.IsLeftColumn);
+            var hasRight = parts.Any(b => !b.IsLeftColumn);
+
+            if (hasLeft && hasRight)
+            {
+                var topIdx = Blocks.IndexOf(tc);
+                if (topIdx < 0) continue;
+                UnsubscribeFromBlock(tc);
+                Blocks.RemoveAt(topIdx);
+                ReorderBlocks();
+                continue;
+            }
+
+            if (hasLeft && !hasRight)
+            {
+                var allLeft = tc.LeftColumnBlocks.Count > 0 &&
+                    tc.LeftColumnBlocks.All(b => parts.Contains(b));
+                if (allLeft)
+                {
+                    UnwrapTwoColumnPromotingFilledColumn(tc, false);
+                    continue;
+                }
+
+                foreach (var block in parts.OrderByDescending(b => tc.LeftColumnBlocks.IndexOf(b)))
+                {
+                    if (Blocks.IndexOf(tc) < 0) break;
+                    if (!tc.LeftColumnBlocks.Contains(block)) continue;
+                    RemoveCellFromTwoColumnOrUnwrap(tc, block);
+                }
+                continue;
+            }
+
+            if (hasRight && !hasLeft)
+            {
+                var allRight = tc.RightColumnBlocks.Count > 0 &&
+                    tc.RightColumnBlocks.All(b => parts.Contains(b));
+                if (allRight)
+                {
+                    UnwrapTwoColumnPromotingFilledColumn(tc, true);
+                    continue;
+                }
+
+                foreach (var block in parts.OrderByDescending(b => tc.RightColumnBlocks.IndexOf(b)))
+                {
+                    if (Blocks.IndexOf(tc) < 0) break;
+                    if (!tc.RightColumnBlocks.Contains(block)) continue;
+                    RemoveCellFromTwoColumnOrUnwrap(tc, block);
+                }
+            }
         }
 
         if (Blocks.Count == 0)
@@ -1563,18 +2010,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var defaultBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
             SubscribeToBlock(defaultBlock);
             Blocks.Add(defaultBlock);
-            Dispatcher.UIThread.Post(
-                () => defaultBlock.IsFocused = true,
-                DispatcherPriority.Input);
+            Dispatcher.UIThread.Post(() => defaultBlock.IsFocused = true, DispatcherPriority.Input);
         }
         else
         {
-            int focusIndex = Math.Min(firstIndex, Blocks.Count - 1);
-            if (focusIndex < 0) focusIndex = 0;
-            var target = Blocks[focusIndex];
-            Dispatcher.UIThread.Post(
-                () => target.IsFocused = true,
-                DispatcherPriority.Input);
+            var focusTarget = BlockHierarchy.EnumerateInDocumentOrder(Blocks).FirstOrDefault();
+            if (focusTarget != null)
+                Dispatcher.UIThread.Post(() => focusTarget.IsFocused = true, DispatcherPriority.Input);
         }
 
         ReorderBlocks();
@@ -1585,9 +2027,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     public bool HasCrossBlockTextSelection()
     {
-        for (int i = 0; i < Blocks.Count; i++)
+        foreach (var vm in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
         {
-            if (GetEditableBlockForViewModel(Blocks[i])?.GetSelectionRange() != null) return true;
+            if (GetEditableBlockForViewModel(vm)?.GetSelectionRange() != null) return true;
         }
         return false;
     }
@@ -1598,9 +2040,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _isApplyingCrossBlockFormat = true;
         try
         {
-            for (int i = 0; i < Blocks.Count; i++)
+            var doc = GetDocumentOrderBlocks();
+            for (int i = 0; i < doc.Count; i++)
             {
-                var editableBlock = GetEditableBlockForViewModel(Blocks[i]);
+                var editableBlock = GetEditableBlockForViewModel(doc[i]);
                 if (editableBlock?.GetSelectionRange() != null)
                     editableBlock.ApplyInlineFormatInternal(kind, color);
             }
@@ -1615,45 +2058,48 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void TryDeleteTextSelection()
     {
-        int? firstAffectedIndex = null;
-        for (int i = 0; i < Blocks.Count; i++)
+        BlockViewModel? firstAffected = null;
+        foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
         {
-            var editableBlock = GetEditableBlockForViewModel(Blocks[i]);
+            var editableBlock = GetEditableBlockForViewModel(block);
             if (editableBlock?.GetSelectionRange() != null)
             {
-                if (firstAffectedIndex == null) firstAffectedIndex = i;
+                firstAffected ??= block;
                 editableBlock.DeleteSelection();
             }
         }
 
-        RemoveEmptyBlocksAfterTextDelete(firstAffectedIndex ?? 0);
+        RemoveEmptyBlocksAfterTextDelete(firstAffected);
     }
 
     /// <summary>
     /// Removes empty blocks after a text-delete operation, but keeps the first block that had
     /// selection (even if empty) and focuses it. Other empty blocks are removed.
     /// </summary>
-    private void RemoveEmptyBlocksAfterTextDelete(int firstBlockInDeletion)
+    private void RemoveEmptyBlocksAfterTextDelete(BlockViewModel? firstBlockInDeletion)
     {
         BeginStructuralChange();
 
-        var emptyIndices = new List<int>();
-        for (int i = 0; i < Blocks.Count; i++)
+        var docOrder = BlockHierarchy.EnumerateInDocumentOrder(Blocks).ToList();
+        var toRemove = new List<BlockViewModel>();
+        foreach (var block in docOrder)
         {
-            if (BlockEditorContentPolicy.IsVisuallyEmpty(Blocks[i].Content))
-                emptyIndices.Add(i);
-        }
-        var toRemove = emptyIndices.Where(i => i != firstBlockInDeletion).ToList();
-
-        foreach (int i in toRemove.OrderByDescending(x => x))
-        {
-            var block = Blocks[i];
-            UnsubscribeFromBlock(block);
-            Blocks.RemoveAt(i);
+            if (block.Type is BlockType.TwoColumn or BlockType.Divider)
+                continue;
+            if (!BlockEditorContentPolicy.IsVisuallyEmpty(block.Content))
+                continue;
+            if (firstBlockInDeletion != null && ReferenceEquals(block, firstBlockInDeletion))
+                continue;
+            toRemove.Add(block);
         }
 
-        int newFocusIndex = firstBlockInDeletion - toRemove.Count(i => i < firstBlockInDeletion);
-        newFocusIndex = Math.Clamp(newFocusIndex, 0, Math.Max(0, Blocks.Count - 1));
+        var toRemoveSet = new HashSet<BlockViewModel>(toRemove);
+        for (int i = docOrder.Count - 1; i >= 0; i--)
+        {
+            var block = docOrder[i];
+            if (!toRemoveSet.Contains(block)) continue;
+            RemoveEmptyBlockCellForTextDelete(block);
+        }
 
         if (Blocks.Count == 0)
         {
@@ -1666,16 +2112,71 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         else
         {
-            var target = Blocks[newFocusIndex];
-            Dispatcher.UIThread.Post(
-                () => target.IsFocused = true,
-                DispatcherPriority.Input);
+            var focusTarget = firstBlockInDeletion != null && BlockHierarchy.FindById(Blocks, firstBlockInDeletion.Id) != null
+                ? firstBlockInDeletion
+                : BlockHierarchy.EnumerateInDocumentOrder(Blocks).FirstOrDefault();
+            if (focusTarget != null)
+            {
+                Dispatcher.UIThread.Post(
+                    () => focusTarget.IsFocused = true,
+                    DispatcherPriority.Input);
+            }
         }
 
         ReorderBlocks();
         ClearBlockSelection();
         CommitStructuralChange("Delete text selection");
         BlocksChanged?.Invoke();
+    }
+
+    private void RemoveEmptyBlockCellForTextDelete(BlockViewModel block)
+    {
+        if (block.OwnerTwoColumn is TwoColumnBlockViewModel tc)
+        {
+            var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+            var ci = col.IndexOf(block);
+            if (ci < 0) return;
+
+            if (col.Count == 1 && tc.LeftColumnBlocks.Count + tc.RightColumnBlocks.Count == 1)
+            {
+                var topIdx = Blocks.IndexOf(tc);
+                if (topIdx < 0) return;
+                UnsubscribeFromBlock(tc);
+                Blocks.RemoveAt(topIdx);
+                var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
+                SubscribeToBlock(placeholder);
+                Blocks.Insert(topIdx, placeholder);
+                ReorderBlocks();
+                return;
+            }
+
+            UnsubscribeFromBlock(block);
+            col.RemoveAt(ci);
+            BlockHierarchy.ClearChildOwnership(block);
+            if (col.Count == 0)
+            {
+                var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
+                BlockHierarchy.WireChildOwnership(tc, ph, block.IsLeftColumn);
+                col.Add(ph);
+                SubscribeToBlock(ph);
+            }
+            ReorderBlocks();
+            return;
+        }
+
+        var index = Blocks.IndexOf(block);
+        if (index == -1) return;
+
+        if (Blocks.Count == 1)
+        {
+            block.Content = string.Empty;
+            block.Type = BlockType.Text;
+            return;
+        }
+
+        UnsubscribeFromBlock(block);
+        Blocks.Remove(block);
+        ReorderBlocks();
     }
 
     private async Task TryCopySelectionToClipboardAsync()
@@ -1688,7 +2189,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var copied = await TryCopySelectionToClipboardCoreAsync();
         if (!copied) return;
 
-        var hasBlockSelection = Blocks.Any(b => b.IsSelected);
+        var hasBlockSelection = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.IsSelected);
         if (hasBlockSelection)
         {
             DeleteSelectedBlocks();
@@ -1701,9 +2202,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        int fi = GetFocusedBlockIndex();
-        if (fi < 0) return;
-        var ed = GetEditableBlockForViewModel(Blocks[fi]);
+        var focusVm = BlockHierarchy.FindFocused(Blocks);
+        if (focusVm == null) return;
+        var ed = GetEditableBlockForViewModel(focusVm);
         if (ed?.GetSelectionRange() is { } range && range.start < range.end)
             ed.DeleteSelection();
     }
@@ -1714,7 +2215,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         FlushTypingBatch();
 
         // Mode 2: block selection (drag-box)
-        var selectedBlocks = Blocks.Where(b => b.IsSelected).ToList();
+        var selectedBlocks = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Where(b => b.IsSelected).ToList();
         if (selectedBlocks.Count > 0)
         {
             await WriteBlocksToClipboardAsync(selectedBlocks);
@@ -1722,15 +2223,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
 
         var toCopy = new List<BlockViewModel>();
-        for (int i = 0; i < Blocks.Count; i++)
+        var docList = GetDocumentOrderBlocks();
+        for (int i = 0; i < docList.Count; i++)
         {
-            var editableBlock = GetEditableBlockForViewModel(Blocks[i]);
+            var editableBlock = GetEditableBlockForViewModel(docList[i]);
             if (editableBlock == null) continue;
             var range = editableBlock.GetSelectionRange();
             if (range == null || range.Value.start >= range.Value.end) continue;
-            var block = Blocks[i];
+            var block = docList[i];
             int start = range.Value.start, end = range.Value.end;
-            var liveRuns = GetLiveRunsForBlockIndex(i);
+            var liveRuns = GetLiveRunsForBlock(block);
             var sliceRuns = InlineRunFormatApplier.SliceRuns(liveRuns, start, end);
             // Slices from image captions are plain text; never emit a pseudo-Image block (would serialize as full image).
             var exportType = block.Type == BlockType.Image ? BlockType.Text : block.Type;
@@ -1750,10 +2252,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
 
         // Mode 3: focused block (caret-only or no cross-block selection)
-        int fi = GetFocusedBlockIndex();
-        if (fi >= 0 && fi < Blocks.Count)
+        var fb = BlockHierarchy.FindFocused(Blocks);
+        if (fb != null)
         {
-            var b = Blocks[fi];
+            var b = fb;
             if (b.Type == BlockType.Image)
             {
                 var topLevel = TopLevel.GetTopLevel(this);
@@ -1772,14 +2274,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return false;
     }
 
-    private IReadOnlyList<InlineRun> GetLiveRunsForBlockIndex(int index)
+    private IReadOnlyList<InlineRun> GetLiveRunsForBlock(BlockViewModel block)
     {
-        if (index < 0 || index >= Blocks.Count)
-            return Array.Empty<InlineRun>();
-        var rte = GetEditableBlockForViewModel(Blocks[index])?.TryGetRichTextEditor();
+        var rte = GetEditableBlockForViewModel(block)?.TryGetRichTextEditor();
         if (rte?.Runs != null)
             return InlineRunFormatApplier.Normalize(new List<InlineRun>(rte.Runs));
-        return Blocks[index].Runs;
+        return block.Runs;
     }
 
     /// <summary>Push live <see cref="RichTextEditor.Runs"/> into the view model so clipboard serialization matches the editor.</summary>
@@ -1787,9 +2287,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         foreach (var b in blocks)
         {
-            int idx = Blocks.IndexOf(b);
-            if (idx < 0) continue;
-            var rte = GetEditableBlockForViewModel(Blocks[idx])?.TryGetRichTextEditor();
+            var rte = GetEditableBlockForViewModel(b)?.TryGetRichTextEditor();
             if (rte == null) continue;
             b.SetRuns(InlineRunFormatApplier.Normalize(new List<InlineRun>(rte.Runs)));
         }
@@ -1899,10 +2397,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
             if (!replaceBlockSelection && pasted.Length >= 1)
             {
-                int focusedIndex = GetFocusedBlockIndex();
-                if (focusedIndex >= 0 && focusedIndex < Blocks.Count)
+                var focusedVm = BlockHierarchy.FindFocused(Blocks);
+                if (focusedVm != null)
                 {
-                    var focusedVm = Blocks[focusedIndex];
+                    var topInsert = BlockHierarchy.GetTopLevelIndex(Blocks, focusedVm);
+                    if (topInsert >= 0)
+                    {
                     var canInlinePaste = focusedVm.Type != BlockType.Divider && !PasteFirstBlockRequiresBlockInsert(pasted);
                     // Image caption: only merge plain text; never turn the image into a heading/list via structural paste.
                     if (focusedVm.Type == BlockType.Image)
@@ -1910,7 +2410,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
                     if (canInlinePaste)
                     {
-                        var editableBlock = GetEditableBlockForViewModel(Blocks[focusedIndex]);
+                        var editableBlock = GetEditableBlockForViewModel(focusedVm);
                         var range = editableBlock?.GetSelectionOrCaretRange();
                         if (range.HasValue)
                         {
@@ -1931,10 +2431,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                 {
                                     if (textAfter.Length > 0)
                                     {
-                                        var tailBlock = BlockFactory.CreateBlock(BlockType.Text, focusedIndex + 1);
+                                        var tailBlock = BlockFactory.CreateBlock(BlockType.Text, topInsert + 1);
                                         tailBlock.Content = textAfter;
                                         SubscribeToBlock(tailBlock);
-                                        Blocks.Insert(focusedIndex + 1, tailBlock);
+                                        Blocks.Insert(topInsert + 1, tailBlock);
                                         ReorderBlocks();
                                     }
                                     ClearBlockSelection();
@@ -1943,7 +2443,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                     return;
                                 }
 
-                                int insertAtCode = focusedIndex + 1;
+                                int insertAtCode = topInsert + 1;
                                 for (int i = 1; i < pasted.Length; i++)
                                 {
                                     var block = pasted[i];
@@ -1962,7 +2462,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                 return;
                             }
 
-                            var liveRunsForPaste = GetLiveRunsForBlockIndex(focusedIndex);
+                            var liveRunsForPaste = GetLiveRunsForBlock(focusedVm);
                             var tailRuns = InlineRunFormatApplier.SliceRuns(liveRunsForPaste, end, content.Length);
                             var beforeRuns = InlineRunFormatApplier.SliceRuns(liveRunsForPaste, 0, start);
                             bool promoteStructuralFirst =
@@ -1990,10 +2490,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                             {
                                 if (InlineRunFormatApplier.Flatten(tailRuns).Length > 0)
                                 {
-                                    var tailBlockRich = BlockFactory.CreateBlock(BlockType.Text, focusedIndex + 1);
+                                    var tailBlockRich = BlockFactory.CreateBlock(BlockType.Text, topInsert + 1);
                                     tailBlockRich.SetRuns(tailRuns);
                                     SubscribeToBlock(tailBlockRich);
-                                    Blocks.Insert(focusedIndex + 1, tailBlockRich);
+                                    Blocks.Insert(topInsert + 1, tailBlockRich);
                                     ReorderBlocks();
                                 }
                                 ClearBlockSelection();
@@ -2002,7 +2502,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                 return;
                             }
 
-                            int insertAtRich = focusedIndex + 1;
+                            int insertAtRich = topInsert + 1;
                             for (int i = 1; i < pasted.Length; i++)
                             {
                                 var block = pasted[i];
@@ -2023,6 +2523,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                             BlocksChanged?.Invoke();
                             return;
                         }
+                    }
                     }
                 }
             }
@@ -2224,18 +2725,27 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return string.IsNullOrWhiteSpace(t) ? null : t;
     }
 
+    /// <summary>Top-level <see cref="Blocks"/> index for the row that contains the focused leaf block.</summary>
     private int GetFocusedBlockIndex()
     {
-        // Use the maintained index; fall back to a linear scan only when stale.
-        if (_focusedBlockIndex >= 0 && _focusedBlockIndex < Blocks.Count && Blocks[_focusedBlockIndex].IsFocused)
-            return _focusedBlockIndex;
-
-        for (int i = 0; i < Blocks.Count; i++)
+        if (_focusedBlockIndex >= 0 && _focusedBlockIndex < Blocks.Count)
         {
-            if (Blocks[i].IsFocused)
+            var row = Blocks[_focusedBlockIndex];
+            if (row.IsFocused)
+                return _focusedBlockIndex;
+            if (row is TwoColumnBlockViewModel tc
+                && (tc.LeftColumnBlocks.Any(b => b.IsFocused) || tc.RightColumnBlocks.Any(b => b.IsFocused)))
+                return _focusedBlockIndex;
+        }
+
+        var focused = BlockHierarchy.FindFocused(Blocks);
+        if (focused != null)
+        {
+            var top = BlockHierarchy.GetTopLevelIndex(Blocks, focused);
+            if (top >= 0)
             {
-                _focusedBlockIndex = i;
-                return i;
+                _focusedBlockIndex = top;
+                return top;
             }
         }
         _focusedBlockIndex = -1;
@@ -2244,22 +2754,21 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     #endregion
 
-    /// <summary>
-    /// Returns the block index at the given point (in editor coordinates), or -1 if none.
-    /// </summary>
+    /// <summary>Document-order leaf index at the given point (editor coordinates), or -1 if none.</summary>
     private int GetBlockIndexAtPoint(Point point)
     {
-        for (int i = 0; i < Blocks.Count; i++)
+        var doc = GetDocumentOrderBlocks();
+        for (int i = 0; i < doc.Count; i++)
         {
-            var rect = GetControlBoundsInEditor(GetEditableBlockForViewModel(Blocks[i]));
+            var rect = GetControlBoundsInEditor(GetEditableBlockForViewModel(doc[i]));
             if (rect.Width > 0 && rect.Height > 0 && rect.Contains(point))
                 return i;
         }
-        if (Blocks.Count > 0)
+        if (doc.Count > 0)
         {
-            var lastRect = GetControlBoundsInEditor(GetEditableBlockForViewModel(Blocks[^1]));
+            var lastRect = GetControlBoundsInEditor(GetEditableBlockForViewModel(doc[^1]));
             if (lastRect.Height > 0 && point.Y >= lastRect.Y + lastRect.Height)
-                return Blocks.Count;
+                return doc.Count;
         }
         return -1;
     }
@@ -2268,12 +2777,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// Clears text selection (SelectionStart/SelectionEnd) in every block except the one at exceptBlockIndex.
     /// Pass -1 to clear all blocks. Used so a new press or click on empty space clears previous cross-block selection.
     /// </summary>
-    private void ClearTextSelectionInAllBlocksExcept(int exceptBlockIndex)
+    private void ClearTextSelectionInAllBlocksExcept(BlockViewModel? exceptBlock)
     {
-        for (int i = 0; i < Blocks.Count; i++)
+        foreach (var b in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
         {
-            if (exceptBlockIndex >= 0 && i == exceptBlockIndex) continue;
-            GetEditableBlockForViewModel(Blocks[i])?.ApplyTextSelection(0, 0);
+            if (exceptBlock != null && ReferenceEquals(b, exceptBlock)) continue;
+            GetEditableBlockForViewModel(b)?.ApplyTextSelection(0, 0);
         }
     }
 
@@ -2282,14 +2791,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         int anchorIndex = _crossBlockAnchorBlockIndex;
         if (anchorIndex < 0 || _crossBlockAnchorBlock == null) return;
 
+        var docList = GetDocumentOrderBlocks();
         int rawIndex = GetBlockIndexAtPoint(currentPoint);
         if (rawIndex < 0) return;
-        rawIndex = Math.Clamp(rawIndex, 0, Blocks.Count - 1);
+        rawIndex = Math.Clamp(rawIndex, 0, Math.Max(0, docList.Count - 1));
 
         int currentIndex = rawIndex;
-        if (_lastCrossBlockCurrentIndex >= 0 && _lastCrossBlockCurrentIndex < Blocks.Count)
+        if (_lastCrossBlockCurrentIndex >= 0 && _lastCrossBlockCurrentIndex < docList.Count)
         {
-            var rect = GetControlBoundsInEditor(GetEditableBlockForViewModel(Blocks[_lastCrossBlockCurrentIndex]));
+            var rect = GetControlBoundsInEditor(GetEditableBlockForViewModel(docList[_lastCrossBlockCurrentIndex]));
             if (rect.Width > 0 && rect.Height > 0 && rect.Contains(currentPoint))
                 currentIndex = _lastCrossBlockCurrentIndex;
         }
@@ -2301,12 +2811,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         int endIdx = Math.Max(anchorIndex, currentIndex);
 
         // Text selection only: never use block selection (IsSelected). Clear it on all blocks.
-        for (int i = 0; i < Blocks.Count; i++)
-            Blocks[i].IsSelected = false;
+        foreach (var b in Blocks)
+            b.IsSelected = false;
 
-        for (int i = 0; i < Blocks.Count; i++)
+        for (int i = 0; i < docList.Count; i++)
         {
-            var editableBlock = GetEditableBlockForViewModel(Blocks[i]);
+            var editableBlock = GetEditableBlockForViewModel(docList[i]);
             if (editableBlock == null) continue;
 
             // Blocks outside the selection range must be explicitly cleared so that shrinking
@@ -2317,7 +2827,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 continue;
             }
 
-            var block = Blocks[i];
+            var block = docList[i];
             int len = editableBlock.GetLogicalTextLengthForCrossBlockSelection();
 
             if (anchorIndex == currentIndex)
@@ -2364,6 +2874,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private EditableBlock? _currentDropIndicatorBlock;
     private BlockViewModel? _splitDropTargetBlock;
     private bool _splitDropLeftEdge;
+    private TwoColumnBlockViewModel? _columnDropTarget;
+    private bool _columnDropLeft;
+    private int _columnDropInsertIndex = -1;
 
     // Fraction of block height that acts as a "snap-to-boundary" zone.
     // Only the top/bottom portion triggers an insert-before/after decision;
@@ -2392,6 +2905,23 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         _splitDropTargetBlock = null;
 
+        if (payload.BlocksInDocumentOrder.Count == 1
+            && primary.OwnerTwoColumn is TwoColumnBlockViewModel otcSnap
+            && TryGetTopLevelInsertInSplitRowSnapBand(cursorPosInEditor.Y, otcSnap, out var snapInsert))
+        {
+            ClearDropIndicator();
+            _currentDropInsertIndex = snapInsert;
+            ShowHorizontalReorderDropLineInOverlay(snapInsert);
+            return;
+        }
+
+        if (payload.BlocksInDocumentOrder.Count == 1
+            && TryUpdateColumnDropIndicator(cursorPosInEditor, primary))
+            return;
+
+        if (_columnDropTarget != null)
+            ClearDropIndicator();
+
         var insertIndex = GetInsertIndex(cursorPosInEditor.Y);
         if (insertIndex < 0)
         {
@@ -2406,15 +2936,26 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             .ToList();
         if (sortedIndices.Count == 0)
         {
-            ClearDropIndicator();
-            return;
+            if (payload.BlocksInDocumentOrder.Count != 1 || primary.OwnerTwoColumn is not TwoColumnBlockViewModel otc)
+            {
+                ClearDropIndicator();
+                return;
+            }
+            var ti = Blocks.IndexOf(otc);
+            if (ti < 0)
+            {
+                ClearDropIndicator();
+                return;
+            }
+            sortedIndices = new List<int> { ti };
         }
 
         int gMin = sortedIndices[0];
         int gMax = sortedIndices[^1];
         bool contiguous = sortedIndices.Count == gMax - gMin + 1;
+        bool nestedDrag = payload.BlocksInDocumentOrder.Count == 1 && primary.OwnerTwoColumn != null;
 
-        if (contiguous && insertIndex >= gMin && insertIndex <= gMax + 1)
+        if (contiguous && insertIndex >= gMin && insertIndex <= gMax + 1 && !nestedDrag)
         {
             ClearDropIndicator();
             return;
@@ -2443,6 +2984,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
 
         if (_splitDropTargetBlock == null
+            && _columnDropTarget == null
             && insertIndex == _currentDropInsertIndex
             && this.FindControl<Border>("BlockReorderDropLineOverlay") is { IsVisible: true })
             return;
@@ -2495,6 +3037,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     public void ClearDropIndicator()
     {
         _splitDropTargetBlock = null;
+        _columnDropTarget = null;
+        _columnDropInsertIndex = -1;
         if (this.FindControl<Border>("BlockReorderDropLineOverlay") is { } dropLine)
         {
             dropLine.IsVisible = false;
@@ -2536,7 +3080,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             };
         }
 
-        var selected = Blocks.Where(b => b.IsSelected).ToList();
+        var selected = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Where(b => b.IsSelected).ToList();
         if (selected.Count < 2)
         {
             return new BlockViewModel.BlockReorderDragPayload
@@ -2559,7 +3103,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
         }
 
-        var ordered = expanded.OrderBy(b => Blocks.IndexOf(b)).ToList();
+        var docOrder = GetDocumentOrderBlocks();
+        var ordered = expanded.OrderBy(b =>
+        {
+            var i = docOrder.IndexOf(b);
+            return i < 0 ? int.MaxValue : i;
+        }).ToList();
         return new BlockViewModel.BlockReorderDragPayload
         {
             Primary = handleVm,
@@ -2589,6 +3138,19 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
 
             var ok = TryPerformSplitDrop(payload.Primary, _splitDropTargetBlock, _splitDropLeftEdge);
+            ClearDropIndicator();
+            return ok;
+        }
+
+        if (_columnDropTarget != null && _columnDropInsertIndex >= 0)
+        {
+            if (payload.BlocksInDocumentOrder.Count != 1)
+            {
+                ClearDropIndicator();
+                return false;
+            }
+
+            var ok = TryPerformColumnDrop(payload.Primary, _columnDropTarget, _columnDropLeft, _columnDropInsertIndex);
             ClearDropIndicator();
             return ok;
         }
@@ -2654,14 +3216,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var draggedIndex = Blocks.IndexOf(draggedBlock);
         if (draggedIndex < 0)
         {
-            if (draggedBlock.GetColumnSibling(Blocks) == null)
+            if (draggedBlock.OwnerTwoColumn == null && draggedBlock.GetColumnSibling(Blocks) == null)
                 return false;
             BeginStructuralChange();
-            DetachColumnCell(draggedBlock);
+            var splitAfterDetach = DetachColumnCell(draggedBlock);
             var insertT = Math.Clamp(_currentDropInsertIndex, 0, Blocks.Count);
             SubscribeToBlock(draggedBlock);
             Blocks.Insert(insertT, draggedBlock);
             ReorderBlocks();
+            TryCollapseSplitAfterDragOut(splitAfterDetach);
             CommitStructuralChange("Move block");
             NotifyBlocksChanged();
             return true;
@@ -2684,12 +3247,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
 
             BeginStructuralChange();
-            DetachColumnCell(draggedBlock);
+            var splitAfterDetach = DetachColumnCell(draggedBlock);
             var insertAt = draggedIndex < rawInsert ? rawInsert - 1 : rawInsert;
             insertAt = Math.Clamp(insertAt, 0, Blocks.Count);
             SubscribeToBlock(draggedBlock);
             Blocks.Insert(insertAt, draggedBlock);
             ReorderBlocks();
+            TryCollapseSplitAfterDragOut(splitAfterDetach);
             CommitStructuralChange("Move block");
             NotifyBlocksChanged();
             return true;
@@ -2729,6 +3293,211 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             blockVisual.ShowDropLineAtLeft();
         else
             blockVisual.ShowDropLineAtRight();
+        return true;
+    }
+
+    private bool TryUpdateColumnDropIndicator(Point cursorPosInEditor, BlockViewModel draggedBlock)
+    {
+        if (!TryGetColumnDropInsert(cursorPosInEditor, draggedBlock, out var tc, out var left, out var insertIdx))
+            return false;
+
+        var col = left ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+        var from = col.IndexOf(draggedBlock);
+        if (from >= 0 && (insertIdx == from || insertIdx == from + 1))
+            return false;
+
+        if (ReferenceEquals(_columnDropTarget, tc) && _columnDropLeft == left && _columnDropInsertIndex == insertIdx
+            && this.FindControl<Border>("BlockReorderDropLineOverlay") is { IsVisible: true })
+            return true;
+
+        ClearDropIndicator();
+        _columnDropTarget = tc;
+        _columnDropLeft = left;
+        _columnDropInsertIndex = insertIdx;
+        _currentDropInsertIndex = -1;
+        ShowColumnDropLineInOverlay(tc, left, insertIdx);
+        return true;
+    }
+
+    private bool TryGetColumnDropInsert(Point cursor, BlockViewModel dragged, out TwoColumnBlockViewModel tc,
+        out bool leftColumn, out int insertIndex)
+    {
+        tc = null!;
+        leftColumn = false;
+        insertIndex = 0;
+        if (dragged is TwoColumnBlockViewModel || dragged.Type == BlockType.Divider)
+            return false;
+
+        var containers = GetBlockContainersInOrder();
+        if (containers == null) return false;
+        for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
+        {
+            if (BlockRows[r] is not SplitBlockRowViewModel sp) continue;
+            tc = sp.TwoColumn;
+            var rowHost = containers[r];
+            var splitView = rowHost.GetVisualDescendants().OfType<SplitBlockRowView>().FirstOrDefault();
+            if (splitView == null) continue;
+            var leftIc = splitView.FindControl<ItemsControl>("LeftColumnItems");
+            var rightIc = splitView.FindControl<ItemsControl>("RightColumnItems");
+            if (leftIc == null || rightIc == null) continue;
+            var lTl = leftIc.TranslatePoint(new Point(0, 0), this);
+            var rTl = rightIc.TranslatePoint(new Point(0, 0), this);
+            if (!lTl.HasValue || !rTl.HasValue) continue;
+            var leftRect = new Rect(lTl.Value, leftIc.Bounds.Size);
+            var rightRect = new Rect(rTl.Value, rightIc.Bounds.Size);
+            if (leftRect.Contains(cursor))
+            {
+                leftColumn = true;
+                return TryInsertIndexInColumnStack(cursor.Y, tc.LeftColumnBlocks, out insertIndex);
+            }
+            if (rightRect.Contains(cursor))
+            {
+                leftColumn = false;
+                return TryInsertIndexInColumnStack(cursor.Y, tc.RightColumnBlocks, out insertIndex);
+            }
+        }
+        return false;
+    }
+
+    private bool TryInsertIndexInColumnStack(double cursorY, ObservableCollection<BlockViewModel> col,
+        out int insertIndex)
+    {
+        insertIndex = 0;
+        if (col.Count == 0)
+        {
+            insertIndex = 0;
+            return true;
+        }
+        for (int i = 0; i < col.Count; i++)
+        {
+            var eb = GetEditableBlockForViewModel(col[i]);
+            if (eb == null) continue;
+            var b = GetControlBoundsInEditor(eb);
+            if (b.Height <= 0) continue;
+            double midY = b.Y + b.Height * 0.5;
+            if (cursorY < midY)
+            {
+                insertIndex = i;
+                return true;
+            }
+        }
+        insertIndex = col.Count;
+        return true;
+    }
+
+    private SplitBlockRowView? FindSplitRowView(TwoColumnBlockViewModel tc)
+    {
+        var containers = GetBlockContainersInOrder();
+        if (containers == null) return null;
+        for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
+        {
+            if (BlockRows[r] is SplitBlockRowViewModel sp && ReferenceEquals(sp.TwoColumn, tc))
+                return containers[r].GetVisualDescendants().OfType<SplitBlockRowView>().FirstOrDefault();
+        }
+        return null;
+    }
+
+    private void ShowColumnDropLineInOverlay(TwoColumnBlockViewModel tc, bool leftColumn, int insertIndex)
+    {
+        var overlay = this.FindControl<LayoutOverlayPanel>("BlockDragGhostOverlay");
+        var line = this.FindControl<Border>("BlockReorderDropLineOverlay");
+        if (overlay == null || line == null) return;
+
+        var col = leftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+        double x, y, width;
+
+        if (col.Count == 0)
+        {
+            var splitView = FindSplitRowView(tc);
+            var ic = splitView?.FindControl<ItemsControl>(leftColumn ? "LeftColumnItems" : "RightColumnItems");
+            if (ic == null) return;
+            var tl = ic.TranslatePoint(new Point(0, 0), overlay);
+            if (!tl.HasValue) return;
+            x = tl.Value.X;
+            y = tl.Value.Y;
+            width = ic.Bounds.Width;
+        }
+        else if (insertIndex < col.Count)
+        {
+            var eb = GetEditableBlockForViewModel(col[insertIndex]);
+            if (eb == null) return;
+            var tl = eb.TranslatePoint(new Point(0, 0), overlay);
+            if (!tl.HasValue) return;
+            y = tl.Value.Y - 2;
+            x = tl.Value.X;
+            width = eb.Bounds.Width;
+        }
+        else
+        {
+            var eb = GetEditableBlockForViewModel(col[^1]);
+            if (eb == null) return;
+            var tl = eb.TranslatePoint(new Point(0, eb.Bounds.Height), overlay);
+            if (!tl.HasValue) return;
+            y = tl.Value.Y - HorizontalDropLineHeight * 0.5;
+            var tl0 = eb.TranslatePoint(new Point(0, 0), overlay);
+            if (!tl0.HasValue) return;
+            x = tl0.Value.X;
+            width = eb.Bounds.Width;
+        }
+
+        line.Width = width;
+        line.Height = HorizontalDropLineHeight;
+        Canvas.SetLeft(line, x);
+        Canvas.SetTop(line, y);
+        line.IsVisible = true;
+        overlay.InvalidateArrange();
+    }
+
+    private bool TryPerformColumnDrop(BlockViewModel dragged, TwoColumnBlockViewModel tc, bool leftColumn, int insertIndex)
+    {
+        if (dragged is TwoColumnBlockViewModel || dragged.Type == BlockType.Divider)
+            return false;
+        var col = leftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+
+        int fromIdx = col.IndexOf(dragged);
+        bool sameList = fromIdx >= 0;
+        if (sameList && (insertIndex == fromIdx || insertIndex == fromIdx + 1))
+            return false;
+
+        BeginStructuralChange();
+
+        if (sameList)
+        {
+            col.RemoveAt(fromIdx);
+            BlockHierarchy.ClearChildOwnership(dragged);
+            int adj = insertIndex;
+            if (fromIdx < insertIndex) adj--;
+            adj = Math.Clamp(adj, 0, col.Count);
+            BlockHierarchy.WireChildOwnership(tc, dragged, leftColumn);
+            col.Insert(adj, dragged);
+        }
+        else
+        {
+            TwoColumnBlockViewModel? detachedFrom = null;
+            if (dragged.OwnerTwoColumn != null)
+                detachedFrom = DetachColumnCell(dragged);
+            else if (dragged.GetColumnSibling(Blocks) != null)
+                detachedFrom = DetachColumnCell(dragged);
+            else
+            {
+                var ti = Blocks.IndexOf(dragged);
+                if (ti >= 0)
+                {
+                    UnsubscribeFromBlock(dragged);
+                    Blocks.RemoveAt(ti);
+                }
+            }
+
+            BlockHierarchy.WireChildOwnership(tc, dragged, leftColumn);
+            insertIndex = Math.Clamp(insertIndex, 0, col.Count);
+            SubscribeToBlock(dragged);
+            col.Insert(insertIndex, dragged);
+            TryCollapseSplitAfterDragOut(detachedFrom);
+        }
+
+        ReorderBlocks();
+        CommitStructuralChange("Move to column");
+        NotifyBlocksChanged();
         return true;
     }
 
@@ -2800,7 +3569,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (row is SplitBlockRowViewModel splitRow)
             {
                 BlockViewModel? hit = null;
-                foreach (var vm in new[] { splitRow.Left, splitRow.Right })
+                foreach (var vm in BlockHierarchy.EnumerateInDocumentOrder(new[] { splitRow.TwoColumn }))
                 {
                     if (ReferenceEquals(vm, dragged) || vm.Type == BlockType.Divider) continue;
                     var rect = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
@@ -2815,7 +3584,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 if (hit == null)
                 {
                     double best = double.MaxValue;
-                    foreach (var vm in new[] { splitRow.Left, splitRow.Right })
+                    foreach (var vm in BlockHierarchy.EnumerateInDocumentOrder(new[] { splitRow.TwoColumn }))
                     {
                         if (ReferenceEquals(vm, dragged) || vm.Type == BlockType.Divider) continue;
                         var rect = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
@@ -2853,21 +3622,42 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return false;
     }
 
-    /// <summary>Remove <paramref name="cell"/> from the document; sibling becomes a normal unpaired block.</summary>
-    private void DetachColumnCell(BlockViewModel cell)
+    /// <summary>Remove <paramref name="cell"/> from a split column or legacy flat pair.</summary>
+    /// <returns>The <see cref="TwoColumnBlockViewModel"/> when detached from a nested split (caller should run collapse after drop completes).</returns>
+    private TwoColumnBlockViewModel? DetachColumnCell(BlockViewModel cell)
     {
+        if (cell.OwnerTwoColumn is TwoColumnBlockViewModel tc)
+        {
+            var col = cell.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+            UnsubscribeFromBlock(cell);
+            col.Remove(cell);
+            BlockHierarchy.ClearChildOwnership(cell);
+            if (col.Count == 0)
+            {
+                var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
+                BlockHierarchy.WireChildOwnership(tc, ph, cell.IsLeftColumn);
+                col.Add(ph);
+                SubscribeToBlock(ph);
+            }
+            return tc;
+        }
+
         var sibling = cell.GetColumnSibling(Blocks);
-        if (sibling == null) return;
+        if (sibling == null) return null;
         UnsubscribeFromBlock(cell);
         var idx = Blocks.IndexOf(cell);
-        if (idx < 0) return;
+        if (idx < 0) return null;
         Blocks.RemoveAt(idx);
         ColumnPairHelper.ClearPair(cell, sibling);
+        return null;
     }
 
     private bool TryPerformSplitDrop(BlockViewModel dragged, BlockViewModel target, bool dropOnLeftEdge)
     {
         if (dragged.Type == BlockType.Divider || target.Type == BlockType.Divider)
+            return false;
+        // Only split top-level targets into a new row (multi-block columns need different UX).
+        if (target.OwnerTwoColumn != null)
             return false;
 
         var targetIdx = Blocks.IndexOf(target);
@@ -2875,8 +3665,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         BeginStructuralChange();
 
-        if (dragged.GetColumnSibling(Blocks) != null)
-            DetachColumnCell(dragged);
+        TwoColumnBlockViewModel? splitLeftBehind = null;
+        if (dragged.OwnerTwoColumn != null || dragged.GetColumnSibling(Blocks) != null)
+            splitLeftBehind = DetachColumnCell(dragged);
 
         targetIdx = Blocks.IndexOf(target);
         if (targetIdx < 0) return false;
@@ -2912,13 +3703,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var left = dropOnLeftEdge ? dragged : target;
         var right = dropOnLeftEdge ? target : dragged;
 
-        ColumnPairHelper.WirePair(left, right, Guid.NewGuid().ToString());
-        Blocks.Insert(targetIdx, left);
-        SubscribeToBlock(left);
-        Blocks.Insert(targetIdx + 1, right);
-        SubscribeToBlock(right);
+        var tc = new TwoColumnBlockViewModel(left.Order);
+        BlockHierarchy.WireChildOwnership(tc, left, true);
+        BlockHierarchy.WireChildOwnership(tc, right, false);
+        tc.LeftColumnBlocks.Add(left);
+        tc.RightColumnBlocks.Add(right);
+        SubscribeToBlock(tc);
+        Blocks.Insert(targetIdx, tc);
 
         ReorderBlocks();
+        TryCollapseSplitAfterDragOut(splitLeftBehind);
         CommitStructuralChange("Split into columns");
         NotifyBlocksChanged();
 
@@ -2960,6 +3754,49 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return Blocks.Count;
     }
 
+    /// <summary>
+    /// When dragging a block out of a split, prefer full-width horizontal gaps above/below the split row
+    /// (snap bands) over in-column drop targets.
+    /// </summary>
+    private bool TryGetTopLevelInsertInSplitRowSnapBand(double cursorY, TwoColumnBlockViewModel tc, out int insertIndex)
+    {
+        insertIndex = -1;
+        if (Blocks.IndexOf(tc) < 0) return false;
+
+        var rowBounds = GetBlockBoundsInEditorOrder();
+        if (rowBounds.Count == 0 || BlockRows.Count != rowBounds.Count)
+            return false;
+
+        for (int r = 0; r < rowBounds.Count; r++)
+        {
+            if (BlockRows[r] is not SplitBlockRowViewModel sp || !ReferenceEquals(sp.TwoColumn, tc))
+                continue;
+
+            var (top, bottom) = rowBounds[r];
+            if (cursorY < top || cursorY >= bottom)
+                continue;
+
+            var row = BlockRows[r];
+            int insertBeforeTop = row.StartBlockIndex;
+            int insertAfterBottom = row.StartBlockIndex + row.BlockSpan;
+            var height = bottom - top;
+            var snapBand = Math.Max(4, height * SnapBandFraction);
+
+            if (cursorY < top + snapBand)
+            {
+                insertIndex = insertBeforeTop;
+                return true;
+            }
+            if (cursorY >= bottom - snapBand)
+            {
+                insertIndex = insertAfterBottom;
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
     private List<(double Top, double Bottom)> GetBlockBoundsInEditorOrder()
     {
         var list = new List<(double Top, double Bottom)>();
@@ -2996,18 +3833,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (containers == null) return null;
         for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
         {
-            var row = BlockRows[r];
             var c = containers[r];
-            if (row is SingleBlockRowViewModel s && ReferenceEquals(s.Block, vm))
-            {
-                return c as EditableBlock
-                    ?? c.GetVisualDescendants().OfType<EditableBlock>().FirstOrDefault(e => ReferenceEquals(e.DataContext, vm));
-            }
-            if (row is SplitBlockRowViewModel sp
-                && (ReferenceEquals(sp.Left, vm) || ReferenceEquals(sp.Right, vm)))
-            {
-                return c.GetVisualDescendants().OfType<EditableBlock>().FirstOrDefault(e => ReferenceEquals(e.DataContext, vm));
-            }
+            var eb = c.GetVisualDescendants().OfType<EditableBlock>()
+                .FirstOrDefault(e => ReferenceEquals(e.DataContext, vm));
+            if (eb != null) return eb;
         }
         return null;
     }
@@ -3055,11 +3884,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private CaretState? CaptureCaretState()
     {
-        int idx = GetFocusedBlockIndex();
-        if (idx < 0) return null;
-        var editableBlock = GetEditableBlockForViewModel(Blocks[idx]);
+        var focused = BlockHierarchy.FindFocused(Blocks);
+        if (focused == null) return null;
+        var editableBlock = GetEditableBlockForViewModel(focused);
         var caretIdx = editableBlock?.GetCaretIndex();
-        return new CaretState { BlockIndex = idx, CaretPosition = caretIdx ?? 0 };
+        return new CaretState { BlockId = focused.Id, CaretPosition = caretIdx ?? 0 };
     }
 
     /// <summary>
@@ -3118,6 +3947,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
             foreach (var blk in flattened)
             {
+                if (ColumnPairHelper.IsNestedTwoColumnBlock(blk))
+                {
+                    var tvm = new TwoColumnBlockViewModel(blk);
+                    SubscribeToBlock(tvm);
+                    newList.Add(tvm);
+                    continue;
+                }
+
                 if (existingById.TryGetValue(blk.Id, out var existing) && usedIds.Add(blk.Id))
                 {
                     blk.EnsureInlineRuns();
@@ -3134,6 +3971,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     newList.Add(vm);
                 }
             }
+
+            var mergeWork = new ObservableCollection<BlockViewModel>(newList);
+            ColumnPairHelper.MergeConsecutiveColumnPairs(mergeWork);
+            newList = mergeWork.ToList();
 
             // Unsubscribe from blocks that are no longer present
             foreach (var kvp in existingById)
@@ -3194,7 +4035,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _isRestoringFromHistory = true;
         try
         {
-            var vm = Blocks.FirstOrDefault(b => b.Id == blockId);
+            var vm = BlockHierarchy.FindById(Blocks, blockId);
             if (vm != null)
             {
                 vm.SetRuns(runs);
@@ -3216,24 +4057,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void ApplyCaretFocus(CaretState? caret)
     {
-        if (caret == null || caret.BlockIndex < 0 || caret.BlockIndex >= Blocks.Count)
-            return;
+        if (caret == null || string.IsNullOrEmpty(caret.BlockId)) return;
 
-        // Clear stale VM focus flags first; rapid undo can leave IsFocused=true while
-        // the real TextBox has already lost focus.
-        for (int i = 0; i < Blocks.Count; i++)
-            Blocks[i].IsFocused = false;
+        foreach (var b in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+            b.IsFocused = false;
 
-        var blockIndex = caret.BlockIndex;
         var caretPos = caret.CaretPosition;
-        var target = Blocks[blockIndex];
+        var target = BlockHierarchy.FindById(Blocks, caret.BlockId);
+        if (target == null) return;
         target.PendingCaretIndex = caretPos;
 
-        // Force a fresh focus transition at Input priority for rapid undo/redo stability.
         Dispatcher.UIThread.Post(() =>
         {
-            if (blockIndex < 0 || blockIndex >= Blocks.Count) return;
-            var latestTarget = Blocks[blockIndex];
+            var latestTarget = BlockHierarchy.FindById(Blocks, caret.BlockId);
+            if (latestTarget == null) return;
             latestTarget.PendingCaretIndex = caretPos;
             latestTarget.IsFocused = true;
         }, DispatcherPriority.Input);
@@ -3255,8 +4092,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             BlockEditorLogger.Log($"TrackTypingEdit skipped: history={_history != null} restoring={_isRestoringFromHistory}");
             return;
         }
-
-        var idx = Blocks.IndexOf(block);
 
         if (_typingBatchBlockId != null && _typingBatchBlockId != block.Id)
         {
@@ -3282,7 +4117,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                         _typingBatchRunsBefore, block.Content, previousText);
                 }
             }
-            _typingBatchCaretBefore = CaptureCaretState() ?? new CaretState { BlockIndex = idx, CaretPosition = 0 };
+            _typingBatchCaretBefore = CaptureCaretState() ?? new CaretState { BlockId = block.Id, CaretPosition = 0 };
             BlockEditorLogger.Log($"TrackTypingEdit: NEW batch for block {block.Id} before={Truncate(previousText)} current={Truncate(block.Content)}");
         }
 
@@ -3312,7 +4147,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         if (_history == null || _typingBatchBlockId == null) return;
 
-        var vm = Blocks.FirstOrDefault(b => b.Id == _typingBatchBlockId);
+        var vm = BlockHierarchy.FindById(Blocks, _typingBatchBlockId);
         if (vm == null)
         {
             BlockEditorLogger.Log($"FlushTypingBatch: block {_typingBatchBlockId} not found, discarding");
@@ -3339,10 +4174,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var textBefore = Core.Formatting.InlineRunFormatApplier.Flatten(runsBefore);
         var textAfter = vm.Content ?? string.Empty;
 
-        var idx = Blocks.IndexOf(vm);
         var editableBlock = GetEditableBlockForViewModel(vm);
         var caretIdx = editableBlock?.GetCaretIndex();
-        var caretAfter = new CaretState { BlockIndex = idx, CaretPosition = caretIdx ?? 0 };
+        var caretAfter = new CaretState { BlockId = vm.Id, CaretPosition = caretIdx ?? 0 };
 
         BlockEditorLogger.Log($"FlushTypingBatch: PUSH TextEditOp block={vm.Id} before={Truncate(textBefore)} after={Truncate(textAfter)}");
 

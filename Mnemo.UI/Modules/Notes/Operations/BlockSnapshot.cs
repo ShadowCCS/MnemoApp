@@ -61,9 +61,10 @@ public sealed class BlockSnapshot
 
 /// <summary>
 /// Captures caret/selection state so undo feels correct after merges/splits.
+/// Uses <see cref="BlockId"/> so nested blocks inside a split are addressable.
 /// </summary>
 public sealed class CaretState
 {
-    public int BlockIndex { get; init; }
+    public string BlockId { get; init; } = "";
     public int CaretPosition { get; init; }
 }

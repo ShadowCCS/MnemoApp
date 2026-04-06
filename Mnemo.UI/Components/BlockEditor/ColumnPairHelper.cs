@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using Mnemo.Core.Models;
 
@@ -85,12 +86,25 @@ public static class ColumnPairHelper
         }
     }
 
-    /// <summary>Legacy <see cref="BlockType.TwoColumn"/> + <see cref="Block.Children"/> → two flat blocks with pair meta.</summary>
+    /// <summary>True when <paramref name="b"/> is persisted nested split (two <see cref="BlockType.ColumnGroup"/> columns).</summary>
+    public static bool IsNestedTwoColumnBlock(Block b) =>
+        b.Type == BlockType.TwoColumn
+        && b.Children is { Count: >= 2 }
+        && b.Children[0].Type == BlockType.ColumnGroup
+        && b.Children[1].Type == BlockType.ColumnGroup;
+
+    /// <summary>Legacy <see cref="BlockType.TwoColumn"/> + two non–column-group children → two flat blocks with pair meta. Nested <see cref="BlockType.ColumnGroup"/> splits are left as one <see cref="BlockType.TwoColumn"/> block.</summary>
     public static List<Block> ExpandLegacyTwoColumnBlocks(IEnumerable<Block> blocks)
     {
         var list = new List<Block>();
         foreach (var b in blocks.Where(x => x != null).OrderBy(x => x.Order))
         {
+            if (IsNestedTwoColumnBlock(b))
+            {
+                list.Add(b);
+                continue;
+            }
+
             if (b.Type == BlockType.TwoColumn && b.Children is { Count: >= 2 })
             {
                 var id = Guid.NewGuid().ToString();
@@ -117,6 +131,20 @@ public static class ColumnPairHelper
                 list.Add(b);
         }
         return list;
+    }
+
+    /// <summary>Merge consecutive flat left/right pairs (pair meta) into <see cref="TwoColumnBlockViewModel"/> rows.</summary>
+    public static void MergeConsecutiveColumnPairs(ObservableCollection<BlockViewModel> blocks)
+    {
+        for (var i = 0; i < blocks.Count - 1; i++)
+        {
+            if (!IsPairedLeft(blocks[i], i, blocks)) continue;
+            var left = blocks[i];
+            var right = blocks[i + 1];
+            var tc = TwoColumnBlockViewModel.FromFlatPair(left, right);
+            blocks.RemoveAt(i + 1);
+            blocks[i] = tc;
+        }
     }
 
     private static Block CloneBlockForPairChild(Block source)

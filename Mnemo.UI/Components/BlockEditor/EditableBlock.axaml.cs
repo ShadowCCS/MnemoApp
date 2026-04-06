@@ -147,6 +147,15 @@ public partial class EditableBlock : UserControl
                 text = text.Remove(selStart, selectionLength);
             var caretIndex = Math.Clamp(selectionLength > 0 ? selStart : editor.CaretIndex, 0, text.Length);
 
+            if (_viewModel.OwnerTwoColumn != null
+                && QuoteEnterBehavior.TryGetSplitOnEmptyLineEnter(text, caretIndex, out var splitBody, out var splitFollowing))
+            {
+                _viewModel.NotifyStructuralChangeStarting();
+                _viewModel.Content = splitBody;
+                _viewModel.RequestExitSplitBelow(splitFollowing);
+                return;
+            }
+
             if (_viewModel.Type == BlockType.Quote
                 && QuoteEnterBehavior.TryGetSplitOnEmptyLineEnter(text, caretIndex, out var quoteBody, out var followingText))
             {
@@ -1057,6 +1066,26 @@ public partial class EditableBlock : UserControl
         if (_viewModel == null || _stateManager == null) return;
 
         CloseSlashMenu();
+
+        if (blockType == BlockType.TwoColumn)
+        {
+            if (_viewModel.OwnerTwoColumn != null)
+            {
+                _stateManager.SetNormal();
+                _focusManager?.ClearCache();
+                return;
+            }
+
+            var editor = FindParentBlockEditor();
+            if (editor != null)
+            {
+                _stateManager.PreviousText = string.Empty;
+                editor.ReplaceBlockWithTwoColumn(_viewModel);
+                _stateManager.SetNormal();
+                _focusManager?.ClearCache();
+                return;
+            }
+        }
 
         _viewModel.NotifyStructuralChangeStarting();
         _viewModel.Type = blockType;

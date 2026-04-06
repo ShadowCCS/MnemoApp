@@ -1,8 +1,12 @@
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Mnemo.UI.Modules.Overview.ViewModels;
 
 namespace Mnemo.UI.Modules.Overview.Controls;
@@ -17,6 +21,9 @@ public class WidgetContainer : ContentControl
     private Point? _initialMousePosition;
     private bool _isDragging;
     private Button? _removeButton;
+    private ScrollViewer? _scrollAncestor;
+    private bool _viewportEntranceComplete;
+    private DispatcherTimer? _viewportEntranceFallbackTimer;
 
     public static readonly StyledProperty<bool> IsEditModeProperty =
         AvaloniaProperty.Register<WidgetContainer, bool>(nameof(IsEditMode));
@@ -36,6 +43,107 @@ public class WidgetContainer : ContentControl
     static WidgetContainer()
     {
         WidgetProperty.Changed.AddClassHandler<WidgetContainer>((c, _) => c.SyncHeaderFromWidget());
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _scrollAncestor = this.FindAncestorOfType<ScrollViewer>();
+        if (_scrollAncestor == null)
+        {
+            _viewportEntranceComplete = true;
+            return;
+        }
+
+        Opacity = 0;
+        _scrollAncestor.ScrollChanged += OnScrollAncestorChanged;
+        LayoutUpdated += OnLayoutUpdatedForViewportEntrance;
+        Dispatcher.UIThread.Post(TryCompleteViewportEntrance, DispatcherPriority.Loaded);
+
+        _viewportEntranceFallbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+        _viewportEntranceFallbackTimer.Tick += OnViewportEntranceFallbackTick;
+        _viewportEntranceFallbackTimer.Start();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        StopViewportEntranceFallbackTimer();
+        if (_scrollAncestor != null)
+        {
+            _scrollAncestor.ScrollChanged -= OnScrollAncestorChanged;
+            _scrollAncestor = null;
+        }
+        LayoutUpdated -= OnLayoutUpdatedForViewportEntrance;
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void StopViewportEntranceFallbackTimer()
+    {
+        if (_viewportEntranceFallbackTimer == null) return;
+        _viewportEntranceFallbackTimer.Stop();
+        _viewportEntranceFallbackTimer.Tick -= OnViewportEntranceFallbackTick;
+        _viewportEntranceFallbackTimer = null;
+    }
+
+    private void OnViewportEntranceFallbackTick(object? sender, EventArgs e)
+    {
+        StopViewportEntranceFallbackTimer();
+        if (_viewportEntranceComplete) return;
+        UnhookViewportEntrance();
+        Transitions = null;
+        Opacity = 1;
+    }
+
+    private void UnhookViewportEntrance()
+    {
+        _viewportEntranceComplete = true;
+        if (_scrollAncestor != null)
+            _scrollAncestor.ScrollChanged -= OnScrollAncestorChanged;
+        LayoutUpdated -= OnLayoutUpdatedForViewportEntrance;
+    }
+
+    private void OnScrollAncestorChanged(object? sender, ScrollChangedEventArgs e) => TryCompleteViewportEntrance();
+
+    private void OnLayoutUpdatedForViewportEntrance(object? sender, EventArgs e) => TryCompleteViewportEntrance();
+
+    private void TryCompleteViewportEntrance()
+    {
+        if (_viewportEntranceComplete || _scrollAncestor == null) return;
+        if (Bounds.Width <= 0 || Bounds.Height <= 0) return;
+
+        if (!IntersectsScrollViewport(_scrollAncestor))
+            return;
+
+        StopViewportEntranceFallbackTimer();
+        UnhookViewportEntrance();
+
+        Transitions ??= new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(420),
+                Easing = new CubicEaseOut(),
+            },
+        };
+        Opacity = 1;
+    }
+
+    /// <summary>
+    /// True when this control's bounds overlap the scroll viewer's visible viewport (coordinates from <c>TranslatePoint</c> into the scroll viewer).
+    /// </summary>
+    private bool IntersectsScrollViewport(ScrollViewer scroll)
+    {
+        var topLeft = this.TranslatePoint(new Point(0, 0), scroll);
+        if (!topLeft.HasValue) return false;
+
+        double w = scroll.Viewport.Width;
+        double h = scroll.Viewport.Height;
+        if (w <= 0 || h <= 0) return true;
+
+        var r = new Rect(topLeft.Value, Bounds.Size);
+        var viewport = new Rect(0, 0, w, h);
+        return r.Intersects(viewport);
     }
 
     public bool IsEditMode

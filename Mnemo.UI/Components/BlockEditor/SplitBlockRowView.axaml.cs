@@ -10,12 +10,12 @@ namespace Mnemo.UI.Components.BlockEditor;
 public partial class SplitBlockRowView : UserControl
 {
     private bool _splitDragging;
-    private BlockViewModel? _subscribedLeft;
+    private TwoColumnBlockViewModel? _subscribedTwoColumn;
 
     public SplitBlockRowView()
     {
         InitializeComponent();
-        Loaded += (_, _) => ApplyRatioFromLeft();
+        Loaded += (_, _) => ApplyRatioFromTwoColumn();
         DataContextChanged += OnDataContextChanged;
         if (SplitterBorder != null)
         {
@@ -42,24 +42,24 @@ public partial class SplitBlockRowView : UserControl
 
     private void OnDataContextChanged(object? sender, System.EventArgs e)
     {
-        if (_subscribedLeft != null)
-            _subscribedLeft.PropertyChanged -= OnLeftPropertyChanged;
-        _subscribedLeft = (DataContext as SplitBlockRowViewModel)?.Left;
-        if (_subscribedLeft != null)
-            _subscribedLeft.PropertyChanged += OnLeftPropertyChanged;
-        ApplyRatioFromLeft();
+        if (_subscribedTwoColumn != null)
+            _subscribedTwoColumn.PropertyChanged -= OnTwoColumnPropertyChanged;
+        _subscribedTwoColumn = (DataContext as SplitBlockRowViewModel)?.TwoColumn;
+        if (_subscribedTwoColumn != null)
+            _subscribedTwoColumn.PropertyChanged += OnTwoColumnPropertyChanged;
+        ApplyRatioFromTwoColumn();
     }
 
-    private void OnLeftPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnTwoColumnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(BlockViewModel.ColumnSplitRatio) or nameof(BlockViewModel.Meta))
-            ApplyRatioFromLeft();
+            ApplyRatioFromTwoColumn();
     }
 
-    private void ApplyRatioFromLeft()
+    private void ApplyRatioFromTwoColumn()
     {
         if (DataContext is not SplitBlockRowViewModel row || RootGrid == null) return;
-        var r = row.Left.ColumnSplitRatio;
+        var r = row.TwoColumn.ColumnSplitRatio;
         RootGrid.ColumnDefinitions[0].Width = new GridLength(r, GridUnitType.Star);
         RootGrid.ColumnDefinitions[2].Width = new GridLength(1 - r, GridUnitType.Star);
     }
@@ -78,8 +78,8 @@ public partial class SplitBlockRowView : UserControl
         if (!_splitDragging || DataContext is not SplitBlockRowViewModel row || RootGrid == null) return;
         var w = RootGrid.Bounds.Width;
         if (w <= 1) return;
-        row.Left.ColumnSplitRatio = e.GetPosition(RootGrid).X / w;
-        ApplyRatioFromLeft();
+        row.TwoColumn.ColumnSplitRatio = e.GetPosition(RootGrid).X / w;
+        ApplyRatioFromTwoColumn();
     }
 
     private void Splitter_OnPointerReleased(object? sender, PointerReleasedEventArgs e)
@@ -93,10 +93,10 @@ public partial class SplitBlockRowView : UserControl
 
     protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
-        if (_subscribedLeft != null)
+        if (_subscribedTwoColumn != null)
         {
-            _subscribedLeft.PropertyChanged -= OnLeftPropertyChanged;
-            _subscribedLeft = null;
+            _subscribedTwoColumn.PropertyChanged -= OnTwoColumnPropertyChanged;
+            _subscribedTwoColumn = null;
         }
         base.OnDetachedFromVisualTree(e);
     }

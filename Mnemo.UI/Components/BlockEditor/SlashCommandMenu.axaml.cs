@@ -102,6 +102,7 @@ public partial class SlashCommandMenu : UserControl
             new() { IconPath = iconBase + "quote.svg", Name = T("Quote"), Description = T("QuoteDescription"), Shortcut = "\"", BlockType = BlockType.Quote },
             new() { IconPath = iconBase + "math-function.svg", Name = T("Code"), Description = T("CodeDescription"), Shortcut = null, BlockType = BlockType.Code },
             new() { IconPath = iconBase + "separator.svg", Name = T("Divider"), Description = T("DividerDescription"), Shortcut = "---", BlockType = BlockType.Divider },
+            new() { IconPath = "avares://Mnemo.UI/Icons/Editor/two-column.svg", Name = T("TwoColumn"), Description = T("TwoColumnDescription"), Shortcut = null, BlockType = BlockType.TwoColumn },
             new() { IconPath = iconBase + "photo.svg", Name = T("Image"), Description = T("ImageDescription"), Shortcut = null, BlockType = BlockType.Image }
         };
     }

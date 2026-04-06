@@ -19,8 +19,21 @@ public static class BlockFactory
             BlockType.Quote => new BlockViewModel(type, "", order),
             BlockType.Divider => new BlockViewModel(type, "", order),
             BlockType.Image => CreateImageBlock(order),
+            BlockType.TwoColumn => CreateTwoColumnBlock(order),
             _ => new BlockViewModel(BlockType.Text, "", order)
         };
+    }
+
+    private static BlockViewModel CreateTwoColumnBlock(int order)
+    {
+        var tc = new TwoColumnBlockViewModel(order);
+        var left = new BlockViewModel(BlockType.Text, "", 0);
+        var right = new BlockViewModel(BlockType.Text, "", 0);
+        BlockHierarchy.WireChildOwnership(tc, left, true);
+        BlockHierarchy.WireChildOwnership(tc, right, false);
+        tc.LeftColumnBlocks.Add(left);
+        tc.RightColumnBlocks.Add(right);
+        return tc;
     }
 
     private static BlockViewModel CreateCodeBlock(int order)

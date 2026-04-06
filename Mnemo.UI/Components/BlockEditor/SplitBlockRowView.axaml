@@ -6,11 +6,22 @@
     x:CompileBindings="False">
     <Grid>
         <Grid x:Name="RootGrid" ColumnDefinitions="5*,12,5*">
-            <local:EditableBlock
-                x:Name="LeftCell"
+            <ItemsControl
+                x:Name="LeftColumnItems"
                 Grid.Column="0"
                 MinWidth="48"
-                DataContext="{Binding Left}" />
+                ItemsSource="{Binding TwoColumn.LeftColumnBlocks}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" Spacing="6" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <local:EditableBlock />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
             <!-- Wide transparent track; thin grip only on hover / while dragging -->
             <Border
                 x:Name="SplitterBorder"
@@ -41,11 +52,22 @@
                     </Border.Transitions>
                 </Border>
             </Border>
-            <local:EditableBlock
-                x:Name="RightCell"
+            <ItemsControl
+                x:Name="RightColumnItems"
                 Grid.Column="2"
                 MinWidth="48"
-                DataContext="{Binding Right}" />
+                ItemsSource="{Binding TwoColumn.RightColumnBlocks}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" Spacing="6" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <local:EditableBlock />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </Grid>
     </Grid>
 </UserControl>

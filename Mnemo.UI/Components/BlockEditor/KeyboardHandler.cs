@@ -83,6 +83,17 @@ public class KeyboardHandler
             editor.InsertTextAtCaret("\n");
             return;
         }
+        // Split column: Enter inserts a newline in non-empty text; whitespace-only line exits (handled in EditableBlock).
+        if (viewModel.OwnerTwoColumn != null)
+        {
+            if (selectionLength == 0 && QuoteEnterBehavior.IsCaretOnWhitespaceOnlyLine(text, caretIndex))
+            {
+                EnterPressed?.Invoke();
+                return;
+            }
+            editor.InsertTextAtCaret("\n");
+            return;
+        }
         if (viewModel.Type == BlockType.Quote)
         {
             if (selectionLength == 0 && QuoteEnterBehavior.IsCaretOnWhitespaceOnlyLine(text, caretIndex))

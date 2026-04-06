@@ -18,7 +18,9 @@ public enum BlockType
     Code,
     Divider,
     Image,
-    /// <summary>Side-by-side columns; child blocks are in <see cref="Block.Children"/> (exactly two).</summary>
+    /// <summary>Layout-only container for one side of a <see cref="TwoColumn"/> split; holds a vertical stack in <see cref="Block.Children"/>.</summary>
+    ColumnGroup,
+    /// <summary>Side-by-side columns; <see cref="Block.Children"/> are two <see cref="ColumnGroup"/> blocks (left then right).</summary>
     TwoColumn
 }
 
@@ -59,7 +61,10 @@ public class Block
     public Dictionary<string, object> Meta { get; set; } = new();
     public int Order { get; set; }
 
-    /// <summary>When <see cref="Type"/> is <see cref="BlockType.TwoColumn"/>, the left and right column blocks (in order).</summary>
+    /// <summary>
+    /// Nested blocks: for <see cref="BlockType.TwoColumn"/>, two <see cref="ColumnGroup"/> entries (left, right);
+    /// each <see cref="ColumnGroup"/> holds that column&apos;s stack in <see cref="Children"/>.
+    /// </summary>
     public List<Block>? Children { get; set; }
 
     /// <summary>
