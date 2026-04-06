@@ -474,11 +474,15 @@ public partial class ImageBlockComponent : BlockComponentBase
             if (e.Key == Key.Up)
             {
                 if (!CaptionRichTextEditor.TryVerticalLogicalNavigation(shift, up: true))
-                    ViewModel?.RequestFocusPrevious();
+                {
+                    var px = CaptionRichTextEditor.TryGetCaretHorizontalOffsetForBlockNavigation(out var x) ? x : (double?)null;
+                    ViewModel?.RequestFocusPrevious(px);
+                }
             }
             else if (!CaptionRichTextEditor.TryVerticalLogicalNavigation(shift, up: false))
             {
-                ViewModel?.RequestFocusNext();
+                var px = CaptionRichTextEditor.TryGetCaretHorizontalOffsetForBlockNavigation(out var x) ? x : (double?)null;
+                ViewModel?.RequestFocusNext(px);
             }
 
             return;

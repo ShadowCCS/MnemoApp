@@ -128,8 +128,8 @@ public partial class EditableBlock : UserControl
         _markdownDetector.ShortcutDetected += OnMarkdownShortcutDetected;
     }
 
-    private void HandleRequestFocusPrevious() => _viewModel?.RequestFocusPrevious();
-    private void HandleRequestFocusNext() => _viewModel?.RequestFocusNext();
+    private void HandleRequestFocusPrevious(double? caretPixelX) => _viewModel?.RequestFocusPrevious(caretPixelX);
+    private void HandleRequestFocusNext(double? caretPixelX) => _viewModel?.RequestFocusNext(caretPixelX);
     private void HandleMergeWithPrevious() => _viewModel?.RequestMergeWithPrevious();
     private void HandleEnterPressed()
     {
@@ -583,7 +583,15 @@ public partial class EditableBlock : UserControl
                     // caret position — calling FocusTextBox() would snap the caret to the end.
                     var alreadyFocused = _focusManager?.GetFocusedTextBox() != null;
 
-                    if (_viewModel.PendingCaretIndex.HasValue)
+                    if (_viewModel.PendingCaretPixelX.HasValue)
+                    {
+                        var px = _viewModel.PendingCaretPixelX.Value;
+                        var lastLine = _viewModel.PendingCaretPlaceOnLastLine;
+                        _viewModel.PendingCaretPixelX = null;
+                        _viewModel.PendingCaretPlaceOnLastLine = false;
+                        _focusManager?.FocusTextBoxAtHorizontalOffset(px, lastLine);
+                    }
+                    else if (_viewModel.PendingCaretIndex.HasValue)
                     {
                         var caretIndex = _viewModel.PendingCaretIndex.Value;
                         _viewModel.PendingCaretIndex = null;

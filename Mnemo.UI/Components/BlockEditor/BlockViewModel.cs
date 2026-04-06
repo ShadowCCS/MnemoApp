@@ -256,6 +256,12 @@ public class BlockViewModel : INotifyPropertyChanged
         set { _pendingCaretIndex = value; OnPropertyChanged(); }
     }
 
+    /// <summary>When set with <see cref="PendingCaretPlaceOnLastLine"/>, positions the caret by horizontal pixel column (see <see cref="RichTextEditor.GetCaretIndexFromHorizontalOffset"/>).</summary>
+    public double? PendingCaretPixelX { get; set; }
+
+    /// <summary>True: Up into this block — use last visual line. False: Down into this block — first line.</summary>
+    public bool PendingCaretPlaceOnLastLine { get; set; }
+
     /// <summary>
     /// Set by EditableBlock just before NotifyContentChanged to carry the pre-edit text.
     /// Consumed and cleared by the history system. Not persisted.
@@ -356,8 +362,8 @@ public class BlockViewModel : INotifyPropertyChanged
     public event Action<BlockViewModel, BlockType, string?>? NewBlockOfTypeRequested;
     public event Action<BlockViewModel, string?>? NewBlockAboveRequested;
     public event Action<BlockViewModel>? DeleteAndFocusAboveRequested;
-    public event Action<BlockViewModel>? FocusPreviousRequested;
-    public event Action<BlockViewModel>? FocusNextRequested;
+    public event Action<BlockViewModel, double?>? FocusPreviousRequested;
+    public event Action<BlockViewModel, double?>? FocusNextRequested;
     public event Action<BlockViewModel>? MergeWithPreviousRequested;
     /// <summary>Empty line in a split column: new block below the split (like quote exit).</summary>
     public event Action<BlockViewModel, string?>? ExitSplitBelowRequested;
@@ -522,14 +528,14 @@ public class BlockViewModel : INotifyPropertyChanged
         DeleteAndFocusAboveRequested?.Invoke(this);
     }
 
-    public void RequestFocusPrevious()
+    public void RequestFocusPrevious(double? caretPixelX = null)
     {
-        FocusPreviousRequested?.Invoke(this);
+        FocusPreviousRequested?.Invoke(this, caretPixelX);
     }
 
-    public void RequestFocusNext()
+    public void RequestFocusNext(double? caretPixelX = null)
     {
-        FocusNextRequested?.Invoke(this);
+        FocusNextRequested?.Invoke(this, caretPixelX);
     }
 
     public void RequestMergeWithPrevious()

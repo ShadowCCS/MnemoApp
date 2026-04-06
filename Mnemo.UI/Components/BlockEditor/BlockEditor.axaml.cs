@@ -363,6 +363,29 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         Dispatcher.UIThread.Post(() => left.IsFocused = true, DispatcherPriority.Render);
     }
 
+    /// <summary>Appends an empty text block to a split column (tap below the column stack). Focuses the last cell if it is already empty.</summary>
+    internal void TryAddEmptyBlockInSplitColumn(TwoColumnBlockViewModel tc, bool leftColumn)
+    {
+        if (Blocks.IndexOf(tc) < 0) return;
+
+        var col = leftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+        if (col.Count > 0 && BlockEditorContentPolicy.IsVisuallyEmpty(col[^1].Content))
+        {
+            var last = col[^1];
+            last.PendingCaretIndex = 0;
+            Dispatcher.UIThread.Post(() => last.IsFocused = true, DispatcherPriority.Input);
+            return;
+        }
+
+        BeginStructuralChange();
+        var newBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
+        col.Add(newBlock);
+        ReorderBlocks();
+        CommitStructuralChange("New block in column");
+        newBlock.PendingCaretIndex = 0;
+        Dispatcher.UIThread.Post(() => newBlock.IsFocused = true, DispatcherPriority.Render);
+    }
+
     private void SubscribeToBlock(BlockViewModel block)
     {
         block.ContentChanged += OnBlockContentChanged;
@@ -1044,19 +1067,29 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         Dispatcher.UIThread.Post(() => newVm.IsFocused = true, DispatcherPriority.Input);
     }
 
-    private void OnFocusPreviousRequested(BlockViewModel block)
+    private void OnFocusPreviousRequested(BlockViewModel block, double? caretPixelX)
     {
         var prev = BlockHierarchy.FindPreviousInDocumentOrder(Blocks, block);
         if (prev == null) return;
         block.IsFocused = false;
+        if (caretPixelX.HasValue)
+        {
+            prev.PendingCaretPixelX = caretPixelX.Value;
+            prev.PendingCaretPlaceOnLastLine = true;
+        }
         Dispatcher.UIThread.Post(() => prev.IsFocused = true, DispatcherPriority.Input);
     }
 
-    private void OnFocusNextRequested(BlockViewModel block)
+    private void OnFocusNextRequested(BlockViewModel block, double? caretPixelX)
     {
         var next = BlockHierarchy.FindNextInDocumentOrder(Blocks, block);
         if (next == null) return;
         block.IsFocused = false;
+        if (caretPixelX.HasValue)
+        {
+            next.PendingCaretPixelX = caretPixelX.Value;
+            next.PendingCaretPlaceOnLastLine = false;
+        }
         Dispatcher.UIThread.Post(() => next.IsFocused = true, DispatcherPriority.Input);
     }
 
@@ -1402,6 +1435,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
              source.GetVisualAncestors().OfType<Border>().Any(b => Equals(b.Tag, "ColumnSplitHandle")));
         if (hitIsColumnSplitHandle) return;
 
+        // Tap strip below column stacks (adds a block in that column); must not arm box-select.
+        if (IsSplitColumnBottomTapBorder(source))
+            return;
+
         // Let native CheckBox handling run (checklist toggles) instead of capturing in editor tunnel.
         bool hitIsCheckBox = source is CheckBox || (source != null && source.GetVisualAncestors().Any(a => a is CheckBox));
         if (hitIsCheckBox) return;
@@ -1537,6 +1574,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 return true;
         }
         return false;
+    }
+
+    private static bool IsSplitColumnBottomTapBorder(Visual? source)
+    {
+        if (source == null) return false;
+        if (source is Border b0 && b0.Tag is string t0 && t0.StartsWith("SplitColumnBottom", StringComparison.Ordinal))
+            return true;
+        return source.GetVisualAncestors().OfType<Border>()
+            .Any(b => b.Tag is string t && t.StartsWith("SplitColumnBottom", StringComparison.Ordinal));
     }
 
     private List<BlockViewModel> GetDocumentOrderBlocks() =>
@@ -2344,6 +2390,34 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
     }
 
+    /// <summary>First index for inserting blocks after the focused cell: column stack after the cell, or top-level after the row.</summary>
+    private static int GetPasteSiblingInsertStartIndex(BlockViewModel focusedVm, int topInsert) =>
+        focusedVm.OwnerTwoColumn is TwoColumnBlockViewModel tc
+        && (focusedVm.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks) is { } col
+        && col.IndexOf(focusedVm) is >= 0 and var cellIdx
+            ? cellIdx + 1
+            : topInsert + 1;
+
+    /// <summary>Inserts a block after the focused cell in-document: into the split column when focused is in a column, otherwise into <see cref="Blocks"/>.</summary>
+    private void InsertPasteSiblingBlock(BlockViewModel focusedVm, ref int insertAt, BlockViewModel block)
+    {
+        if (focusedVm.OwnerTwoColumn is TwoColumnBlockViewModel tc)
+        {
+            var col = focusedVm.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
+            int ci = col.IndexOf(focusedVm);
+            if (ci >= 0)
+            {
+                col.Insert(insertAt, block);
+                insertAt++;
+                return;
+            }
+        }
+
+        Blocks.Insert(insertAt, block);
+        block.Order = insertAt;
+        insertAt++;
+    }
+
     private async Task TryPasteFromClipboardAsync(bool replaceBlockSelection)
     {
         try
@@ -2434,7 +2508,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                         var tailBlock = BlockFactory.CreateBlock(BlockType.Text, topInsert + 1);
                                         tailBlock.Content = textAfter;
                                         SubscribeToBlock(tailBlock);
-                                        Blocks.Insert(topInsert + 1, tailBlock);
+                                        int insertAtTail = GetPasteSiblingInsertStartIndex(focusedVm, topInsert);
+                                        InsertPasteSiblingBlock(focusedVm, ref insertAtTail, tailBlock);
                                         ReorderBlocks();
                                     }
                                     ClearBlockSelection();
@@ -2443,7 +2518,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                     return;
                                 }
 
-                                int insertAtCode = topInsert + 1;
+                                int insertAtCode = GetPasteSiblingInsertStartIndex(focusedVm, topInsert);
                                 for (int i = 1; i < pasted.Length; i++)
                                 {
                                     var block = pasted[i];
@@ -2451,9 +2526,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                         (i == pasted.Length - 1 ? textAfter : string.Empty);
                                     block.Content = blockContent;
                                     SubscribeToBlock(block);
-                                    Blocks.Insert(insertAtCode, block);
-                                    block.Order = insertAtCode;
-                                    insertAtCode++;
+                                    InsertPasteSiblingBlock(focusedVm, ref insertAtCode, block);
                                 }
                                 ReorderBlocks();
                                 ClearBlockSelection();
@@ -2493,7 +2566,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                     var tailBlockRich = BlockFactory.CreateBlock(BlockType.Text, topInsert + 1);
                                     tailBlockRich.SetRuns(tailRuns);
                                     SubscribeToBlock(tailBlockRich);
-                                    Blocks.Insert(topInsert + 1, tailBlockRich);
+                                    int insertAtTailRich = GetPasteSiblingInsertStartIndex(focusedVm, topInsert);
+                                    InsertPasteSiblingBlock(focusedVm, ref insertAtTailRich, tailBlockRich);
                                     ReorderBlocks();
                                 }
                                 ClearBlockSelection();
@@ -2502,7 +2576,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                 return;
                             }
 
-                            int insertAtRich = topInsert + 1;
+                            int insertAtRich = GetPasteSiblingInsertStartIndex(focusedVm, topInsert);
                             for (int i = 1; i < pasted.Length; i++)
                             {
                                 var block = pasted[i];
@@ -2513,9 +2587,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                     block.SetRuns(mergedLast);
                                 }
                                 SubscribeToBlock(block);
-                                Blocks.Insert(insertAtRich, block);
-                                block.Order = insertAtRich;
-                                insertAtRich++;
+                                InsertPasteSiblingBlock(focusedVm, ref insertAtRich, block);
                             }
                             ReorderBlocks();
                             ClearBlockSelection();

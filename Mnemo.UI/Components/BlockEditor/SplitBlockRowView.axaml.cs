@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.VisualTree;
 
@@ -89,6 +90,20 @@ public partial class SplitBlockRowView : UserControl
         e.Pointer.Capture(null);
         RefreshSplitterGripOpacity();
         this.GetVisualAncestors().OfType<BlockEditor>().FirstOrDefault()?.CommitColumnSplitResize();
+    }
+
+    private void ColumnBottomLeft_Tapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is not SplitBlockRowViewModel row) return;
+        this.GetVisualAncestors().OfType<BlockEditor>().FirstOrDefault()?.TryAddEmptyBlockInSplitColumn(row.TwoColumn, leftColumn: true);
+        e.Handled = true;
+    }
+
+    private void ColumnBottomRight_Tapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is not SplitBlockRowViewModel row) return;
+        this.GetVisualAncestors().OfType<BlockEditor>().FirstOrDefault()?.TryAddEmptyBlockInSplitColumn(row.TwoColumn, leftColumn: false);
+        e.Handled = true;
     }
 
     protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)

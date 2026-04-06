@@ -946,6 +946,71 @@ public class RichTextEditor : Control
         return true;
     }
 
+    /// <summary>
+    /// Horizontal center of the caret in layout coordinates, for matching column when moving to another block.
+    /// </summary>
+    public bool TryGetCaretHorizontalOffsetForBlockNavigation(out double pixelX)
+    {
+        pixelX = 0;
+        EnsureLayoutForVerticalNavigation();
+        var layout = _textLayout;
+        if (layout == null)
+            return false;
+
+        if (TextLength == 0)
+        {
+            try
+            {
+                var r = layout.HitTestTextPosition(0);
+                pixelX = r.Width > 0.01 ? r.X + r.Width * 0.5 : r.X + 1;
+            }
+            catch
+            {
+                pixelX = 0;
+            }
+            return true;
+        }
+
+        var hitPos = Math.Clamp(_caretIndex, 0, TextLength);
+        try
+        {
+            var caretRect = layout.HitTestTextPosition(hitPos);
+            pixelX = caretRect.Width > 0.01
+                ? caretRect.X + caretRect.Width * 0.5
+                : caretRect.X + 1;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Places the caret on the first or last visual line at the given horizontal offset (same convention as
+    /// <see cref="TryGetCaretHorizontalOffsetForBlockNavigation"/>).
+    /// </summary>
+    public int GetCaretIndexFromHorizontalOffset(double pixelX, bool useFirstVisualLine)
+    {
+        EnsureLayoutForVerticalNavigation();
+        var layout = _textLayout;
+        if (layout == null)
+            return 0;
+
+        var lines = layout.TextLines;
+        if (lines.Count == 0)
+            return Math.Clamp(_caretIndex, 0, TextLength);
+
+        int lineIdx = useFirstVisualLine ? 0 : lines.Count - 1;
+        var targetTextLine = lines[lineIdx];
+        var yTop = GetAccumulatedLineTop(layout, lineIdx);
+        var probeY = yTop + targetTextLine.Height * 0.5;
+        var maxX = Math.Max(targetTextLine.WidthIncludingTrailingWhitespace, 1);
+        var probeX = Math.Clamp(pixelX, 0, maxX);
+        var idx = HitTestLayoutAt(layout, new Point(probeX, probeY));
+        return Math.Clamp(idx, 0, TextLength);
+    }
+
     private void EnsureLayoutForVerticalNavigation()
     {
         var w = Bounds.Width > 0 && !double.IsNaN(Bounds.Width)

@@ -11,8 +11,9 @@ public class KeyboardHandler
     public bool WasBackspace => _lastKey == Key.Back;
 
     public event Action? BackspaceOnEmpty;
-    public event Action? RequestFocusPrevious;
-    public event Action? RequestFocusNext;
+    /// <summary>Nullable horizontal offset in source <see cref="RichTextEditor"/> layout space; null if unknown.</summary>
+    public event Action<double?>? RequestFocusPrevious;
+    public event Action<double?>? RequestFocusNext;
 #pragma warning disable CS0067
     public event Action? RequestNewBlock;
 #pragma warning restore CS0067
@@ -68,10 +69,11 @@ public class KeyboardHandler
         e.Handled = true;
         if (!editor.TryVerticalLogicalNavigation(shift, up))
         {
+            double? px = editor.TryGetCaretHorizontalOffsetForBlockNavigation(out var x) ? x : null;
             if (up)
-                RequestFocusPrevious?.Invoke();
+                RequestFocusPrevious?.Invoke(px);
             else
-                RequestFocusNext?.Invoke();
+                RequestFocusNext?.Invoke(px);
         }
     }
 

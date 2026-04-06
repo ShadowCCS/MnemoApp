@@ -78,6 +78,34 @@ public class FocusManager
     public void FocusTextBoxAtStart() => FocusTextBox(0);
     public void FocusTextBoxAtEnd() => FocusTextBox(null);
 
+    /// <summary>Focuses the editor and sets the caret from a horizontal column carried from another block (first or last visual line).</summary>
+    public void FocusTextBoxAtHorizontalOffset(double pixelX, bool placeOnLastVisualLine)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            void Apply()
+            {
+                var imageCaption = FindImageCaptionEditor();
+                var editor = FindFocusableEditor(excludeImageCaption: imageCaption != null);
+                if (editor == null)
+                {
+                    var imageHost = FindImageBlockHoverHost();
+                    if (imageHost != null && !ShouldSkipImageHoverHostFocus(imageHost))
+                        imageHost.Focus();
+                    else
+                        Dispatcher.UIThread.Post(Apply, DispatcherPriority.Loaded);
+                    return;
+                }
+
+                bool useFirstLine = !placeOnLastVisualLine;
+                int idx = editor.GetCaretIndexFromHorizontalOffset(pixelX, useFirstLine);
+                ApplyFocus(editor, idx);
+            }
+
+            Apply();
+        }, DispatcherPriority.Input);
+    }
+
     /// <summary>Returns the currently focused <see cref="RichTextEditor"/>, or null.</summary>
     public RichTextEditor? GetFocusedTextBox()
     {
