@@ -31,6 +31,13 @@ public class RichTextEditor : Control
     public static readonly StyledProperty<string?> WatermarkProperty =
         AvaloniaProperty.Register<RichTextEditor, string?>(nameof(Watermark));
 
+    /// <summary>
+    /// When true, empty text + non-null <see cref="Watermark"/> is drawn without requiring pointer-over or focus on this control
+    /// (e.g. image captions: parent sets Watermark while the pointer is over the image).
+    /// </summary>
+    public static readonly StyledProperty<bool> ShowInactiveWatermarkProperty =
+        AvaloniaProperty.Register<RichTextEditor, bool>(nameof(ShowInactiveWatermark), defaultValue: false);
+
     public static readonly StyledProperty<double> FontSizeProperty =
         AvaloniaProperty.Register<RichTextEditor, double>(nameof(FontSize), defaultValue: 16.0);
 
@@ -101,6 +108,12 @@ public class RichTextEditor : Control
     {
         get => GetValue(WatermarkProperty);
         set => SetValue(WatermarkProperty, value);
+    }
+
+    public bool ShowInactiveWatermark
+    {
+        get => GetValue(ShowInactiveWatermarkProperty);
+        set => SetValue(ShowInactiveWatermarkProperty, value);
     }
 
     public double FontSize
@@ -188,6 +201,7 @@ public class RichTextEditor : Control
         FontWeightProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
         ForegroundProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
         WatermarkProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
+        ShowInactiveWatermarkProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateVisual());
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -365,6 +379,11 @@ public class RichTextEditor : Control
         _lastLayoutWidth = 0;
     }
 
+    private bool ShouldDrawWatermark() =>
+        string.IsNullOrEmpty(Text)
+        && _watermarkLayout != null
+        && (IsFocused || IsPointerOver || ShowInactiveWatermark);
+
     private static IBrush GetThemeForeground()
     {
         if (Application.Current == null)
@@ -439,8 +458,8 @@ public class RichTextEditor : Control
         {
             _textLayout.Draw(context, origin);
             // Do not trust VM-only focus: several blocks can briefly (or stuck) have IsFocused while only
-            // one RichTextEditor has keyboard focus. Image captions also show watermark on pointer-hover without focus.
-            if (string.IsNullOrEmpty(Text) && _watermarkLayout != null && (IsFocused || IsPointerOver))
+            // one RichTextEditor has keyboard focus. Image captions: parent toggles Watermark while hovering the image.
+            if (ShouldDrawWatermark() && _watermarkLayout != null)
                 _watermarkLayout.Draw(context, origin);
         }
 
@@ -478,7 +497,7 @@ public class RichTextEditor : Control
             }
         }
 
-        if (_watermarkLayout != null && string.IsNullOrEmpty(currentText) && (IsFocused || IsPointerOver))
+        if (ShouldDrawWatermark() && _watermarkLayout != null)
         {
             try
             {

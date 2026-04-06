@@ -370,6 +370,7 @@
                     <editor:RichTextEditor
                         x:Name="CaptionRichTextEditor"
                         Tag="BlockEditorImageCaption"
+                        ShowInactiveWatermark="True"
                         HorizontalAlignment="Stretch"
                         FontSize="12"
                         Opacity="0.6" />

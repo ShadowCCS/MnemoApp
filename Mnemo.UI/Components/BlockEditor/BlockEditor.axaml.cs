@@ -10,6 +10,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -943,6 +944,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 ClearBlockSelection();
                 ClearTextSelectionInAllBlocksExcept(-1);
+                if (TryFindImageCaptionRichEditor(source, out var captionRte))
+                {
+                    var idx = captionRte.HitTestPoint(e.GetPosition(captionRte));
+                    vm.PendingCaretIndex = Math.Clamp(idx, 0, captionRte.TextLength);
+                }
                 vm.IsFocused = true;
                 return;
             }
@@ -1015,6 +1021,23 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         ClearBlockSelection();
         ClearTextSelectionInAllBlocksExcept(-1);
         e.Pointer.Capture(this);
+    }
+
+    private static bool TryFindImageCaptionRichEditor(Visual? source, [NotNullWhen(true)] out RichTextEditor? captionRte)
+    {
+        captionRte = null;
+        if (source == null) return false;
+        if (source is RichTextEditor r0 && r0.Tag is string t0 && t0 == "BlockEditorImageCaption")
+        {
+            captionRte = r0;
+            return true;
+        }
+
+        var r1 = source.GetVisualAncestors().OfType<RichTextEditor>()
+            .FirstOrDefault(x => x.Tag is string tag && tag == "BlockEditorImageCaption");
+        if (r1 == null) return false;
+        captionRte = r1;
+        return true;
     }
 
     /// <summary>
