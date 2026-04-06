@@ -9,7 +9,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Status](https://img.shields.io/badge/status-In_Development-blue.svg)](https://github.com/ShadowCCS/mnemoapp)
-![Framework](https://img.shields.io/badge/framework-.NET%209.0-purple.svg)
+![Framework](https://img.shields.io/badge/framework-.NET%2010.0-purple.svg)
 ![UI](https://img.shields.io/badge/UI-Avalonia%2011-orange.svg)
 
 > <div align="center">Free. Open-source. Cross-platform. A next-generation study application built for learners, by learners.</div>
