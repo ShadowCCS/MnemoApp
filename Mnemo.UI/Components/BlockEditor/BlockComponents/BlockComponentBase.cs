@@ -79,7 +79,7 @@ public abstract class BlockComponentBase : UserControl
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(BlockViewModel.Runs) or nameof(BlockViewModel.Content))
+        if (e.PropertyName is nameof(BlockViewModel.Spans) or nameof(BlockViewModel.Content))
             SyncFromViewModel();
     }
 
@@ -87,7 +87,7 @@ public abstract class BlockComponentBase : UserControl
     {
         if (_editor == null || ViewModel == null || _suppressSync) return;
         _suppressSync = true;
-        _editor.Runs = ViewModel.Runs;
+        _editor.Spans = ViewModel.Spans;
         _suppressSync = false;
     }
 
@@ -150,7 +150,7 @@ public abstract class BlockComponentBase : UserControl
     {
         if (_editor == null || ViewModel == null || _suppressSync) return;
         _suppressSync = true;
-        ViewModel.CommitRunsFromEditor(_editor.Runs);
+        ViewModel.CommitSpansFromEditor(_editor.Spans);
         _suppressSync = false;
         // Commit may normalize or auto-link; sync VM → editor after suppress ends.
         SyncFromViewModel();

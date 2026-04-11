@@ -80,7 +80,7 @@ public static class WelcomeNoteFirstRunSeed
                 ApplyWelcomeImagePath(note.Blocks, destImagePath);
 
             foreach (var b in EnumerateBlocks(note.Blocks))
-                b.EnsureInlineRuns();
+                b.EnsureSpans();
 
             var save = await noteService.SaveNoteAsync(note).ConfigureAwait(false);
             if (!save.IsSuccess)
@@ -112,7 +112,9 @@ public static class WelcomeNoteFirstRunSeed
         {
             if (b.Type != BlockType.Image || b.Id != WelcomeImageBlockId)
                 continue;
-            b.Meta["imagePath"] = absolutePath;
+            b.Payload = b.Payload is ImagePayload ip
+                ? ip with { Path = absolutePath }
+                : new ImagePayload(Path: absolutePath);
             break;
         }
     }

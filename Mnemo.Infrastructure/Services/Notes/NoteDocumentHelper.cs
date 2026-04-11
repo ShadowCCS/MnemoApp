@@ -14,7 +14,7 @@ internal static class NoteDocumentHelper
         if (note.Blocks is { Count: > 0 })
         {
             foreach (var b in note.Blocks)
-                b.EnsureInlineRuns();
+                b.EnsureSpans();
             return string.Join("\n\n", note.Blocks.OrderBy(b => b.Order).Select(b => b.Content));
         }
 
@@ -48,7 +48,7 @@ internal static class NoteDocumentHelper
                 {
                     Id = Guid.NewGuid().ToString(),
                     Type = BlockType.Text,
-                    Content = raw,
+                    Spans = new List<InlineSpan> { InlineSpan.Plain(raw) },
                     Order = 0
                 }
             ];
@@ -69,7 +69,7 @@ internal static class NoteDocumentHelper
 
     public static object BlockToDto(Block b)
     {
-        b.EnsureInlineRuns();
+        b.EnsureSpans();
         return new
         {
             block_id = b.Id,

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Models.Clipboard;
@@ -27,23 +26,10 @@ public static class NoteClipboardMapper
         int order = firstOrder;
         foreach (var dto in document.Blocks)
         {
-            if (dto.Type == BlockType.TwoColumn && dto.Children is { Count: >= 2 }
-                && dto.Children[0].Type == BlockType.ColumnGroup && dto.Children[1].Type == BlockType.ColumnGroup)
-            {
-                list.Add(BuildViewModelFromDto(dto, order));
-                order += 1;
-                continue;
-            }
-
             if (dto.Type == BlockType.TwoColumn && dto.Children is { Count: >= 2 })
             {
-                var left = BuildViewModelFromDto(dto.Children[0], order);
-                var right = BuildViewModelFromDto(dto.Children[1], order + 1);
-                ColumnPairHelper.WirePair(left, right, Guid.NewGuid().ToString(),
-                    dto.ColumnSplitRatio is > 0 and < 1 ? dto.ColumnSplitRatio.Value : 0.5);
-                list.Add(left);
-                list.Add(right);
-                order += 2;
+                list.Add(BuildViewModelFromDto(dto, order));
+                order++;
                 continue;
             }
 
@@ -57,9 +43,7 @@ public static class NoteClipboardMapper
     {
         if (vm is TwoColumnBlockViewModel tc)
         {
-            double ratio = 0.5;
-            if (tc.Meta.TryGetValue("columnSplitRatio", out var r) && r is double d && d > 0 && d < 1)
-                ratio = d;
+            var ratio = tc.ColumnSplitRatio;
             return new NoteClipboardBlockDto
             {
                 Type = BlockType.TwoColumn,
@@ -85,32 +69,25 @@ public static class NoteClipboardMapper
         var dto = new NoteClipboardBlockDto
         {
             Type = vm.Type,
-            Runs = vm.Runs.Select(ToRunDto).ToList(),
+            Runs = vm.Spans.Select(ToRunDto).ToList(),
             ListNumberIndex = vm.Type == BlockType.NumberedList ? vm.ListNumberIndex : null
         };
         if (vm.Type == BlockType.Checklist)
             dto.IsChecked = vm.IsChecked;
-        if (vm.Type == BlockType.Code &&
-            vm.Meta.TryGetValue("language", out var lang) &&
-            lang != null)
-            dto.CodeLanguage = lang.ToString();
+        if (vm.Type == BlockType.Code)
+            dto.CodeLanguage = vm.CodeLanguage;
+
+        if (vm.Type == BlockType.Equation)
+            dto.EquationLatex = vm.EquationLatex;
 
         if (vm.Type == BlockType.Image)
         {
-            dto.ImagePath = MetaString(vm, "imagePath");
-            dto.ImageAlt = MetaString(vm, "imageAlt");
-            if (vm.Meta.TryGetValue("imageWidth", out var w) && w != null)
-            {
-                dto.ImageWidth = w switch
-                {
-                    double d => d,
-                    System.Text.Json.JsonElement je when je.ValueKind == System.Text.Json.JsonValueKind.Number => je.GetDouble(),
-                    _ => double.TryParse(w.ToString(), out var p) ? p : null
-                };
-            }
-            var ia = MetaString(vm, "imageAlign");
-            if (!string.IsNullOrEmpty(ia))
-                dto.ImageAlign = ia;
+            dto.ImagePath = vm.ImagePath;
+            dto.ImageAlt = vm.Content;
+            if (vm.ImageWidth > 0)
+                dto.ImageWidth = vm.ImageWidth;
+            if (!string.IsNullOrEmpty(vm.ImageAlign) && vm.ImageAlign != "left")
+                dto.ImageAlign = vm.ImageAlign;
         }
 
         if (vm.Meta.TryGetValue(ColumnPairHelper.PairIdKey, out var pairId) && pairId != null)
@@ -124,63 +101,89 @@ public static class NoteClipboardMapper
         return dto;
     }
 
-    private static NoteClipboardRunDto ToRunDto(InlineRun run) =>
-        new()
+    private static NoteClipboardRunDto ToRunDto(InlineSpan span) => span switch
+    {
+        EquationSpan eq => new NoteClipboardRunDto
         {
-            Text = run.Text,
-            Bold = run.Style.Bold,
-            Italic = run.Style.Italic,
-            Underline = run.Style.Underline,
-            Strikethrough = run.Style.Strikethrough,
-            Code = run.Style.Code,
-            BackgroundColor = run.Style.BackgroundColor
-        };
+            Text = string.Empty,
+            Bold = eq.Style.Bold,
+            Italic = eq.Style.Italic,
+            Underline = eq.Style.Underline,
+            Strikethrough = eq.Style.Strikethrough,
+            Code = eq.Style.Code,
+            BackgroundColor = eq.Style.BackgroundColor,
+            EquationLatex = eq.Latex
+        },
+        TextSpan t => new NoteClipboardRunDto
+        {
+            Text = t.Text,
+            Bold = t.Style.Bold,
+            Italic = t.Style.Italic,
+            Underline = t.Style.Underline,
+            Strikethrough = t.Style.Strikethrough,
+            Code = t.Style.Code,
+            BackgroundColor = t.Style.BackgroundColor,
+            EquationLatex = null
+        },
+        _ => new NoteClipboardRunDto()
+    };
 
     private static BlockViewModel ToViewModel(NoteClipboardBlockDto dto, int order) =>
         BuildViewModelFromDto(dto, order);
 
     private static BlockViewModel BuildViewModelFromDto(NoteClipboardBlockDto dto, int order)
     {
-        if (dto.Type == BlockType.TwoColumn && dto.Children is { Count: >= 2 }
-            && dto.Children[0].Type == BlockType.ColumnGroup && dto.Children[1].Type == BlockType.ColumnGroup)
+        if (dto.Type == BlockType.TwoColumn && dto.Children is { Count: >= 2 })
         {
             var tc = new TwoColumnBlockViewModel(order);
             if (dto.ColumnSplitRatio is > 0 and < 1)
-                tc.Meta["columnSplitRatio"] = dto.ColumnSplitRatio.Value;
-            else
-                tc.Meta["columnSplitRatio"] = 0.5;
+                tc.ColumnSplitRatio = dto.ColumnSplitRatio.Value;
 
-            int o = order;
-            foreach (var ch in dto.Children[0].Children ?? new List<NoteClipboardBlockDto>())
+            var o = order;
+            void IngestSide(NoteClipboardBlockDto side, bool left)
             {
-                var childVm = BuildViewModelFromDto(ch, o++);
-                BlockHierarchy.WireChildOwnership(tc, childVm, true);
-                tc.LeftColumnBlocks.Add(childVm);
+                if (side.Type == BlockType.ColumnGroup && side.Children is { Count: > 0 })
+                {
+                    foreach (var ch in side.Children!)
+                    {
+                        var childVm = BuildViewModelFromDto(ch, o++);
+                        BlockHierarchy.WireChildOwnership(tc, childVm, left);
+                        (left ? tc.LeftColumnBlocks : tc.RightColumnBlocks).Add(childVm);
+                    }
+                }
+                else
+                {
+                    var childVm = BuildViewModelFromDto(side, o++);
+                    BlockHierarchy.WireChildOwnership(tc, childVm, left);
+                    (left ? tc.LeftColumnBlocks : tc.RightColumnBlocks).Add(childVm);
+                }
             }
-            foreach (var ch in dto.Children[1].Children ?? new List<NoteClipboardBlockDto>())
-            {
-                var childVm = BuildViewModelFromDto(ch, o++);
-                BlockHierarchy.WireChildOwnership(tc, childVm, false);
-                tc.RightColumnBlocks.Add(childVm);
-            }
+
+            IngestSide(dto.Children[0], true);
+            IngestSide(dto.Children[1], false);
             if (tc.LeftColumnBlocks.Count == 0)
             {
                 var ph = BlockFactory.CreateBlock(BlockType.Text, o++);
                 BlockHierarchy.WireChildOwnership(tc, ph, true);
                 tc.LeftColumnBlocks.Add(ph);
             }
+
             if (tc.RightColumnBlocks.Count == 0)
             {
                 var ph = BlockFactory.CreateBlock(BlockType.Text, o++);
                 BlockHierarchy.WireChildOwnership(tc, ph, false);
                 tc.RightColumnBlocks.Add(ph);
             }
+
             return tc;
         }
 
         var vm = BlockFactory.CreateBlock(dto.Type, order);
         if (!string.IsNullOrEmpty(dto.CodeLanguage))
-            vm.Meta["language"] = dto.CodeLanguage;
+            vm.CodeLanguage = dto.CodeLanguage;
+
+        if (dto.Type == BlockType.Equation && !string.IsNullOrEmpty(dto.EquationLatex))
+            vm.EquationLatex = dto.EquationLatex;
 
         if (dto.Type == BlockType.Checklist && dto.IsChecked.HasValue)
             vm.IsChecked = dto.IsChecked.Value;
@@ -190,25 +193,24 @@ public static class NoteClipboardMapper
 
         if (dto.Type == BlockType.Image)
         {
-            vm.Meta["imagePath"] = dto.ImagePath ?? string.Empty;
-            vm.Meta["imageWidth"] = dto.ImageWidth is > 0 ? dto.ImageWidth.Value : 0.0;
-            if (!string.IsNullOrEmpty(dto.ImageAlign))
-                vm.Meta["imageAlign"] = dto.ImageAlign;
+            vm.ImagePath = dto.ImagePath ?? string.Empty;
+            vm.ImageWidth = dto.ImageWidth is > 0 ? dto.ImageWidth.Value : 0;
+            vm.ImageAlign = string.IsNullOrEmpty(dto.ImageAlign) ? "left" : dto.ImageAlign;
             var alt = dto.ImageAlt ?? string.Empty;
-            vm.SetRuns(new List<InlineRun> { InlineRun.Plain(alt) });
+            vm.SetSpans(new List<InlineSpan> { InlineSpan.Plain(alt) });
             ApplyColumnClipboardMeta(vm, dto);
             return vm;
         }
 
         if (dto.Runs is { Count: > 0 })
         {
-            var runs = dto.Runs.Select(FromRunDto).ToList();
-            vm.SetRuns(InlineRunFormatApplier.Normalize(runs));
+            var spans = dto.Runs.Select(FromRunDto).ToList();
+            vm.SetSpans(InlineSpanFormatApplier.Normalize(spans));
         }
         else if (!string.IsNullOrEmpty(dto.Content))
-            vm.SetRuns(InlineMarkdownParser.ToRuns(dto.Content));
+            vm.SetSpans(InlineMarkdownParser.ToSpans(dto.Content));
         else
-            vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+            vm.SetSpans(new List<InlineSpan> { InlineSpan.Plain(string.Empty) });
 
         ApplyColumnClipboardMeta(vm, dto);
         return vm;
@@ -224,23 +226,17 @@ public static class NoteClipboardMapper
             vm.Meta["columnSplitRatio"] = dto.ColumnSplitRatio.Value;
     }
 
-    private static string MetaString(BlockViewModel vm, string key)
+    private static InlineSpan FromRunDto(NoteClipboardRunDto dto)
     {
-        if (!vm.Meta.TryGetValue(key, out var val) || val == null) return string.Empty;
-        if (val is string s) return s;
-        if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
-        return val.ToString() ?? string.Empty;
-    }
-
-    private static InlineRun FromRunDto(NoteClipboardRunDto dto)
-    {
-        var style = new InlineStyle(
+        var style = new TextStyle(
             Bold: dto.Bold,
             Italic: dto.Italic,
             Underline: dto.Underline,
             Strikethrough: dto.Strikethrough,
             Code: dto.Code,
             BackgroundColor: dto.BackgroundColor);
-        return new InlineRun(dto.Text ?? string.Empty, style);
+        if (!string.IsNullOrEmpty(dto.EquationLatex))
+            return new EquationSpan(dto.EquationLatex, style);
+        return new TextSpan(dto.Text ?? string.Empty, style);
     }
 }

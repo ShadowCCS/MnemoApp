@@ -26,6 +26,9 @@ public partial class InlineFormattingToolbar : UserControl
     /// <summary>Raised when a background color is selected from the color dropdown.</summary>
     public event Action<string>? BackgroundColorRequested;
 
+    /// <summary>Raised when the equation button is clicked (converts selection to inline equation).</summary>
+    public event Action? EquationRequested;
+
     private const string ActiveClass = "FormattingToolbarIconActive";
 
     /// <summary>Headings use forced bold; the Bold control is non-interactive while this is false.</summary>
@@ -127,6 +130,9 @@ public partial class InlineFormattingToolbar : UserControl
         if (this.FindControl<Button>("UnlinkButton") is { } linkBtn)
             ToolTip.SetTip(linkBtn, T("LinkTooltip"));
 
+        if (this.FindControl<Button>("EquationButton") is { } eqBtn)
+            ToolTip.SetTip(eqBtn, T("EquationTooltip"));
+
         Loaded -= OnLoaded;
     }
 
@@ -201,6 +207,7 @@ public partial class InlineFormattingToolbar : UserControl
     private void OnUnlinkClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Link);
     private void OnStrikethroughClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Strikethrough);
     private void OnHighlightClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Highlight);
+    private void OnEquationClick(object? sender, RoutedEventArgs e) => EquationRequested?.Invoke();
     private void OnSubscriptClick(object? sender, RoutedEventArgs e) { }
     private void OnSuperscriptClick(object? sender, RoutedEventArgs e) { }
 

@@ -13,6 +13,7 @@ using Mnemo.UI.Components.BlockEditor.BlockComponents.BulletList;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.NumberedList;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Checklist;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Image;
+using Mnemo.UI.Components.BlockEditor.BlockComponents.Equation;
 using System;
 using System.Globalization;
 
@@ -38,6 +39,7 @@ public class BlockTypeToComponentConverter : IValueConverter
             BlockType.NumberedList => new NumberedListBlockComponent(),
             BlockType.Checklist => new ChecklistBlockComponent(),
             BlockType.Image => new ImageBlockComponent(),
+            BlockType.Equation => new EquationBlockComponent(),
             _ => new TextBlockComponent()
         };
     }

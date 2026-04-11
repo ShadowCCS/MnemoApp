@@ -91,14 +91,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     // Text-edit batching (300ms idle flush)
     private DispatcherTimer? _typingBatchTimer;
     private string? _typingBatchBlockId;
-    private List<InlineRun>? _typingBatchRunsBefore;
+    private List<InlineSpan>? _typingBatchRunsBefore;
     private CaretState? _typingBatchCaretBefore;
     private const int TypingBatchIdleMs = 300;
-
-    /// <summary>
-    /// While true, <see cref="UnsubscribeFromBlock"/> does not delete app-local image files (e.g. full document reload).
-    /// </summary>
-    private bool _skipImageDeletionOnUnsubscribe;
 
     /// <summary>
     /// Set by the owning view to enable document-wide undo/redo.
@@ -247,16 +242,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _history?.Clear();
 
         // Unsubscribe from old blocks (do not delete image assets — they may still belong to the note on disk)
-        _skipImageDeletionOnUnsubscribe = true;
-        try
-        {
-            foreach (var block in Blocks)
-                UnsubscribeFromBlock(block);
-        }
-        finally
-        {
-            _skipImageDeletionOnUnsubscribe = false;
-        }
+        foreach (var block in Blocks)
+            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: false);
 
         // Create new collection to ensure proper UI notification
         var newBlocks = new ObservableCollection<BlockViewModel>();
@@ -359,7 +346,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         BeginStructuralChange();
 
-        UnsubscribeFromBlock(block);
+        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
         Blocks.RemoveAt(index);
 
         var tc = (TwoColumnBlockViewModel)BlockFactory.CreateBlock(BlockType.TwoColumn, block.Order);
@@ -395,6 +382,59 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         CommitStructuralChange("New block in column");
         newBlock.PendingCaretIndex = 0;
         Dispatcher.UIThread.Post(() => newBlock.IsFocused = true, DispatcherPriority.Render);
+    }
+
+    /// <summary>
+    /// Splits a text block at [start, end) into [before][equation][after] blocks.
+    /// The selected text becomes the LaTeX source for the new equation block.
+    /// </summary>
+    public void SplitBlockIntoEquation(BlockViewModel block, int selStart, int selEnd)
+    {
+        var index = Blocks.IndexOf(block);
+        if (index < 0) return;
+
+        var runs = block.Spans;
+        var selectedText = Core.Formatting.InlineSpanFormatApplier.Flatten(
+            Core.Formatting.InlineSpanFormatApplier.SliceRuns(runs, selStart, selEnd));
+        var latex = Core.Formatting.EquationLatexNormalizer.Normalize(selectedText);
+
+        var beforeRuns = Core.Formatting.InlineSpanFormatApplier.SliceRuns(runs, 0, selStart);
+        var afterRuns = Core.Formatting.InlineSpanFormatApplier.SliceRuns(runs, selEnd,
+            Core.Formatting.InlineSpanFormatApplier.Flatten(runs).Length);
+
+        BeginStructuralChange();
+
+        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+        Blocks.RemoveAt(index);
+
+        int insertAt = index;
+
+        if (beforeRuns.Count > 0 && !string.IsNullOrEmpty(Core.Formatting.InlineSpanFormatApplier.Flatten(beforeRuns)))
+        {
+            var beforeVm = BlockFactory.CreateBlock(block.Type, 0);
+            beforeVm.CommitSpansFromEditor(beforeRuns);
+            SubscribeToBlock(beforeVm);
+            Blocks.Insert(insertAt++, beforeVm);
+        }
+
+        var eqVm = BlockFactory.CreateBlock(BlockType.Equation, 0);
+        eqVm.EquationLatex = latex;
+        SubscribeToBlock(eqVm);
+        Blocks.Insert(insertAt++, eqVm);
+
+        if (afterRuns.Count > 0 && !string.IsNullOrEmpty(Core.Formatting.InlineSpanFormatApplier.Flatten(afterRuns)))
+        {
+            var afterVm = BlockFactory.CreateBlock(block.Type, 0);
+            afterVm.CommitSpansFromEditor(afterRuns);
+            SubscribeToBlock(afterVm);
+            Blocks.Insert(insertAt++, afterVm);
+        }
+
+        ReorderBlocks();
+        CommitStructuralChange("Split to equation");
+        NotifyBlocksChanged();
+
+        Dispatcher.UIThread.Post(() => eqVm.IsFocused = true, DispatcherPriority.Render);
     }
 
     private void SubscribeToBlock(BlockViewModel block)
@@ -441,15 +481,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (e.OldItems != null)
         {
             foreach (BlockViewModel o in e.OldItems)
-                UnsubscribeFromBlock(o);
+                UnsubscribeFromBlock(o, removeStoredImageIfOrphan: false);
         }
         UpdateListNumbers();
         NotifyBlocksChanged();
     }
 
-    private void UnsubscribeFromBlock(BlockViewModel block)
+    /// <param name="removeStoredImageIfOrphan">
+    /// True when the block is permanently removed from the document (delete, merge, paste replace, etc.).
+    /// False when detaching for reorder, column moves, undo/redo restore, or reparenting — the same block (or its image path) may still be in use.
+    /// </param>
+    private void UnsubscribeFromBlock(BlockViewModel block, bool removeStoredImageIfOrphan = false)
     {
-        QueueDeleteOrphanImageForRemovedBlock(block);
+        if (removeStoredImageIfOrphan)
+            QueueDeleteOrphanImageForRemovedBlock(block);
         block.ContentChanged -= OnBlockContentChanged;
         block.PropertyChanged -= OnBlockPropertyChanged;
         block.DeleteRequested -= OnBlockDeleteRequested;
@@ -467,9 +512,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             tc.ColumnChildrenChanged -= OnTwoColumnColumnChildrenChanged;
             foreach (var c in tc.LeftColumnBlocks.ToList())
-                UnsubscribeFromBlock(c);
+                UnsubscribeFromBlock(c, removeStoredImageIfOrphan);
             foreach (var c in tc.RightColumnBlocks.ToList())
-                UnsubscribeFromBlock(c);
+                UnsubscribeFromBlock(c, removeStoredImageIfOrphan);
         }
     }
 
@@ -540,9 +585,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         ClearBlockSelection();
         var prev = block.PreviousContent;
-        var prevRuns = block.PreviousRuns;
+        var prevRuns = block.PreviousSpans;
         block.PreviousContent = null;
-        block.PreviousRuns = null;
+        block.PreviousSpans = null;
 
         if (!_isRestoringFromHistory && _pendingSnapshot == null)
         {
@@ -588,7 +633,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
             col.Remove(block);
             BlockHierarchy.ClearChildOwnership(block);
-            UnsubscribeFromBlock(block);
+            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
             if (col.Count == 0)
             {
                 var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
@@ -599,7 +644,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         else
         {
-            UnsubscribeFromBlock(block);
+            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
             Blocks.Remove(block);
         }
 
@@ -632,7 +677,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             col.Remove(block);
             BlockHierarchy.ClearChildOwnership(block);
-            UnsubscribeFromBlock(block);
+            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
             if (col.Count == 0)
             {
                 var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
@@ -668,7 +713,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var topIdx = Blocks.IndexOf(tc);
                 if (topIdx < 0) return;
-                UnsubscribeFromBlock(tc);
+                UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
                 Blocks.RemoveAt(topIdx);
                 var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
                 SubscribeToBlock(placeholder);
@@ -694,7 +739,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var topIdx = Blocks.IndexOf(tc);
                 if (topIdx < 0) return;
-                UnsubscribeFromBlock(tc);
+                UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
                 Blocks.RemoveAt(topIdx);
                 var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
                 SubscribeToBlock(placeholder);
@@ -735,7 +780,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        UnsubscribeFromBlock(block);
+        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
         Blocks.Remove(block);
 
         var targetIndex = index > 0 ? index - 1 : 0;
@@ -808,17 +853,17 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var promoted = filledCol.ToList();
         foreach (var b in emptyCol.ToList())
         {
-            UnsubscribeFromBlock(b);
+            UnsubscribeFromBlock(b, removeStoredImageIfOrphan: true);
             emptyCol.Remove(b);
         }
         foreach (var b in promoted)
         {
-            UnsubscribeFromBlock(b);
+            UnsubscribeFromBlock(b, removeStoredImageIfOrphan: false);
             filledCol.Remove(b);
             BlockHierarchy.ClearChildOwnership(b);
         }
 
-        UnsubscribeFromBlock(tc);
+        UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: false);
         Blocks.RemoveAt(topIdx);
 
         int insertAt = topIdx;
@@ -842,7 +887,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var ci = col.IndexOf(block);
         if (ci < 0) return false;
 
-        UnsubscribeFromBlock(block);
+        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
         col.RemoveAt(ci);
         BlockHierarchy.ClearChildOwnership(block);
 
@@ -883,7 +928,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         var topIdx = Blocks.IndexOf(tc);
         if (topIdx < 0) return;
-        UnsubscribeFromBlock(tc);
+        UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
         Blocks.RemoveAt(topIdx);
         var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
         SubscribeToBlock(placeholder);
@@ -1053,7 +1098,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var svc = ResolveImageAssetService();
         if (svc == null) return;
 
-        var srcPath = GetBlockMetaString(block, "imagePath");
+        var srcPath = block.ImagePath;
         if (string.IsNullOrEmpty(srcPath) || !File.Exists(srcPath)) return;
 
         var index = Blocks.IndexOf(block);
@@ -1065,11 +1110,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         BeginStructuralChange();
 
-        newVm.Meta["imagePath"] = result.Value;
-        newVm.Meta["imageWidth"] = GetBlockMetaDouble(block, "imageWidth");
-        var imageAlign = GetBlockMetaString(block, "imageAlign");
-        newVm.Meta["imageAlign"] = string.IsNullOrEmpty(imageAlign) ? "left" : imageAlign;
-        newVm.SetRuns(new List<InlineRun> { InlineRun.Plain(GetBlockMetaString(block, "imageAlt")) });
+        newVm.ImagePath = result.Value;
+        newVm.ImageWidth = block.ImageWidth;
+        newVm.ImageAlign = string.IsNullOrEmpty(block.ImageAlign) ? "left" : block.ImageAlign;
+        newVm.SetSpans(new List<InlineSpan>(block.Spans));
 
         SubscribeToBlock(newVm);
         Blocks.Insert(index + 1, newVm);
@@ -1846,9 +1890,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         or BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist
         or BlockType.Quote;
 
-    /// <summary>Image/Divider blocks have no inline runs — merging them into a Text block drops the payload.</summary>
+    /// <summary>Image/Divider/Equation blocks have no inline runs — merging them into a Text block drops the payload.</summary>
     private static bool PasteFirstBlockRequiresBlockInsert(BlockViewModel[] pasted) =>
-        pasted.Length > 0 && pasted[0].Type is BlockType.Image or BlockType.Divider;
+        pasted.Length > 0 && pasted[0].Type is BlockType.Image or BlockType.Divider or BlockType.Equation;
 
     /// <summary>
     /// Applies pasted block type and body runs, then list/checklist metadata. Runs are committed first so
@@ -1856,7 +1900,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private static void ApplyPastedStructuralBlockToViewModel(BlockViewModel target, BlockViewModel pastedFirst)
     {
-        target.CommitRunsFromEditor(InlineRunFormatApplier.Normalize(pastedFirst.CloneRuns()));
+        target.CommitSpansFromEditor(InlineSpanFormatApplier.Normalize(pastedFirst.CloneSpans()));
         target.Type = pastedFirst.Type;
         if (pastedFirst.Type == BlockType.NumberedList)
             target.ListNumberIndex = pastedFirst.ListNumberIndex;
@@ -1991,7 +2035,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var topLevel = toRemove.Where(b => b.OwnerTwoColumn == null).OrderByDescending(b => Blocks.IndexOf(b)).ToList();
         foreach (var block in topLevel)
         {
-            UnsubscribeFromBlock(block);
+            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
             Blocks.Remove(block);
         }
 
@@ -2021,7 +2065,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var topIdx = Blocks.IndexOf(tc);
                 if (topIdx < 0) continue;
-                UnsubscribeFromBlock(tc);
+                UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
                 Blocks.RemoveAt(topIdx);
                 ReorderBlocks();
                 continue;
@@ -2113,17 +2157,23 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             var eb = GetEditableBlockForViewModel(vm);
             if (eb?.GetSelectionRange() is not { } sel) continue;
-            var url = GetLinkUrlInRuns(vm.Runs, sel.start, sel.end);
+            var url = GetLinkUrlInRuns(vm.Spans, sel.start, sel.end);
             if (!string.IsNullOrEmpty(url)) return url;
         }
         return null;
     }
 
-    private static string? GetLinkUrlInRuns(IReadOnlyList<InlineRun> runs, int start, int end)
+    private static string? GetLinkUrlInRuns(IReadOnlyList<InlineSpan> runs, int start, int end)
     {
         int pos = 0;
-        foreach (var run in runs)
+        foreach (var seg in runs)
         {
+            if (seg is not TextSpan run)
+            {
+                pos += 1;
+                continue;
+            }
+
             int re = pos + run.Text.Length;
             if (re > start && pos < end && run.Style.LinkUrl != null)
                 return run.Style.LinkUrl;
@@ -2239,7 +2289,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var topIdx = Blocks.IndexOf(tc);
                 if (topIdx < 0) return;
-                UnsubscribeFromBlock(tc);
+                UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
                 Blocks.RemoveAt(topIdx);
                 var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
                 SubscribeToBlock(placeholder);
@@ -2248,7 +2298,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 return;
             }
 
-            UnsubscribeFromBlock(block);
+            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
             col.RemoveAt(ci);
             BlockHierarchy.ClearChildOwnership(block);
             if (col.Count == 0)
@@ -2272,7 +2322,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        UnsubscribeFromBlock(block);
+        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
         Blocks.Remove(block);
         ReorderBlocks();
     }
@@ -2331,11 +2381,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var block = docList[i];
             int start = range.Value.start, end = range.Value.end;
             var liveRuns = GetLiveRunsForBlock(block);
-            var sliceRuns = InlineRunFormatApplier.SliceRuns(liveRuns, start, end);
+            var sliceRuns = InlineSpanFormatApplier.SliceRuns(liveRuns, start, end);
             // Slices from image captions are plain text; never emit a pseudo-Image block (would serialize as full image).
             var exportType = block.Type == BlockType.Image ? BlockType.Text : block.Type;
             var vm = BlockFactory.CreateBlock(exportType, toCopy.Count);
-            vm.SetRuns(sliceRuns);
+            vm.SetSpans(sliceRuns);
             if (block.Type == BlockType.Checklist)
                 vm.IsChecked = block.IsChecked;
             if (block.Type == BlockType.NumberedList)
@@ -2372,22 +2422,22 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return false;
     }
 
-    private IReadOnlyList<InlineRun> GetLiveRunsForBlock(BlockViewModel block)
+    private IReadOnlyList<InlineSpan> GetLiveRunsForBlock(BlockViewModel block)
     {
         var rte = GetEditableBlockForViewModel(block)?.TryGetRichTextEditor();
-        if (rte?.Runs != null)
-            return InlineRunFormatApplier.Normalize(new List<InlineRun>(rte.Runs));
-        return block.Runs;
+        if (rte?.Spans != null)
+            return InlineSpanFormatApplier.Normalize(new List<InlineSpan>(rte.Spans));
+        return block.Spans;
     }
 
-    /// <summary>Push live <see cref="RichTextEditor.Runs"/> into the view model so clipboard serialization matches the editor.</summary>
+    /// <summary>Push live <see cref="RichTextEditor.Spans"/> into the view model so clipboard serialization matches the editor.</summary>
     private void SyncViewModelsFromRichEditors(IEnumerable<BlockViewModel> blocks)
     {
         foreach (var b in blocks)
         {
             var rte = GetEditableBlockForViewModel(b)?.TryGetRichTextEditor();
             if (rte == null) continue;
-            b.SetRuns(InlineRunFormatApplier.Normalize(new List<InlineRun>(rte.Runs)));
+            b.SetSpans(InlineSpanFormatApplier.Normalize(new List<InlineSpan>(rte.Spans)));
         }
     }
 
@@ -2402,7 +2452,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         Bitmap? singleImageBitmap = null;
         if (blocks.Count == 1 && blocks[0].Type == BlockType.Image)
         {
-            var p = GetBlockMetaString(blocks[0], "imagePath");
+            var p = blocks[0].ImagePath;
             if (!string.IsNullOrEmpty(p) && File.Exists(p))
             {
                 try
@@ -2424,7 +2474,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 var json = NoteClipboardCodec.Serialize(doc);
                 NoteClipboardDiagnostics.Log($"Copy {blocks.Count} block(s); md preview: {Truncate(markdown, 120)}");
                 for (int bi = 0; bi < blocks.Count; bi++)
-                    NoteClipboardDiagnostics.Log($"  block[{bi}] type={blocks[bi].Type} {NoteClipboardDiagnostics.SummarizeRuns(blocks[bi].Runs)}");
+                    NoteClipboardDiagnostics.Log($"  block[{bi}] type={blocks[bi].Type} {NoteClipboardDiagnostics.SummarizeSpans(blocks[bi].Spans)}");
                 await NoteClipboardService.WriteAsync(topLevel.Clipboard, markdown, json, singleImageBitmap).ConfigureAwait(true);
             }
             else if (singleImageBitmap != null)
@@ -2517,7 +2567,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
             await HydratePastedImageBlocksAsync(pasted).ConfigureAwait(true);
             if (pasted.Length > 0)
-                NoteClipboardDiagnostics.Log($"Paste: first block type={pasted[0].Type} {NoteClipboardDiagnostics.SummarizeRuns(pasted[0].Runs)}");
+                NoteClipboardDiagnostics.Log($"Paste: first block type={pasted[0].Type} {NoteClipboardDiagnostics.SummarizeSpans(pasted[0].Spans)}");
 
             BeginStructuralChange();
 
@@ -2588,35 +2638,35 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                             }
 
                             var liveRunsForPaste = GetLiveRunsForBlock(focusedVm);
-                            var tailRuns = InlineRunFormatApplier.SliceRuns(liveRunsForPaste, end, content.Length);
-                            var beforeRuns = InlineRunFormatApplier.SliceRuns(liveRunsForPaste, 0, start);
+                            var tailRuns = InlineSpanFormatApplier.SliceRuns(liveRunsForPaste, end, content.Length);
+                            var beforeRuns = InlineSpanFormatApplier.SliceRuns(liveRunsForPaste, 0, start);
                             bool promoteStructuralFirst =
-                                InlineRunFormatApplier.Flatten(beforeRuns).Length == 0
+                                InlineSpanFormatApplier.Flatten(beforeRuns).Length == 0
                                 && IsStructuralBlockTypeForLineStartPaste(pasted[0].Type);
 
                             int caretAfterPaste;
                             if (promoteStructuralFirst)
                             {
                                 ApplyPastedStructuralBlockToViewModel(focusedVm, pasted[0]);
-                                caretAfterPaste = InlineRunFormatApplier.Flatten(focusedVm.Runs).Length;
+                                caretAfterPaste = InlineSpanFormatApplier.Flatten(focusedVm.Spans).Length;
                             }
                             else
                             {
-                                var pasteFirstRuns = pasted[0].CloneRuns();
-                                var mergedFirst = InlineRunFormatApplier.Normalize(
-                                    new List<InlineRun>([..beforeRuns, ..pasteFirstRuns]));
-                                focusedVm.CommitRunsFromEditor(mergedFirst);
-                                caretAfterPaste = start + InlineRunFormatApplier.Flatten(pasteFirstRuns).Length;
+                                var pasteFirstRuns = pasted[0].CloneSpans();
+                                var mergedFirst = InlineSpanFormatApplier.Normalize(
+                                    new List<InlineSpan>([..beforeRuns, ..pasteFirstRuns]));
+                                focusedVm.CommitSpansFromEditor(mergedFirst);
+                                caretAfterPaste = start + InlineSpanFormatApplier.Flatten(pasteFirstRuns).Length;
                             }
 
                             editableBlock!.SetCaretIndex(caretAfterPaste);
 
                             if (pasted.Length == 1)
                             {
-                                if (InlineRunFormatApplier.Flatten(tailRuns).Length > 0)
+                                if (InlineSpanFormatApplier.Flatten(tailRuns).Length > 0)
                                 {
                                     var tailBlockRich = BlockFactory.CreateBlock(BlockType.Text, topInsert + 1);
-                                    tailBlockRich.SetRuns(tailRuns);
+                                    tailBlockRich.SetSpans(tailRuns);
                                     SubscribeToBlock(tailBlockRich);
                                     int insertAtTailRich = GetPasteSiblingInsertStartIndex(focusedVm, topInsert);
                                     InsertPasteSiblingBlock(focusedVm, ref insertAtTailRich, tailBlockRich);
@@ -2634,9 +2684,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                 var block = pasted[i];
                                 if (i == pasted.Length - 1)
                                 {
-                                    var mergedLast = InlineRunFormatApplier.Normalize(
-                                        new List<InlineRun>([..block.CloneRuns(), ..tailRuns]));
-                                    block.SetRuns(mergedLast);
+                                    var mergedLast = InlineSpanFormatApplier.Normalize(
+                                        new List<InlineSpan>([..block.CloneSpans(), ..tailRuns]));
+                                    block.SetSpans(mergedLast);
                                 }
                                 SubscribeToBlock(block);
                                 InsertPasteSiblingBlock(focusedVm, ref insertAtRich, block);
@@ -2666,7 +2716,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     foreach (int i in selectedIndices.OrderByDescending(x => x))
                     {
                         var block = Blocks[i];
-                        UnsubscribeFromBlock(block);
+                        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
                         Blocks.RemoveAt(i);
                     }
                     insertIndex = firstIndex;
@@ -2715,7 +2765,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     /// <summary>
     /// Last-block guard for clicking the area below all blocks: avoid stacking duplicate empty text blocks.
-    /// Image blocks often have empty <see cref="BlockViewModel.Content"/> while caption/path live in meta.
+    /// Image blocks often have empty <see cref="BlockViewModel.Content"/> while the file path is on <see cref="BlockViewModel.ImagePath"/>.
     /// </summary>
     private static bool IsLastBlockEmptyForBelowBlocksAreaClick(IReadOnlyList<BlockViewModel> blocks)
     {
@@ -2723,8 +2773,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var last = blocks[blocks.Count - 1];
         if (last.Type == BlockType.Image)
         {
-            if (!string.IsNullOrWhiteSpace(GetBlockMetaString(last, "imagePath"))) return false;
-            if (!string.IsNullOrWhiteSpace(GetBlockMetaString(last, "imageAlt"))) return false;
+            if (!string.IsNullOrWhiteSpace(last.ImagePath)) return false;
+            if (!string.IsNullOrWhiteSpace(last.Content)) return false;
         }
 
         return BlockEditorContentPolicy.IsVisuallyEmpty(last.Content);
@@ -2759,7 +2809,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             if (ReferenceEquals(b, excludeBlock)) continue;
             if (b.Type != BlockType.Image) continue;
-            var other = NormalizePathForImageCompare(GetBlockMetaString(b, "imagePath"));
+            var other = NormalizePathForImageCompare(b.ImagePath);
             if (other != null && string.Equals(other, norm, StringComparison.OrdinalIgnoreCase))
                 return true;
         }
@@ -2769,9 +2819,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void QueueDeleteOrphanImageForRemovedBlock(BlockViewModel removedBlock)
     {
-        if (_skipImageDeletionOnUnsubscribe) return;
         if (removedBlock.Type != BlockType.Image) return;
-        var path = GetBlockMetaString(removedBlock, "imagePath");
+        var path = removedBlock.ImagePath;
         if (string.IsNullOrWhiteSpace(path)) return;
         if (!MnemoAppPaths.IsPathUnderImagesDirectory(path)) return;
         if (AnyOtherImageBlockUsesPath(path, removedBlock)) return;
@@ -2810,7 +2859,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         foreach (var vm in pasted)
         {
             if (vm.Type != BlockType.Image) continue;
-            var path = GetBlockMetaString(vm, "imagePath");
+            var path = vm.ImagePath;
             if (string.IsNullOrEmpty(path) || !File.Exists(path)) continue;
             var fileName = Path.GetFileNameWithoutExtension(path);
             if (string.Equals(fileName, vm.Id, StringComparison.OrdinalIgnoreCase)) continue;
@@ -2818,7 +2867,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var r = await svc.ImportAndCopyAsync(path, vm.Id).ConfigureAwait(true);
                 if (r.IsSuccess && !string.IsNullOrEmpty(r.Value))
-                    vm.Meta["imagePath"] = r.Value!;
+                    vm.ImagePath = r.Value!;
             }
             catch
             {
@@ -2872,10 +2921,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private static BlockViewModel CreateImageBlockStubForPaste(string pathOrExternal)
     {
         var vm = BlockFactory.CreateBlock(BlockType.Image, 0);
-        vm.Meta["imagePath"] = pathOrExternal;
-        vm.Meta["imageAlt"] = string.Empty;
-        vm.Meta["imageWidth"] = 0.0;
-        vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+        vm.ImagePath = pathOrExternal;
+        vm.ImageWidth = 0;
+        vm.SetSpans(new List<InlineSpan> { InlineSpan.Plain(string.Empty) });
         return vm;
     }
 
@@ -2887,10 +2935,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, vm.Id + ".png");
         source.Save(path);
-        vm.Meta["imagePath"] = path;
-        vm.Meta["imageAlt"] = string.Empty;
-        vm.Meta["imageWidth"] = 0.0;
-        vm.SetRuns(new List<InlineRun> { InlineRun.Plain(string.Empty) });
+        vm.ImagePath = path;
+        vm.ImageWidth = 0;
+        vm.SetSpans(new List<InlineSpan> { InlineSpan.Plain(string.Empty) });
         return Task.FromResult(vm);
     }
 
@@ -3369,7 +3416,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         foreach (var idx in indices.OrderByDescending(i => i))
         {
             var vm = Blocks[idx];
-            UnsubscribeFromBlock(vm);
+            UnsubscribeFromBlock(vm, removeStoredImageIfOrphan: false);
             Blocks.RemoveAt(idx);
         }
 
@@ -3663,7 +3710,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 var ti = Blocks.IndexOf(dragged);
                 if (ti >= 0)
                 {
-                    UnsubscribeFromBlock(dragged);
+                    UnsubscribeFromBlock(dragged, removeStoredImageIfOrphan: false);
                     Blocks.RemoveAt(ti);
                 }
             }
@@ -3809,7 +3856,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (cell.OwnerTwoColumn is TwoColumnBlockViewModel tc)
         {
             var col = cell.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
-            UnsubscribeFromBlock(cell);
+            UnsubscribeFromBlock(cell, removeStoredImageIfOrphan: false);
             col.Remove(cell);
             BlockHierarchy.ClearChildOwnership(cell);
             if (col.Count == 0)
@@ -3824,7 +3871,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         var sibling = cell.GetColumnSibling(Blocks);
         if (sibling == null) return null;
-        UnsubscribeFromBlock(cell);
+        UnsubscribeFromBlock(cell, removeStoredImageIfOrphan: false);
         var idx = Blocks.IndexOf(cell);
         if (idx < 0) return null;
         Blocks.RemoveAt(idx);
@@ -3857,7 +3904,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             var tIdxBefore = Blocks.IndexOf(target);
             var sIdx = Blocks.IndexOf(targetSib);
-            UnsubscribeFromBlock(targetSib);
+            UnsubscribeFromBlock(targetSib, removeStoredImageIfOrphan: false);
             Blocks.RemoveAt(sIdx);
             ColumnPairHelper.ClearPair(target, targetSib);
             SubscribeToBlock(targetSib);
@@ -3872,12 +3919,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var draggedIdx = Blocks.IndexOf(dragged);
         if (draggedIdx >= 0)
         {
-            UnsubscribeFromBlock(dragged);
+            UnsubscribeFromBlock(dragged, removeStoredImageIfOrphan: false);
             Blocks.RemoveAt(draggedIdx);
             if (draggedIdx < targetIdx) targetIdx--;
         }
 
-        UnsubscribeFromBlock(target);
+        UnsubscribeFromBlock(target, removeStoredImageIfOrphan: false);
         Blocks.RemoveAt(targetIdx);
 
         var left = dropOnLeftEdge ? dragged : target;
@@ -4137,8 +4184,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
                 if (existingById.TryGetValue(blk.Id, out var existing) && usedIds.Add(blk.Id))
                 {
-                    blk.EnsureInlineRuns();
-                    existing.SetRuns(blk.InlineRuns!);
+                    blk.EnsureSpans();
+                    existing.SetSpans(blk.Spans);
                     existing.Type = blk.Type;
                     existing.Meta = new Dictionary<string, object>(blk.Meta ?? new Dictionary<string, object>());
                     existing.Order = blk.Order;
@@ -4160,7 +4207,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             foreach (var kvp in existingById)
             {
                 if (!usedIds.Contains(kvp.Key))
-                    UnsubscribeFromBlock(kvp.Value);
+                    UnsubscribeFromBlock(kvp.Value, removeStoredImageIfOrphan: false);
             }
 
             // Ensure at least one block
@@ -4210,7 +4257,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// <summary>
     /// Callback used by TextEditOperation to restore a single block's runs.
     /// </summary>
-    private void RestoreBlockRuns(string blockId, List<InlineRun> runs, CaretState? caret)
+    private void RestoreBlockRuns(string blockId, List<InlineSpan> runs, CaretState? caret)
     {
         _isRestoringFromHistory = true;
         try
@@ -4218,7 +4265,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var vm = BlockHierarchy.FindById(Blocks, blockId);
             if (vm != null)
             {
-                vm.SetRuns(runs);
+                vm.SetSpans(runs);
                 BlockEditorLogger.Log($"RestoreBlockRuns blockId={blockId} text='{Truncate(vm.Content)}'");
             }
             else
@@ -4265,7 +4312,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// <paramref name="previousText"/> is the text *before* this edit (from EditorStateManager).
     /// Must not be null — caller must have a valid pre-edit snapshot.
     /// </summary>
-    internal void TrackTypingEdit(BlockViewModel block, string previousText, List<InlineRun>? previousRuns = null)
+    internal void TrackTypingEdit(BlockViewModel block, string previousText, List<InlineSpan>? previousRuns = null)
     {
         if (_history == null || _isRestoringFromHistory)
         {
@@ -4289,11 +4336,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
             else
             {
-                _typingBatchRunsBefore = block.CloneRuns();
+                _typingBatchRunsBefore = block.CloneSpans();
                 // Reconstruct the runs as they were *before* this edit using the previous text
                 if (previousText != block.Content)
                 {
-                    _typingBatchRunsBefore = Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(
+                    _typingBatchRunsBefore = Core.Formatting.InlineSpanFormatApplier.ApplyTextEdit(
                         _typingBatchRunsBefore, block.Content, previousText);
                 }
             }
@@ -4337,8 +4384,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        var runsAfter = vm.CloneRuns();
-        var runsBefore = _typingBatchRunsBefore ?? new List<InlineRun> { InlineRun.Plain(string.Empty) };
+        var runsAfter = vm.CloneSpans();
+        var runsBefore = _typingBatchRunsBefore ?? new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
 
         bool runsEqual = runsBefore.Count == runsAfter.Count && runsBefore.SequenceEqual(runsAfter);
 
@@ -4351,7 +4398,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        var textBefore = Core.Formatting.InlineRunFormatApplier.Flatten(runsBefore);
+        var textBefore = Core.Formatting.InlineSpanFormatApplier.Flatten(runsBefore);
         var textAfter = vm.Content ?? string.Empty;
 
         var editableBlock = GetEditableBlockForViewModel(vm);

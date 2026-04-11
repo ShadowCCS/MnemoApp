@@ -370,7 +370,13 @@
     "InsertLinkRemoveLink": "Remove link",
     "CrossBlockLinkHint": "Selection spans multiple blocks. Only the link address is set here; each block keeps its own selected text.",
     "ExternalLinkTitle": "Open external link",
-    "ExternalLinkMessage": "You are about to open the following address. Your browser or mail app will open outside Mnemo.\n\n{0}"
+    "ExternalLinkMessage": "You are about to open the following address. Your browser or mail app will open outside Mnemo.\n\n{0}",
+    "Equation": "Equation",
+    "EquationDescription": "LaTeX math equation block",
+    "EquationPlaceholder": "Click to add an equation…",
+    "EquationFlyoutPlaceholder": "Type LaTeX, e.g. \\frac{a}{b}",
+    "EquationRenderError": "Could not render equation",
+    "EquationTooltip": "Equation (Ctrl+Shift+E)"
   },
   "Mindmap": {
     "Title": "Mindmaps",

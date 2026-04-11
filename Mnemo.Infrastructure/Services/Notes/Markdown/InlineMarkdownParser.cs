@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Markdig;
+using Markdig.Extensions.Mathematics;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using Mnemo.Core.Formatting;
@@ -8,84 +9,84 @@ using Mnemo.Core.Models;
 
 namespace Mnemo.Infrastructure.Services.Notes.Markdown;
 
-/// <summary>Parses inline markdown into <see cref="InlineRun"/> lists using Markdig (shared with block editor).</summary>
+/// <summary>Parses inline markdown into <see cref="InlineSpan"/> lists using Markdig.</summary>
 public static class InlineMarkdownParser
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
-    public static List<InlineRun> ToRuns(string? markdown)
+    public static List<InlineSpan> ToSpans(string? markdown)
     {
         if (string.IsNullOrEmpty(markdown))
-            return new List<InlineRun> { InlineRun.Plain(string.Empty) };
+            return new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
 
         var doc = global::Markdig.Markdown.Parse(markdown, Pipeline);
-        var runs = new List<InlineRun>();
+        var spans = new List<InlineSpan>();
         var firstBlock = true;
         foreach (var block in doc)
         {
             if (!firstBlock)
-                runs.Add(InlineRun.Plain("\n"));
+                spans.Add(InlineSpan.Plain("\n"));
             firstBlock = false;
 
             switch (block)
             {
                 case ParagraphBlock paragraph:
-                    VisitInlines(paragraph.Inline, InlineStyle.Default, runs);
+                    VisitInlines(paragraph.Inline, TextStyle.Default, spans);
                     break;
                 case HeadingBlock heading:
-                    VisitInlines(heading.Inline, InlineStyle.Default, runs);
+                    VisitInlines(heading.Inline, TextStyle.Default, spans);
                     break;
                 case ThematicBreakBlock:
                     break;
                 case FencedCodeBlock fenced:
-                    runs.Add(new InlineRun(LinesToString(fenced.Lines), InlineStyle.Default));
+                    spans.Add(new TextSpan(LinesToString(fenced.Lines), TextStyle.Default));
                     break;
                 case CodeBlock cb:
-                    runs.Add(new InlineRun(LinesToString(cb.Lines), InlineStyle.Default));
+                    spans.Add(new TextSpan(LinesToString(cb.Lines), TextStyle.Default));
                     break;
                 case QuoteBlock quote:
-                    AppendBlockContainer(quote, runs);
+                    AppendBlockContainer(quote, spans);
                     break;
                 case ListBlock list:
-                    AppendBlockContainer(list, runs);
+                    AppendBlockContainer(list, spans);
                     break;
                 default:
                     if (block is LeafBlock { Inline: { } leafInline })
-                        VisitInlines(leafInline, InlineStyle.Default, runs);
+                        VisitInlines(leafInline, TextStyle.Default, spans);
                     break;
             }
         }
 
-        var normalized = InlineRunFormatApplier.Normalize(runs);
+        var normalized = InlineSpanFormatApplier.Normalize(spans);
         if (normalized.Count == 0)
-            normalized.Add(InlineRun.Plain(string.Empty));
+            normalized.Add(InlineSpan.Plain(string.Empty));
         return normalized;
     }
 
-    private static void AppendBlockContainer(ContainerBlock container, List<InlineRun> runs)
+    private static void AppendBlockContainer(ContainerBlock container, List<InlineSpan> spans)
     {
         var first = true;
         foreach (var child in container)
         {
             if (!first)
-                runs.Add(InlineRun.Plain("\n"));
+                spans.Add(InlineSpan.Plain("\n"));
             first = false;
             if (child is ParagraphBlock p)
-                VisitInlines(p.Inline, InlineStyle.Default, runs);
+                VisitInlines(p.Inline, TextStyle.Default, spans);
             else if (child is QuoteBlock q)
-                AppendBlockContainer(q, runs);
+                AppendBlockContainer(q, spans);
             else if (child is ListBlock l)
-                AppendBlockContainer(l, runs);
+                AppendBlockContainer(l, spans);
             else if (child is ListItemBlock item)
-                AppendBlockContainer(item, runs);
+                AppendBlockContainer(item, spans);
             else if (child is LeafBlock { Inline: { } inline })
-                VisitInlines(inline, InlineStyle.Default, runs);
+                VisitInlines(inline, TextStyle.Default, spans);
         }
     }
 
-    private static void VisitInlines(Inline? inline, InlineStyle style, List<InlineRun> runs)
+    private static void VisitInlines(Inline? inline, TextStyle style, List<InlineSpan> spans)
     {
         if (inline == null) return;
 
@@ -93,19 +94,19 @@ public static class InlineMarkdownParser
         {
             case LiteralInline literal:
                 if (literal.Content.Length > 0)
-                    runs.Add(new InlineRun(literal.Content.ToString(), style));
+                    spans.Add(new TextSpan(literal.Content.ToString(), style));
                 break;
 
             case CodeInline code:
-                runs.Add(new InlineRun(code.Content, style.WithSet(InlineFormatKind.Code)));
+                spans.Add(new TextSpan(code.Content, style.WithSet(InlineFormatKind.Code)));
                 break;
 
             case EmphasisInline emphasis:
-                VisitEmphasis(emphasis, style, runs);
+                VisitEmphasis(emphasis, style, spans);
                 break;
 
             case LineBreakInline:
-                runs.Add(new InlineRun("\n", style));
+                spans.Add(new TextSpan("\n", style));
                 break;
 
             case LinkInline link:
@@ -115,7 +116,7 @@ public static class InlineMarkdownParser
                     ? style
                     : style.WithSet(InlineFormatKind.Link, InlineAutoLink.NormalizeUrl(href));
                 foreach (var c in link)
-                    VisitInlines(c, linkedStyle, runs);
+                    VisitInlines(c, linkedStyle, spans);
                 break;
             }
 
@@ -123,7 +124,15 @@ public static class InlineMarkdownParser
             {
                 var raw = auto.Url ?? string.Empty;
                 var href = InlineAutoLink.NormalizeUrl(raw);
-                runs.Add(new InlineRun(raw, style.WithSet(InlineFormatKind.Link, href)));
+                spans.Add(new TextSpan(raw, style.WithSet(InlineFormatKind.Link, href)));
+                break;
+            }
+
+            case MathInline math:
+            {
+                var latex = math.Content.ToString().Trim();
+                if (!string.IsNullOrEmpty(latex))
+                    spans.Add(new EquationSpan(latex));
                 break;
             }
 
@@ -132,7 +141,7 @@ public static class InlineMarkdownParser
 
             case ContainerInline container:
                 foreach (var c in container)
-                    VisitInlines(c, style, runs);
+                    VisitInlines(c, style, spans);
                 break;
         }
     }
@@ -149,7 +158,7 @@ public static class InlineMarkdownParser
         return sb.ToString();
     }
 
-    private static void VisitEmphasis(EmphasisInline emphasis, InlineStyle style, List<InlineRun> runs)
+    private static void VisitEmphasis(EmphasisInline emphasis, TextStyle style, List<InlineSpan> spans)
     {
         var next = emphasis.DelimiterChar switch
         {
@@ -164,6 +173,6 @@ public static class InlineMarkdownParser
         };
 
         foreach (var c in emphasis)
-            VisitInlines(c, next, runs);
+            VisitInlines(c, next, spans);
     }
 }

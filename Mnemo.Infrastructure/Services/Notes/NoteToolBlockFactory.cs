@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Models.Tools.Notes;
@@ -27,17 +28,47 @@ internal static class NoteToolBlockFactory
         if (bt == BlockType.Divider)
             return b;
 
-        if (bt == BlockType.Code)
+        if (bt == BlockType.Equation)
         {
-            b.Content = p.Content ?? string.Empty;
+            var latex = p.Content ?? string.Empty;
+            b.Payload = new EquationPayload(latex);
+            b.Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
+            b.Meta.Remove("equationLatex");
             return b;
         }
 
-        b.InlineRuns = InlineMarkdownParser.ToRuns(p.Content ?? string.Empty);
+        if (bt == BlockType.Code)
+        {
+            var lang = b.Meta.TryGetValue("language", out var lv) ? lv?.ToString() ?? "csharp" : "csharp";
+            var src = p.Content ?? string.Empty;
+            b.Payload = new CodePayload(lang, src);
+            b.Spans = new List<InlineSpan> { InlineSpan.Plain(src) };
+            b.Meta.Remove("language");
+            return b;
+        }
+
+        b.Spans = InlineMarkdownParser.ToSpans(p.Content ?? string.Empty);
         if (bt is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
             EnsureHeadingBold(b);
 
+        if (bt == BlockType.Checklist)
+        {
+            b.Payload = new ChecklistPayload(ReadMetaChecked(b.Meta));
+            b.Meta.Remove("checked");
+        }
+
         return b;
+    }
+
+    private static bool ReadMetaChecked(Dictionary<string, object> meta)
+    {
+        if (!meta.TryGetValue("checked", out var v) || v == null)
+            return false;
+        if (v is bool b)
+            return b;
+        if (v is JsonElement je)
+            return je.ValueKind == JsonValueKind.True;
+        return false;
     }
 
     public static List<Block> FromPayloads(IReadOnlyList<ToolBlockPayload> payloads, int startOrder = 0)
@@ -50,8 +81,16 @@ internal static class NoteToolBlockFactory
 
     private static void EnsureHeadingBold(Block b)
     {
-        b.EnsureInlineRuns();
-        var boldRuns = b.InlineRuns!.Select(r => new InlineRun(r.Text, r.Style.WithSet(InlineFormatKind.Bold))).ToList();
-        b.InlineRuns = InlineRunFormatApplier.Normalize(boldRuns);
+        b.EnsureSpans();
+        var list = new List<InlineSpan>();
+        foreach (var s in b.Spans)
+        {
+            if (s is TextSpan t)
+                list.Add(t with { Style = t.Style.WithSet(InlineFormatKind.Bold) });
+            else
+                list.Add(s);
+        }
+
+        b.Spans = InlineSpanFormatApplier.Normalize(list);
     }
 }

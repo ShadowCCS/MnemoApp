@@ -80,6 +80,7 @@ internal static class BlockHierarchy
     {
         child.OwnerTwoColumn = parent;
         child.IsLeftColumn = leftColumn;
+        child.StripColumnLayoutMetaAsNestedCell();
     }
 
     public static void ClearChildOwnership(BlockViewModel child)
@@ -104,7 +105,7 @@ internal static class BlockHierarchy
         {
             Id = System.Guid.NewGuid().ToString(),
             Type = BlockType.ColumnGroup,
-            InlineRuns = new List<InlineRun> { InlineRun.Plain(string.Empty) },
+            Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) },
             Children = list
         };
     }

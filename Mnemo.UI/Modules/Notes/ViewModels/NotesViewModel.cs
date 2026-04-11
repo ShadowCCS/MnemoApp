@@ -504,7 +504,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             {
                 Id = Guid.NewGuid().ToString(),
                 Type = BlockType.Text,
-                Content = SelectedNote.Content ?? "",
+                Spans = new List<InlineSpan> { InlineSpan.Plain(SelectedNote.Content ?? "") },
                 Order = 0
             }
         };
@@ -604,7 +604,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         if (blocks == null || blocks.Count == 0)
             return null;
         foreach (var b in blocks)
-            b.EnsureInlineRuns();
+            b.EnsureSpans();
         var json = JsonSerializer.Serialize(blocks);
         var list = JsonSerializer.Deserialize<List<Block>>(json);
         if (list == null || list.Count == 0)
@@ -614,7 +614,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         {
             ordered[i].Id = Guid.NewGuid().ToString();
             ordered[i].Order = i;
-            ordered[i].EnsureInlineRuns();
+            ordered[i].EnsureSpans();
         }
         return ordered;
     }

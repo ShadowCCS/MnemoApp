@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Avalonia;
@@ -151,12 +150,9 @@ public partial class ImageBlockComponent : BlockComponentBase
         var vm = ViewModel;
         if (vm == null) return;
 
-        var imagePath = GetMetaString(vm, "imagePath");
-        var imageAlt = GetMetaString(vm, "imageAlt");
-        var imageWidth = GetMetaDouble(vm, "imageWidth");
+        var imagePath = vm.ImagePath;
+        var imageWidth = vm.ImageWidth;
 
-        if ((vm.Content ?? string.Empty) != imageAlt)
-            vm.SetRuns(new List<InlineRun> { InlineRun.Plain(imageAlt) });
         ApplyImageWidth(imageWidth);
         ClampImageWidthToViewport();
 
@@ -339,7 +335,7 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         var vm = ViewModel;
         if (vm == null) return "left";
-        return NormalizeImageAlign(GetMetaString(vm, "imageAlign"));
+        return NormalizeImageAlign(vm.ImageAlign);
     }
 
     private void UpdateAlignButtonIcons()
@@ -362,7 +358,7 @@ public partial class ImageBlockComponent : BlockComponentBase
         var vm = ViewModel;
         if (vm == null) return;
         var normalized = NormalizeImageAlign(value);
-        vm.Meta["imageAlign"] = normalized;
+        vm.ImageAlign = normalized;
         vm.NotifyContentChanged();
         UpdateAlignButtonIcons();
         // EditableBlock listens to Meta changes and updates its HorizontalAlignment
@@ -557,7 +553,7 @@ public partial class ImageBlockComponent : BlockComponentBase
         if (!result.IsSuccess)
             return;
 
-        vm.Meta["imagePath"] = result.Value!;
+        vm.ImagePath = result.Value!;
         vm.NotifyContentChanged();
 
         await Dispatcher.UIThread.InvokeAsync(() => LoadBitmap(result.Value!));
@@ -570,7 +566,7 @@ public partial class ImageBlockComponent : BlockComponentBase
         var vm = ViewModel;
         if (vm == null || _imageAssetService == null) return;
 
-        var oldPath = GetMetaString(vm, "imagePath");
+        var oldPath = vm.ImagePath;
 
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel == null) return;
@@ -599,7 +595,7 @@ public partial class ImageBlockComponent : BlockComponentBase
         if (!string.IsNullOrEmpty(oldPath) && oldPath != result.Value)
             await _imageAssetService.DeleteStoredFileAsync(oldPath);
 
-        vm.Meta["imagePath"] = result.Value!;
+        vm.ImagePath = result.Value!;
         vm.NotifyContentChanged();
 
         await Dispatcher.UIThread.InvokeAsync(() => LoadBitmap(result.Value!));
@@ -610,7 +606,7 @@ public partial class ImageBlockComponent : BlockComponentBase
         var vm = ViewModel;
         if (vm == null) return;
 
-        var imagePath = GetMetaString(vm, "imagePath");
+        var imagePath = vm.ImagePath;
         if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath)) return;
 
         var topLevel = TopLevel.GetTopLevel(this);
@@ -733,7 +729,7 @@ public partial class ImageBlockComponent : BlockComponentBase
         var vm = ViewModel;
         if (vm != null)
         {
-            vm.Meta["imageWidth"] = newWidth;
+            vm.ImageWidth = newWidth;
             vm.NotifyContentChanged();
         }
     }
@@ -826,9 +822,9 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         var vm = ViewModel;
         if (vm == null) return;
-        var cur = GetMetaDouble(vm, "imageWidth");
+        var cur = vm.ImageWidth;
         if (Math.Abs(cur - width) < 0.5) return;
-        vm.Meta["imageWidth"] = width;
+        vm.ImageWidth = width;
         vm.NotifyContentChanged();
     }
 
@@ -842,20 +838,4 @@ public partial class ImageBlockComponent : BlockComponentBase
             DisplayImage.Width = double.NaN;
     }
 
-    private static string GetMetaString(BlockViewModel vm, string key)
-    {
-        if (!vm.Meta.TryGetValue(key, out var val)) return string.Empty;
-        if (val is string s) return s;
-        if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
-        return val?.ToString() ?? string.Empty;
-    }
-
-    private static double GetMetaDouble(BlockViewModel vm, string key)
-    {
-        if (!vm.Meta.TryGetValue(key, out var val)) return 0;
-        if (val is double d) return d;
-        if (val is JsonElement je && je.ValueKind == JsonValueKind.Number) return je.GetDouble();
-        if (double.TryParse(val?.ToString(), out var parsed)) return parsed;
-        return 0;
-    }
 }

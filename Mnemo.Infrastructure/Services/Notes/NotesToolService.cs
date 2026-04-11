@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Mnemo.Core.Models;
 using Mnemo.Core.Models.Tools;
@@ -201,7 +202,7 @@ public sealed class NotesToolService
 
             foreach (var b in blocks.OrderBy(x => x.Order))
             {
-                b.EnsureInlineRuns();
+                b.EnsureSpans();
                 var text = b.Content ?? string.Empty;
                 if (!TextSearchMatch.MatchTokens(text, tokens, matchAll, fuzzy))
                     continue;
@@ -484,8 +485,20 @@ public sealed class NotesToolService
             return ToolInvocationResult.Failure(ToolResultCodes.NotFound, "block not found.");
 
         b.Type = newType;
-        if (newType != BlockType.Checklist)
+        if (newType == BlockType.Checklist)
+        {
+            var chk = b.Payload is ChecklistPayload cp
+                ? cp.Checked
+                : ReadMetaCheckedFlag(b.Meta);
+            b.Payload = new ChecklistPayload(chk);
             b.Meta.Remove("checked");
+        }
+        else
+        {
+            b.Meta.Remove("checked");
+            if (b.Payload is ChecklistPayload)
+                b.Payload = new EmptyPayload();
+        }
 
         var res = await _notes.SaveNoteAsync(note).ConfigureAwait(false);
         return res.IsSuccess
@@ -544,7 +557,7 @@ public sealed class NotesToolService
             .OrderBy(b => b.Order)
             .Select(b =>
             {
-                b.EnsureInlineRuns();
+                b.EnsureSpans();
                 return new { block_id = b.Id, type = b.Type.ToString(), text = b.Content, order = b.Order };
             }).ToList();
 
@@ -724,5 +737,17 @@ public sealed class NotesToolService
         var inter = a.Count(x => b.Contains(x));
         var union = a.Count + b.Count - inter;
         return union == 0 ? 0 : (double)inter / union;
+    }
+
+    private static bool ReadMetaCheckedFlag(Dictionary<string, object> meta)
+    {
+        if (!meta.TryGetValue("checked", out var v) || v == null)
+            return false;
+        return v switch
+        {
+            bool b => b,
+            JsonElement je when je.ValueKind == JsonValueKind.True => true,
+            _ => false
+        };
     }
 }

@@ -4,19 +4,26 @@ using Mnemo.Core.Models;
 
 namespace Mnemo.Infrastructure.Services.Notes.Markdown;
 
-/// <summary>Serializes <see cref="InlineRun"/> lists to CommonMark-style inline markdown.</summary>
+/// <summary>Serializes <see cref="InlineSpan"/> lists to CommonMark-style inline markdown.</summary>
 public static class InlineMarkdownSerializer
 {
-    public static string SerializeRuns(IReadOnlyList<InlineRun> runs)
+    public static string SerializeSpans(IReadOnlyList<InlineSpan> spans)
     {
-        if (runs.Count == 0) return string.Empty;
+        if (spans.Count == 0) return string.Empty;
         var sb = new StringBuilder();
-        foreach (var r in runs)
-            sb.Append(SerializeRun(r));
+        foreach (var s in spans)
+            sb.Append(SerializeSpan(s));
         return sb.ToString();
     }
 
-    private static string SerializeRun(InlineRun r)
+    private static string SerializeSpan(InlineSpan s) => s switch
+    {
+        EquationSpan e => "$" + e.Latex + "$",
+        TextSpan t => SerializeTextSpan(t),
+        _ => string.Empty
+    };
+
+    private static string SerializeTextSpan(TextSpan r)
     {
         if (r.Text.Length == 0)
             return string.Empty;
@@ -25,24 +32,24 @@ public static class InlineMarkdownSerializer
             return SerializeCodeSpan(r.Text);
 
         var escaped = EscapeMarkdownText(r.Text);
-        var s = escaped;
+        var o = escaped;
         if (r.Style.Bold && r.Style.Italic)
-            s = "***" + s + "***";
+            o = "***" + o + "***";
         else if (r.Style.Bold)
-            s = "**" + s + "**";
+            o = "**" + o + "**";
         else if (r.Style.Italic)
-            s = "*" + s + "*";
+            o = "*" + o + "*";
         if (r.Style.Strikethrough)
-            s = "~~" + s + "~~";
+            o = "~~" + o + "~~";
         if (!string.IsNullOrEmpty(r.Style.LinkUrl))
-            s = "[" + s + "](" + EscapeMarkdownLinkDestination(r.Style.LinkUrl) + ")";
-        return s;
+            o = "[" + o + "](" + EscapeMarkdownLinkDestination(r.Style.LinkUrl) + ")";
+        return o;
     }
 
     private static string EscapeMarkdownLinkDestination(string url)
     {
         if (string.IsNullOrEmpty(url)) return url;
-        return url.Replace("\\", "\\\\", StringComparison.Ordinal).Replace(")", "\\)", StringComparison.Ordinal);
+        return url.Replace("\\", "\\\\", System.StringComparison.Ordinal).Replace(")", "\\)", System.StringComparison.Ordinal);
     }
 
     private static string SerializeCodeSpan(string text)

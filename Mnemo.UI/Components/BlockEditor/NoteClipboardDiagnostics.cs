@@ -21,28 +21,36 @@ internal static class NoteClipboardDiagnostics
         Trace.WriteLine("[Mnemo:Clipboard] " + message);
     }
 
-    internal static string SummarizeRuns(IReadOnlyList<InlineRun>? runs, int maxRuns = 12)
+    internal static string SummarizeSpans(IReadOnlyList<InlineSpan>? spans, int maxSpans = 12)
     {
-        if (runs == null || runs.Count == 0) return "(no runs)";
+        if (spans == null || spans.Count == 0) return "(no spans)";
         var sb = new StringBuilder();
-        int n = Math.Min(runs.Count, maxRuns);
+        int n = Math.Min(spans.Count, maxSpans);
         for (int i = 0; i < n; i++)
         {
-            var r = runs[i];
-            var t = r.Text.Length > 24 ? r.Text[..24] + "…" : r.Text;
-            t = t.Replace("\r", "\\r").Replace("\n", "\\n", StringComparison.Ordinal);
-            sb.Append('[').Append(i).Append("] \"")
-                .Append(t).Append("\" B=").Append(r.Style.Bold)
-                .Append(" I=").Append(r.Style.Italic)
-                .Append(" U=").Append(r.Style.Underline)
-                .Append(" ~=").Append(r.Style.Strikethrough)
-                .Append(" code=").Append(r.Style.Code)
-                .Append(" bg=").Append(r.Style.BackgroundColor ?? "—")
-                .Append("; ");
+            var s = spans[i];
+            if (s is TextSpan r)
+            {
+                var t = r.Text.Length > 24 ? r.Text[..24] + "…" : r.Text;
+                t = t.Replace("\r", "\\r").Replace("\n", "\\n", StringComparison.Ordinal);
+                sb.Append('[').Append(i).Append("] text:\"")
+                    .Append(t).Append("\" B=").Append(r.Style.Bold)
+                    .Append(" I=").Append(r.Style.Italic)
+                    .Append(" U=").Append(r.Style.Underline)
+                    .Append(" ~=").Append(r.Style.Strikethrough)
+                    .Append(" code=").Append(r.Style.Code)
+                    .Append(" bg=").Append(r.Style.BackgroundColor ?? "—")
+                    .Append("; ");
+            }
+            else if (s is EquationSpan e)
+            {
+                var t = e.Latex.Length > 24 ? e.Latex[..24] + "…" : e.Latex;
+                sb.Append('[').Append(i).Append("] eq:$").Append(t).Append("$; ");
+            }
         }
 
-        if (runs.Count > maxRuns)
-            sb.Append("…(+").Append(runs.Count - maxRuns).Append(" runs)");
+        if (spans.Count > maxSpans)
+            sb.Append("…(+").Append(spans.Count - maxSpans).Append(" spans)");
         return sb.ToString();
     }
 }

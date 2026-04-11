@@ -20,10 +20,10 @@ public static class NoteBlockMarkdownConverter
         for (var i = 0; i < ordered.Count; i++)
         {
             var b = ordered[i];
-            if (i > 0 && b.Type != BlockType.Code)
+            if (i > 0 && b.Type is not BlockType.Code and not BlockType.Equation)
                 sb.AppendLine();
             sb.Append(SerializeBlock(b));
-            if (b.Type == BlockType.Code)
+            if (b.Type is BlockType.Code or BlockType.Equation)
                 sb.AppendLine();
         }
 
@@ -32,10 +32,10 @@ public static class NoteBlockMarkdownConverter
 
     public static string SerializeBlock(Block block)
     {
-        block.EnsureInlineRuns();
-        var body = block.Type is BlockType.Code or BlockType.Divider
+        block.EnsureSpans();
+        var body = block.Type is BlockType.Code or BlockType.Divider or BlockType.Equation
             ? block.Content
-            : InlineMarkdownSerializer.SerializeRuns(block.InlineRuns!);
+            : InlineMarkdownSerializer.SerializeSpans(block.Spans);
         var listNum = GetListNumber(block);
         var isChecked = GetChecklistChecked(block);
         return block.Type switch
@@ -48,8 +48,9 @@ public static class NoteBlockMarkdownConverter
             BlockType.NumberedList => $"{listNum}. {body}",
             BlockType.Checklist => isChecked ? $"- [x] {body}" : $"- [ ] {body}",
             BlockType.Quote => "> " + body.Replace("\n", "\n> ", StringComparison.Ordinal),
-            BlockType.Code => "```\n" + (block.Content ?? string.Empty) + "\n```",
+            BlockType.Code => SerializeCodeFence(block),
             BlockType.Divider => "---",
+            BlockType.Equation => "$$\n" + GetEquationLatex(block) + "\n$$",
             BlockType.TwoColumn => block.Children is { Count: >= 2 }
                 ? SerializeBlock(block.Children[0]) + "\n\n---\n\n" + SerializeBlock(block.Children[1])
                 : string.Empty,
@@ -79,8 +80,51 @@ public static class NoteBlockMarkdownConverter
                 continue;
             }
 
+            if (trimmed == "$$" || (trimmed.StartsWith("$$") && trimmed.EndsWith("$$") && trimmed.Length > 2))
+            {
+                if (trimmed == "$$")
+                {
+                    var eqContent = new System.Text.StringBuilder();
+                    i++;
+                    while (i < lines.Length)
+                    {
+                        if (lines[i].TrimStart() == "$$") { i++; break; }
+                        if (eqContent.Length > 0) eqContent.AppendLine();
+                        eqContent.Append(lines[i]);
+                        i++;
+                    }
+                    var eqBlock = new Block
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Type = BlockType.Equation,
+                        Order = order++
+                    };
+                    var latex = eqContent.ToString().Trim();
+                    eqBlock.Payload = new EquationPayload(latex);
+                    eqBlock.Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
+                    result.Add(eqBlock);
+                }
+                else
+                {
+                    var inner = trimmed[2..^2].Trim();
+                    var eqBlock = new Block
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Type = BlockType.Equation,
+                        Order = order++
+                    };
+                    eqBlock.Payload = new EquationPayload(inner);
+                    eqBlock.Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
+                    result.Add(eqBlock);
+                    i++;
+                }
+                continue;
+            }
+
             if (trimmed.StartsWith("```", StringComparison.Ordinal))
             {
+                var fenceLang = trimmed.Length > 3 ? trimmed[3..].Trim() : string.Empty;
+                var language = string.IsNullOrEmpty(fenceLang) ? "csharp" : fenceLang;
                 var codeContent = new System.Text.StringBuilder();
                 i++;
                 while (i < lines.Length)
@@ -97,12 +141,15 @@ public static class NoteBlockMarkdownConverter
                     i++;
                 }
 
+                var source = codeContent.ToString();
                 var codeBlock = new Block
                 {
                     Id = Guid.NewGuid().ToString(),
                     Type = BlockType.Code,
                     Order = order++,
-                    Content = codeContent.ToString()
+                    Spans = new List<InlineSpan> { new TextSpan(source, TextStyle.Default) },
+                    Payload = new CodePayload(language, source),
+                    Meta = new Dictionary<string, object>()
                 };
                 result.Add(codeBlock);
                 continue;
@@ -133,7 +180,7 @@ public static class NoteBlockMarkdownConverter
             {
                 var content = Regex.Replace(trimmed, @"^-\s*\[\s*[xX]\s*\]\s*", "", RegexOptions.None).Trim();
                 var b = CreateRichBlock(BlockType.Checklist, content, order++);
-                b.Meta["checked"] = true;
+                b.Payload = new ChecklistPayload(true);
                 result.Add(b);
                 i++;
                 continue;
@@ -143,7 +190,7 @@ public static class NoteBlockMarkdownConverter
             {
                 var content = Regex.Replace(trimmed, @"^-\s*\[\s*\]\s*", "", RegexOptions.None).Trim();
                 var b = CreateRichBlock(BlockType.Checklist, content, order++);
-                b.Meta["checked"] = false;
+                b.Payload = new ChecklistPayload(false);
                 result.Add(b);
                 i++;
                 continue;
@@ -224,7 +271,7 @@ public static class NoteBlockMarkdownConverter
         };
         if (type == BlockType.Divider)
             return b;
-        b.InlineRuns = InlineMarkdownParser.ToRuns(content ?? string.Empty);
+        b.Spans = InlineMarkdownParser.ToSpans(content ?? string.Empty);
         if (type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
             EnsureHeadingBold(b);
         return b;
@@ -232,9 +279,17 @@ public static class NoteBlockMarkdownConverter
 
     private static void EnsureHeadingBold(Block b)
     {
-        b.EnsureInlineRuns();
-        var boldRuns = b.InlineRuns!.Select(r => new InlineRun(r.Text, r.Style.WithSet(InlineFormatKind.Bold))).ToList();
-        b.InlineRuns = InlineRunFormatApplier.Normalize(boldRuns);
+        b.EnsureSpans();
+        var list = new List<InlineSpan>();
+        foreach (var s in b.Spans)
+        {
+            if (s is TextSpan t)
+                list.Add(t with { Style = t.Style.WithSet(InlineFormatKind.Bold) });
+            else
+                list.Add(s);
+        }
+
+        b.Spans = InlineSpanFormatApplier.Normalize(list);
     }
 
     private static int GetListNumber(Block block)
@@ -252,6 +307,8 @@ public static class NoteBlockMarkdownConverter
 
     private static bool GetChecklistChecked(Block block)
     {
+        if (block.Payload is ChecklistPayload cp)
+            return cp.Checked;
         if (!block.Meta.TryGetValue("checked", out var v))
             return false;
         return v switch
@@ -260,6 +317,40 @@ public static class NoteBlockMarkdownConverter
             JsonElement je when je.ValueKind is JsonValueKind.True => true,
             JsonElement je when je.ValueKind is JsonValueKind.False => false,
             _ => false
+        };
+    }
+
+    private static string SerializeCodeFence(Block block)
+    {
+        string source;
+        string lang;
+        if (block.Payload is CodePayload cp)
+        {
+            lang = (cp.Language ?? string.Empty).Trim();
+            source = cp.Source ?? string.Empty;
+        }
+        else
+        {
+            lang = string.Empty;
+            source = block.Content ?? string.Empty;
+        }
+
+        return string.IsNullOrEmpty(lang)
+            ? "```\n" + source + "\n```"
+            : "```" + lang + "\n" + source + "\n```";
+    }
+
+    private static string GetEquationLatex(Block block)
+    {
+        if (block.Payload is EquationPayload ep)
+            return ep.Latex;
+        if (!block.Meta.TryGetValue("equationLatex", out var v) || v == null)
+            return string.Empty;
+        return v switch
+        {
+            string s => s,
+            JsonElement je when je.ValueKind == JsonValueKind.String => je.GetString() ?? string.Empty,
+            _ => v.ToString() ?? string.Empty
         };
     }
 }

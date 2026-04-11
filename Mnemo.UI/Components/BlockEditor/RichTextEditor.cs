@@ -13,12 +13,23 @@ using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using Avalonia.Utilities;
 using Avalonia.Threading;
+using Avalonia.Layout;
+using Avalonia.VisualTree;
+using Avalonia.Controls.Primitives.PopupPositioning;
+using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
+using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.LaTeX;
+using Mnemo.UI.Controls;
+using Mnemo.UI;
+using Mnemo.UI.Services.LaTeX.Layout.Boxes;
+using Mnemo.UI.Services.LaTeX.Rendering;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
 /// <summary>
-/// Custom editable control that renders styled <see cref="InlineRun"/> lists directly via
+/// Custom editable control that renders styled <see cref="InlineSpan"/> lists directly via
 /// <see cref="TextLayout"/>, giving pixel-accurate caret and selection geometry that stays
 /// aligned with the visible rich text at all times.
 /// </summary>
@@ -26,9 +37,9 @@ public class RichTextEditor : Control
 {
     // ── Avalonia properties ──────────────────────────────────────────────────
 
-    public static readonly StyledProperty<IReadOnlyList<InlineRun>> RunsProperty =
-        AvaloniaProperty.Register<RichTextEditor, IReadOnlyList<InlineRun>>(
-            nameof(Runs), defaultValue: Array.Empty<InlineRun>());
+    public static readonly StyledProperty<IReadOnlyList<InlineSpan>> SpansProperty =
+        AvaloniaProperty.Register<RichTextEditor, IReadOnlyList<InlineSpan>>(
+            nameof(Spans), defaultValue: Array.Empty<InlineSpan>());
 
     public static readonly StyledProperty<string?> WatermarkProperty =
         AvaloniaProperty.Register<RichTextEditor, string?>(nameof(Watermark));
@@ -74,8 +85,12 @@ public class RichTextEditor : Control
     private int _selectionEnd;
     private TextLayout? _textLayout;
     private TextLayout? _watermarkLayout;
-    /// <summary>Text we built the current _textLayout for; used to detect stale layout when Runs were set after first paint.</summary>
+    /// <summary>Text we built the current _textLayout for; used to detect stale layout when Spans were set after first paint.</summary>
     private string? _lastBuiltText;
+    /// <summary>Logical caret boundary <c>k</c> → layout character index (same convention as <see cref="TextLayout"/>).</summary>
+    private int[]? _layoutBoundaryAtLogical;
+    /// <summary>Length of the expanded layout string (spaces reserve inline math width).</summary>
+    private int _layoutTextLength;
     /// <summary>Width we last built layout for; used in Render to avoid building with Bounds (can be 0 or stale) and to prevent layout loops.</summary>
     private double _lastLayoutWidth;
     private bool _caretVisible = true;
@@ -85,6 +100,31 @@ public class RichTextEditor : Control
 
     private static readonly FontFamily MonoFont =
         new("Cascadia Code, Consolas, Courier New, monospace");
+
+    /// <summary>Cached inline equation layouts keyed by (charIndex, latex). Rebuilt when runs change.</summary>
+    private readonly List<InlineEquationEntry> _inlineEquations = new();
+    private readonly LRUCache<(string, double, uint), FormattedText> _mathTextCache = new(200);
+    private ILaTeXEngine? _latexEngine;
+    private bool _inlineEquationsDirty = true;
+
+    /// <summary>Extra space so inline math ink (fractions, integrals) is not clipped vs text line metrics.</summary>
+    private double _mathPadLeft, _mathPadTop, _mathPadRight, _mathPadBottom;
+
+    /// <summary>While the inline equation flyout is open, LaTeX is previewed from here without committing <see cref="SpansProperty"/>.</summary>
+    private bool _inlineEqPreviewActive;
+    private string? _inlineEqPreviewLatex;
+    private DispatcherTimer? _inlineEqRebuildTimer;
+    /// <summary>Escape sets this so <see cref="Closed"/> does not commit to the document.</summary>
+    private bool _inlineEqSuppressCloseCommit;
+
+    private sealed class InlineEquationEntry
+    {
+        public int CharIndex;
+        public string Latex = string.Empty;
+        public Box? Layout;
+        public double Width;
+        public double Height;
+    }
 
     // ── Routed events ────────────────────────────────────────────────────────
 
@@ -106,10 +146,10 @@ public class RichTextEditor : Control
 
     // ── Public API ───────────────────────────────────────────────────────────
 
-    public IReadOnlyList<InlineRun> Runs
+    public IReadOnlyList<InlineSpan> Spans
     {
-        get => GetValue(RunsProperty);
-        set => SetValue(RunsProperty, value);
+        get => GetValue(SpansProperty);
+        set => SetValue(SpansProperty, value);
     }
 
     public string? Watermark
@@ -188,7 +228,7 @@ public class RichTextEditor : Control
     }
 
     /// <summary>Flat text derived from the current runs.</summary>
-    public string Text => FlattenRuns(Runs ?? Array.Empty<InlineRun>());
+    public string Text => FlattenRuns(Spans ?? Array.Empty<InlineSpan>());
 
     public int TextLength => Text.Length;
 
@@ -203,9 +243,17 @@ public class RichTextEditor : Control
     static RichTextEditor()
     {
         FocusableProperty.OverrideDefaultValue<RichTextEditor>(true);
+        ClipToBoundsProperty.OverrideDefaultValue<RichTextEditor>(false);
         MinWidthProperty.OverrideDefaultValue<RichTextEditor>(2.0);
-        RunsProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.OnRunsChanged());
-        FontSizeProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
+        SpansProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.OnSpansChanged());
+        FontSizeProperty.Changed.AddClassHandler<RichTextEditor>((o, e) =>
+        {
+            o._inlineEquationsDirty = true;
+            o.InvalidateLayout();
+#pragma warning disable CS4014
+            o.RebuildInlineEquationsAsync();
+#pragma warning restore CS4014
+        });
         FontWeightProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
         ForegroundProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
         WatermarkProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
@@ -222,6 +270,8 @@ public class RichTextEditor : Control
     {
         base.OnDetachedFromVisualTree(e);
         StopCaretTimer();
+        _inlineEqRebuildTimer?.Stop();
+        _inlineEqRebuildTimer = null;
         DisposeLayouts();
     }
 
@@ -237,9 +287,12 @@ public class RichTextEditor : Control
         var maxWidth = availableSize.Width > 0 && !double.IsInfinity(availableSize.Width)
             ? availableSize.Width : MaxLayoutWidth;
         BuildLayout(maxWidth);
-        var height = _textLayout?.Height ?? FontSize;
+        var textH = _textLayout?.Height ?? FontSize;
+        var textW = _textLayout?.Width ?? MinLayoutWidth;
+        var height = textH + _mathPadTop + _mathPadBottom;
+        var intrinsicW = textW + _mathPadLeft + _mathPadRight;
         var width = double.IsInfinity(availableSize.Width) || availableSize.Width <= 0
-            ? Math.Max(MinLayoutWidth, Math.Min(MaxLayoutWidth, _textLayout?.Width ?? MinLayoutWidth))
+            ? Math.Max(MinLayoutWidth, Math.Min(MaxLayoutWidth, intrinsicW))
             : availableSize.Width;
         return new Size(width, height);
     }
@@ -258,7 +311,7 @@ public class RichTextEditor : Control
             maxWidth = MinLayoutWidth;
         DisposeLayouts();
 
-        var runs = Runs ?? Array.Empty<InlineRun>();
+        var runs = Spans ?? Array.Empty<InlineSpan>();
         var text = FlattenRuns(runs);
         // Use an explicit opaque brush so text is always visible (theme/resolution can make DynamicResource brush wrong at measure time).
         var foreground = Foreground ?? GetThemeForeground();
@@ -285,6 +338,8 @@ public class RichTextEditor : Control
                     null, FlowDirection.LeftToRight, maxWidth);
             }
             _lastBuiltText = string.Empty;
+            _layoutBoundaryAtLogical = new int[] { 0 };
+            _layoutTextLength = 0;
             return;
         }
 
@@ -293,10 +348,12 @@ public class RichTextEditor : Control
         if (safeForeground.Opacity == 0)
             safeForeground = new SolidColorBrush(Colors.Black);
 
-        // Single layout with style overrides so line breaking uses correct metrics (bold vs normal, etc.) and drawing is correct.
-        var styleSpans = BuildStyleSpans(runs, safeForeground);
+        var (layoutText, styleSpans, boundaries) = BuildExpandedLayoutText(runs, text.Length, safeForeground, typeface);
+        _layoutBoundaryAtLogical = boundaries;
+        _layoutTextLength = layoutText.Length;
+
         _textLayout = new TextLayout(
-            text, typeface, FontSize, safeForeground,
+            layoutText, typeface, FontSize, safeForeground,
             TextAlignment.Left, TextWrapping.Wrap, TextTrimming.None,
             null, FlowDirection.LeftToRight, maxWidth,
             double.PositiveInfinity, double.NaN, 0, 0,
@@ -304,69 +361,198 @@ public class RichTextEditor : Control
         _lastBuiltText = text;
     }
 
-    private List<ValueSpan<TextRunProperties>> BuildStyleSpans(
-        IReadOnlyList<InlineRun> runs, IBrush defaultForeground)
+    /// <summary>Layout string uses spaces to reserve measured inline-math width (Notion-style flow).</summary>
+    private (string LayoutText, List<ValueSpan<TextRunProperties>> GlyphSpans, int[] Boundaries) BuildExpandedLayoutText(
+        IReadOnlyList<InlineSpan> docSpans,
+        int logicalLen,
+        IBrush defaultForeground,
+        Typeface defaultTypeface)
     {
-        var spans = new List<ValueSpan<TextRunProperties>>(runs.Count);
-        int offset = 0;
-        foreach (var run in runs)
+        var sb = new StringBuilder();
+        var glyphSpans = new List<ValueSpan<TextRunProperties>>(docSpans.Count * 2);
+        var boundaries = new int[logicalLen + 1];
+        boundaries[0] = 0;
+        int logicalIdx = 0;
+        int layoutOffset = 0;
+
+        foreach (var seg in docSpans)
         {
-            if (run.Text.Length == 0) continue;
-
-            var style = run.Style;
-            var ff = style.Code ? MonoFont : FontFamily.Default;
-            var fw = style.Bold ? FontWeight.Bold : FontWeight.Normal;
-            var fs = style.Italic ? FontStyle.Italic : FontStyle.Normal;
-            var typeface = new Typeface(ff, fs, fw);
-
-            TextDecorationCollection? decorations = null;
-            if (style.Underline || style.Strikethrough || !string.IsNullOrEmpty(style.LinkUrl))
+            if (seg is TextSpan run)
             {
-                decorations = new TextDecorationCollection();
-                if (style.Underline || !string.IsNullOrEmpty(style.LinkUrl))
-                    decorations.Add(new TextDecoration { Location = TextDecorationLocation.Underline });
-                if (style.Strikethrough)
-                    decorations.Add(new TextDecoration { Location = TextDecorationLocation.Strikethrough });
-            }
+                if (run.Text.Length == 0) continue;
 
-            IBrush runForeground = defaultForeground;
-            if (!string.IsNullOrEmpty(style.LinkUrl)
-                && Application.Current?.TryFindResource("LinksBrush", out var linkRes) == true
-                && linkRes is IBrush linkBrush)
-                runForeground = linkBrush;
+                var style = run.Style;
+                var ff = style.Code ? MonoFont : FontFamily.Default;
+                var fw = style.Bold ? FontWeight.Bold : FontWeight.Normal;
+                var fs = style.Italic ? FontStyle.Italic : FontStyle.Normal;
+                var runTypeface = new Typeface(ff, fs, fw);
 
-            IBrush? background = null;
-            if (!string.IsNullOrEmpty(style.BackgroundColor))
-            {
-                if (Color.TryParse(style.BackgroundColor, out var bgColor))
+                TextDecorationCollection? decorations = null;
+                if (style.Underline || style.Strikethrough || !string.IsNullOrEmpty(style.LinkUrl))
                 {
-                    background = new SolidColorBrush(bgColor);
+                    decorations = new TextDecorationCollection();
+                    if (style.Underline || !string.IsNullOrEmpty(style.LinkUrl))
+                        decorations.Add(new TextDecoration { Location = TextDecorationLocation.Underline });
+                    if (style.Strikethrough)
+                        decorations.Add(new TextDecoration { Location = TextDecorationLocation.Strikethrough });
                 }
-                else if (style.BackgroundColor.StartsWith("swatch", StringComparison.OrdinalIgnoreCase) && Application.Current != null)
+
+                IBrush runForeground = defaultForeground;
+                if (!string.IsNullOrEmpty(style.LinkUrl)
+                    && Application.Current?.TryFindResource("LinksBrush", out var linkRes) == true
+                    && linkRes is IBrush linkBrush)
+                    runForeground = linkBrush;
+
+                IBrush? background = null;
+                if (!string.IsNullOrEmpty(style.BackgroundColor))
                 {
-                    var key = "ColorSwatch" + style.BackgroundColor.Substring(6);
-                    if (Application.Current.TryFindResource(key, out var res) && res is Color rc)
+                    if (Color.TryParse(style.BackgroundColor, out var bgColor))
                     {
-                        background = new SolidColorBrush(rc);
+                        background = new SolidColorBrush(bgColor);
+                    }
+                    else if (style.BackgroundColor.StartsWith("swatch", StringComparison.OrdinalIgnoreCase) && Application.Current != null)
+                    {
+                        var key = "ColorSwatch" + style.BackgroundColor.Substring(6);
+                        if (Application.Current.TryFindResource(key, out var res) && res is Color rc)
+                        {
+                            background = new SolidColorBrush(rc);
+                        }
                     }
                 }
+
+                var props = new GenericTextRunProperties(
+                    runTypeface,
+                    fontRenderingEmSize: FontSize,
+                    textDecorations: decorations,
+                    foregroundBrush: runForeground,
+                    backgroundBrush: background);
+
+                sb.Append(run.Text);
+                glyphSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, run.Text.Length, props));
+                layoutOffset += run.Text.Length;
+                for (var c = 0; c < run.Text.Length; c++)
+                {
+                    logicalIdx++;
+                    boundaries[logicalIdx] = layoutOffset;
+                }
             }
+            else if (seg is EquationSpan eq)
+            {
+                var style = eq.Style;
+                var ff = style.Code ? MonoFont : FontFamily.Default;
+                var fw = style.Bold ? FontWeight.Bold : FontWeight.Normal;
+                var fs = style.Italic ? FontStyle.Italic : FontStyle.Normal;
+                var runTypeface = new Typeface(ff, fs, fw);
+                var props = new GenericTextRunProperties(
+                    runTypeface,
+                    fontRenderingEmSize: FontSize,
+                    textDecorations: null,
+                    foregroundBrush: Brushes.Transparent,
+                    backgroundBrush: null);
 
-            var props = new GenericTextRunProperties(
-                typeface,
-                fontRenderingEmSize: FontSize,
-                textDecorations: decorations,
-                foregroundBrush: runForeground,
-                backgroundBrush: background);
-
-            spans.Add(new ValueSpan<TextRunProperties>(offset, run.Text.Length, props));
-            offset += run.Text.Length;
+                var placeholderAdv = MeasureRunTextWidth(InlineSpan.EquationAtomChar.ToString(), runTypeface, Brushes.Transparent);
+                double target = GetEquationTargetWidth(logicalIdx, placeholderAdv);
+                int n = GetMinimalSpaceCountForTargetWidth(target, runTypeface, Brushes.Transparent);
+                for (var j = 0; j < n; j++)
+                    sb.Append(' ');
+                glyphSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, n, props));
+                layoutOffset += n;
+                logicalIdx++;
+                boundaries[logicalIdx] = layoutOffset;
+            }
         }
-        return spans;
+
+        return (sb.ToString(), glyphSpans, boundaries);
     }
 
-    private void OnRunsChanged()
+    private static double MeasureTextLayoutWidth(string text, Typeface typeface, IBrush fg, double fontSize)
     {
+        if (text.Length == 0) return 0;
+        using var tl = new TextLayout(
+            text, typeface, fontSize, fg,
+            TextAlignment.Left, TextWrapping.NoWrap, TextTrimming.None,
+            null, FlowDirection.LeftToRight, 10000);
+        return tl.Width > 0 ? tl.Width : fontSize * 0.25;
+    }
+
+    private double MeasureRunTextWidth(string text, Typeface typeface, IBrush fg) =>
+        MeasureTextLayoutWidth(text, typeface, fg, FontSize);
+
+    private double GetEquationTargetWidth(int logicalCharIndex, double placeholderAdvance)
+    {
+        foreach (var eq in _inlineEquations)
+        {
+            if (eq.CharIndex == logicalCharIndex && eq.Width > 0)
+                return eq.Width;
+        }
+
+        return placeholderAdvance;
+    }
+
+    /// <summary>Minimal number of spaces so measured width ≥ target (same font as the equation run — avoids bold/code mismatch vs default space width).</summary>
+    private int GetMinimalSpaceCountForTargetWidth(double targetWidth, Typeface typeface, IBrush fg)
+    {
+        if (targetWidth <= 0)
+            return 1;
+        double spaceW = MeasureRunTextWidth(" ", typeface, fg);
+        if (spaceW <= 0)
+            spaceW = FontSize * 0.25;
+        int n = Math.Max(1, (int)Math.Ceiling(targetWidth / spaceW));
+        while (n > 1)
+        {
+            double wPrev = MeasureRunTextWidth(new string(' ', n - 1), typeface, fg);
+            if (wPrev >= targetWidth)
+                n--;
+            else
+                break;
+        }
+
+        return n;
+    }
+
+    private int LogicalCaretToLayoutBoundary(int logicalCaret)
+    {
+        if (_layoutBoundaryAtLogical == null || _layoutBoundaryAtLogical.Length == 0)
+            return 0;
+        var maxLogical = _layoutBoundaryAtLogical.Length - 1;
+        logicalCaret = Math.Clamp(logicalCaret, 0, maxLogical);
+        return _layoutBoundaryAtLogical[logicalCaret];
+    }
+
+    private int LayoutBoundaryIndexToLogicalCaret(int layoutBoundaryIndex)
+    {
+        if (_layoutBoundaryAtLogical == null || _layoutBoundaryAtLogical.Length == 0)
+            return 0;
+        int maxLogical = _layoutBoundaryAtLogical.Length - 1;
+        int maxBound = _layoutBoundaryAtLogical[maxLogical];
+        layoutBoundaryIndex = Math.Clamp(layoutBoundaryIndex, 0, maxBound);
+
+        // boundaries[k] = layout offset of logical caret k (monotone). Map layout probe -> caret index.
+        int u = 0;
+        while (u <= maxLogical && _layoutBoundaryAtLogical[u] <= layoutBoundaryIndex)
+            u++;
+        if (u > maxLogical)
+            return maxLogical;
+
+        int loCaret = u - 1;
+        if (layoutBoundaryIndex == _layoutBoundaryAtLogical[loCaret])
+            return loCaret;
+
+        int hiBound = _layoutBoundaryAtLogical[u];
+        if (layoutBoundaryIndex >= hiBound)
+            return u;
+
+        int loBound = _layoutBoundaryAtLogical[loCaret];
+        if (hiBound <= loBound)
+            return loCaret;
+
+        int mid = (loBound + hiBound) / 2;
+        return layoutBoundaryIndex < mid ? loCaret : loCaret + 1;
+    }
+
+    private void OnSpansChanged()
+    {
+        _inlineEquationsDirty = true;
         InvalidateLayout();
         var len = TextLength;
         if (_caretIndex > len) CaretIndex = len;
@@ -374,6 +560,16 @@ public class RichTextEditor : Control
         if (_selectionStart > selMax) SelectionStart = selMax;
         if (_selectionEnd > selMax) SelectionEnd = selMax;
         RaiseEvent(new TextChangedEventArgs(TextChangedEvent));
+        _ = RebuildInlineEquationsAsync();
+        var runs = Spans ?? Array.Empty<InlineSpan>();
+        if (runs.Any(static s => s is EquationSpan))
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                _inlineEquationsDirty = true;
+                _ = RebuildInlineEquationsAsync();
+            }, DispatcherPriority.Loaded);
+        }
     }
 
     private void InvalidateLayout()
@@ -391,6 +587,8 @@ public class RichTextEditor : Control
         _watermarkLayout = null;
         _lastBuiltText = null;
         _lastLayoutWidth = 0;
+        _layoutBoundaryAtLogical = null;
+        _layoutTextLength = 0;
     }
 
     private bool ShouldDrawWatermark() =>
@@ -413,6 +611,19 @@ public class RichTextEditor : Control
         }
     }
 
+    private static string TNotes(string key)
+    {
+        var loc = (Application.Current as App)?.Services?.GetService<ILocalizationService>();
+        return loc?.T(key, "NotesEditor") ?? key;
+    }
+
+    private static IBrush GetEquationActiveHighlightBrush()
+    {
+        if (Application.Current?.TryFindResource("OverlayHighlightColorBrush", out var r) == true && r is IBrush b)
+            return b;
+        return new SolidColorBrush(Color.FromArgb(0xCC, 0x46, 0x45, 0x49));
+    }
+
     // ── Rendering ────────────────────────────────────────────────────────────
 
     public override void Render(DrawingContext context)
@@ -425,64 +636,73 @@ public class RichTextEditor : Control
 
         var origin = new Point(0, 0);
 
-        // Selection background
-        int selStart = Math.Min(_selectionStart, _selectionEnd);
-        int selEnd = Math.Max(_selectionStart, _selectionEnd);
-        if (selEnd > selStart && _textLayout != null)
+        using (context.PushTransform(Matrix.CreateTranslation(_mathPadLeft, _mathPadTop)))
         {
-            var selBrush = SelectionBrush ?? new SolidColorBrush(Colors.CornflowerBlue, 0.4);
-            if (string.IsNullOrEmpty(Text))
+            // Selection background
+            int selStart = Math.Min(_selectionStart, _selectionEnd);
+            int selEnd = Math.Max(_selectionStart, _selectionEnd);
+            if (selEnd > selStart && _textLayout != null)
             {
-                double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
-                double w = Math.Max(3.0, FontSize * 0.45);
-                context.FillRectangle(selBrush, new Rect(0, 0, w, h));
-            }
-            else
-            {
-                var rects = _textLayout.HitTestTextRange(selStart, selEnd - selStart).ToList();
-                bool hasDrawable = rects.Any(r => r.Width > 0.5 && r.Height > 0.5);
-                if (!hasDrawable)
+                var selBrush = SelectionBrush ?? new SolidColorBrush(Colors.CornflowerBlue, 0.4);
+                if (string.IsNullOrEmpty(Text))
                 {
-                    // U+200B and other zero-advance glyphs often yield no range rects; draw a caret-sized chip.
-                    try
-                    {
-                        int idx = TextLength > 0 ? Math.Clamp(selStart, 0, TextLength - 1) : 0;
-                        var pos = _textLayout.HitTestTextPosition(idx);
-                        double h = pos.Height > 0 ? pos.Height : (_textLayout.Height > 0 ? _textLayout.Height : FontSize);
-                        double chipW = pos.Width > 0.5 ? pos.Width : Math.Max(3.0, FontSize * 0.45);
-                        context.FillRectangle(selBrush, new Rect(pos.X, pos.Y, chipW, h));
-                    }
-                    catch
-                    {
-                        double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
-                        double chipW = Math.Max(3.0, FontSize * 0.45);
-                        context.FillRectangle(selBrush, new Rect(0, 0, chipW, h));
-                    }
+                    double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
+                    double w = Math.Max(3.0, FontSize * 0.45);
+                    context.FillRectangle(selBrush, new Rect(0, 0, w, h));
                 }
                 else
                 {
-                    foreach (var rect in rects)
-                        context.FillRectangle(selBrush, rect.Translate(origin));
+                    int layoutSelStart = LogicalCaretToLayoutBoundary(selStart);
+                    int layoutSelLen = LogicalCaretToLayoutBoundary(selEnd) - layoutSelStart;
+                    // Avalonia HitTestTextRange requires non-zero length; mapping can be 0 on edge transitions.
+                    List<Rect> rects;
+                    if (layoutSelLen <= 0)
+                        rects = new List<Rect>();
+                    else
+                        rects = _textLayout.HitTestTextRange(layoutSelStart, layoutSelLen).ToList();
+                    bool hasDrawable = rects.Any(r => r.Width > 0.5 && r.Height > 0.5);
+                    if (!hasDrawable)
+                    {
+                        // U+200B and other zero-advance glyphs often yield no range rects; draw a caret-sized chip.
+                        try
+                        {
+                            int idx = TextLength > 0 ? LogicalCaretToLayoutBoundary(Math.Clamp(selStart, 0, TextLength - 1)) : 0;
+                            var pos = _textLayout.HitTestTextPosition(idx);
+                            double h = pos.Height > 0 ? pos.Height : (_textLayout.Height > 0 ? _textLayout.Height : FontSize);
+                            double chipW = pos.Width > 0.5 ? pos.Width : Math.Max(3.0, FontSize * 0.45);
+                            context.FillRectangle(selBrush, new Rect(pos.X, pos.Y, chipW, h));
+                        }
+                        catch
+                        {
+                            double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
+                            double chipW = Math.Max(3.0, FontSize * 0.45);
+                            context.FillRectangle(selBrush, new Rect(0, 0, chipW, h));
+                        }
+                    }
+                    else
+                    {
+                        foreach (var rect in rects)
+                            context.FillRectangle(selBrush, rect.Translate(origin));
+                    }
                 }
             }
-        }
 
-        // Always draw the text layout first so removing the watermark repaints the line (avoids stale glyphs).
-        if (_textLayout != null)
-        {
-            _textLayout.Draw(context, origin);
-            // Do not trust VM-only focus: several blocks can briefly (or stuck) have IsFocused while only
-            // one RichTextEditor has keyboard focus. Image captions: parent toggles Watermark while hovering the image.
-            if (ShouldDrawWatermark() && _watermarkLayout != null)
-                _watermarkLayout.Draw(context, origin);
-        }
+            // Always draw the text layout first so removing the watermark repaints the line (avoids stale glyphs).
+            if (_textLayout != null)
+            {
+                _textLayout.Draw(context, origin);
+                RenderInlineEquations(context);
+                if (ShouldDrawWatermark() && _watermarkLayout != null)
+                    _watermarkLayout.Draw(context, origin);
+            }
 
-        // Caret
-        if (IsFocused && _caretVisible && selEnd == selStart && _textLayout != null)
-        {
-            var caretBrush = CaretBrush ?? Brushes.Black;
-            var caretRect = GetCaretRect();
-            context.FillRectangle(caretBrush, caretRect);
+            // Caret
+            if (IsFocused && _caretVisible && selEnd == selStart && _textLayout != null)
+            {
+                var caretBrush = CaretBrush ?? Brushes.Black;
+                var caretRect = GetCaretRect();
+                context.FillRectangle(caretBrush, caretRect);
+            }
         }
     }
 
@@ -503,7 +723,7 @@ public class RichTextEditor : Control
                 var charRect = _textLayout.HitTestTextPosition(0);
                 var h = charRect.Height > 0 ? charRect.Height : FontSize;
                 var w = charRect.Width > 0 ? charRect.Width : 1;
-                return new Rect(charRect.X, charRect.Y, w, h);
+                return new Rect(charRect.X + _mathPadLeft, charRect.Y + _mathPadTop, w, h);
             }
             catch
             {
@@ -518,7 +738,7 @@ public class RichTextEditor : Control
                 var charRect = _watermarkLayout.HitTestTextPosition(0);
                 var h = charRect.Height > 0 ? charRect.Height : FontSize;
                 var w = charRect.Width > 0 ? charRect.Width : 1;
-                return new Rect(charRect.X, charRect.Y, w, h);
+                return new Rect(charRect.X + _mathPadLeft, charRect.Y + _mathPadTop, w, h);
             }
             catch
             {
@@ -526,7 +746,7 @@ public class RichTextEditor : Control
             }
         }
 
-        return new Rect(0, 0, Bounds.Width > 0 ? Bounds.Width : layoutWidth, FontSize);
+        return new Rect(_mathPadLeft, _mathPadTop, Bounds.Width > 0 ? Bounds.Width : layoutWidth, FontSize);
     }
 
     /// <summary>Returns the bounding rect of the current selection in local coordinates, or null if no selection or layout not ready.</summary>
@@ -539,24 +759,35 @@ public class RichTextEditor : Control
         {
             double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
             double w = Math.Max(3.0, FontSize * 0.45);
-            return new Rect(0, 0, w, h);
+            return new Rect(_mathPadLeft, _mathPadTop, w, h);
         }
         try
         {
-            var rects = _textLayout.HitTestTextRange(selStart, selEnd - selStart).ToList();
+            int layoutSelStart = LogicalCaretToLayoutBoundary(selStart);
+            int layoutSelLen = LogicalCaretToLayoutBoundary(selEnd) - layoutSelStart;
+            if (layoutSelLen <= 0)
+            {
+                int fbIdx = TextLength > 0 ? LogicalCaretToLayoutBoundary(Math.Clamp(selStart, 0, TextLength - 1)) : 0;
+                var fbPos = _textLayout.HitTestTextPosition(fbIdx);
+                double fbH = fbPos.Height > 0 ? fbPos.Height : (_textLayout.Height > 0 ? _textLayout.Height : FontSize);
+                double fbW = fbPos.Width > 0.5 ? fbPos.Width : Math.Max(3.0, FontSize * 0.45);
+                return new Rect(fbPos.X + _mathPadLeft, fbPos.Y + _mathPadTop, fbW, fbH);
+            }
+
+            var rects = _textLayout.HitTestTextRange(layoutSelStart, layoutSelLen).ToList();
             bool hasDrawable = rects.Any(r => r.Width > 0.5 && r.Height > 0.5);
             if (hasDrawable)
             {
                 var r = rects[0];
                 for (int i = 1; i < rects.Count; i++)
                     r = r.Union(rects[i]);
-                return r;
+                return r.Translate(new Vector(_mathPadLeft, _mathPadTop));
             }
-            int idx = TextLength > 0 ? Math.Clamp(selStart, 0, TextLength - 1) : 0;
+            int idx = TextLength > 0 ? LogicalCaretToLayoutBoundary(Math.Clamp(selStart, 0, TextLength - 1)) : 0;
             var pos = _textLayout.HitTestTextPosition(idx);
             double h = pos.Height > 0 ? pos.Height : (_textLayout.Height > 0 ? _textLayout.Height : FontSize);
             double chipW = pos.Width > 0.5 ? pos.Width : Math.Max(3.0, FontSize * 0.45);
-            return new Rect(pos.X, pos.Y, chipW, h);
+            return new Rect(pos.X + _mathPadLeft, pos.Y + _mathPadTop, chipW, h);
         }
         catch
         {
@@ -569,7 +800,8 @@ public class RichTextEditor : Control
         if (_textLayout == null) return new Rect(0, 0, 1, FontSize);
         try
         {
-            var charRect = _textLayout.HitTestTextPosition(_caretIndex);
+            var layoutIdx = LogicalCaretToLayoutBoundary(_caretIndex);
+            var charRect = _textLayout.HitTestTextPosition(layoutIdx);
             return new Rect(charRect.X, charRect.Y, 1.5, charRect.Height > 0 ? charRect.Height : FontSize);
         }
         catch
@@ -681,6 +913,8 @@ public class RichTextEditor : Control
 
         if (e.ClickCount == 1)
         {
+            // Single-click must place the caret / start a drag-select. Opening the equation editor here
+            // stole the gesture and made selection across inline math unreliable (double-click still opens).
             CaretIndex = idx;
             SelectionStart = idx;
             SelectionEnd = idx;
@@ -690,6 +924,11 @@ public class RichTextEditor : Control
         }
         else if (e.ClickCount == 2)
         {
+            if (TryOpenInlineEquationFlyoutAtPoint(pos))
+            {
+                e.Handled = true;
+                return;
+            }
             SelectWord(idx);
         }
         else if (e.ClickCount >= 3)
@@ -855,7 +1094,7 @@ public class RichTextEditor : Control
     /// <summary>Delete characters [start, end) and notify via TextChanged.</summary>
     private void DeleteRange(int start, int end)
     {
-        var flat = FlattenRuns(Runs ?? Array.Empty<InlineRun>());
+        var flat = FlattenRuns(Spans ?? Array.Empty<InlineSpan>());
         if (flat.Length == 0 && start == 0 && end == 1)
         {
             SelectionStart = 0;
@@ -863,8 +1102,8 @@ public class RichTextEditor : Control
             CaretIndex = 0;
             return;
         }
-        var runs = ApplyTextDeletion(Runs ?? Array.Empty<InlineRun>(), start, end);
-        Runs = runs;
+        var runs = ApplyTextDeletion(Spans ?? Array.Empty<InlineSpan>(), start, end);
+        Spans = runs;
     }
 
     private void InsertText(string text)
@@ -874,9 +1113,9 @@ public class RichTextEditor : Control
         if (TextLength == 0 && start == 0 && end == 1)
             end = 0;
 
-        var runs = ApplyTextInsertion(Runs ?? Array.Empty<InlineRun>(), start, end, text);
+        var runs = ApplyTextInsertion(Spans ?? Array.Empty<InlineSpan>(), start, end, text);
         int newCaret = start + text.Length;
-        Runs = runs;
+        Spans = runs;
         CaretIndex = newCaret;
         SelectionStart = newCaret;
         SelectionEnd = newCaret;
@@ -887,32 +1126,26 @@ public class RichTextEditor : Control
 
     // ── Run mutation helpers ─────────────────────────────────────────────────
 
-    private static IReadOnlyList<InlineRun> ApplyTextDeletion(
-        IReadOnlyList<InlineRun> runs, int start, int end)
+    private static IReadOnlyList<InlineSpan> ApplyTextDeletion(
+        IReadOnlyList<InlineSpan> runs, int start, int end)
     {
-        return Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(
+        return Core.Formatting.InlineSpanFormatApplier.ApplyTextEdit(
             runs, FlattenRuns(runs), FlattenRuns(runs).Remove(start, end - start));
     }
 
-    private static IReadOnlyList<InlineRun> ApplyTextInsertion(
-        IReadOnlyList<InlineRun> runs, int selStart, int selEnd, string text)
+    private static IReadOnlyList<InlineSpan> ApplyTextInsertion(
+        IReadOnlyList<InlineSpan> runs, int selStart, int selEnd, string text)
     {
         var flat = FlattenRuns(runs);
         int removeLen = selEnd - selStart;
         var newFlat = removeLen > 0
             ? flat.Remove(selStart, removeLen).Insert(selStart, text)
             : flat.Insert(selStart, text);
-        return Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(runs, flat, newFlat);
+        return Core.Formatting.InlineSpanFormatApplier.ApplyTextEdit(runs, flat, newFlat);
     }
 
-    private static string FlattenRuns(IReadOnlyList<InlineRun> runs)
-    {
-        if (runs.Count == 0) return string.Empty;
-        if (runs.Count == 1) return runs[0].Text;
-        var sb = new StringBuilder();
-        foreach (var r in runs) sb.Append(r.Text);
-        return sb.ToString();
-    }
+    private static string FlattenRuns(IReadOnlyList<InlineSpan> runs) =>
+        InlineSpanText.FlattenEditing(runs);
 
     // ── Hit-testing ──────────────────────────────────────────────────────────
 
@@ -920,18 +1153,19 @@ public class RichTextEditor : Control
     public bool TryGetLinkUrlAt(int index, out string? url)
     {
         url = null;
-        var runs = Runs ?? Array.Empty<InlineRun>();
+        var runs = Spans ?? Array.Empty<InlineSpan>();
         if (runs.Count == 0) return false;
         int len = TextLength;
         if (len == 0) return false;
         int i = Math.Clamp(index, 0, len - 1);
         int pos = 0;
-        foreach (var run in runs)
+        foreach (var seg in runs)
         {
-            int end = pos + run.Text.Length;
+            int segLen = seg is TextSpan t ? t.Text.Length : 1;
+            int end = pos + segLen;
             if (i < end && i >= pos)
             {
-                url = run.Style.LinkUrl;
+                url = seg is TextSpan tx ? tx.Style.LinkUrl : null;
                 return url != null;
             }
 
@@ -975,15 +1209,97 @@ public class RichTextEditor : Control
         if (_textLayout == null) return 0;
         try
         {
-            var result = _textLayout.HitTestPoint(point);
-            int pos = result.TextPosition;
-            if (result.IsTrailing && pos < TextLength) pos++;
-            return Math.Clamp(pos, 0, TextLength);
+            var local = new Point(point.X - _mathPadLeft, point.Y - _mathPadTop);
+            var result = _textLayout.HitTestPoint(local);
+            int layoutBoundary = result.IsTrailing ? result.TextPosition + 1 : result.TextPosition;
+            layoutBoundary = Math.Clamp(layoutBoundary, 0, _layoutTextLength);
+            return Math.Clamp(LayoutBoundaryIndexToLogicalCaret(layoutBoundary), 0, TextLength);
         }
         catch
         {
             return 0;
         }
+    }
+
+    /// <summary>
+    /// Union of layout span rects and painted math ink, in text-layout local coordinates (inside math padding transform).
+    /// </summary>
+    private bool TryGetInlineEquationBounds(InlineEquationEntry eq, double pad, out Rect bounds)
+    {
+        bounds = default;
+        if (_textLayout == null || _layoutBoundaryAtLogical == null)
+            return false;
+
+        int lo = LogicalCaretToLayoutBoundary(eq.CharIndex);
+        int hi = LogicalCaretToLayoutBoundary(eq.CharIndex + 1);
+        int spanLen = hi - lo;
+        if (spanLen <= 0)
+            return false;
+
+        try
+        {
+            var rects = _textLayout.HitTestTextRange(lo, spanLen).ToList();
+            if (rects.Count == 0)
+            {
+                var p = _textLayout.HitTestTextPosition(lo);
+                bounds = new Rect(p.X, p.Y, Math.Max(p.Width, 1), p.Height);
+            }
+            else
+            {
+                bounds = rects[0];
+                for (int i = 1; i < rects.Count; i++)
+                    bounds = bounds.Union(rects[i]);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (eq.Layout != null)
+        {
+            try
+            {
+                var leftX = _textLayout.HitTestTextPosition(lo).X;
+                var baselineY = GetTextBaselineYForLayoutIndex(_textLayout, lo);
+                var ink = CalculateMathPaintBounds(eq.Layout, leftX, baselineY);
+                bounds = bounds.Union(ink);
+            }
+            catch
+            {
+                // keep layout-only bounds
+            }
+        }
+
+        bounds = new Rect(bounds.X - pad, bounds.Y - pad, bounds.Width + 2 * pad, bounds.Height + 2 * pad);
+        return bounds.Width > 0 && bounds.Height > 0;
+    }
+
+    /// <summary>
+    /// Notion-like: hit target is the union of the reserved layout span and the painted math ink (with padding),
+    /// not only layout character boundaries (which missed trailing space and tall fractions).
+    /// </summary>
+    private bool TryOpenInlineEquationFlyoutAtPoint(Point pos)
+    {
+        if (_textLayout == null || _layoutBoundaryAtLogical == null)
+            return false;
+
+        var local = new Point(pos.X - _mathPadLeft, pos.Y - _mathPadTop);
+
+        foreach (var eq in _inlineEquations)
+        {
+            const double pad = 3;
+            if (!TryGetInlineEquationBounds(eq, pad, out var bounds))
+                continue;
+
+            if (bounds.Contains(local))
+            {
+                OpenInlineEquationFlyout(eq.CharIndex, eq.Latex ?? string.Empty);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // ── Word nav helpers ─────────────────────────────────────────────────────
@@ -1052,7 +1368,7 @@ public class RichTextEditor : Control
             return true;
         }
 
-        var hitPos = Math.Clamp(_caretIndex, 0, TextLength);
+        var hitPos = LogicalCaretToLayoutBoundary(Math.Clamp(_caretIndex, 0, TextLength));
         try
         {
             var caretRect = layout.HitTestTextPosition(hitPos);
@@ -1121,7 +1437,7 @@ public class RichTextEditor : Control
             return false;
 
         var trailingEdge = _caretIndex >= TextLength;
-        var idxForLineLookup = Math.Clamp(_caretIndex, 0, TextLength);
+        var idxForLineLookup = LogicalCaretToLayoutBoundary(Math.Clamp(_caretIndex, 0, TextLength));
         var oldLine = layout.GetLineIndexFromCharacterIndex(idxForLineLookup, trailingEdge);
 
         if (up)
@@ -1139,7 +1455,7 @@ public class RichTextEditor : Control
         var yTop = GetAccumulatedLineTop(layout, targetVisualLine);
         var probeY = yTop + targetTextLine.Height * 0.5;
 
-        var hitPos = Math.Clamp(_caretIndex, 0, TextLength);
+        var hitPos = LogicalCaretToLayoutBoundary(Math.Clamp(_caretIndex, 0, TextLength));
         Rect caretRect;
         try
         {
@@ -1158,14 +1474,15 @@ public class RichTextEditor : Control
 
         newCaretIndex = HitTestLayoutAt(layout, new Point(probeX, probeY));
 
-        var newLine = layout.GetLineIndexFromCharacterIndex(
-            Math.Clamp(newCaretIndex, 0, TextLength),
-            newCaretIndex >= TextLength);
+        var layoutIdxForNewLine = LogicalCaretToLayoutBoundary(Math.Clamp(newCaretIndex, 0, TextLength));
+        var newLine = layout.GetLineIndexFromCharacterIndex(layoutIdxForNewLine, newCaretIndex >= TextLength);
 
         if (newLine != targetVisualLine)
         {
-            var col = Math.Max(0, _caretIndex - lines[oldLine].FirstTextSourceIndex);
-            newCaretIndex = FallbackCaretSameColumn(lines[targetVisualLine], col);
+            var layoutCaretOld = LogicalCaretToLayoutBoundary(Math.Clamp(_caretIndex, 0, TextLength));
+            var col = Math.Max(0, layoutCaretOld - lines[oldLine].FirstTextSourceIndex);
+            var layoutCaret = FallbackCaretSameColumn(lines[targetVisualLine], col);
+            newCaretIndex = LayoutBoundaryIndexToLogicalCaret(Math.Clamp(layoutCaret, 0, _layoutTextLength));
         }
 
         newCaretIndex = Math.Clamp(newCaretIndex, 0, TextLength);
@@ -1185,10 +1502,9 @@ public class RichTextEditor : Control
         try
         {
             var result = layout.HitTestPoint(point);
-            var pos = result.TextPosition;
-            if (result.IsTrailing && pos < TextLength)
-                pos++;
-            return Math.Clamp(pos, 0, TextLength);
+            int layoutBoundary = result.IsTrailing ? result.TextPosition + 1 : result.TextPosition;
+            layoutBoundary = Math.Clamp(layoutBoundary, 0, _layoutTextLength);
+            return Math.Clamp(LayoutBoundaryIndexToLogicalCaret(layoutBoundary), 0, TextLength);
         }
         catch
         {
@@ -1208,11 +1524,23 @@ public class RichTextEditor : Control
         return start + off;
     }
 
+    private static bool IsEquationPlaceholderChar(char c) => c == InlineSpan.EquationAtomChar;
+
     private int FindWordStart(int pos)
     {
         var text = Text;
         pos = Math.Clamp(pos, 0, text.Length);
-        while (pos > 0 && !char.IsWhiteSpace(text[pos - 1])) pos--;
+        if (pos < text.Length && IsEquationPlaceholderChar(text[pos]))
+            return pos;
+        if (pos > 0 && IsEquationPlaceholderChar(text[pos - 1]))
+            return pos - 1;
+        while (pos > 0 && !char.IsWhiteSpace(text[pos - 1]))
+        {
+            if (IsEquationPlaceholderChar(text[pos - 1]))
+                return pos - 1;
+            pos--;
+        }
+
         return pos;
     }
 
@@ -1220,7 +1548,15 @@ public class RichTextEditor : Control
     {
         var text = Text;
         pos = Math.Clamp(pos, 0, text.Length);
-        while (pos < text.Length && !char.IsWhiteSpace(text[pos])) pos++;
+        if (pos < text.Length && IsEquationPlaceholderChar(text[pos]))
+            return pos + 1;
+        while (pos < text.Length && !char.IsWhiteSpace(text[pos]))
+        {
+            if (IsEquationPlaceholderChar(text[pos]))
+                return pos + 1;
+            pos++;
+        }
+
         return pos;
     }
 
@@ -1257,5 +1593,411 @@ public class RichTextEditor : Control
         SelectionStart = FindWordStart(pos);
         SelectionEnd = FindWordEnd(pos);
         CaretIndex = SelectionEnd;
+    }
+
+    // ── Inline equation rendering ────────────────────────────────────────────
+
+    private ILaTeXEngine? ResolveLatexEngine()
+    {
+        if (_latexEngine != null) return _latexEngine;
+        if ((Application.Current as App)?.Services is { } sp)
+            _latexEngine = sp.GetService<ILaTeXEngine>();
+        return _latexEngine;
+    }
+
+    private async Task RebuildInlineEquationsAsync()
+    {
+        if (!_inlineEquationsDirty) return;
+        _inlineEquationsDirty = false;
+
+        var engine = ResolveLatexEngine();
+        var built = new List<InlineEquationEntry>();
+
+        var runs = Spans ?? Array.Empty<InlineSpan>();
+        int charOffset = 0;
+        foreach (var seg in runs)
+        {
+            if (seg is EquationSpan eq && engine != null)
+            {
+                var latexForLayout = eq.Latex;
+                if (_inlineEqPreviewActive && charOffset == _inlineEqCharIndex)
+                    latexForLayout = _inlineEqPreviewLatex ?? latexForLayout;
+
+                var entry = new InlineEquationEntry
+                {
+                    CharIndex = charOffset,
+                    Latex = latexForLayout ?? string.Empty
+                };
+
+                try
+                {
+                    var latex = (latexForLayout ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(latex))
+                    {
+                        built.Add(entry);
+                        charOffset += 1;
+                        continue;
+                    }
+
+                    var boxObj = await engine.GetLayoutBoxAsync(latex, FontSize).ConfigureAwait(true);
+                    if (boxObj is Box box)
+                    {
+                        entry.Layout = box;
+                        entry.Width = box.Width + 2;
+                        entry.Height = box.TotalHeight + 2;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Inline equation layout error: {ex.Message}");
+                }
+
+                built.Add(entry);
+                charOffset += 1;
+                continue;
+            }
+
+            charOffset += seg is TextSpan t ? t.Text.Length : 1;
+        }
+
+        _inlineEquations.Clear();
+        _inlineEquations.AddRange(built);
+
+        var layoutWidth = _lastLayoutWidth > 0 ? _lastLayoutWidth : (Bounds.Width > 0 ? Bounds.Width : MinLayoutWidth);
+        BuildLayout(layoutWidth);
+        ComputeMathPadding();
+        InvalidateVisual();
+
+        if (_inlineEquationsDirty)
+            _ = RebuildInlineEquationsAsync();
+    }
+
+    /// <summary>Union of box ink bounds (same convention as <see cref="LaTeXRenderer"/>).</summary>
+    private static Rect CalculateMathPaintBounds(Box box, double x, double baselineY)
+    {
+        var top = baselineY - box.Height;
+        var bounds = new Rect(x, top, box.Width, box.TotalHeight);
+        foreach (var (child, cx, cy) in box.GetChildPositions(x, baselineY))
+            bounds = bounds.Union(CalculateMathPaintBounds(child, cx, cy));
+        return bounds;
+    }
+
+    private void ComputeMathPadding()
+    {
+        if (_textLayout == null)
+        {
+            SetMathPadsIfChanged(0, 0, 0, 0);
+            return;
+        }
+
+        const double safety = 2;
+        double padLeft = 0, padTop = 0, padRight = 0, padBottom = 0;
+        var textH = _textLayout.Height;
+        var textW = _textLayout.Width;
+
+        foreach (var eq in _inlineEquations)
+        {
+            if (eq.Layout == null) continue;
+            try
+            {
+                var layoutEq = LogicalCaretToLayoutBoundary(eq.CharIndex);
+                var charRect = _textLayout.HitTestTextPosition(layoutEq);
+                var x = charRect.X;
+                var baselineY = GetTextBaselineYForLayoutIndex(_textLayout, layoutEq);
+                var b = CalculateMathPaintBounds(eq.Layout, x, baselineY);
+                padLeft = Math.Max(padLeft, Math.Max(0, safety - b.Left));
+                padTop = Math.Max(padTop, Math.Max(0, safety - b.Top));
+                padRight = Math.Max(padRight, Math.Max(0, b.Right + safety - textW));
+                padBottom = Math.Max(padBottom, Math.Max(0, b.Bottom + safety - textH));
+            }
+            catch
+            {
+                // Hit test may fail for edge indices
+            }
+        }
+
+        SetMathPadsIfChanged(padLeft, padTop, padRight, padBottom);
+    }
+
+    private void SetMathPadsIfChanged(double l, double t, double r, double b)
+    {
+        if (Math.Abs(_mathPadLeft - l) < 0.25 && Math.Abs(_mathPadTop - t) < 0.25
+            && Math.Abs(_mathPadRight - r) < 0.25 && Math.Abs(_mathPadBottom - b) < 0.25)
+            return;
+        _mathPadLeft = l;
+        _mathPadTop = t;
+        _mathPadRight = r;
+        _mathPadBottom = b;
+        InvalidateMeasure();
+    }
+
+    private void RestartDebouncedInlineEquationRebuild()
+    {
+        if (_inlineEqRebuildTimer == null)
+        {
+            _inlineEqRebuildTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
+            _inlineEqRebuildTimer.Tick += (_, _) =>
+            {
+                _inlineEqRebuildTimer?.Stop();
+                if (!_inlineEqPreviewActive) return;
+                _inlineEquationsDirty = true;
+                _ = RebuildInlineEquationsAsync();
+            };
+        }
+
+        _inlineEqRebuildTimer.Stop();
+        _inlineEqRebuildTimer.Start();
+    }
+
+    private void OnInlineEquationFlyoutClosed()
+    {
+        _inlineEqPreviewActive = false;
+        _inlineEqRebuildTimer?.Stop();
+        var commit = !_inlineEqSuppressCloseCommit;
+        _inlineEqSuppressCloseCommit = false;
+        if (commit)
+            InlineEquationEdited?.Invoke(_inlineEqCharIndex, _inlineEqTextBox?.Text ?? string.Empty);
+        _inlineEqPreviewLatex = null;
+        _inlineEquationsDirty = true;
+        InvalidateVisual();
+        _ = RebuildInlineEquationsAsync();
+    }
+
+    /// <summary>
+    /// Raised when the inline equation flyout closes with a committed edit (Enter or light dismiss).
+    /// Escape closes without raising. Preview text while typing does not touch <see cref="SpansProperty"/>.
+    /// Args: (charIndex, newLatex).
+    /// </summary>
+    public event Action<int, string>? InlineEquationEdited;
+
+    private Flyout? _inlineEqFlyout;
+    private TextBox? _inlineEqTextBox;
+    private Button? _inlineEqDoneButton;
+    private int _inlineEqCharIndex;
+    /// <summary>Local (to this control) bounds for anchoring the inline flyout under the equation.</summary>
+    private Rect _inlineFlyoutAnchorLocal;
+
+    private void OpenInlineEquationFlyout(int charIndex, string currentLatex)
+    {
+        _inlineEqCharIndex = charIndex;
+        _inlineEqSuppressCloseCommit = false;
+        _inlineEqPreviewActive = true;
+        _inlineEqPreviewLatex = currentLatex;
+
+        CaretIndex = charIndex;
+        SelectionStart = charIndex;
+        SelectionEnd = charIndex;
+
+        if (_inlineEqFlyout == null)
+        {
+            _inlineEqTextBox = new TextBox
+            {
+                MinWidth = 220,
+                MaxWidth = 360,
+                AcceptsReturn = false,
+                FontFamily = MonoFont,
+                FontSize = 14,
+                Watermark = TNotes("EquationFlyoutPlaceholder")
+            };
+
+            _inlineEqTextBox.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Escape)
+                {
+                    _inlineEqSuppressCloseCommit = true;
+                    _inlineEqFlyout?.Hide();
+                    e.Handled = true;
+                    return;
+                }
+
+                if (e.Key == Key.Enter)
+                {
+                    _inlineEqSuppressCloseCommit = false;
+                    _inlineEqFlyout?.Hide();
+                    e.Handled = true;
+                }
+            };
+
+            _inlineEqTextBox.TextChanged += (_, _) =>
+            {
+                if (_inlineEqTextBox == null || !_inlineEqPreviewActive) return;
+                _inlineEqPreviewLatex = _inlineEqTextBox.Text ?? string.Empty;
+                _inlineEquationsDirty = true;
+                RestartDebouncedInlineEquationRebuild();
+            };
+
+            _inlineEqDoneButton = new Button
+            {
+                Classes = { "accent" },
+                VerticalAlignment = VerticalAlignment.Stretch,
+                MinWidth = 80,
+                Padding = new Thickness(12, 6),
+                Content = $"{TNotes("Done")} \u21B5"
+            };
+            _inlineEqDoneButton.Click += (_, _) =>
+            {
+                _inlineEqSuppressCloseCommit = false;
+                _inlineEqFlyout?.Hide();
+            };
+
+            var grid = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                MinWidth = 280,
+                MaxWidth = 440
+            };
+            Grid.SetColumn(_inlineEqTextBox, 0);
+            Grid.SetColumn(_inlineEqDoneButton, 1);
+            _inlineEqTextBox.Margin = new Thickness(0, 0, 10, 0);
+            grid.Children.Add(_inlineEqTextBox);
+            grid.Children.Add(_inlineEqDoneButton);
+
+            var shell = new Border
+            {
+                Padding = new Thickness(12, 10),
+                CornerRadius = new CornerRadius(8),
+                Child = grid
+            };
+            shell.AttachedToVisualTree += (_, _) =>
+            {
+                if (shell.TryFindResource("MenuFlyoutPresenterBackground", out var bg) && bg is IBrush bgb)
+                    shell.Background = bgb;
+                if (shell.TryFindResource("MenuFlyoutPresenterBorderBrush", out var bd) && bd is IBrush bdb)
+                    shell.BorderBrush = bdb;
+                shell.BorderThickness = new Thickness(1);
+            };
+
+            _inlineEqFlyout = new Flyout
+            {
+                Content = shell,
+                Placement = PlacementMode.Custom,
+                CustomPopupPlacementCallback = OnInlineEquationFlyoutPlacement,
+                ShowMode = FlyoutShowMode.Standard,
+                // App sets PopupFlyoutBase default VerticalOffset; custom placement uses p.Offset only.
+                VerticalOffset = 0,
+                HorizontalOffset = 0
+            };
+
+            _inlineEqFlyout.Closed += (_, _) => OnInlineEquationFlyoutClosed();
+
+            _inlineEqFlyout.Opened += (_, _) =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    _inlineEqTextBox?.Focus();
+                    _inlineEqTextBox?.SelectAll();
+                }, DispatcherPriority.Input);
+            };
+        }
+        else
+            _inlineEqDoneButton!.Content = $"{TNotes("Done")} \u21B5";
+
+        EnsureLayoutForVerticalNavigation();
+        if (_textLayout != null)
+        {
+            try
+            {
+                var layoutIdx = LogicalCaretToLayoutBoundary(charIndex);
+                var charRect = _textLayout.HitTestTextPosition(layoutIdx);
+                double w = LogicalCaretToLayoutBoundary(charIndex + 1) - layoutIdx;
+                if (w <= 0.5)
+                {
+                    foreach (var eq in _inlineEquations)
+                    {
+                        if (eq.CharIndex == charIndex && eq.Width > 0)
+                        {
+                            w = Math.Max(w, eq.Width);
+                            break;
+                        }
+                    }
+                    w = Math.Max(w, charRect.Width);
+                }
+                w = Math.Max(w, 8);
+                _inlineFlyoutAnchorLocal = new Rect(charRect.X, charRect.Y, w, Math.Max(charRect.Height, 1));
+            }
+            catch
+            {
+                _inlineFlyoutAnchorLocal = new Rect(0, 0, Math.Max(Bounds.Width, 8), Math.Max(Bounds.Height, 1));
+            }
+        }
+        else
+            _inlineFlyoutAnchorLocal = new Rect(0, 0, Math.Max(Bounds.Width, 8), Math.Max(Bounds.Height, 1));
+
+        _inlineEqTextBox!.Text = currentLatex;
+        InvalidateVisual();
+        _inlineEqFlyout.ShowAt(this);
+    }
+
+    private void OnInlineEquationFlyoutPlacement(CustomPopupPlacement p)
+    {
+        if (p.Target is not Visual v)
+            return;
+        var top = v.GetVisualRoot() as TopLevel;
+        if (top == null)
+            return;
+        var m = v.TransformToVisual(top);
+        if (m == null)
+            return;
+        p.AnchorRectangle = _inlineFlyoutAnchorLocal.TransformToAABB(m.Value);
+        // Anchor = bottom of equation rect; Gravity.Bottom = open *below* that edge (Top would open above).
+        p.Anchor = PopupAnchor.Bottom;
+        p.Gravity = PopupGravity.Bottom;
+        p.Offset = new Point(0, 8);
+        p.ConstraintAdjustment = PopupPositionerConstraintAdjustment.FlipY
+            | PopupPositionerConstraintAdjustment.SlideY;
+    }
+
+    private void RenderInlineEquations(DrawingContext context)
+    {
+        if (_inlineEquations.Count == 0 || _textLayout == null) return;
+
+        var foreground = Foreground ?? GetThemeForeground();
+        var textBrush = foreground ?? Brushes.Black;
+        var activeHl = GetEquationActiveHighlightBrush();
+
+        foreach (var eq in _inlineEquations)
+        {
+            if (eq.Layout == null) continue;
+
+            try
+            {
+                if (_inlineEqPreviewActive && eq.CharIndex == _inlineEqCharIndex &&
+                    TryGetInlineEquationBounds(eq, pad: 2, out var hl))
+                {
+                    context.DrawRectangle(activeHl, null, new RoundedRect(hl, 4, 4));
+                }
+
+                var layoutEq = LogicalCaretToLayoutBoundary(eq.CharIndex);
+                var charRect = _textLayout.HitTestTextPosition(layoutEq);
+                var x = charRect.X;
+                var baselineY = GetTextBaselineYForLayoutIndex(_textLayout, layoutEq);
+
+                var renderContext = new MathRenderContext(context, textBrush, _mathTextCache);
+                eq.Layout.Render(renderContext, x, baselineY);
+            }
+            catch
+            {
+                // Hit test may fail for out-of-bounds positions
+            }
+        }
+    }
+
+    /// <summary>Y coordinate of the text line baseline at a layout character index (matches TextLayout / surrounding text).</summary>
+    private double GetTextBaselineYForLayoutIndex(TextLayout layout, int layoutCharIndex)
+    {
+        var lines = layout.TextLines;
+        if (lines.Count == 0)
+            return 0;
+
+        var trailing = layoutCharIndex >= _layoutTextLength;
+        var idx = Math.Clamp(layoutCharIndex, 0, Math.Max(0, _layoutTextLength));
+        var lineIndex = layout.GetLineIndexFromCharacterIndex(idx, trailing);
+        lineIndex = Math.Clamp(lineIndex, 0, lines.Count - 1);
+
+        double y = 0;
+        for (var i = 0; i < lineIndex; i++)
+            y += lines[i].Height;
+
+        return y + lines[lineIndex].Baseline;
     }
 }

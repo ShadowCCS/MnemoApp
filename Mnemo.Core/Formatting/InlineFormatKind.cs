@@ -12,5 +12,7 @@ public enum InlineFormatKind
     Subscript,
     Superscript,
     /// <summary>Hyperlink; set URL via apply with string parameter, or null to remove.</summary>
-    Link
+    Link,
+    /// <summary>Inline equation; set LaTeX source via apply with string parameter, or null to remove.</summary>
+    Equation
 }

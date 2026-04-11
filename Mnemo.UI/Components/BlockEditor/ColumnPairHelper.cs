@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.Json;
+using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
-/// <summary>Side-by-side layout: two top-level blocks share <c>columnPairId</c> + <c>columnSide</c> meta.</summary>
+/// <summary>Legacy flat pair: two consecutive top-level blocks share <c>columnPairId</c> + <c>columnSide</c> meta (merged into <see cref="TwoColumnBlockViewModel"/> on load). Canonical model is nested <see cref="BlockType.TwoColumn"/> + <see cref="TwoColumnPayload"/>.</summary>
 public static class ColumnPairHelper
 {
     public const string PairIdKey = "columnPairId";
@@ -93,7 +95,7 @@ public static class ColumnPairHelper
         && b.Children[0].Type == BlockType.ColumnGroup
         && b.Children[1].Type == BlockType.ColumnGroup;
 
-    /// <summary>Legacy <see cref="BlockType.TwoColumn"/> + two non–column-group children → two flat blocks with pair meta. Nested <see cref="BlockType.ColumnGroup"/> splits are left as one <see cref="BlockType.TwoColumn"/> block.</summary>
+    /// <summary>Normalizes legacy <see cref="BlockType.TwoColumn"/> rows (non–<see cref="BlockType.ColumnGroup"/> children) into nested column groups + <see cref="TwoColumnPayload"/>. Already-nested splits pass through.</summary>
     public static List<Block> ExpandLegacyTwoColumnBlocks(IEnumerable<Block> blocks)
     {
         var list = new List<Block>();
@@ -107,25 +109,19 @@ public static class ColumnPairHelper
 
             if (b.Type == BlockType.TwoColumn && b.Children is { Count: >= 2 })
             {
-                var id = Guid.NewGuid().ToString();
-                var left = CloneBlockForPairChild(b.Children[0]);
-                var right = CloneBlockForPairChild(b.Children[1]);
-                left.Meta ??= new Dictionary<string, object>();
-                right.Meta ??= new Dictionary<string, object>();
-                left.Meta[PairIdKey] = id;
-                left.Meta[SideKey] = Left;
-                right.Meta[PairIdKey] = id;
-                right.Meta[SideKey] = Right;
-                if (b.Meta != null && b.Meta.TryGetValue("columnSplitRatio", out var ratio))
+                var ratio = ReadTwoColumnSplitRatio(b);
+                var leftGroup = EnsureColumnGroupWrapper(CloneBlockForPairChild(b.Children[0]));
+                var rightGroup = EnsureColumnGroupWrapper(CloneBlockForPairChild(b.Children[1]));
+                list.Add(new Block
                 {
-                    left.Meta["columnSplitRatio"] = ratio is double d ? d : 0.5;
-                }
-                else
-                    left.Meta["columnSplitRatio"] = 0.5;
-                left.Order = b.Order;
-                right.Order = b.Order;
-                list.Add(left);
-                list.Add(right);
+                    Id = b.Id,
+                    Type = BlockType.TwoColumn,
+                    Order = b.Order,
+                    Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) },
+                    Payload = new TwoColumnPayload(ratio),
+                    Meta = CopyMetaWithoutColumnLayout(b.Meta),
+                    Children = new List<Block> { leftGroup, rightGroup }
+                });
             }
             else
                 list.Add(b);
@@ -147,14 +143,59 @@ public static class ColumnPairHelper
         }
     }
 
+    private static double ReadTwoColumnSplitRatio(Block b)
+    {
+        if (b.Payload is TwoColumnPayload tcp)
+        {
+            var r = tcp.SplitRatio;
+            if (r <= 0 || r >= 1 || double.IsNaN(r))
+                return 0.5;
+            return Math.Clamp(r, 0.1, 0.9);
+        }
+
+        if (b.Meta != null && b.Meta.TryGetValue("columnSplitRatio", out var v) && v != null)
+        {
+            if (v is double d) return Math.Clamp(d, 0.1, 0.9);
+            if (v is int i) return Math.Clamp(i, 0.1, 0.9);
+            if (v is JsonElement je && je.ValueKind == JsonValueKind.Number)
+                return Math.Clamp(je.GetDouble(), 0.1, 0.9);
+        }
+
+        return 0.5;
+    }
+
+    private static Dictionary<string, object> CopyMetaWithoutColumnLayout(Dictionary<string, object>? meta)
+    {
+        var d = new Dictionary<string, object>(meta ?? new Dictionary<string, object>());
+        d.Remove("columnSplitRatio");
+        d.Remove(PairIdKey);
+        d.Remove(SideKey);
+        return d;
+    }
+
+    private static Block EnsureColumnGroupWrapper(Block inner)
+    {
+        inner.EnsureSpans();
+        if (inner.Type == BlockType.ColumnGroup)
+            return inner;
+        return new Block
+        {
+            Id = Guid.NewGuid().ToString(),
+            Type = BlockType.ColumnGroup,
+            Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) },
+            Children = new List<Block> { inner }
+        };
+    }
+
     private static Block CloneBlockForPairChild(Block source)
     {
-        source.EnsureInlineRuns();
+        source.EnsureSpans();
         return new Block
         {
             Id = string.IsNullOrEmpty(source.Id) ? Guid.NewGuid().ToString() : source.Id,
             Type = source.Type,
-            InlineRuns = new List<InlineRun>(source.InlineRuns!),
+            Spans = new List<InlineSpan>(source.Spans),
+            Payload = source.Payload,
             Meta = new Dictionary<string, object>(source.Meta ?? new Dictionary<string, object>()),
             Order = source.Order
         };

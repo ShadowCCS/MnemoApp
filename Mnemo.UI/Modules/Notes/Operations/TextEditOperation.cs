@@ -8,48 +8,48 @@ namespace Mnemo.UI.Modules.Notes.Operations;
 
 /// <summary>
 /// Captures a batched text edit within a single block (typing session).
-/// Stores inline runs so formatting is preserved across undo/redo.
+/// Stores inline spans so formatting is preserved across undo/redo.
 /// </summary>
 public class TextEditOperation : IHistoryOperation
 {
     private readonly string _blockId;
-    private readonly List<InlineRun> _runsBefore;
-    private readonly List<InlineRun> _runsAfter;
+    private readonly List<InlineSpan> _spansBefore;
+    private readonly List<InlineSpan> _spansAfter;
     private readonly CaretState? _caretBefore;
     private readonly CaretState? _caretAfter;
-    private readonly Action<string, List<InlineRun>, CaretState?> _restoreRuns;
+    private readonly Action<string, List<InlineSpan>, CaretState?> _restoreSpans;
 
     public string Description { get; }
     public OperationSource Source => OperationSource.NotesEditor;
 
-    /// <param name="restoreRuns">Callback: (blockId, runs, caretState) => apply to live document.</param>
+    /// <param name="restoreSpans">Callback: (blockId, spans, caretState) => apply to live document.</param>
     public TextEditOperation(
         string description,
         string blockId,
-        List<InlineRun> runsBefore,
-        List<InlineRun> runsAfter,
+        List<InlineSpan> spansBefore,
+        List<InlineSpan> spansAfter,
         CaretState? caretBefore,
         CaretState? caretAfter,
-        Action<string, List<InlineRun>, CaretState?> restoreRuns)
+        Action<string, List<InlineSpan>, CaretState?> restoreSpans)
     {
         Description = description;
         _blockId = blockId;
-        _runsBefore = new List<InlineRun>(runsBefore);
-        _runsAfter = new List<InlineRun>(runsAfter);
+        _spansBefore = new List<InlineSpan>(spansBefore);
+        _spansAfter = new List<InlineSpan>(spansAfter);
         _caretBefore = caretBefore;
         _caretAfter = caretAfter;
-        _restoreRuns = restoreRuns;
+        _restoreSpans = restoreSpans;
     }
 
     public Task ApplyAsync()
     {
-        _restoreRuns(_blockId, _runsAfter, _caretAfter);
+        _restoreSpans(_blockId, _spansAfter, _caretAfter);
         return Task.CompletedTask;
     }
 
     public Task RollbackAsync()
     {
-        _restoreRuns(_blockId, _runsBefore, _caretBefore);
+        _restoreSpans(_blockId, _spansBefore, _caretBefore);
         return Task.CompletedTask;
     }
 }

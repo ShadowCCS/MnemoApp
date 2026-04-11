@@ -140,6 +140,20 @@
                     Color="{DynamicResource TextPrimaryBrush}" />
             </Button>
 
+            <!-- Equation -->
+            <Button
+                x:Name="EquationButton"
+                Classes="FormattingToolbarButton FormattingToolbarIcon"
+                Click="OnEquationClick">
+                <TextBlock
+                    Text="Σ"
+                    FontSize="15"
+                    FontWeight="Bold"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Foreground="{DynamicResource TextPrimaryBrush}" />
+            </Button>
+
             <!-- Subscript (placeholder) -->
             <Button
                 x:Name="SubscriptButton"

@@ -11,15 +11,11 @@ namespace Mnemo.Core.Formatting;
 /// </summary>
 public static class InlineAutoLink
 {
-    /// <summary>
-    /// https? and mailto, plus bare www. hosts (normalized with https).
-    /// </summary>
     private static readonly Regex UrlRegex = new(
         @"\b(?:(?:https?|mailto):[^\s<>\[\]]+|www\.[^\s<>\[\]]+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex WwwPrefix = new(@"^www\.", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    /// <summary>Canonical href for opening (e.g. https:// for www).</summary>
     public static string NormalizeUrl(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -30,17 +26,14 @@ public static class InlineAutoLink
         return t;
     }
 
-    /// <summary>
-    /// Returns a new normalized run list with auto-detected links applied. Never mutates the input list.
-    /// </summary>
-    public static List<InlineRun> Apply(IReadOnlyList<InlineRun> runs)
+    public static List<InlineSpan> Apply(IReadOnlyList<InlineSpan> spans)
     {
-        if (runs.Count == 0)
-            return new List<InlineRun>();
+        if (spans.Count == 0)
+            return new List<InlineSpan>();
 
-        var flat = InlineRunFormatApplier.Flatten(runs);
+        var flat = InlineSpanFormatApplier.Flatten(spans);
         if (flat.Length == 0)
-            return InlineRunFormatApplier.Normalize(runs);
+            return InlineSpanFormatApplier.Normalize(spans);
 
         var matches = new List<(int Start, int End, string Url)>();
         foreach (Match m in UrlRegex.Matches(flat))
@@ -54,15 +47,14 @@ public static class InlineAutoLink
             var url = NormalizeUrl(trimmed);
             if (string.IsNullOrEmpty(url))
                 continue;
-            if (!CanApplyLink(runs, start, end, url))
+            if (!CanApplyLink(spans, start, end, url))
                 continue;
             matches.Add((start, end, url));
         }
 
         if (matches.Count == 0)
-            return InlineRunFormatApplier.Normalize(runs);
+            return InlineSpanFormatApplier.Normalize(spans);
 
-        // Non-overlapping left-to-right: skip later match if it overlaps a prior one
         matches.Sort((a, b) => a.Start.CompareTo(b.Start));
         var filtered = new List<(int Start, int End, string Url)>();
         int lastEnd = -1;
@@ -73,14 +65,14 @@ public static class InlineAutoLink
             lastEnd = x.End;
         }
 
-        var result = InlineRunFormatApplier.Normalize(runs);
+        var result = InlineSpanFormatApplier.Normalize(spans);
         for (int i = filtered.Count - 1; i >= 0; i--)
         {
             var (s, e, url) = filtered[i];
-            result = InlineRunFormatApplier.Apply(result, s, e, InlineFormatKind.Link, url);
+            result = InlineSpanFormatApplier.Apply(result, s, e, InlineFormatKind.Link, url);
         }
 
-        return InlineRunFormatApplier.Normalize(result);
+        return InlineSpanFormatApplier.Normalize(result);
     }
 
     private static string TrimTrailingJunk(string s)
@@ -93,25 +85,27 @@ public static class InlineAutoLink
     }
 
     private static bool IsTrailingJunk(char c) =>
-        c is '.' or ',' or ';' or ':' or '!' or '?' or ')' or ']' or '"' or '\'' or '”' or '’';
+        c is '.' or ',' or ';' or ':' or '!' or '?' or ')' or ']' or '"' or '\'' or '\u201d' or '\u2019';
 
-    private static bool CanApplyLink(IReadOnlyList<InlineRun> runs, int start, int end, string normalizedUrl)
+    private static bool CanApplyLink(IReadOnlyList<InlineSpan> spans, int start, int end, string normalizedUrl)
     {
-        if (FullyLinkedWithUrl(runs, start, end, normalizedUrl))
+        if (FullyLinkedWithUrl(spans, start, end, normalizedUrl))
             return false;
 
         int pos = 0;
-        foreach (var run in runs)
+        foreach (var span in spans)
         {
-            int runEnd = pos + run.Text.Length;
+            int runEnd = pos + (span is TextSpan t ? t.Text.Length : 1);
             int segStart = Math.Max(start, pos);
             int segEnd = Math.Min(end, runEnd);
             if (segStart < segEnd)
             {
-                if (run.Style.Code) return false;
-                if (run.Style.SuppressAutoLink) return false;
-                if (run.Style.LinkUrl != null
-                    && !string.Equals(run.Style.LinkUrl, normalizedUrl, StringComparison.OrdinalIgnoreCase))
+                if (span is not TextSpan tx)
+                    return false;
+                if (tx.Style.Code) return false;
+                if (tx.Style.SuppressAutoLink) return false;
+                if (tx.Style.LinkUrl != null
+                    && !string.Equals(tx.Style.LinkUrl, normalizedUrl, StringComparison.OrdinalIgnoreCase))
                     return false;
             }
 
@@ -121,19 +115,20 @@ public static class InlineAutoLink
         return true;
     }
 
-    private static bool FullyLinkedWithUrl(IReadOnlyList<InlineRun> runs, int start, int end, string url)
+    private static bool FullyLinkedWithUrl(IReadOnlyList<InlineSpan> spans, int start, int end, string url)
     {
         bool any = false;
         int pos = 0;
-        foreach (var run in runs)
+        foreach (var span in spans)
         {
-            int runEnd = pos + run.Text.Length;
+            int runEnd = pos + (span is TextSpan t ? t.Text.Length : 1);
             int segStart = Math.Max(start, pos);
             int segEnd = Math.Min(end, runEnd);
             if (segStart < segEnd)
             {
-                if (run.Style.LinkUrl == null
-                    || !string.Equals(run.Style.LinkUrl, url, StringComparison.OrdinalIgnoreCase))
+                if (span is not TextSpan tx
+                    || tx.Style.LinkUrl == null
+                    || !string.Equals(tx.Style.LinkUrl, url, StringComparison.OrdinalIgnoreCase))
                     return false;
                 any = true;
             }

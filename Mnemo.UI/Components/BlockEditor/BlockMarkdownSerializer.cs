@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using Mnemo.Core.Models;
 using Mnemo.Infrastructure.Services.Notes.Markdown;
@@ -23,10 +22,10 @@ public static class BlockMarkdownSerializer
         for (int i = 0; i < list.Count; i++)
         {
             var b = list[i];
-            if (i > 0 && !IsCodeBlock(b.Type))
+            if (i > 0 && !IsMultilineBlock(b.Type))
                 sb.AppendLine();
             sb.Append(SerializeBlock(b));
-            if (IsCodeBlock(b.Type))
+            if (IsMultilineBlock(b.Type))
                 sb.AppendLine();
         }
         return sb.ToString().TrimEnd();
@@ -48,27 +47,29 @@ public static class BlockMarkdownSerializer
             BlockType.NumberedList => $"{block.ListNumberIndex}. {body}",
             BlockType.Checklist => block.IsChecked ? $"- [x] {body}" : $"- [ ] {body}",
             BlockType.Quote => "> " + body.Replace("\n", "\n> ", StringComparison.Ordinal),
-            BlockType.Code => "```\n" + (block.Content ?? string.Empty) + "\n```",
+            BlockType.Code => SerializeCodeFence(block),
             BlockType.Divider => "---",
             BlockType.Image => SerializeImageMarkdown(block),
+            BlockType.Equation => "$$\n" + block.EquationLatex + "\n$$",
             _ => body
         };
     }
 
     private static string SerializeImageMarkdown(BlockViewModel block)
     {
-        var path = MetaString(block, "imagePath");
+        var path = block.ImagePath ?? string.Empty;
         if (string.IsNullOrEmpty(path)) return string.Empty;
-        var alt = MetaString(block, "imageAlt").Replace("\\", "\\\\", StringComparison.Ordinal).Replace("]", "\\]", StringComparison.Ordinal);
+        var alt = (block.Content ?? string.Empty).Replace("\\", "\\\\", StringComparison.Ordinal).Replace("]", "\\]", StringComparison.Ordinal);
         return $"![{alt}]({path})";
     }
 
-    private static string MetaString(BlockViewModel block, string key)
+    private static string SerializeCodeFence(BlockViewModel block)
     {
-        if (!block.Meta.TryGetValue(key, out var val) || val == null) return string.Empty;
-        if (val is string s) return s;
-        if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
-        return val.ToString() ?? string.Empty;
+        var lang = (block.CodeLanguage ?? string.Empty).Trim();
+        var body = block.Content ?? string.Empty;
+        return string.IsNullOrEmpty(lang)
+            ? "```\n" + body + "\n```"
+            : "```" + lang + "\n" + body + "\n```";
     }
 
     /// <summary>Inline markdown for rich blocks; code/divider use literal <see cref="BlockViewModel.Content"/> in <see cref="SerializeBlock"/>.</summary>
@@ -76,7 +77,7 @@ public static class BlockMarkdownSerializer
     {
         if (block.Type is BlockType.Code or BlockType.Divider)
             return block.Content ?? string.Empty;
-        return BlockEditorContentPolicy.WithoutLegacySentinel(InlineMarkdownSerializer.SerializeRuns(block.Runs));
+        return BlockEditorContentPolicy.WithoutLegacySentinel(InlineMarkdownSerializer.SerializeSpans(block.Spans));
     }
 
     /// <summary>
@@ -105,11 +106,41 @@ public static class BlockMarkdownSerializer
                 continue;
             }
 
+            // Equation block: $$ fence (multiline or single-line)
+            if (trimmed == "$$" || (trimmed.StartsWith("$$") && trimmed.EndsWith("$$") && trimmed.Length > 2))
+            {
+                if (trimmed == "$$")
+                {
+                    var eqContent = new System.Text.StringBuilder();
+                    i++;
+                    while (i < lines.Length)
+                    {
+                        if (lines[i].TrimStart() == "$$") { i++; break; }
+                        if (eqContent.Length > 0) eqContent.AppendLine();
+                        eqContent.Append(lines[i]);
+                        i++;
+                    }
+                    var eqBlock = BlockFactory.CreateBlock(BlockType.Equation, order++);
+                    eqBlock.EquationLatex = eqContent.ToString().Trim();
+                    result.Add(eqBlock);
+                }
+                else
+                {
+                    var inner = trimmed[2..^2].Trim();
+                    var eqBlock = BlockFactory.CreateBlock(BlockType.Equation, order++);
+                    eqBlock.EquationLatex = inner;
+                    result.Add(eqBlock);
+                    i++;
+                }
+                continue;
+            }
+
             // Code block (multiline)
             if (trimmed.StartsWith("```", StringComparison.Ordinal))
             {
+                var fenceLang = trimmed.Length > 3 ? trimmed[3..].Trim() : string.Empty;
+                var language = string.IsNullOrEmpty(fenceLang) ? "csharp" : fenceLang;
                 var codeContent = new System.Text.StringBuilder();
-                var openLine = trimmed;
                 i++;
                 while (i < lines.Length)
                 {
@@ -124,6 +155,7 @@ public static class BlockMarkdownSerializer
                     i++;
                 }
                 var codeBlock = BlockFactory.CreateBlock(BlockType.Code, order++);
+                codeBlock.CodeLanguage = language;
                 codeBlock.Content = codeContent.ToString();
                 result.Add(codeBlock);
                 continue;
@@ -226,10 +258,10 @@ public static class BlockMarkdownSerializer
             if (imgMatch.Success)
             {
                 var vm = BlockFactory.CreateBlock(BlockType.Image, order++);
-                vm.Meta["imagePath"] = UnescapeMarkdownImageTarget(imgMatch.Groups[2].Value.Trim());
-                vm.Meta["imageWidth"] = 0.0;
+                vm.ImagePath = UnescapeMarkdownImageTarget(imgMatch.Groups[2].Value.Trim());
+                vm.ImageWidth = 0;
                 var alt = UnescapeMarkdownImageAlt(imgMatch.Groups[1].Value);
-                vm.SetRuns(new List<InlineRun> { InlineRun.Plain(alt) });
+                vm.SetSpans(new List<InlineSpan> { InlineSpan.Plain(alt) });
                 result.Add(vm);
                 i++;
                 continue;
@@ -248,11 +280,11 @@ public static class BlockMarkdownSerializer
         var vm = BlockFactory.CreateBlock(type, order);
         if (type == BlockType.Divider)
             return vm;
-        vm.SetRuns(InlineMarkdownParser.ToRuns(content ?? string.Empty));
+        vm.SetSpans(InlineMarkdownParser.ToSpans(content ?? string.Empty));
         return vm;
     }
 
-    private static bool IsCodeBlock(BlockType type) => type == BlockType.Code;
+    private static bool IsMultilineBlock(BlockType type) => type is BlockType.Code or BlockType.Equation;
 
     private static string UnescapeMarkdownImageAlt(string alt) =>
         alt.Replace("\\]", "]", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);

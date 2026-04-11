@@ -282,7 +282,7 @@ public partial class EditableBlock : UserControl
                 component.DataContext = _viewModel;
                 // Explicitly sync runs so text is visible even if DataContextChanged/SyncFromViewModel ran before DC was set.
                 if (component.GetRichTextEditor() is { } rte)
-                    rte.Runs = _viewModel.Runs;
+                    rte.Spans = _viewModel.Spans;
             }
 
             component.TextBoxGotFocus += HandleBlockComponentGotFocus;
@@ -301,6 +301,7 @@ public partial class EditableBlock : UserControl
                 editor.PointerReleased += OnTextBoxPointerReleasedForToolbar;
                 editor.PointerMoved += OnTextBoxPointerMovedForToolbar;
                 editor.KeyUp += OnTextBoxKeyUpForToolbar;
+                editor.InlineEquationEdited += OnInlineEquationEdited;
             }
             else
             {
@@ -517,7 +518,6 @@ public partial class EditableBlock : UserControl
 
     private void OnViewModelContentChanged(BlockViewModel sender)
     {
-        // Image alignment stored in Meta; re-apply if changed
         if (_viewModel?.Type == BlockType.Image)
             UpdateEditableBlockAlignment();
     }
@@ -541,7 +541,7 @@ public partial class EditableBlock : UserControl
 
         if (_viewModel?.Type == BlockType.Image)
         {
-            var align = ParseImageAlignFromMeta(_viewModel);
+            var align = ParseImageAlign(_viewModel);
             this.HorizontalAlignment = align;
         }
         else
@@ -550,11 +550,9 @@ public partial class EditableBlock : UserControl
         }
     }
 
-    private static HorizontalAlignment ParseImageAlignFromMeta(BlockViewModel vm)
+    private static HorizontalAlignment ParseImageAlign(BlockViewModel vm)
     {
-        if (!vm.Meta.TryGetValue("imageAlign", out var val) || val == null) return HorizontalAlignment.Left;
-        var s = val is string str ? str : val.ToString();
-        return s?.Trim().ToLowerInvariant() switch
+        return vm.ImageAlign.Trim().ToLowerInvariant() switch
         {
             "center" => HorizontalAlignment.Center,
             "right" => HorizontalAlignment.Right,
@@ -710,7 +708,7 @@ public partial class EditableBlock : UserControl
         if (text == previousText)
             return;
 
-        // RichTextEditor: component already committed via CommitRunsFromEditor; just keep state in sync
+        // RichTextEditor: component already committed via CommitSpansFromEditor; just keep state in sync
         if (sender is RichTextEditor)
         {
             _stateManager.PreviousText = text;
@@ -828,6 +826,13 @@ public partial class EditableBlock : UserControl
             return true;
         }
 
+        if (e.Key == Key.E && shift)
+        {
+            ApplyInlineEquation();
+            e.Handled = true;
+            return true;
+        }
+
         InlineFormatKind? kind = e.Key switch
         {
             Key.B when !shift => InlineFormatKind.Bold,
@@ -873,9 +878,9 @@ public partial class EditableBlock : UserControl
         return true;
     }
 
-    private static (int start, int end)? TryGetContiguousLinkSpanAtCaret(RichTextEditor editor, IReadOnlyList<InlineRun> runs)
+    private static (int start, int end)? TryGetContiguousLinkSpanAtCaret(RichTextEditor editor, IReadOnlyList<InlineSpan> runs)
     {
-        var flatLen = InlineRunFormatApplier.Flatten(runs).Length;
+        var flatLen = InlineSpanFormatApplier.Flatten(runs).Length;
         if (flatLen == 0) return null;
         int caret = Math.Clamp(editor.CaretIndex, 0, flatLen);
         int idx = caret >= flatLen ? flatLen - 1 : caret;
@@ -890,14 +895,15 @@ public partial class EditableBlock : UserControl
         return (s, end);
     }
 
-    private static string? GetLinkUrlAtCharIndex(IReadOnlyList<InlineRun> runs, int index)
+    private static string? GetLinkUrlAtCharIndex(IReadOnlyList<InlineSpan> runs, int index)
     {
         int pos = 0;
-        foreach (var run in runs)
+        foreach (var seg in runs)
         {
-            int end = pos + run.Text.Length;
+            int len = seg is TextSpan t ? t.Text.Length : 1;
+            int end = pos + len;
             if (index < end && index >= pos)
-                return run.Style.LinkUrl;
+                return seg is TextSpan tx ? tx.Style.LinkUrl : null;
             pos = end;
         }
 
@@ -1003,9 +1009,13 @@ public partial class EditableBlock : UserControl
             
             if (meta != null)
             {
+                if (blockType == BlockType.Code && meta.TryGetValue("language", out var langObj) && langObj != null)
+                    _viewModel.CodeLanguage = langObj.ToString() ?? "csharp";
                 foreach (var kvp in meta)
                 {
                     if (kvp.Key == MarkdownShortcutDetector.ShortcutReplacementContentKey)
+                        continue;
+                    if (blockType == BlockType.Code && kvp.Key == "language")
                         continue;
                     _viewModel.Meta[kvp.Key] = kvp.Value;
                 }
@@ -1043,7 +1053,7 @@ public partial class EditableBlock : UserControl
         return true;
     }
 
-    private static bool IsEditableBlockType(BlockType type) => type != BlockType.Divider && type != BlockType.Image;
+    private static bool IsEditableBlockType(BlockType type) => type is not BlockType.Divider and not BlockType.Image and not BlockType.Equation;
 
     #endregion
 
@@ -1167,8 +1177,8 @@ public partial class EditableBlock : UserControl
         _stateManager.SetNormal();
         _focusManager?.ClearCache();
 
-        // When converting to Divider or Image, ensure there is an editable block below so the user can keep typing
-        var addedBlockBelow = (blockType == BlockType.Divider || blockType == BlockType.Image) && EnsureEditableBlockBelowIfNeeded();
+        // When converting to a non-editable block, ensure there is an editable block below so the user can keep typing
+        var addedBlockBelow = blockType is BlockType.Divider or BlockType.Image or BlockType.Equation && EnsureEditableBlockBelowIfNeeded();
 
         if (!addedBlockBelow)
         {
@@ -1246,6 +1256,7 @@ public partial class EditableBlock : UserControl
         var toolbar = new InlineFormattingToolbar();
         toolbar.FormatRequested += OnFormatRequested;
         toolbar.BackgroundColorRequested += OnBackgroundColorRequested;
+        toolbar.EquationRequested += OnEquationRequested;
         _currentFormattingToolbar = toolbar;
 
         bool showAbove = ShouldShowToolbarAbove(textBox);
@@ -1302,6 +1313,7 @@ public partial class EditableBlock : UserControl
             {
                 _currentFormattingToolbar.FormatRequested -= OnFormatRequested;
                 _currentFormattingToolbar.BackgroundColorRequested -= OnBackgroundColorRequested;
+                _currentFormattingToolbar.EquationRequested -= OnEquationRequested;
                 _currentFormattingToolbar = null;
             }
         }
@@ -1334,13 +1346,13 @@ public partial class EditableBlock : UserControl
     {
         if (_currentFormattingToolbar == null || _cachedSelectionRange == null || _viewModel == null) return;
         var (start, end) = _cachedSelectionRange.Value;
-        var state = GetFormatStateForRange(_viewModel.Runs, start, end);
+        var state = GetFormatStateForRange(_viewModel.Spans, start, end);
         _currentFormattingToolbar.UpdateFormatState(state.bold, state.italic, state.underline, state.strikethrough, state.highlight, state.backgroundColor, state.hasLink);
         var heading = _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3;
         _currentFormattingToolbar.SetBoldButtonEnabled(!heading);
     }
 
-    private static (bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor, bool hasLink) GetFormatStateForRange(IReadOnlyList<InlineRun> runs, int start, int end)
+    private static (bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor, bool hasLink) GetFormatStateForRange(IReadOnlyList<InlineSpan> runs, int start, int end)
     {
         if (runs.Count == 0 || start >= end) return (false, false, false, false, false, null, false);
         bool bold = true, italic = true, underline = true, strikethrough = true, highlight = true;
@@ -1348,8 +1360,14 @@ public partial class EditableBlock : UserControl
         bool anyOverlap = false;
         bool hasLink = false;
         int pos = 0;
-        foreach (var run in runs)
+        foreach (var seg in runs)
         {
+            if (seg is not TextSpan run)
+            {
+                pos += 1;
+                continue;
+            }
+
             int runEnd = pos + run.Text.Length;
             if (runEnd <= start || pos >= end) { pos = runEnd; continue; }
             anyOverlap = true;
@@ -1381,6 +1399,68 @@ public partial class EditableBlock : UserControl
         ApplyInlineFormat(kind, color);
     }
 
+    private void OnEquationRequested() => ApplyInlineEquation();
+
+    private void OnInlineEquationEdited(int charIndex, string newLatex)
+    {
+        if (_viewModel == null) return;
+        var spans = _viewModel.Spans.ToList();
+        int offset = 0;
+        for (int i = 0; i < spans.Count; i++)
+        {
+            int len = spans[i] is TextSpan t ? t.Text.Length : 1;
+            int runEnd = offset + len;
+            if (charIndex >= offset && charIndex < runEnd && spans[i] is EquationSpan eq)
+            {
+                spans[i] = eq with { Latex = newLatex };
+                _viewModel.CommitSpansFromEditor(spans);
+                var editor = _currentBlockComponent?.GetRichTextEditor();
+                if (editor != null)
+                    editor.Spans = _viewModel.Spans;
+                return;
+            }
+
+            offset = runEnd;
+        }
+    }
+
+    private void ApplyInlineEquation()
+    {
+        var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+        if (_viewModel == null || editor == null) return;
+
+        var range = GetSelectionRange() ?? _cachedSelectionRange;
+        int start, end;
+        if (range == null || range.Value.start >= range.Value.end)
+        {
+            var word = editor.TryGetWordRangeAtCaret();
+            if (word == null) return;
+            (start, end) = word.Value;
+            editor.SelectionStart = start;
+            editor.SelectionEnd = end;
+            editor.CaretIndex = end;
+        }
+        else
+        {
+            (start, end) = range.Value;
+        }
+
+        if (start >= end) return;
+
+        var selectedText = Core.Formatting.InlineSpanFormatApplier.Flatten(
+            Core.Formatting.InlineSpanFormatApplier.SliceRuns(_viewModel.Spans, start, end));
+        var latex = Core.Formatting.EquationLatexNormalizer.Normalize(selectedText);
+
+        _viewModel.ApplyFormat(start, end, InlineFormatKind.Equation, latex);
+
+        editor.Spans = _viewModel.Spans;
+        editor.CaretIndex = start + 1;
+        editor.SelectionStart = start + 1;
+        editor.SelectionEnd = start + 1;
+
+        CloseFormattingToolbar();
+    }
+
     private async Task HandleLinkFormatRequestedAsync(bool expandWordWhenNoSelection = true)
     {
         var blockEditor = FindParentBlockEditor();
@@ -1390,7 +1470,7 @@ public partial class EditableBlock : UserControl
         {
             if (GetSelectionRange() == null && _cachedSelectionRange == null)
             {
-                var linkSpan = TryGetContiguousLinkSpanAtCaret(editor, _viewModel.Runs);
+                var linkSpan = TryGetContiguousLinkSpanAtCaret(editor, _viewModel.Spans);
                 if (linkSpan != null)
                 {
                     editor.SelectionStart = linkSpan.Value.start;
@@ -1438,12 +1518,12 @@ public partial class EditableBlock : UserControl
         var range = GetSelectionRange() ?? _cachedSelectionRange;
         if (range == null || _viewModel == null) return;
 
-        var flat = InlineRunFormatApplier.Flatten(_viewModel.Runs);
+        var flat = InlineSpanFormatApplier.Flatten(_viewModel.Spans);
         var (a, b) = range.Value;
         if (a >= b || b > flat.Length) return;
         string selectedText = flat.Substring(a, b - a);
-        bool hasLinkSel = GetFormatStateForRange(_viewModel.Runs, a, b).hasLink;
-        string? initialUrl = hasLinkSel ? GetLinkUrlForRange(_viewModel.Runs, a, b) : null;
+        bool hasLinkSel = GetFormatStateForRange(_viewModel.Spans, a, b).hasLink;
+        string? initialUrl = hasLinkSel ? GetLinkUrlForRange(_viewModel.Spans, a, b) : null;
 
         var dlgResult = await ShowLinkEditDialogAsync(
             initialUrl: initialUrl ?? string.Empty,
@@ -1479,7 +1559,7 @@ public partial class EditableBlock : UserControl
         var (newStart, newEnd) = _viewModel.ApplyLinkEdit(range.start, range.end, displayText, normalizedUrl, removeLink: false);
 
         _stateManager?.SetUpdatingFromViewModel();
-        editor.Runs = _viewModel.Runs;
+        editor.Spans = _viewModel.Spans;
         editor.SelectionStart = newStart;
         editor.SelectionEnd = newEnd;
         editor.CaretIndex = newEnd;
@@ -1491,11 +1571,17 @@ public partial class EditableBlock : UserControl
         editor.Focus();
     }
 
-    private static string? GetLinkUrlForRange(IReadOnlyList<InlineRun> runs, int start, int end)
+    private static string? GetLinkUrlForRange(IReadOnlyList<InlineSpan> runs, int start, int end)
     {
         int pos = 0;
-        foreach (var run in runs)
+        foreach (var seg in runs)
         {
+            if (seg is not TextSpan run)
+            {
+                pos += 1;
+                continue;
+            }
+
             int re = pos + run.Text.Length;
             if (re > start && pos < end && run.Style.LinkUrl != null)
                 return run.Style.LinkUrl;
@@ -1575,7 +1661,7 @@ public partial class EditableBlock : UserControl
 
         if (GetSelectionRange() == null)
         {
-            var span = TryGetContiguousLinkSpanAtCaret(editor, _viewModel.Runs);
+            var span = TryGetContiguousLinkSpanAtCaret(editor, _viewModel.Spans);
             if (span == null)
                 return;
             editor.SelectionStart = span.Value.start;
@@ -1681,7 +1767,7 @@ public partial class EditableBlock : UserControl
         _stateManager?.SetUpdatingFromViewModel();
 
         // Sync runs from VM into editor
-        editor.Runs = _viewModel.Runs;
+        editor.Spans = _viewModel.Spans;
         editor.SelectionStart = newSelStart;
         editor.SelectionEnd = newSelEnd;
         editor.CaretIndex = newSelEnd;
@@ -2056,7 +2142,7 @@ public partial class EditableBlock : UserControl
         if (_viewModel == null) return false;
         var range = GetSelectionRange();
         if (range == null) return false;
-        return GetFormatStateForRange(_viewModel.Runs, range.Value.start, range.Value.end).hasLink;
+        return GetFormatStateForRange(_viewModel.Spans, range.Value.start, range.Value.end).hasLink;
     }
 
     public int? GetCaretIndex()
@@ -2106,14 +2192,14 @@ public partial class EditableBlock : UserControl
         editor.SelectionStart = start;
         editor.SelectionEnd = start + len;
         // Trigger deletion by invoking the internal delete logic via key simulation is complex;
-        // instead manipulate runs directly through InlineRunFormatApplier
-        var newRuns = Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(
-            editor.Runs, text, text.Remove(start, len));
-        editor.Runs = newRuns;
+        // instead manipulate runs directly through InlineSpanFormatApplier
+        var newRuns = Core.Formatting.InlineSpanFormatApplier.ApplyTextEdit(
+            editor.Spans, text, text.Remove(start, len));
+        editor.Spans = newRuns;
         editor.CaretIndex = start;
         editor.SelectionStart = start;
         editor.SelectionEnd = start;
-        _viewModel.CommitRunsFromEditor(editor.Runs);
+        _viewModel.CommitSpansFromEditor(editor.Spans);
         return true;
     }
 
@@ -2128,13 +2214,13 @@ public partial class EditableBlock : UserControl
         start = Math.Clamp(start, 0, len);
         end = Math.Clamp(end, 0, len);
         var newFlat = flat.Remove(start, end - start).Insert(start, text);
-        var newRuns = Core.Formatting.InlineRunFormatApplier.ApplyTextEdit(editor.Runs, flat, newFlat);
-        editor.Runs = newRuns;
+        var newRuns = Core.Formatting.InlineSpanFormatApplier.ApplyTextEdit(editor.Spans, flat, newFlat);
+        editor.Spans = newRuns;
         int newCaret = start + text.Length;
         editor.CaretIndex = newCaret;
         editor.SelectionStart = newCaret;
         editor.SelectionEnd = newCaret;
-        _viewModel.CommitRunsFromEditor(editor.Runs);
+        _viewModel.CommitSpansFromEditor(editor.Spans);
         return true;
     }
 

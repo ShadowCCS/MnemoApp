@@ -369,7 +369,13 @@
       "InsertLinkRemoveLink": "リンクを削除",
       "CrossBlockLinkHint": "複数のブロックにまたがる選択です。ここではリンク先のみ設定します。各ブロックの選択テキストはそのままです。",
       "ExternalLinkTitle": "外部リンクを開く",
-      "ExternalLinkMessage": "次のアドレスを開こうとしています。ブラウザまたはメールが Mnemo の外で起動します。\n\n{0}"
+      "ExternalLinkMessage": "次のアドレスを開こうとしています。ブラウザまたはメールが Mnemo の外で起動します。\n\n{0}",
+      "Equation": "数式",
+      "EquationDescription": "LaTeX数式ブロック",
+      "EquationPlaceholder": "クリックして数式を追加…",
+      "EquationFlyoutPlaceholder": "LaTeX を入力 (例: \\frac{a}{b})",
+      "EquationRenderError": "数式を表示できませんでした",
+      "EquationTooltip": "数式 (Ctrl+Shift+E)"
     },
     "Mindmap": {
       "Title": "マインドマップ",

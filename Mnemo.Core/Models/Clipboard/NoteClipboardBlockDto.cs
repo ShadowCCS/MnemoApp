@@ -37,4 +37,7 @@ public sealed class NoteClipboardBlockDto
 
     /// <summary>Left column width fraction when <see cref="ColumnSide"/> is Left.</summary>
     public double? ColumnSplitRatio { get; set; }
+
+    /// <summary>LaTeX source for <see cref="BlockType.Equation"/> blocks.</summary>
+    public string? EquationLatex { get; set; }
 }

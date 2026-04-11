@@ -1,7 +1,7 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Serialization;
+using Mnemo.Core.Formatting;
+using Mnemo.Core.Serialization;
 
 namespace Mnemo.Core.Models;
 
@@ -18,67 +18,36 @@ public enum BlockType
     Code,
     Divider,
     Image,
-    /// <summary>Layout-only container for one side of a <see cref="TwoColumn"/> split; holds a vertical stack in <see cref="Block.Children"/>.</summary>
     ColumnGroup,
-    /// <summary>Side-by-side columns; <see cref="Block.Children"/> are two <see cref="ColumnGroup"/> blocks (left then right).</summary>
-    TwoColumn
+    TwoColumn,
+    Equation
 }
 
+[JsonConverter(typeof(BlockJsonConverter))]
 public class Block
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public BlockType Type { get; set; }
 
-    /// <summary>
-    /// Structured inline runs (source of truth for rich text).
-    /// When null or empty, <see cref="Content"/> is used as a plain-text fallback.
-    /// </summary>
-    public List<InlineRun>? InlineRuns { get; set; }
+    /// <summary>Structured inline content (rich text blocks). Equation/code/image blocks may use <see cref="Payload"/> as primary.</summary>
+    public List<InlineSpan> Spans { get; set; } = new();
 
-    /// <summary>
-    /// Flattened plain text derived from <see cref="InlineRuns"/>.
-    /// Setting this replaces runs with a single unstyled run.
-    /// </summary>
-    [JsonInclude]
-    public string Content
-    {
-        get => InlineRuns is { Count: > 0 }
-            ? Formatting.InlineRunFormatApplier.Flatten(InlineRuns)
-            : _legacyContent ?? string.Empty;
-        set
-        {
-            _legacyContent = value;
-            if (InlineRuns == null || InlineRuns.Count == 0)
-            {
-                InlineRuns = new List<InlineRun> { InlineRun.Plain(value ?? string.Empty) };
-            }
-        }
-    }
-
-    [JsonIgnore]
-    private string? _legacyContent;
+    /// <summary>Typed data for non-flow blocks (equation, image, code, checklist) and layout (two-column split). Use <see cref="Meta"/> only for extensions.</summary>
+    public BlockPayload Payload { get; set; } = new EmptyPayload();
 
     public Dictionary<string, object> Meta { get; set; } = new();
     public int Order { get; set; }
-
-    /// <summary>
-    /// Nested blocks: for <see cref="BlockType.TwoColumn"/>, two <see cref="ColumnGroup"/> entries (left, right);
-    /// each <see cref="ColumnGroup"/> holds that column&apos;s stack in <see cref="Children"/>.
-    /// </summary>
     public List<Block>? Children { get; set; }
 
-    /// <summary>
-    /// Ensures InlineRuns is populated. Call after deserialization when InlineRuns might be null
-    /// but Content was set from JSON.
-    /// </summary>
-    public void EnsureInlineRuns()
+    /// <summary>Human-visible plain text (equations as LaTeX, not atom chars). For markdown/export.</summary>
+    [JsonIgnore]
+    public string Content => InlineSpanText.FlattenDisplay(Spans);
+
+    /// <summary>Ensures <see cref="Spans"/> is non-empty after load.</summary>
+    public void EnsureSpans()
     {
-        if (InlineRuns is not { Count: > 0 })
-        {
-            InlineRuns = new List<InlineRun>
-            {
-                InlineRun.Plain(_legacyContent ?? string.Empty)
-            };
-        }
+        if (Spans is not { Count: > 0 })
+            Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
+        Spans = InlineSpanFormatApplier.Normalize(Spans);
     }
 }

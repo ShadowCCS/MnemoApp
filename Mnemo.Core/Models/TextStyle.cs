@@ -1,10 +1,7 @@
 namespace Mnemo.Core.Models;
 
-/// <summary>
-/// Immutable annotation set for an inline run, mirroring Notion's annotation object.
-/// Value equality enables adjacent-run merging.
-/// </summary>
-public readonly record struct InlineStyle(
+/// <summary>Text-only annotations (no inline equation — use <see cref="EquationSpan"/>).</summary>
+public readonly record struct TextStyle(
     bool Bold = false,
     bool Italic = false,
     bool Underline = false,
@@ -14,10 +11,9 @@ public readonly record struct InlineStyle(
     string? LinkUrl = null,
     bool SuppressAutoLink = false)
 {
-    public static readonly InlineStyle Default = new();
+    public static readonly TextStyle Default = new();
 
-    /// <summary>Returns a copy with a single flag toggled.</summary>
-    public InlineStyle WithToggle(Formatting.InlineFormatKind kind, string? color = null) => kind switch
+    public TextStyle WithToggle(Formatting.InlineFormatKind kind, string? color = null) => kind switch
     {
         Formatting.InlineFormatKind.Bold => this with { Bold = !Bold },
         Formatting.InlineFormatKind.Italic => this with { Italic = !Italic },
@@ -29,11 +25,11 @@ public readonly record struct InlineStyle(
         Formatting.InlineFormatKind.Link => LinkUrl != null
             ? this with { LinkUrl = null, SuppressAutoLink = true }
             : this,
+        Formatting.InlineFormatKind.Equation => this,
         _ => this
     };
 
-    /// <summary>Returns a copy with a single flag forced on.</summary>
-    public InlineStyle WithSet(Formatting.InlineFormatKind kind, string? color = null) => kind switch
+    public TextStyle WithSet(Formatting.InlineFormatKind kind, string? color = null) => kind switch
     {
         Formatting.InlineFormatKind.Bold => this with { Bold = true },
         Formatting.InlineFormatKind.Italic => this with { Italic = true },
@@ -43,11 +39,11 @@ public readonly record struct InlineStyle(
         Formatting.InlineFormatKind.Highlight => this with { BackgroundColor = color ?? "#FFFF00" },
         Formatting.InlineFormatKind.BackgroundColor => this with { BackgroundColor = color },
         Formatting.InlineFormatKind.Link => this with { LinkUrl = color, SuppressAutoLink = false },
+        Formatting.InlineFormatKind.Equation => this,
         _ => this
     };
 
-    /// <summary>Returns a copy with a single flag forced off.</summary>
-    public InlineStyle WithClear(Formatting.InlineFormatKind kind) => kind switch
+    public TextStyle WithClear(Formatting.InlineFormatKind kind) => kind switch
     {
         Formatting.InlineFormatKind.Bold => this with { Bold = false },
         Formatting.InlineFormatKind.Italic => this with { Italic = false },
@@ -59,10 +55,10 @@ public readonly record struct InlineStyle(
         Formatting.InlineFormatKind.Link => LinkUrl != null
             ? this with { LinkUrl = null, SuppressAutoLink = true }
             : this,
+        Formatting.InlineFormatKind.Equation => this,
         _ => this
     };
 
-    /// <summary>Checks whether a specific format flag is active.</summary>
     public bool Has(Formatting.InlineFormatKind kind) => kind switch
     {
         Formatting.InlineFormatKind.Bold => Bold,
@@ -73,6 +69,7 @@ public readonly record struct InlineStyle(
         Formatting.InlineFormatKind.Highlight => BackgroundColor != null,
         Formatting.InlineFormatKind.BackgroundColor => BackgroundColor != null,
         Formatting.InlineFormatKind.Link => LinkUrl != null,
+        Formatting.InlineFormatKind.Equation => false,
         _ => false
     };
 }

@@ -20,6 +20,7 @@ public static class BlockFactory
             BlockType.Divider => new BlockViewModel(type, "", order),
             BlockType.Image => CreateImageBlock(order),
             BlockType.TwoColumn => CreateTwoColumnBlock(order),
+            BlockType.Equation => CreateEquationBlock(order),
             _ => new BlockViewModel(BlockType.Text, "", order)
         };
     }
@@ -39,7 +40,7 @@ public static class BlockFactory
     private static BlockViewModel CreateCodeBlock(int order)
     {
         var block = new BlockViewModel(BlockType.Code, "", order);
-        block.Meta["language"] = "csharp";
+        block.CodeLanguage = "csharp";
         return block;
     }
 
@@ -51,7 +52,13 @@ public static class BlockFactory
     private static BlockViewModel CreateImageBlock(int order)
     {
         var block = new BlockViewModel(BlockType.Image, "", order);
-        // EnsureMetaKeys is called in the ctor; imagePath/imageAlt/imageWidth are pre-populated.
+        return block;
+    }
+
+    private static BlockViewModel CreateEquationBlock(int order)
+    {
+        var block = new BlockViewModel(BlockType.Equation, "", order);
+        block.EquationLatex = string.Empty;
         return block;
     }
 }
