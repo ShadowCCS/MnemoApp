@@ -4,7 +4,7 @@ namespace Mnemo.UI.Components.BlockEditor;
 public abstract class BlockRowViewModelBase
 {
     /// <summary>Index of the first <see cref="BlockViewModel"/> in <see cref="BlockEditor.Blocks"/> for this row.</summary>
-    public int StartBlockIndex { get; protected init; }
+    public int StartBlockIndex { get; set; }
 
     /// <summary>How many consecutive top-level <see cref="BlockEditor.Blocks"/> entries this row consumes (always 1 for a split; columns are nested).</summary>
     public int BlockSpan { get; protected init; }

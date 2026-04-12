@@ -128,20 +128,57 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
     }
 
-    private void OnBlocksCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RebuildBlockRows();
+    private void OnBlocksCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                for (var i = 0; i < e.NewItems!.Count; i++)
+                {
+                    var block = (BlockViewModel)e.NewItems[i]!;
+                    var index = e.NewStartingIndex + i;
+                    BlockRows.Insert(index, MakeRow(block, index));
+                    for (var j = index + 1; j < BlockRows.Count; j++)
+                        BlockRows[j].StartBlockIndex = j;
+                }
+                break;
+
+            case NotifyCollectionChangedAction.Remove:
+                for (var i = 0; i < e.OldItems!.Count; i++)
+                    BlockRows.RemoveAt(e.OldStartingIndex);
+                for (var j = e.OldStartingIndex; j < BlockRows.Count; j++)
+                    BlockRows[j].StartBlockIndex = j;
+                break;
+
+            case NotifyCollectionChangedAction.Move:
+                BlockRows.Move(e.OldStartingIndex, e.NewStartingIndex);
+                var lo = Math.Min(e.OldStartingIndex, e.NewStartingIndex);
+                var hi = Math.Max(e.OldStartingIndex, e.NewStartingIndex);
+                for (var j = lo; j <= hi; j++)
+                    BlockRows[j].StartBlockIndex = j;
+                break;
+
+            case NotifyCollectionChangedAction.Reset:
+                RebuildBlockRows();
+                break;
+
+            default:
+                RebuildBlockRows();
+                break;
+        }
+    }
 
     private void RebuildBlockRows()
     {
         BlockRows.Clear();
         for (var i = 0; i < Blocks.Count; i++)
-        {
-            var b = Blocks[i];
-            if (b is TwoColumnBlockViewModel tc)
-                BlockRows.Add(new SplitBlockRowViewModel(tc, i));
-            else
-                BlockRows.Add(new SingleBlockRowViewModel(b, i));
-        }
+            BlockRows.Add(MakeRow(Blocks[i], i));
     }
+
+    private static BlockRowViewModelBase MakeRow(BlockViewModel block, int index) =>
+        block is TwoColumnBlockViewModel tc
+            ? new SplitBlockRowViewModel(tc, index)
+            : new SingleBlockRowViewModel(block, index);
 
     // TopLevel handlers for global pointer tracking (needed to intercept moves even when TextBox has capture)
     private TopLevel? _topLevel;
@@ -1546,7 +1583,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     var richEditor = editableBlock.TryGetRichTextEditor();
                     if (richEditor != null)
                     {
-                        bool pointerIsOverEditor = richEditor.IsPointerOver;
+                        var localPos = e.GetPosition(richEditor);
+                        var editorBounds = new Rect(richEditor.Bounds.Size);
+                        bool pointerIsOverEditor = editorBounds.Contains(localPos);
                         if (!pointerIsOverEditor)
                         {
                             var pointInFocusedBlock = this.TranslatePoint(pos, editableBlock);
@@ -1707,6 +1746,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             Canvas.SetTop(_blockDragGhostBorder, pos.Y - _blockDragGhostPointerOffset.Y);
             _blockDragGhostOverlay.InvalidateArrange();
         }
+
+        // TopLevel tunnel runs for every move app-wide; if a child (e.g. RichTextEditor) owns capture,
+        // do not run box/cross-block selection — the child must receive moves for in-control drag-select.
+        if (e.Pointer.Captured != null && !ReferenceEquals(e.Pointer.Captured, this))
+            return;
 
         // Only process if at least one selection mode is armed or active
         if (!_boxSelectArmed && !_isBoxSelecting && !_crossBlockArmed && !_isCrossBlockSelecting)

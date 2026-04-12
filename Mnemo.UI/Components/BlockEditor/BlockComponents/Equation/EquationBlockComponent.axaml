@@ -18,6 +18,7 @@
             <!-- Rendered LaTeX preview (shown when equation is non-empty) -->
             <ContentControl x:Name="RenderedContent"
                             HorizontalAlignment="Left"
+                            HorizontalContentAlignment="Left"
                             VerticalAlignment="Center" />
 
             <!-- Empty placeholder (shown when no equation yet) -->

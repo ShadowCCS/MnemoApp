@@ -672,12 +672,36 @@ public partial class EditableBlock : UserControl
                     var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
                     if (editor != null && editor.IsFocused) return;
                     if (_currentFormattingToolbar?.IsInteractingWithToolbar == true) return;
+                    if (ShouldSuppressCompleteLostFocusForInEditorFocusRedirect()) return;
                     CompleteLostFocus();
                 }, DispatcherPriority.Input);
                 return;
             }
-            CompleteLostFocus();
+            if (!ShouldSuppressCompleteLostFocusForInEditorFocusRedirect())
+                CompleteLostFocus();
         }
+    }
+
+    /// <summary>
+    /// Keyboard focus can move to <see cref="BlockEditor"/> (or other chrome under it) for one frame during
+    /// a pointer press before the tunnel handler re-focuses the RTE. Clearing <see cref="BlockViewModel.IsFocused"/>
+    /// there makes the tunnel think the block was unfocused. Still clear when focus moves to another block.
+    /// </summary>
+    private bool ShouldSuppressCompleteLostFocusForInEditorFocusRedirect()
+    {
+        var blockEditor = FindParentBlockEditor();
+        var top = TopLevel.GetTopLevel(this);
+        var newFocus = top?.FocusManager?.GetFocusedElement() as Visual;
+        if (newFocus == null || blockEditor == null)
+            return false;
+        if (!blockEditor.IsVisualAncestorOf(newFocus))
+            return false;
+
+        var newFocusEditable = newFocus.FindAncestorOfType<EditableBlock>();
+        if (newFocusEditable != null && !ReferenceEquals(newFocusEditable, this))
+            return false;
+
+        return true;
     }
 
     private void CompleteLostFocus()

@@ -191,6 +191,10 @@ public partial class EquationBlockComponent : BlockComponentBase
     private async void RenderEquationCore()
     {
         var latex = GetLatexSource();
+#if DEBUG
+        var prev = latex.Length > 80 ? latex[..80] + "…" : latex;
+        Debug.WriteLine($"RenderEquationCore: len={latex.Length} preview='{prev}'");
+#endif
 
         if (string.IsNullOrWhiteSpace(latex))
         {

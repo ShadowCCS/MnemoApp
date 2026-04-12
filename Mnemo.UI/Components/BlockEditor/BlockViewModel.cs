@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -457,14 +457,14 @@ public class BlockViewModel : INotifyPropertyChanged
     public bool IsFocused
     {
         get => _isFocused;
-        set 
-        { 
-            if (_isFocused != value)
-            {
-                _isFocused = value; 
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Watermark));
-            }
+        set
+        {
+            if (_isFocused == value)
+                return;
+
+            _isFocused = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Watermark));
         }
     }
 

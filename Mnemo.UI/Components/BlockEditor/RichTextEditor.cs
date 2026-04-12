@@ -281,6 +281,24 @@ public class RichTextEditor : Control
     /// <summary>Max width when measure is unconstrained; avoids infinite desired size and layout loops.</summary>
     private const double MaxLayoutWidth = 4096;
 
+    /// <summary>
+    /// Width for <see cref="BuildLayout"/> / hit-test sync: <see cref="Bounds"/> can still be narrow before the
+    /// next arrange even when the visual parent (e.g. column) is already wide — max with parent avoids stale layout.
+    /// </summary>
+    private double ComputeEffectiveLayoutMaxWidth()
+    {
+        var wSelf = Bounds.Width > 0 && !double.IsNaN(Bounds.Width) ? Bounds.Width : 0;
+        var wArrange = _lastLayoutWidth > 0 && !double.IsNaN(_lastLayoutWidth) ? _lastLayoutWidth : 0;
+        var wParent = 0.0;
+        if (this.GetVisualParent() is Control pc && pc.Bounds.Width > 0 && !double.IsNaN(pc.Bounds.Width))
+            wParent = pc.Bounds.Width;
+
+        var m = Math.Max(wSelf, Math.Max(wArrange, wParent));
+        if (m <= 0)
+            return MinLayoutWidth;
+        return Math.Min(MaxLayoutWidth, m);
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         // Never use infinite width: causes huge desired size and can trigger infinite layout loop.
@@ -429,10 +447,10 @@ public class RichTextEditor : Control
 
                 sb.Append(run.Text);
                 glyphSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, run.Text.Length, props));
-                layoutOffset += run.Text.Length;
                 for (var c = 0; c < run.Text.Length; c++)
                 {
                     logicalIdx++;
+                    layoutOffset++;
                     boundaries[logicalIdx] = layoutOffset;
                 }
             }
@@ -450,9 +468,10 @@ public class RichTextEditor : Control
                     foregroundBrush: Brushes.Transparent,
                     backgroundBrush: null);
 
-                var placeholderAdv = MeasureRunTextWidth(InlineSpan.EquationAtomChar.ToString(), runTypeface, Brushes.Transparent);
+                var measureFg = ForegroundForTextMeasurement(defaultForeground);
+                var placeholderAdv = MeasureRunTextWidth(InlineSpan.EquationAtomChar.ToString(), runTypeface, measureFg);
                 double target = GetEquationTargetWidth(logicalIdx, placeholderAdv);
-                int n = GetMinimalSpaceCountForTargetWidth(target, runTypeface, Brushes.Transparent);
+                int n = GetMinimalSpaceCountForTargetWidth(target, runTypeface, measureFg);
                 for (var j = 0; j < n; j++)
                     sb.Append(' ');
                 glyphSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, n, props));
@@ -478,12 +497,24 @@ public class RichTextEditor : Control
     private double MeasureRunTextWidth(string text, Typeface typeface, IBrush fg) =>
         MeasureTextLayoutWidth(text, typeface, fg, FontSize);
 
+    /// <summary>
+    /// TextLayout measurement with transparent brushes can return widths far below real glyph advances, which
+    /// inflates the space count for inline math and leaves a large empty band — measure with an opaque brush instead.
+    /// </summary>
+    private static IBrush ForegroundForTextMeasurement(IBrush defaultForeground)
+    {
+        if (defaultForeground is null || defaultForeground.Opacity <= 0)
+            return Brushes.Black;
+        return defaultForeground;
+    }
+
     private double GetEquationTargetWidth(int logicalCharIndex, double placeholderAdvance)
     {
+        var lineCap = _lastLayoutWidth > 0 ? _lastLayoutWidth : (Bounds.Width > 0 ? Bounds.Width : MinLayoutWidth);
         foreach (var eq in _inlineEquations)
         {
             if (eq.CharIndex == logicalCharIndex && eq.Width > 0)
-                return eq.Width;
+                return ClampInlineEquationReserveWidth(eq.Width, eq.Latex ?? string.Empty, FontSize, lineCap);
         }
 
         return placeholderAdvance;
@@ -497,6 +528,8 @@ public class RichTextEditor : Control
         double spaceW = MeasureRunTextWidth(" ", typeface, fg);
         if (spaceW <= 0)
             spaceW = FontSize * 0.25;
+        // Guard: transparent or odd shaping can yield a tiny measured space while layout still advances ~0.25–0.5 em.
+        spaceW = Math.Max(spaceW, FontSize * 0.22);
         int n = Math.Max(1, (int)Math.Ceiling(targetWidth / spaceW));
         while (n > 1)
         {
@@ -638,9 +671,10 @@ public class RichTextEditor : Control
 
         using (context.PushTransform(Matrix.CreateTranslation(_mathPadLeft, _mathPadTop)))
         {
-            // Selection background
             int selStart = Math.Min(_selectionStart, _selectionEnd);
             int selEnd = Math.Max(_selectionStart, _selectionEnd);
+
+            // 1. Selection behind text (glyphs and run backgrounds paint on top).
             if (selEnd > selStart && _textLayout != null)
             {
                 var selBrush = SelectionBrush ?? new SolidColorBrush(Colors.CornflowerBlue, 0.4);
@@ -660,6 +694,7 @@ public class RichTextEditor : Control
                         rects = new List<Rect>();
                     else
                         rects = _textLayout.HitTestTextRange(layoutSelStart, layoutSelLen).ToList();
+
                     bool hasDrawable = rects.Any(r => r.Width > 0.5 && r.Height > 0.5);
                     if (!hasDrawable)
                     {
@@ -687,7 +722,7 @@ public class RichTextEditor : Control
                 }
             }
 
-            // Always draw the text layout first so removing the watermark repaints the line (avoids stale glyphs).
+            // 2. Text and inline math on top of selection tint.
             if (_textLayout != null)
             {
                 _textLayout.Draw(context, origin);
@@ -696,7 +731,7 @@ public class RichTextEditor : Control
                     _watermarkLayout.Draw(context, origin);
             }
 
-            // Caret
+            // 3. Caret on top.
             if (IsFocused && _caretVisible && selEnd == selStart && _textLayout != null)
             {
                 var caretBrush = CaretBrush ?? Brushes.Black;
@@ -1206,14 +1241,18 @@ public class RichTextEditor : Control
 
     public int HitTestPoint(Point point)
     {
-        if (_textLayout == null) return 0;
+        // Reuse existing width-sync guard so pointer hit-tests use a layout matching rendered width.
+        EnsureLayoutForVerticalNavigation();
+
+        if (_textLayout is null) return 0;
         try
         {
             var local = new Point(point.X - _mathPadLeft, point.Y - _mathPadTop);
             var result = _textLayout.HitTestPoint(local);
-            int layoutBoundary = result.IsTrailing ? result.TextPosition + 1 : result.TextPosition;
-            layoutBoundary = Math.Clamp(layoutBoundary, 0, _layoutTextLength);
-            return Math.Clamp(LayoutBoundaryIndexToLogicalCaret(layoutBoundary), 0, TextLength);
+            int rawLayoutBoundary = result.IsTrailing ? result.TextPosition + 1 : result.TextPosition;
+            int layoutBoundary = Math.Clamp(rawLayoutBoundary, 0, _layoutTextLength);
+            int logical = LayoutBoundaryIndexToLogicalCaret(layoutBoundary);
+            return Math.Clamp(logical, 0, TextLength);
         }
         catch
         {
@@ -1410,15 +1449,13 @@ public class RichTextEditor : Control
 
     private void EnsureLayoutForVerticalNavigation()
     {
-        var w = Bounds.Width > 0 && !double.IsNaN(Bounds.Width)
-            ? Bounds.Width
-            : (_lastLayoutWidth > 0 ? _lastLayoutWidth : MinLayoutWidth);
+        var effectiveW = ComputeEffectiveLayoutMaxWidth();
         var needRebuild = _textLayout == null || Text != _lastBuiltText;
-        if (!needRebuild && Bounds.Width > 0 && _textLayout != null
-            && Math.Abs(Bounds.Width - _textLayout.MaxWidth) > 0.5)
+        if (!needRebuild && _textLayout != null
+            && Math.Abs(effectiveW - _textLayout.MaxWidth) > 0.5)
             needRebuild = true;
         if (needRebuild)
-            BuildLayout(w);
+            BuildLayout(effectiveW);
     }
 
     /// <summary>
@@ -1612,6 +1649,7 @@ public class RichTextEditor : Control
 
         var engine = ResolveLatexEngine();
         var built = new List<InlineEquationEntry>();
+        var lineLayoutCap = _lastLayoutWidth > 0 ? _lastLayoutWidth : (Bounds.Width > 0 ? Bounds.Width : MinLayoutWidth);
 
         var runs = Spans ?? Array.Empty<InlineSpan>();
         int charOffset = 0;
@@ -1643,7 +1681,8 @@ public class RichTextEditor : Control
                     if (boxObj is Box box)
                     {
                         entry.Layout = box;
-                        entry.Width = box.Width + 2;
+                        var advance = box.Width + 2;
+                        entry.Width = ClampInlineEquationReserveWidth(advance, latex, FontSize, lineLayoutCap);
                         entry.Height = box.TotalHeight + 2;
                     }
                 }
@@ -1672,6 +1711,33 @@ public class RichTextEditor : Control
             _ = RebuildInlineEquationsAsync();
     }
 
+    /// <summary>
+    /// When the LaTeX layout engine over-reserves horizontal space (bad glue, delimiter scaling, etc.), the inline
+    /// flow still uses <see cref="Box.Width"/> for space runs — clamp so reserve tracks plausible size for the source string.
+    /// </summary>
+    private static double ClampInlineEquationReserveWidth(double advance, string latex, double fontSize, double lineMaxWidth)
+    {
+        if (advance <= 0 || double.IsNaN(advance) || double.IsInfinity(advance))
+            return Math.Max(fontSize * 0.5, 1);
+
+        var t = (latex ?? string.Empty).Trim();
+        if (t.Length == 0)
+            return advance;
+
+        if (lineMaxWidth > 0 && advance > lineMaxWidth)
+            advance = lineMaxWidth;
+
+        // Long sources may be wide matrices / macros; only apply the heuristic on shorter inline TeX.
+        if (t.Length > 96)
+            return advance;
+
+        double lengthSlack = t.Length * fontSize * 0.82 + fontSize * 12;
+        if (advance <= lengthSlack * 1.45)
+            return advance;
+
+        return Math.Min(advance, lengthSlack);
+    }
+
     /// <summary>Union of box ink bounds (same convention as <see cref="LaTeXRenderer"/>).</summary>
     private static Rect CalculateMathPaintBounds(Box box, double x, double baselineY)
     {
@@ -1693,7 +1759,8 @@ public class RichTextEditor : Control
         const double safety = 2;
         double padLeft = 0, padTop = 0, padRight = 0, padBottom = 0;
         var textH = _textLayout.Height;
-        var textW = _textLayout.Width;
+        // Include trailing whitespace so pads are not inflated when inline math reserves space runs at line end.
+        var textW = Math.Max(_textLayout.Width, _textLayout.WidthIncludingTrailingWhitespace);
 
         foreach (var eq in _inlineEquations)
         {

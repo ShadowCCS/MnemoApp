@@ -1,6 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Mnemo.Infrastructure.Services.LaTeX;
 using Mnemo.UI.Services.LaTeX.Layout.Boxes;
@@ -57,6 +58,7 @@ public class LaTeXRenderer : Control
 
     static LaTeXRenderer()
     {
+        HorizontalAlignmentProperty.OverrideDefaultValue<LaTeXRenderer>(HorizontalAlignment.Left);
         AffectsRender<LaTeXRenderer>(LayoutProperty, ForegroundProperty);
         AffectsMeasure<LaTeXRenderer>(LayoutProperty, IsInlineModeProperty);
     }
@@ -165,8 +167,9 @@ public class LaTeXRenderer : Control
 
             var minX = Math.Min(0, actualBounds.Left - InkOverflowSafety);
             var minY = Math.Min(0, actualBounds.Top - InkOverflowSafety);
-            var maxX = Math.Max(actualBounds.Right + InkOverflowSafety, Layout.Width + DefaultPadding * 2);
-            var maxY = Math.Max(actualBounds.Bottom + InkOverflowSafety, Layout.Height + Layout.Depth + DefaultPadding * 2);
+            // Use ink bounds only; comparing to Layout.Width + padding inflated width past glyphs when the two diverged.
+            var maxX = actualBounds.Right + InkOverflowSafety;
+            var maxY = actualBounds.Bottom + InkOverflowSafety;
 
             var width = Math.Max(maxX - minX, MinWidth);
             var height = Math.Max(maxY - minY, MinHeight);
