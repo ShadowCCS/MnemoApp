@@ -66,10 +66,22 @@ public static class InlineSpanFormatApplier
     }
 
     private static TextStyle GetStyle(InlineSpan s) =>
-        s is TextSpan t ? t.Style : ((EquationSpan)s).Style;
+        s switch
+        {
+            TextSpan t => t.Style,
+            EquationSpan e => e.Style,
+            FractionSpan f => f.Style,
+            _ => TextStyle.Default
+        };
 
     private static InlineSpan SetStyle(InlineSpan s, TextStyle style) =>
-        s is TextSpan t ? t with { Style = style } : ((EquationSpan)s) with { Style = style };
+        s switch
+        {
+            TextSpan t => t with { Style = style },
+            EquationSpan e => e with { Style = style },
+            FractionSpan f => f with { Style = style },
+            _ => s
+        };
 
     public static List<InlineSpan> Normalize(IReadOnlyList<InlineSpan> spans)
     {
@@ -142,6 +154,8 @@ public static class InlineSpanFormatApplier
                 }
                 else if (span is EquationSpan e && segStart == offset && segEnd == runEnd)
                     result.Add(e);
+                else if (span is FractionSpan f && segStart == offset && segEnd == runEnd)
+                    result.Add(f);
             }
 
             offset = runEnd;
@@ -249,7 +263,7 @@ public static class InlineSpanFormatApplier
                 {
                     if (!foundInsertStyle)
                     {
-                        insertStyle = ((EquationSpan)span).Style;
+                        insertStyle = GetStyle(span);
                         foundInsertStyle = true;
                         if (inserted.Length > 0)
                             result.Add(new TextSpan(inserted, insertStyle));

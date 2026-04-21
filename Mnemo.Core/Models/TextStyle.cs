@@ -7,6 +7,7 @@ public readonly record struct TextStyle(
     bool Underline = false,
     bool Strikethrough = false,
     bool Code = false,
+    bool Highlight = false,
     string? BackgroundColor = null,
     string? LinkUrl = null,
     bool SuppressAutoLink = false)
@@ -20,7 +21,7 @@ public readonly record struct TextStyle(
         Formatting.InlineFormatKind.Underline => this with { Underline = !Underline },
         Formatting.InlineFormatKind.Strikethrough => this with { Strikethrough = !Strikethrough },
         Formatting.InlineFormatKind.Code => this with { Code = !Code },
-        Formatting.InlineFormatKind.Highlight => this with { BackgroundColor = BackgroundColor != null ? null : (color ?? "#FFFF00") },
+        Formatting.InlineFormatKind.Highlight => this with { Highlight = !Highlight },
         Formatting.InlineFormatKind.BackgroundColor => this with { BackgroundColor = BackgroundColor == color ? null : color },
         Formatting.InlineFormatKind.Link => LinkUrl != null
             ? this with { LinkUrl = null, SuppressAutoLink = true }
@@ -36,7 +37,7 @@ public readonly record struct TextStyle(
         Formatting.InlineFormatKind.Underline => this with { Underline = true },
         Formatting.InlineFormatKind.Strikethrough => this with { Strikethrough = true },
         Formatting.InlineFormatKind.Code => this with { Code = true },
-        Formatting.InlineFormatKind.Highlight => this with { BackgroundColor = color ?? "#FFFF00" },
+        Formatting.InlineFormatKind.Highlight => this with { Highlight = true },
         Formatting.InlineFormatKind.BackgroundColor => this with { BackgroundColor = color },
         Formatting.InlineFormatKind.Link => this with { LinkUrl = color, SuppressAutoLink = false },
         Formatting.InlineFormatKind.Equation => this,
@@ -50,7 +51,7 @@ public readonly record struct TextStyle(
         Formatting.InlineFormatKind.Underline => this with { Underline = false },
         Formatting.InlineFormatKind.Strikethrough => this with { Strikethrough = false },
         Formatting.InlineFormatKind.Code => this with { Code = false },
-        Formatting.InlineFormatKind.Highlight => this with { BackgroundColor = null },
+        Formatting.InlineFormatKind.Highlight => this with { Highlight = false },
         Formatting.InlineFormatKind.BackgroundColor => this with { BackgroundColor = null },
         Formatting.InlineFormatKind.Link => LinkUrl != null
             ? this with { LinkUrl = null, SuppressAutoLink = true }
@@ -66,7 +67,7 @@ public readonly record struct TextStyle(
         Formatting.InlineFormatKind.Underline => Underline,
         Formatting.InlineFormatKind.Strikethrough => Strikethrough,
         Formatting.InlineFormatKind.Code => Code,
-        Formatting.InlineFormatKind.Highlight => BackgroundColor != null,
+        Formatting.InlineFormatKind.Highlight => Highlight,
         Formatting.InlineFormatKind.BackgroundColor => BackgroundColor != null,
         Formatting.InlineFormatKind.Link => LinkUrl != null,
         Formatting.InlineFormatKind.Equation => false,

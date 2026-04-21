@@ -19,6 +19,7 @@ public static class InlineMarkdownSerializer
     private static string SerializeSpan(InlineSpan s) => s switch
     {
         EquationSpan e => "$" + e.Latex + "$",
+        FractionSpan f => $"\\{f.Numerator}/{f.Denominator}",
         TextSpan t => SerializeTextSpan(t),
         _ => string.Empty
     };

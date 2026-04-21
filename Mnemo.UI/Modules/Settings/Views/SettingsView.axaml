@@ -33,6 +33,7 @@
     <UserControl.Resources>
         <converters:PathToImageConverter x:Key="PathToImageConverter"/>
         <converters:BoolToPasswordCharConverter x:Key="BoolToPasswordCharConverter"/>
+        <converters:BoolNegationConverter x:Key="BoolNegationConverter"/>
         <converters:SettingsViewModelDataContextCommandConverter x:Key="SettingsViewModelDataContextCommandConverter"/>
         <!-- Toggle Setting Template -->
         <DataTemplate x:Key="ToggleSettingTemplate" x:DataType="vm:ToggleSettingViewModel">
@@ -554,35 +555,64 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SettingsGroupViewModel">
                                     <StackPanel Spacing="12" Margin="0,0,0,40">
-                                        <TextBlock Text="{Binding Name}" 
-                                                   FontSize="12" 
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   FontFamily="{DynamicResource Font.SemiBold}"
-                                                   LetterSpacing="0.5"
-                                                   Margin="0,0,0,8"/>
-                                        
-                                        <ItemsControl ItemsSource="{Binding Items}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <ContentControl Content="{Binding}">
-                                                        <ContentControl.DataTemplates>
-                                                            <StaticResource ResourceKey="ToggleSettingTemplate"/>
-                                                            <StaticResource ResourceKey="DropdownSettingTemplate"/>
-                                                            <StaticResource ResourceKey="LanguageSettingTemplate"/>
-                                                            <StaticResource ResourceKey="ActionSettingTemplate"/>
-                                                            <StaticResource ResourceKey="AsyncActionSettingTemplate"/>
-                                                            <StaticResource ResourceKey="AppIconSettingTemplate"/>
-                                                            <StaticResource ResourceKey="ThemeSettingTemplate"/>
-                                                            <StaticResource ResourceKey="ProfilePictureSettingTemplate"/>
-                                                            <StaticResource ResourceKey="NameSettingTemplate"/>
-                                                            <StaticResource ResourceKey="TextSettingTemplate"/>
-                                                            <StaticResource ResourceKey="StepSliderSettingTemplate"/>
-                                                            <StaticResource ResourceKey="NoticeSettingTemplate"/>
-                                                        </ContentControl.DataTemplates>
-                                                    </ContentControl>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                        <components:CollapsibleSection Title="{Binding Name}"
+                                                                       IsExpanded="{Binding IsExpanded}"
+                                                                       IsVisible="{Binding IsCollapsible}">
+                                            <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <ContentControl Content="{Binding}">
+                                                            <ContentControl.DataTemplates>
+                                                                <StaticResource ResourceKey="ToggleSettingTemplate"/>
+                                                                <StaticResource ResourceKey="DropdownSettingTemplate"/>
+                                                                <StaticResource ResourceKey="LanguageSettingTemplate"/>
+                                                                <StaticResource ResourceKey="ActionSettingTemplate"/>
+                                                                <StaticResource ResourceKey="AsyncActionSettingTemplate"/>
+                                                                <StaticResource ResourceKey="AppIconSettingTemplate"/>
+                                                                <StaticResource ResourceKey="ThemeSettingTemplate"/>
+                                                                <StaticResource ResourceKey="ProfilePictureSettingTemplate"/>
+                                                                <StaticResource ResourceKey="NameSettingTemplate"/>
+                                                                <StaticResource ResourceKey="TextSettingTemplate"/>
+                                                                <StaticResource ResourceKey="StepSliderSettingTemplate"/>
+                                                                <StaticResource ResourceKey="NoticeSettingTemplate"/>
+                                                            </ContentControl.DataTemplates>
+                                                        </ContentControl>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </components:CollapsibleSection>
+
+                                        <StackPanel IsVisible="{Binding IsCollapsible, Converter={StaticResource BoolNegationConverter}}"
+                                                    Spacing="12">
+                                            <TextBlock Text="{Binding Name}" 
+                                                       FontSize="12" 
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                                       LetterSpacing="0.5"
+                                                       Margin="0,0,0,8"/>
+                                            <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <ContentControl Content="{Binding}">
+                                                            <ContentControl.DataTemplates>
+                                                                <StaticResource ResourceKey="ToggleSettingTemplate"/>
+                                                                <StaticResource ResourceKey="DropdownSettingTemplate"/>
+                                                                <StaticResource ResourceKey="LanguageSettingTemplate"/>
+                                                                <StaticResource ResourceKey="ActionSettingTemplate"/>
+                                                                <StaticResource ResourceKey="AsyncActionSettingTemplate"/>
+                                                                <StaticResource ResourceKey="AppIconSettingTemplate"/>
+                                                                <StaticResource ResourceKey="ThemeSettingTemplate"/>
+                                                                <StaticResource ResourceKey="ProfilePictureSettingTemplate"/>
+                                                                <StaticResource ResourceKey="NameSettingTemplate"/>
+                                                                <StaticResource ResourceKey="TextSettingTemplate"/>
+                                                                <StaticResource ResourceKey="StepSliderSettingTemplate"/>
+                                                                <StaticResource ResourceKey="NoticeSettingTemplate"/>
+                                                            </ContentControl.DataTemplates>
+                                                        </ContentControl>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

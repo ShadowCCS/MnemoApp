@@ -47,6 +47,11 @@ internal static class NoteClipboardDiagnostics
                 var t = e.Latex.Length > 24 ? e.Latex[..24] + "…" : e.Latex;
                 sb.Append('[').Append(i).Append("] eq:$").Append(t).Append("$; ");
             }
+            else if (s is FractionSpan f)
+            {
+                sb.Append('[').Append(i).Append("] frac:")
+                    .Append(f.Numerator).Append('/').Append(f.Denominator).Append("; ");
+            }
         }
 
         if (spans.Count > maxSpans)

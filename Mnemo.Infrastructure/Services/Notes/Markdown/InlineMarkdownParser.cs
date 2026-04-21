@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using Markdig;
 using Markdig.Extensions.Mathematics;
 using Markdig.Syntax;
@@ -12,6 +13,10 @@ namespace Mnemo.Infrastructure.Services.Notes.Markdown;
 /// <summary>Parses inline markdown into <see cref="InlineSpan"/> lists using Markdig.</summary>
 public static class InlineMarkdownParser
 {
+    private static readonly Regex FractionTokenRegex = new(
+        @"\\(\d+)/(\d+)",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
@@ -94,7 +99,7 @@ public static class InlineMarkdownParser
         {
             case LiteralInline literal:
                 if (literal.Content.Length > 0)
-                    spans.Add(new TextSpan(literal.Content.ToString(), style));
+                    AppendLiteralWithFractions(literal.Content.ToString(), style, spans);
                 break;
 
             case CodeInline code:
@@ -174,5 +179,34 @@ public static class InlineMarkdownParser
 
         foreach (var c in emphasis)
             VisitInlines(c, next, spans);
+    }
+
+    private static void AppendLiteralWithFractions(string text, TextStyle style, List<InlineSpan> spans)
+    {
+        var pos = 0;
+        foreach (Match m in FractionTokenRegex.Matches(text))
+        {
+            if (!m.Success)
+                continue;
+
+            if (m.Index > pos)
+                spans.Add(new TextSpan(text[pos..m.Index], style));
+
+            if (int.TryParse(m.Groups[1].Value, out var num)
+                && int.TryParse(m.Groups[2].Value, out var den)
+                && den > 0)
+            {
+                spans.Add(new FractionSpan(num, den, style));
+            }
+            else
+            {
+                spans.Add(new TextSpan(m.Value, style));
+            }
+
+            pos = m.Index + m.Length;
+        }
+
+        if (pos < text.Length)
+            spans.Add(new TextSpan(text[pos..], style));
     }
 }

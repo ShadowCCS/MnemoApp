@@ -93,6 +93,13 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
             if (el.ValueKind != JsonValueKind.Object)
                 continue;
             var kind = el.TryGetProperty("kind", out var k) ? k.GetString() : null;
+            if (kind == "fraction")
+            {
+                var num = el.TryGetProperty("numerator", out var n) && n.TryGetInt32(out var nv) ? nv : 0;
+                var den = el.TryGetProperty("denominator", out var d) && d.TryGetInt32(out var dv) ? dv : 1;
+                list.Add(new FractionSpan(num, den <= 0 ? 1 : den, ReadTextStyle(el)));
+                continue;
+            }
             var isEquation = kind == "equation"
                 || (kind != "text" && el.TryGetProperty("latex", out _) && !el.TryGetProperty("text", out _));
             if (isEquation)
@@ -137,6 +144,13 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
                     writer.WritePropertyName("style");
                     WriteTextStyle(writer, e.Style);
                     break;
+                case FractionSpan f:
+                    writer.WriteString("kind", "fraction");
+                    writer.WriteNumber("numerator", f.Numerator);
+                    writer.WriteNumber("denominator", f.Denominator);
+                    writer.WritePropertyName("style");
+                    WriteTextStyle(writer, f.Style);
+                    break;
                 default:
                     throw new UnreachableException($"Unknown inline span type: {s.GetType().Name}");
             }
@@ -155,6 +169,7 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
         writer.WriteBoolean("underline", st.Underline);
         writer.WriteBoolean("strikethrough", st.Strikethrough);
         writer.WriteBoolean("code", st.Code);
+        writer.WriteBoolean("highlight", st.Highlight);
         if (st.BackgroundColor != null)
             writer.WriteString("backgroundColor", st.BackgroundColor);
         if (st.LinkUrl != null)
@@ -306,13 +321,26 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
         string? S(string n) =>
             st.TryGetProperty(n, out var x) && x.ValueKind == JsonValueKind.String ? x.GetString() : null;
 
+        var highlight = B("highlight");
+        var backgroundColor = S("backgroundColor");
+        // Backward compatibility: earlier builds persisted highlight by only storing a themed backgroundColor.
+        if (!highlight && backgroundColor is not null
+            && (string.Equals(backgroundColor, "#FFD7AA", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(backgroundColor, "#5B3717", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(backgroundColor, "#FFFF00", StringComparison.OrdinalIgnoreCase)))
+        {
+            highlight = true;
+            backgroundColor = null;
+        }
+
         return new TextStyle(
             Bold: B("bold"),
             Italic: B("italic"),
             Underline: B("underline"),
             Strikethrough: B("strikethrough"),
             Code: B("code"),
-            BackgroundColor: S("backgroundColor"),
+            Highlight: highlight,
+            BackgroundColor: backgroundColor,
             LinkUrl: S("linkUrl"),
             SuppressAutoLink: B("suppressAutoLink"));
     }

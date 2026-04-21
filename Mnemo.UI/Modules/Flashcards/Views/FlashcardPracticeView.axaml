@@ -1,0 +1,163 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mnemo.UI.Modules.Flashcards.ViewModels"
+             xmlns:components="using:Mnemo.UI.Components"
+             xmlns:markup="using:Mnemo.UI.Markup"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             x:Class="Mnemo.UI.Modules.Flashcards.Views.FlashcardPracticeView"
+             x:DataType="vm:FlashcardPracticeViewModel"
+             Foreground="{DynamicResource TextPrimaryBrush}"
+             Focusable="True">
+
+    <UserControl.KeyBindings>
+        <KeyBinding Gesture="Space" Command="{Binding FlipCommand}"/>
+        <KeyBinding Gesture="Escape" Command="{Binding ExitToDeckCommand}"/>
+    </UserControl.KeyBindings>
+
+    <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Padding="16,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+                Background="{DynamicResource CardBackgroundSecondaryBrush}">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DeckName}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <ProgressBar Width="200" Height="6" Maximum="100" Value="{Binding ProgressPercent}"/>
+                    <TextBlock Text="{Binding ProgressText}" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Margin="8,0" Command="{Binding ExitToLibraryCommand}">
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=BackToLibrary}"/>
+                </Button>
+                <Button Grid.Column="2" Classes="ghost" Command="{Binding ExitToDeckCommand}">
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=ExitPractice}"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+            <Panel Margin="24">
+                <!-- Nothing to study -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12"
+                            IsVisible="{Binding ShowEmptyQueue}">
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeEmptyTitle}"
+                               FontSize="{DynamicResource FontSize.Heading2}" FontFamily="{DynamicResource Font.Bold}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeEmptyDesc}"
+                               Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" MaxWidth="420"
+                               HorizontalAlignment="Center"/>
+                    <Button HorizontalAlignment="Center" Command="{Binding ExitToDeckCommand}">
+                        <TextBlock Text="{markup:T Ns=Flashcards, Key=BackToDeck}"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Session summary -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16" MaxWidth="420"
+                            IsVisible="{Binding ShowSummary}">
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeCompleteTitle}"
+                               FontSize="{DynamicResource FontSize.Heading2}" FontFamily="{DynamicResource Font.Bold}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeCompleteDesc}"
+                               Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"
+                               HorizontalAlignment="Center"/>
+                    <UniformGrid Columns="2">
+                        <Border Margin="6" Padding="12" CornerRadius="10"
+                                Background="{DynamicResource CardBackgroundSecondaryBrush}">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding CorrectCount}" FontSize="28" FontFamily="{DynamicResource Font.Bold}"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=CorrectLabel}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="6" Padding="12" CornerRadius="10"
+                                Background="{DynamicResource CardBackgroundSecondaryBrush}">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding IncorrectCount}" FontSize="28" FontFamily="{DynamicResource Font.Bold}"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=IncorrectLabel}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button Command="{Binding ExitToDeckCommand}">
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=BackToDeck}"/>
+                        </Button>
+                        <Button Command="{Binding RestartSessionCommand}">
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=StudyAgain}"/>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Active card -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20" MaxWidth="720"
+                            IsVisible="{Binding ShowActivePractice}">
+                    <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" CornerRadius="16"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="24">
+                        <StackPanel Spacing="16">
+                            <components:MarkdownView Source="{Binding CurrentFrontMarkdown}"/>
+                            <Border IsVisible="{Binding IsFlipped}" BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="0,1,0,0" Padding="0,16,0,0">
+                                <components:MarkdownView Source="{Binding CurrentBackMarkdown}"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Test: answer before reveal -->
+                    <StackPanel Spacing="8" IsVisible="{Binding IsTestSession}">
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsFlipped}">
+                            <TextBox MinWidth="280" MinHeight="80" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Watermark="{markup:T Ns=Flashcards, Key=TestAnswerPlaceholder}"
+                                     Text="{Binding TestAnswer}"/>
+                            <Button VerticalAlignment="Top" Command="{Binding RevealTestCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=TestReveal}"/>
+                            </Button>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsFlipped}">
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=TestYourAnswer}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding TestAnswer}" VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.SemiBold}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Spacing="10" HorizontalAlignment="Center">
+                        <Button MinWidth="200" Command="{Binding FlipCommand}" IsVisible="{Binding ShowFlipButton}">
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=Flip}"/>
+                        </Button>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
+                                    IsVisible="{Binding ShowQuickGrades}">
+                            <Button Command="{Binding GradeLearningCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeLearning}"/>
+                            </Button>
+                            <Button Command="{Binding GradeGotItCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeGotIt}"/>
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
+                                    IsVisible="{Binding ShowStandardGrades}">
+                            <Button Content="{markup:T Ns=Flashcards, Key=GradeAgain}" Command="{Binding GradeAgainCommand}"/>
+                            <Button Content="{markup:T Ns=Flashcards, Key=GradeHard}" Command="{Binding GradeHardCommand}"/>
+                            <Button Content="{markup:T Ns=Flashcards, Key=GradeGood}" Command="{Binding GradeGoodCommand}"/>
+                            <Button Content="{markup:T Ns=Flashcards, Key=GradeEasy}" Command="{Binding GradeEasyCommand}"/>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
+                                    IsVisible="{Binding ShowTestGrades}">
+                            <Button Command="{Binding TestIncorrectCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=TestIncorrect}"/>
+                            </Button>
+                            <Button Command="{Binding TestCorrectCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=TestCorrect}"/>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Panel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

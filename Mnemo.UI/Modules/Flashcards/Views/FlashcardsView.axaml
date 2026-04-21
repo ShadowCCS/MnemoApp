@@ -1,0 +1,215 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mnemo.UI.Modules.Flashcards.ViewModels"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:markup="using:Mnemo.UI.Markup"
+             xmlns:models="using:Mnemo.Core.Models.Flashcards"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
+             x:Class="Mnemo.UI.Modules.Flashcards.Views.FlashcardsView"
+             x:DataType="vm:FlashcardsViewModel"
+             Foreground="{DynamicResource TextPrimaryBrush}"
+             x:Name="root"
+             ClipToBounds="False">
+
+    <UserControl.Styles>
+        <!-- Deck cards: Border only (no Button / ContentPresenter theme = no square grey plate) -->
+        <Style Selector="Border.deck-card">
+            <Setter Property="Width" Value="280" />
+            <Setter Property="MinHeight" Value="168" />
+            <Setter Property="Margin" Value="0,0,20,20" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="18,16" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="BoxShadow" Value="0 1 4 0 #14000000" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" Easing="CubicEaseOut" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.deck-card:pointerover">
+            <Setter Property="BoxShadow" Value="0 18 36 -4 #32000000" />
+        </Style>
+        <Style Selector="Border.deck-card:pressed">
+            <Setter Property="BoxShadow" Value="0 8 18 -2 #28000000" />
+        </Style>
+
+        <Style Selector="ItemsControl.deck-library-grid WrapPanel > ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <Style Selector="Border.deck-due-pill">
+            <Setter Property="Background" Value="{DynamicResource WidgetBackgroundPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource LinksBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,4" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="260,*">
+        <!-- Library sidebar -->
+        <Border Grid.Column="0" Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+            <ScrollViewer>
+                <StackPanel Margin="16" Spacing="4">
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=Folders}"
+                               FontFamily="{DynamicResource Font.SemiBold}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="12,8,0,8" />
+
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Command="{Binding SelectAllDecksCommand}" Padding="12,10" CornerRadius="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg"
+                                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=AllDecks}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Command="{Binding SelectDueDecksCommand}" Padding="12,10" CornerRadius="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/bell.svg"
+                                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=DueToday}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="12,8" />
+
+                    <ItemsControl ItemsSource="{Binding Folders}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:FlashcardFolder">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                        Command="{Binding #root.DataContext.SelectFolderCommand}"
+                                        CommandParameter="{Binding Id}" Padding="12,10" CornerRadius="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
+                                                          Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="False">
+            <StackPanel Margin="40" Spacing="32" ClipToBounds="False">
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="{markup:T Ns=Flashcards, Key=Title}"
+                                   FontSize="{DynamicResource FontSize.Heading1}"
+                                   FontFamily="{DynamicResource Font.Bold}" />
+                        <TextBlock Text="{markup:T Ns=Flashcards, Key=Subtitle}"
+                                   FontSize="{DynamicResource FontSize.Body.Medium}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" VerticalAlignment="Center"
+                            Classes="accent"
+                            Command="{Binding CreateDeckCommand}"
+                            BorderThickness="0"
+                            Padding="16,10" CornerRadius="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
+                                              Width="18" Height="18"
+                                              Color="{DynamicResource AccentButtonForegroundBrush}" />
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=NewDeck}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       Foreground="{DynamicResource AccentButtonForegroundBrush}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <TextBox Text="{Binding SearchText}"
+                         HorizontalAlignment="Left"
+                         Watermark="{markup:T Ns=Flashcards, Key=SearchPlaceholder}"
+                         Width="360" MaxWidth="480"
+                         Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                         BorderBrush="{DynamicResource BorderBrush}" CornerRadius="10" Padding="8,10">
+                    <TextBox.InnerLeftContent>
+                        <Border Margin="12,0,4,0">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg"
+                                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
+                        </Border>
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+
+                <ItemsControl Classes="deck-library-grid" ItemsSource="{Binding FilteredDecks}" ClipToBounds="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" ClipToBounds="False" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FlashcardDeckRowViewModel">
+                            <Border Classes="deck-card"
+                                    PointerPressed="OnDeckCardPointerPressed">
+                                <Grid RowDefinitions="Auto,*,Auto">
+                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" TextWrapping="Wrap"
+                                                   FontFamily="{DynamicResource Font.SemiBold}"
+                                                   FontSize="{DynamicResource FontSize.Heading3}"
+                                                   MaxLines="2" TextTrimming="CharacterEllipsis"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Top" Margin="0,0,8,0" />
+                                        <Border Grid.Column="1" Classes="deck-due-pill"
+                                                VerticalAlignment="Top"
+                                                IsVisible="{Binding ShowDueBadge}">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-play.svg"
+                                                                  Width="12" Height="12" Color="{DynamicResource LinksBrush}" />
+                                                <TextBlock Text="{Binding DueBadgeText}"
+                                                           FontSize="12"
+                                                           FontFamily="{DynamicResource Font.SemiBold}"
+                                                           Foreground="{DynamicResource LinksBrush}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="8" Margin="0,12,0,12">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{markup:T Ns=Flashcards, Key=DeckRetentionLabel}"
+                                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding RetentionScore, StringFormat={}{0}%}"
+                                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        </Grid>
+                                        <ProgressBar Minimum="0" Maximum="100"
+                                                     Value="{Binding RetentionPercent}"
+                                                     Height="6" CornerRadius="3"
+                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    </StackPanel>
+
+                                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding CardCountLine}"
+                                                   FontSize="{DynamicResource FontSize.Body.Small}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding LastStudiedLine}"
+                                                   FontSize="{DynamicResource FontSize.Body.Small}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextAlignment="Right" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -20,6 +20,8 @@
             <Setter Property="VerticalAlignment" Value="Top" />
             <!-- ~1 line; MinHeight tracks body size (16px) without forcing excess row height. -->
             <Setter Property="MinHeight" Value="22" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextControlForegroundBrush}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource TextControlSelectionHighlightColorBrush}" />
         </Style>
     </UserControl.Styles>
     <Grid>

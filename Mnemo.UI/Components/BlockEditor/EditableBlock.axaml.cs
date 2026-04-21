@@ -170,7 +170,11 @@ public partial class EditableBlock : UserControl
             }
 
             var isNonEmpty = !BlockEditorContentPolicy.IsVisuallyEmpty(text);
-            if (selectionLength == 0 && caretIndex <= 1 && isNonEmpty)
+            var isLogicalStart = caretIndex == 0
+                || (caretIndex == 1
+                    && text.Length > 0
+                    && text[0] == BlockEditorContentPolicy.LegacyParagraphSentinel);
+            if (selectionLength == 0 && isLogicalStart && isNonEmpty)
             {
                 _viewModel.NotifyStructuralChangeStarting();
                 _viewModel.PendingCaretIndex = caretIndex;
@@ -1381,6 +1385,7 @@ public partial class EditableBlock : UserControl
         if (runs.Count == 0 || start >= end) return (false, false, false, false, false, null, false);
         bool bold = true, italic = true, underline = true, strikethrough = true, highlight = true;
         string? backgroundColor = null;
+        bool backgroundMixed = false;
         bool anyOverlap = false;
         bool hasLink = false;
         int pos = 0;
@@ -1399,9 +1404,16 @@ public partial class EditableBlock : UserControl
             if (!run.Style.Italic) italic = false;
             if (!run.Style.Underline) underline = false;
             if (!run.Style.Strikethrough) strikethrough = false;
-            if (run.Style.BackgroundColor == null) highlight = false;
-            else if (backgroundColor == null) backgroundColor = run.Style.BackgroundColor;
-            else if (backgroundColor != run.Style.BackgroundColor) highlight = false;
+            if (!run.Style.Highlight) highlight = false;
+            if (!backgroundMixed && run.Style.BackgroundColor != null)
+            {
+                if (backgroundColor == null) backgroundColor = run.Style.BackgroundColor;
+                else if (backgroundColor != run.Style.BackgroundColor)
+                {
+                    backgroundColor = null;
+                    backgroundMixed = true;
+                }
+            }
             if (run.Style.LinkUrl != null) hasLink = true;
             pos = runEnd;
         }

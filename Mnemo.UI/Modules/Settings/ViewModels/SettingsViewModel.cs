@@ -195,19 +195,19 @@ public partial class SettingsViewModel : ViewModelBase
     private void RebuildCategories(string? preserveCategoryId = null)
     {
         var account = new SettingsCategoryViewModel(T("Account"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/user.svg", "Account");
-        var profileGroup = new SettingsGroupViewModel(T("Profile"));
+        var profileGroup = new SettingsGroupViewModel(T("Profile"), isCollapsible: true);
         profileGroup.Items.Add(new ProfilePictureSettingViewModel(_settingsService, T("ProfilePicture"), T("ProfilePictureDescription")));
         profileGroup.Items.Add(new NameSettingViewModel(_settingsService, T("DisplayName"), T("DisplayNameDescription")));
         account.Groups.Add(profileGroup);
 
         var general = new SettingsCategoryViewModel(T("General"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/settings.svg", "General") { IsSelected = true };
 
-        var appGroup = new SettingsGroupViewModel(T("Application"));
+        var appGroup = new SettingsGroupViewModel(T("Application"), isCollapsible: true);
         appGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.LaunchAtStartup", T("LaunchAtStartup"), T("LaunchAtStartupDescription")));
         appGroup.Items.Add(new LanguageSettingViewModel(_localizationService, _settingsService));
         appGroup.Items.Add(new ActionSettingViewModel(T("ClearCache"), T("ClearCacheDescription"), T("ClearNow")));
 
-        var expGroup = new SettingsGroupViewModel(T("Experience"));
+        var expGroup = new SettingsGroupViewModel(T("Experience"), isCollapsible: true);
         expGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.EnableGamification", T("EnableGamification"), T("EnableGamificationDescription"), true));
         if (_developerGateUnlocked)
             expGroup.Items.Add(new ToggleSettingViewModel(_settingsService, DeveloperModeKey, "Developer mode", "Shows a Developer section in Settings. Tap the Settings title seven times within two seconds to reveal this switch."));
@@ -217,12 +217,12 @@ public partial class SettingsViewModel : ViewModelBase
 
         var editor = new SettingsCategoryViewModel(T("Editor"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg", "Editor");
 
-        var editorGroup = new SettingsGroupViewModel(T("WritingExperience"));
+        var editorGroup = new SettingsGroupViewModel(T("WritingExperience"), isCollapsible: true);
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.AutoSave", T("AutoSave"), T("AutoSaveDescription"), true));
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.SpellCheck", T("SpellCheck"), T("SpellCheckDescription"), true));
         editorGroup.Items.Add(new StepSliderSettingViewModel(_settingsService, "Editor.Width", T("EditorWidth"), T("EditorWidthDescription"), new[] { T("SuperCompact"), T("Compact"), T("Wide"), T("SuperWide") }, T("Wide")));
 
-        var markdownGroup = new SettingsGroupViewModel(T("MarkdownRendering"));
+        var markdownGroup = new SettingsGroupViewModel(T("MarkdownRendering"), isCollapsible: true);
         markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.BlockSpacing", T("BlockSpacing"), T("BlockSpacingDescription"), new[] { T("Normal"), T("Compact"), T("Relaxed") }));
         markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LineHeight", T("LineSpacing"), T("LineSpacingDescription"), new[] { "1.0", "1.2", "1.4", "1.45", "1.5", "1.6", "1.8", "2.0" }, null, "1.5"));
         markdownGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Markdown.LetterSpacing", T("LetterSpacing"), T("LetterSpacingDescription"), new[] { "0", "0.2", "0.3", "0.4", "0.5", "0.8", "1.0", "1.5" }, null, "0.3"));
@@ -238,7 +238,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         var aiInstalled = _aiRuntimeInstalled;
 
-        var aiGroup = new SettingsGroupViewModel(T("Intelligence"));
+        var aiGroup = new SettingsGroupViewModel(T("Intelligence"), isCollapsible: true);
         if (!aiInstalled)
         {
             aiGroup.Items.Add(new AsyncActionSettingViewModel(
@@ -298,7 +298,7 @@ public partial class SettingsViewModel : ViewModelBase
             },
             aiInstalled));
 
-        var ragGroup = new SettingsGroupViewModel(T("LocalKnowledge"));
+        var ragGroup = new SettingsGroupViewModel(T("LocalKnowledge"), isCollapsible: true);
         ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", T("EnableRAG"), T("EnableRAGDescription"), true, aiInstalled));
         ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", T("EmbeddingModel"), T("EmbeddingModelDescription"), new[] { T("BgeSmallFast") }, null, null, null, aiInstalled));
 
@@ -307,7 +307,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         var appearance = new SettingsCategoryViewModel(T("Appearance"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg", "Appearance");
 
-        var themeGroup = new SettingsGroupViewModel(T("ThemeVisuals"));
+        var themeGroup = new SettingsGroupViewModel(T("ThemeVisuals"), isCollapsible: true);
         themeGroup.Items.Add(new ThemeSettingViewModel(_themeService, T("AppTheme"), T("AppThemeDescription")));
         themeGroup.Items.Add(new AppIconSettingViewModel(_settingsService, T("AppIcon"), T("AppIconDescription")));
 
@@ -315,13 +315,13 @@ public partial class SettingsViewModel : ViewModelBase
 
         var mindmap = new SettingsCategoryViewModel(T("Mindmap"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Mindmap");
 
-        var gridGroup = new SettingsGroupViewModel(T("GridBackground"));
+        var gridGroup = new SettingsGroupViewModel(T("GridBackground"), isCollapsible: true);
         gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridType", T("GridType"), T("GridTypeDescription"), new[] { "None", "Dotted", "Lines" }, null, "Dotted"));
         gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridSize", T("GridSize"), T("GridSizeDescription"), new[] { "20", "40", "60", "80", "100" }, null, "40"));
         gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridDotSize", T("GridDotSize"), T("GridDotSizeDescription"), new[] { "0.5", "1.0", "1.5", "2.0", "2.5", "3.0" }, null, "1.5"));
         gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridOpacity", T("GridOpacity"), T("GridOpacityDescription"), new[] { "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.8", "1.0" }, null, "0.2"));
 
-        var behaviourGroup = new SettingsGroupViewModel(T("Interaction"));
+        var behaviourGroup = new SettingsGroupViewModel(T("Interaction"), isCollapsible: true);
         behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.MinimapVisibility", T("ShowMinimap"), T("ShowMinimapDescription"), new[] { "Auto", "On", "Off" }, null, "Auto"));
         behaviourGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.ModifierBehaviour", T("ShiftBehaviour"), T("ShiftBehaviourDescription"), new[] { T("Selecting"), T("Panning") }, null, T("Selecting")));
 
@@ -329,7 +329,7 @@ public partial class SettingsViewModel : ViewModelBase
         mindmap.Groups.Add(behaviourGroup);
 
         var hotkeys = new SettingsCategoryViewModel(T("Hotkeys"), "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg", "Hotkeys");
-        var hotkeysGroup = new SettingsGroupViewModel(T("Shortcuts"));
+        var hotkeysGroup = new SettingsGroupViewModel(T("Shortcuts"), isCollapsible: true);
         hotkeysGroup.Items.Add(new ActionSettingViewModel(T("GlobalQuickActions"), T("GlobalQuickActionsDescription"), T("ChangeBind")));
         hotkeysGroup.Items.Add(new ActionSettingViewModel(T("NewNote"), T("NewNoteDescription"), T("ChangeBind")));
         hotkeys.Groups.Add(hotkeysGroup);
@@ -349,7 +349,7 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 Subtitle = "Internal tools and experimental options for development builds."
             };
-            var devGroup = new SettingsGroupViewModel("Developer tools");
+            var devGroup = new SettingsGroupViewModel("Developer tools", isCollapsible: true);
             devGroup.Items.Add(new SettingsNoticeViewModel("Reserved for developers", "This page holds developer-only preferences and diagnostics. More options will appear here over time."));
             devGroup.Items.Add(new ToggleSettingViewModel(_settingsService, ChatDatasetSettings.LoggingEnabledKey, "Log conversations for dataset", "Append each turn (manager model + chat model request/response) as one JSON object per line to %LocalAppData%\\mnemo\\chat_dataset\\conversations.jsonl. Off by default.", false));
             devGroup.Items.Add(new AsyncActionSettingViewModel(
@@ -394,4 +394,5 @@ public partial class SettingsViewModel : ViewModelBase
             SelectedCategory = pick;
         }
     }
+
 }

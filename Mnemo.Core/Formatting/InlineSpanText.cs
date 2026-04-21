@@ -5,7 +5,10 @@ using Mnemo.Core.Models;
 
 namespace Mnemo.Core.Formatting;
 
-/// <summary>Flattened string for caret indices / text diff: one <see cref="InlineSpan.EquationAtomChar"/> per <see cref="EquationSpan"/>.</summary>
+/// <summary>
+/// Flattened string for caret indices / text diff:
+/// one atom char per non-text inline span.
+/// </summary>
 public static class InlineSpanText
 {
     public static int LogicalLength(IReadOnlyList<InlineSpan> spans)
@@ -28,11 +31,19 @@ public static class InlineSpanText
                 sb.Append(t.Text);
             else if (s is EquationSpan)
                 sb.Append(InlineSpan.EquationAtomChar);
+            else if (s is FractionSpan)
+                sb.Append(InlineSpan.FractionAtomChar);
         }
 
         return sb.ToString();
     }
 
     public static string FlattenDisplay(IReadOnlyList<InlineSpan> spans) =>
-        string.Concat(spans.Select(s => s is TextSpan t ? t.Text : s is EquationSpan e ? e.Latex : string.Empty));
+        string.Concat(spans.Select(static s => s switch
+        {
+            TextSpan t => t.Text,
+            EquationSpan e => e.Latex,
+            FractionSpan f => $"{f.Numerator}/{f.Denominator}",
+            _ => string.Empty
+        }));
 }

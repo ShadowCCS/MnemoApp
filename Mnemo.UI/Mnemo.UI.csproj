@@ -20,10 +20,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Project resources and content grouping -->
     <Folder Include="Models\" />
+
+    <!-- All assets and themes -->
     <AvaloniaResource Include="Assets\**" />
-    <AvaloniaResource Include="Modules\Onboarding\Assets\**" />
     <AvaloniaResource Include="Themes\**" />
+    <AvaloniaResource Include="Languages\**" />
+
+    <!-- Icon resources, organized by folder -->
     <AvaloniaResource Include="Icons\Tabler\Used\**\*.svg" />
     <AvaloniaResource Include="Icons\SlashCommand\*.svg" />
     <AvaloniaResource Include="Icons\FormattingToolbar\*.svg" />
@@ -31,11 +36,16 @@
     <AvaloniaResource Include="Icons\MindmapToolbar\*.svg" />
     <AvaloniaResource Include="Icons\MindmapToolbar\EdgeTypes\*.svg" />
     <AvaloniaResource Include="Icons\MindmapModeSwitcher\*.svg" />
-    <AvaloniaResource Include="Assets\ProfilePictures\*.png" />
     <AvaloniaResource Include="Icons\States\*.svg" />
     <AvaloniaResource Include="Icons\Editor\*.svg" />
-    <AvaloniaResource Include="Languages\**" />
+    <AvaloniaResource Include="Icons\Sidebar\*.svg" />
+
+    <!-- Specific asset folders -->
+    <AvaloniaResource Include="Assets\ProfilePictures\*.png" />
+
+    <!-- Module translation resources -->
     <EmbeddedResource Include="Modules\Overview\Widgets\**\Translations\*.json" />
+    <EmbeddedResource Include="Modules\Flashcards\Translations\*.json" />
   </ItemGroup>
 
   <ItemGroup>

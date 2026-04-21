@@ -337,6 +337,9 @@ public class BlockViewModel : INotifyPropertyChanged
                 case (EquationSpan ea, EquationSpan eb):
                     if (ea.Latex != eb.Latex || ea.Style != eb.Style) return false;
                     break;
+                case (FractionSpan fa, FractionSpan fb):
+                    if (fa.Numerator != fb.Numerator || fa.Denominator != fb.Denominator || fa.Style != fb.Style) return false;
+                    break;
                 default:
                     return false;
             }

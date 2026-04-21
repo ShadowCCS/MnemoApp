@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -21,6 +22,7 @@ using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services.LaTeX;
+using Mnemo.Infrastructure.Services.TextShortcuts;
 using Mnemo.UI.Controls;
 using Mnemo.UI;
 using Mnemo.UI.Services.LaTeX.Layout.Boxes;
@@ -84,6 +86,7 @@ public class RichTextEditor : Control
     private int _selectionStart;
     private int _selectionEnd;
     private TextLayout? _textLayout;
+    private TextLayout? _backgroundLayout;
     private TextLayout? _watermarkLayout;
     /// <summary>Text we built the current _textLayout for; used to detect stale layout when Spans were set after first paint.</summary>
     private string? _lastBuiltText;
@@ -97,9 +100,11 @@ public class RichTextEditor : Control
     private DispatcherTimer? _caretTimer;
     private bool _isDragging;
     private int _dragAnchor;
+    private AutoShortcutUndoState? _pendingAutoShortcutUndo;
 
     private static readonly FontFamily MonoFont =
         new("Cascadia Code, Consolas, Courier New, monospace");
+    private static readonly Regex TailFractionTokenRegex = new(@"\\\d+/\d+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>Cached inline equation layouts keyed by (charIndex, latex). Rebuilt when runs change.</summary>
     private readonly List<InlineEquationEntry> _inlineEquations = new();
@@ -124,6 +129,14 @@ public class RichTextEditor : Control
         public Box? Layout;
         public double Width;
         public double Height;
+    }
+
+    private sealed class AutoShortcutUndoState
+    {
+        public int ReplacementStart;
+        public string Replacement = string.Empty;
+        public string OriginalSequence = string.Empty;
+        public int TextLengthAfterConversion;
     }
 
     // ── Routed events ────────────────────────────────────────────────────────
@@ -358,6 +371,7 @@ public class RichTextEditor : Control
             _lastBuiltText = string.Empty;
             _layoutBoundaryAtLogical = new int[] { 0 };
             _layoutTextLength = 0;
+            _backgroundLayout = null;
             return;
         }
 
@@ -366,7 +380,7 @@ public class RichTextEditor : Control
         if (safeForeground.Opacity == 0)
             safeForeground = new SolidColorBrush(Colors.Black);
 
-        var (layoutText, styleSpans, boundaries) = BuildExpandedLayoutText(runs, text.Length, safeForeground, typeface);
+        var (layoutText, backgroundSpans, foregroundSpans, boundaries) = BuildExpandedLayoutText(runs, text.Length, safeForeground, typeface);
         _layoutBoundaryAtLogical = boundaries;
         _layoutTextLength = layoutText.Length;
 
@@ -375,19 +389,27 @@ public class RichTextEditor : Control
             TextAlignment.Left, TextWrapping.Wrap, TextTrimming.None,
             null, FlowDirection.LeftToRight, maxWidth,
             double.PositiveInfinity, double.NaN, 0, 0,
-            styleSpans.Count > 0 ? styleSpans : null);
+            foregroundSpans.Count > 0 ? foregroundSpans : null);
+
+        _backgroundLayout = new TextLayout(
+            layoutText, typeface, FontSize, Brushes.Transparent,
+            TextAlignment.Left, TextWrapping.Wrap, TextTrimming.None,
+            null, FlowDirection.LeftToRight, maxWidth,
+            double.PositiveInfinity, double.NaN, 0, 0,
+            backgroundSpans.Count > 0 ? backgroundSpans : null);
         _lastBuiltText = text;
     }
 
     /// <summary>Layout string uses spaces to reserve measured inline-math width (Notion-style flow).</summary>
-    private (string LayoutText, List<ValueSpan<TextRunProperties>> GlyphSpans, int[] Boundaries) BuildExpandedLayoutText(
+    private (string LayoutText, List<ValueSpan<TextRunProperties>> BackgroundSpans, List<ValueSpan<TextRunProperties>> ForegroundSpans, int[] Boundaries) BuildExpandedLayoutText(
         IReadOnlyList<InlineSpan> docSpans,
         int logicalLen,
         IBrush defaultForeground,
         Typeface defaultTypeface)
     {
         var sb = new StringBuilder();
-        var glyphSpans = new List<ValueSpan<TextRunProperties>>(docSpans.Count * 2);
+        var backgroundSpans = new List<ValueSpan<TextRunProperties>>(docSpans.Count * 2);
+        var foregroundSpans = new List<ValueSpan<TextRunProperties>>(docSpans.Count * 2);
         var boundaries = new int[logicalLen + 1];
         boundaries[0] = 0;
         int logicalIdx = 0;
@@ -421,32 +443,25 @@ public class RichTextEditor : Control
                     && linkRes is IBrush linkBrush)
                     runForeground = linkBrush;
 
-                IBrush? background = null;
-                if (!string.IsNullOrEmpty(style.BackgroundColor))
-                {
-                    if (Color.TryParse(style.BackgroundColor, out var bgColor))
-                    {
-                        background = new SolidColorBrush(bgColor);
-                    }
-                    else if (style.BackgroundColor.StartsWith("swatch", StringComparison.OrdinalIgnoreCase) && Application.Current != null)
-                    {
-                        var key = "ColorSwatch" + style.BackgroundColor.Substring(6);
-                        if (Application.Current.TryFindResource(key, out var res) && res is Color rc)
-                        {
-                            background = new SolidColorBrush(rc);
-                        }
-                    }
-                }
+                var background = ResolveInlineBackgroundBrush(style);
 
-                var props = new GenericTextRunProperties(
+                var bgProps = new GenericTextRunProperties(
+                    runTypeface,
+                    fontRenderingEmSize: FontSize,
+                    textDecorations: null,
+                    foregroundBrush: Brushes.Transparent,
+                    backgroundBrush: background);
+
+                var fgProps = new GenericTextRunProperties(
                     runTypeface,
                     fontRenderingEmSize: FontSize,
                     textDecorations: decorations,
                     foregroundBrush: runForeground,
-                    backgroundBrush: background);
+                    backgroundBrush: null);
 
                 sb.Append(run.Text);
-                glyphSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, run.Text.Length, props));
+                backgroundSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, run.Text.Length, bgProps));
+                foregroundSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, run.Text.Length, fgProps));
                 for (var c = 0; c < run.Text.Length; c++)
                 {
                     logicalIdx++;
@@ -461,7 +476,15 @@ public class RichTextEditor : Control
                 var fw = style.Bold ? FontWeight.Bold : FontWeight.Normal;
                 var fs = style.Italic ? FontStyle.Italic : FontStyle.Normal;
                 var runTypeface = new Typeface(ff, fs, fw);
-                var props = new GenericTextRunProperties(
+                var background = ResolveInlineBackgroundBrush(style);
+                var bgProps = new GenericTextRunProperties(
+                    runTypeface,
+                    fontRenderingEmSize: FontSize,
+                    textDecorations: null,
+                    foregroundBrush: Brushes.Transparent,
+                    backgroundBrush: background);
+
+                var fgProps = new GenericTextRunProperties(
                     runTypeface,
                     fontRenderingEmSize: FontSize,
                     textDecorations: null,
@@ -474,14 +497,63 @@ public class RichTextEditor : Control
                 int n = GetMinimalSpaceCountForTargetWidth(target, runTypeface, measureFg);
                 for (var j = 0; j < n; j++)
                     sb.Append(' ');
-                glyphSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, n, props));
+                backgroundSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, n, bgProps));
+                foregroundSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, n, fgProps));
                 layoutOffset += n;
+                logicalIdx++;
+                boundaries[logicalIdx] = layoutOffset;
+            }
+            else if (seg is FractionSpan frac)
+            {
+                var style = frac.Style;
+                var ff = style.Code ? MonoFont : FontFamily.Default;
+                var fw = style.Bold ? FontWeight.Bold : FontWeight.Normal;
+                var fs = style.Italic ? FontStyle.Italic : FontStyle.Normal;
+                var runTypeface = new Typeface(ff, fs, fw);
+
+                TextDecorationCollection? decorations = null;
+                if (style.Underline || style.Strikethrough || !string.IsNullOrEmpty(style.LinkUrl))
+                {
+                    decorations = new TextDecorationCollection();
+                    if (style.Underline || !string.IsNullOrEmpty(style.LinkUrl))
+                        decorations.Add(new TextDecoration { Location = TextDecorationLocation.Underline });
+                    if (style.Strikethrough)
+                        decorations.Add(new TextDecoration { Location = TextDecorationLocation.Strikethrough });
+                }
+
+                IBrush runForeground = defaultForeground;
+                if (!string.IsNullOrEmpty(style.LinkUrl)
+                    && Application.Current?.TryFindResource("LinksBrush", out var linkRes) == true
+                    && linkRes is IBrush linkBrush)
+                    runForeground = linkBrush;
+
+                var background = ResolveInlineBackgroundBrush(style);
+
+                var bgProps = new GenericTextRunProperties(
+                    runTypeface,
+                    fontRenderingEmSize: FontSize,
+                    textDecorations: null,
+                    foregroundBrush: Brushes.Transparent,
+                    backgroundBrush: background);
+
+                var fgProps = new GenericTextRunProperties(
+                    runTypeface,
+                    fontRenderingEmSize: FontSize,
+                    textDecorations: decorations,
+                    foregroundBrush: runForeground,
+                    backgroundBrush: null);
+
+                var rendered = FractionShortcutResolver.Render(frac.Numerator, frac.Denominator);
+                sb.Append(rendered);
+                backgroundSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, rendered.Length, bgProps));
+                foregroundSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, rendered.Length, fgProps));
+                layoutOffset += rendered.Length;
                 logicalIdx++;
                 boundaries[logicalIdx] = layoutOffset;
             }
         }
 
-        return (sb.ToString(), glyphSpans, boundaries);
+        return (sb.ToString(), backgroundSpans, foregroundSpans, boundaries);
     }
 
     private static double MeasureTextLayoutWidth(string text, Typeface typeface, IBrush fg, double fontSize)
@@ -614,6 +686,8 @@ public class RichTextEditor : Control
 
     private void DisposeLayouts()
     {
+        _backgroundLayout?.Dispose();
+        _backgroundLayout = null;
         _textLayout?.Dispose();
         _textLayout = null;
         _watermarkLayout?.Dispose();
@@ -642,6 +716,62 @@ public class RichTextEditor : Control
         {
             return new SolidColorBrush(Colors.Gray);
         }
+    }
+
+    private static IBrush GetThemeSelectionBrush()
+    {
+        if (Application.Current?.TryFindResource("TextControlSelectionHighlightColorBrush", out var res) == true
+            && res is IBrush brush)
+            return brush;
+        return new SolidColorBrush(Colors.CornflowerBlue, 0.4);
+    }
+
+    private static IBrush GetThemeCaretBrush()
+    {
+        if (Application.Current?.TryFindResource("TextControlForegroundBrush", out var fgRes) == true
+            && fgRes is IBrush fgBrush)
+            return fgBrush;
+        if (Application.Current?.TryFindResource("TextPrimaryBrush", out var primaryRes) == true
+            && primaryRes is IBrush primaryBrush)
+            return primaryBrush;
+        return Brushes.Black;
+    }
+
+    private static IBrush GetInlineHighlightBrush()
+    {
+        if (Application.Current?.TryFindResource("InlineHighlightColorBrush", out var brushRes) == true
+            && brushRes is IBrush brush)
+            return brush;
+        if (Application.Current?.TryFindResource("InlineHighlightColor", out var colorRes) == true
+            && colorRes is Color color)
+            return new SolidColorBrush(color);
+        return new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0xAA));
+    }
+
+    private static IBrush? ResolveInlineBackgroundBrush(TextStyle style)
+    {
+        if (style.Highlight)
+            return GetInlineHighlightBrush();
+        if (string.IsNullOrEmpty(style.BackgroundColor))
+            return null;
+
+        if (Color.TryParse(style.BackgroundColor, out var color))
+            return new SolidColorBrush(color);
+
+        if (style.BackgroundColor.StartsWith("swatch", StringComparison.OrdinalIgnoreCase)
+            && Application.Current != null)
+        {
+            var key = "ColorSwatch" + style.BackgroundColor.Substring(6);
+            if (Application.Current.TryFindResource(key, out var swatch))
+            {
+                if (swatch is Color swatchColor)
+                    return new SolidColorBrush(swatchColor);
+                if (swatch is IBrush swatchBrush)
+                    return swatchBrush;
+            }
+        }
+
+        return null;
     }
 
     private static string TNotes(string key)
@@ -674,10 +804,14 @@ public class RichTextEditor : Control
             int selStart = Math.Min(_selectionStart, _selectionEnd);
             int selEnd = Math.Max(_selectionStart, _selectionEnd);
 
-            // 1. Selection behind text (glyphs and run backgrounds paint on top).
+            // 1. Run backgrounds only.
+            if (_backgroundLayout != null)
+                _backgroundLayout.Draw(context, origin);
+
+            // 2. Selection overlay above run backgrounds.
             if (selEnd > selStart && _textLayout != null)
             {
-                var selBrush = SelectionBrush ?? new SolidColorBrush(Colors.CornflowerBlue, 0.4);
+                var selBrush = SelectionBrush ?? GetThemeSelectionBrush();
                 if (string.IsNullOrEmpty(Text))
                 {
                     double h = _textLayout.Height > 0 ? _textLayout.Height : FontSize;
@@ -722,7 +856,7 @@ public class RichTextEditor : Control
                 }
             }
 
-            // 2. Text and inline math on top of selection tint.
+            // 3. Foreground glyphs and inline math.
             if (_textLayout != null)
             {
                 _textLayout.Draw(context, origin);
@@ -730,11 +864,10 @@ public class RichTextEditor : Control
                 if (ShouldDrawWatermark() && _watermarkLayout != null)
                     _watermarkLayout.Draw(context, origin);
             }
-
-            // 3. Caret on top.
+            // 4. Caret on top.
             if (IsFocused && _caretVisible && selEnd == selStart && _textLayout != null)
             {
-                var caretBrush = CaretBrush ?? Brushes.Black;
+                var caretBrush = CaretBrush ?? GetThemeCaretBrush();
                 var caretRect = GetCaretRect();
                 context.FillRectangle(caretBrush, caretRect);
             }
@@ -1097,6 +1230,8 @@ public class RichTextEditor : Control
     {
         if (HasSelection) { DeleteSelection(); return; }
         if (_caretIndex <= 0) return;
+        if (TryUndoLastAutoShortcutConversion())
+            return;
         int newCaret = _caretIndex - 1;
         DeleteRange(newCaret, _caretIndex);
         CaretIndex = newCaret;
@@ -1148,12 +1283,132 @@ public class RichTextEditor : Control
         if (TextLength == 0 && start == 0 && end == 1)
             end = 0;
 
-        var runs = ApplyTextInsertion(Spans ?? Array.Empty<InlineSpan>(), start, end, text);
+        var currentRuns = Spans ?? Array.Empty<InlineSpan>();
+        var oldFlat = FlattenRuns(currentRuns);
+        int removeLen = end - start;
+        var newFlat = removeLen > 0
+            ? oldFlat.Remove(start, removeLen).Insert(start, text)
+            : oldFlat.Insert(start, text);
         int newCaret = start + text.Length;
+
+        var shortcuts = ResolveTextShortcutService();
+        if (shortcuts != null)
+        {
+            var result = shortcuts.Apply(newFlat, newCaret, start, text.Length);
+            if (result.WasTransformed)
+            {
+                newFlat = result.Text;
+                newCaret = Math.Clamp(result.CaretIndex, 0, newFlat.Length);
+                if (!string.IsNullOrEmpty(result.LastAppliedSequence)
+                    && !string.IsNullOrEmpty(result.LastAppliedReplacement)
+                    && result.LastAppliedStartIndex >= 0)
+                {
+                    _pendingAutoShortcutUndo = new AutoShortcutUndoState
+                    {
+                        ReplacementStart = result.LastAppliedStartIndex,
+                        Replacement = result.LastAppliedReplacement!,
+                        OriginalSequence = result.LastAppliedSequence!,
+                        TextLengthAfterConversion = newFlat.Length
+                    };
+                }
+            }
+            else
+                _pendingAutoShortcutUndo = null;
+        }
+        else
+            _pendingAutoShortcutUndo = null;
+
+        IReadOnlyList<InlineSpan> runs = Core.Formatting.InlineSpanFormatApplier.ApplyTextEdit(currentRuns, oldFlat, newFlat);
+        if (TryPromoteFractionAtCaret(runs, newCaret, out var fractionRuns, out var fractionCaret))
+        {
+            runs = fractionRuns;
+            newCaret = fractionCaret;
+        }
         Spans = runs;
         CaretIndex = newCaret;
         SelectionStart = newCaret;
         SelectionEnd = newCaret;
+    }
+
+    private static ITextShortcutService? _textShortcutService;
+
+    /// <summary>
+    /// Resolve lazily so design-time / unit-test instances without a running DI container fall back
+    /// to a no-op (returning null) rather than crashing the editor.
+    /// </summary>
+    private static ITextShortcutService? ResolveTextShortcutService()
+    {
+        if (_textShortcutService != null) return _textShortcutService;
+        if ((Application.Current as App)?.Services is { } sp)
+            _textShortcutService = sp.GetService<ITextShortcutService>();
+        return _textShortcutService;
+    }
+
+    private static bool TryPromoteFractionAtCaret(
+        IReadOnlyList<InlineSpan> runs,
+        int caretIndex,
+        out IReadOnlyList<InlineSpan> promotedRuns,
+        out int promotedCaret)
+    {
+        promotedRuns = runs;
+        promotedCaret = caretIndex;
+
+        var flat = InlineSpanText.FlattenEditing(runs);
+        if (caretIndex <= 0 || caretIndex > flat.Length)
+            return false;
+
+        var windowStart = Math.Max(0, caretIndex - 24);
+        var tail = flat.Substring(windowStart, caretIndex - windowStart);
+        var match = TailFractionTokenRegex.Match(tail);
+        if (!match.Success)
+            return false;
+
+        var token = match.Value;
+        if (!FractionShortcutResolver.TryParse(token, out var numerator, out var denominator))
+            return false;
+
+        var tokenStart = windowStart + match.Index;
+        var tokenEnd = tokenStart + token.Length;
+        var insertion = new List<InlineSpan> { new FractionSpan(numerator, denominator) };
+        promotedRuns = Core.Formatting.InlineSpanFormatApplier.ReplaceRange(runs, tokenStart, tokenEnd, insertion);
+        promotedCaret = tokenStart + 1;
+        return true;
+    }
+
+    private bool TryUndoLastAutoShortcutConversion()
+    {
+        var pending = _pendingAutoShortcutUndo;
+        if (pending is null)
+            return false;
+
+        if (_caretIndex != pending.ReplacementStart + pending.Replacement.Length
+            || TextLength != pending.TextLengthAfterConversion
+            || pending.ReplacementStart < 0
+            || pending.ReplacementStart + pending.Replacement.Length > TextLength)
+        {
+            _pendingAutoShortcutUndo = null;
+            return false;
+        }
+
+        var currentRuns = Spans ?? Array.Empty<InlineSpan>();
+        var oldFlat = FlattenRuns(currentRuns);
+        if (!oldFlat.AsSpan(pending.ReplacementStart, pending.Replacement.Length).SequenceEqual(pending.Replacement.AsSpan()))
+        {
+            _pendingAutoShortcutUndo = null;
+            return false;
+        }
+
+        var newFlat = oldFlat.Remove(pending.ReplacementStart, pending.Replacement.Length)
+            .Insert(pending.ReplacementStart, pending.OriginalSequence);
+        var newRuns = Core.Formatting.InlineSpanFormatApplier.ApplyTextEdit(currentRuns, oldFlat, newFlat);
+        var newCaret = pending.ReplacementStart + pending.OriginalSequence.Length;
+
+        Spans = newRuns;
+        CaretIndex = newCaret;
+        SelectionStart = newCaret;
+        SelectionEnd = newCaret;
+        _pendingAutoShortcutUndo = null;
+        return true;
     }
 
     /// <summary>Inserts text at the caret (replacing selection), same as typed input.</summary>
@@ -1200,7 +1455,13 @@ public class RichTextEditor : Control
             int end = pos + segLen;
             if (i < end && i >= pos)
             {
-                url = seg is TextSpan tx ? tx.Style.LinkUrl : null;
+                url = seg switch
+                {
+                    TextSpan tx => tx.Style.LinkUrl,
+                    EquationSpan eq => eq.Style.LinkUrl,
+                    FractionSpan fr => fr.Style.LinkUrl,
+                    _ => null
+                };
                 return url != null;
             }
 
@@ -1561,7 +1822,8 @@ public class RichTextEditor : Control
         return start + off;
     }
 
-    private static bool IsEquationPlaceholderChar(char c) => c == InlineSpan.EquationAtomChar;
+    private static bool IsEquationPlaceholderChar(char c) =>
+        c == InlineSpan.EquationAtomChar || c == InlineSpan.FractionAtomChar;
 
     private int FindWordStart(int pos)
     {

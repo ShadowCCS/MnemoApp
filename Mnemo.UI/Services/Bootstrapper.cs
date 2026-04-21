@@ -16,7 +16,9 @@ using Mnemo.Infrastructure.Services.AI;
 using Mnemo.Infrastructure.Services.AI.PlatformHardware;
 using Mnemo.Infrastructure.Services.Knowledge;
 using Mnemo.Infrastructure.Services.Notes;
+using Mnemo.Infrastructure.Services.Flashcards;
 using Mnemo.Infrastructure.Services.Speech;
+using Mnemo.Infrastructure.Services.TextShortcuts;
 using Mnemo.Infrastructure.Services.Tools;
 
 namespace Mnemo.UI.Services;
@@ -42,6 +44,7 @@ public static class Bootstrapper
         services.AddSingleton<INoteClipboardPayloadCodec, NoteClipboardPayloadCodec>();
         services.AddSingleton<INoteClipboardPlatformService, NoteClipboardPlatformService>();
         services.AddSingleton<IImageAssetService, ImageAssetService>();
+        services.AddSingleton<ITextShortcutService, TextShortcutService>();
 
         // AI Services
         services.AddSingleton<IPlatformHardwareGpuProvider>(sp =>
@@ -114,6 +117,7 @@ public static class Bootstrapper
         services.AddSingleton<ILearningPathService, LearningPathService>();
         services.AddSingleton<INoteService, NoteService>();
         services.AddSingleton<INoteFolderService, NoteFolderService>();
+        services.AddSingleton<IFlashcardDeckService, InMemoryFlashcardDeckService>();
         services.AddSingleton<ISpeechRecognitionService, WhisperSpeechRecognitionService>();
 
         // 2. Register UI-specific Services
