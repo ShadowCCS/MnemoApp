@@ -1583,10 +1583,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     var richEditor = editableBlock.TryGetRichTextEditor();
                     if (richEditor != null)
                     {
-                        var localPos = e.GetPosition(richEditor);
-                        var editorBounds = new Rect(richEditor.Bounds.Size);
-                        bool pointerIsOverEditor = editorBounds.Contains(localPos);
-                        if (!pointerIsOverEditor)
+                        // Bounds-based checks are not enough: in right-side whitespace the pointer can be inside
+                        // the editor rectangle but hit-test a parent (Border/Grid), so RichTextEditor never gets
+                        // OnPointerPressed. Use the actual event source ancestry instead.
+                        bool sourceInsideEditor = source != null
+                            && (ReferenceEquals(source, richEditor)
+                                || source.GetVisualAncestors().Any(a => ReferenceEquals(a, richEditor)));
+                        if (!sourceInsideEditor)
                         {
                             var pointInFocusedBlock = this.TranslatePoint(pos, editableBlock);
                             if (pointInFocusedBlock.HasValue)
@@ -1594,6 +1597,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                                 var paddingCharIndex = editableBlock.GetCharacterIndexFromPoint(pointInFocusedBlock.Value);
                                 paddingCharIndex = Math.Clamp(paddingCharIndex, 0, editableBlock.GetAnchorCharClampMax());
                                 richEditor.StartDragSelect(paddingCharIndex, e.Pointer);
+                                _crossBlockAnchorBlock = vm;
+                                _crossBlockAnchorBlockIndex = blockIndex;
+                                _crossBlockAnchorCharIndex = paddingCharIndex;
+                                _crossBlockStartPoint = pos;
+                                _crossBlockArmed = true;
+                                _isCrossBlockSelecting = false;
                                 e.Handled = true;
                             }
                         }
@@ -1673,6 +1682,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return false;
     }
 
+    private bool IsPointInsideBlockSurface(BlockViewModel block, Point pointInEditor)
+    {
+        var editable = GetEditableBlockForViewModel(block);
+        if (editable == null)
+            return false;
+        var local = this.TranslatePoint(pointInEditor, editable);
+        return local.HasValue && editable.IsPointerHitInsideBlock(local.Value);
+    }
+
     private static bool IsSplitColumnBottomTapBorder(Visual? source)
     {
         if (source == null) return false;
@@ -1747,17 +1765,23 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             _blockDragGhostOverlay.InvalidateArrange();
         }
 
-        // TopLevel tunnel runs for every move app-wide; if a child (e.g. RichTextEditor) owns capture,
-        // do not run box/cross-block selection — the child must receive moves for in-control drag-select.
-        if (e.Pointer.Captured != null && !ReferenceEquals(e.Pointer.Captured, this))
-            return;
-
         // Only process if at least one selection mode is armed or active
         if (!_boxSelectArmed && !_isBoxSelecting && !_crossBlockArmed && !_isCrossBlockSelecting)
             return;
 
         // Convert position from the event source to editor coordinates
         var current = e.GetPosition(this);
+
+        // TopLevel tunnel runs for every move app-wide. When a child (RichTextEditor) owns capture we usually
+        // skip editor-level selection; however, if cross-block is armed, hand off once pointer leaves the
+        // anchor block so selection can continue across blocks.
+        if (e.Pointer.Captured != null && !ReferenceEquals(e.Pointer.Captured, this))
+        {
+            if (_crossBlockArmed && _crossBlockAnchorBlock != null && !IsPointInsideBlockSurface(_crossBlockAnchorBlock, current))
+                e.Pointer.Capture(this);
+            else
+                return;
+        }
 
         // Box selection: activate once movement exceeds threshold
         if (_boxSelectArmed)

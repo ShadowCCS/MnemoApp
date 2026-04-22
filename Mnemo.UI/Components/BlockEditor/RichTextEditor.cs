@@ -1506,9 +1506,11 @@ public class RichTextEditor : Control
         EnsureLayoutForVerticalNavigation();
 
         if (_textLayout is null) return 0;
+        var local = new Point(point.X - _mathPadLeft, point.Y - _mathPadTop);
+        if (TryClampHitToLineEdge(local, out var clamped))
+            return clamped;
         try
         {
-            var local = new Point(point.X - _mathPadLeft, point.Y - _mathPadTop);
             var result = _textLayout.HitTestPoint(local);
             int rawLayoutBoundary = result.IsTrailing ? result.TextPosition + 1 : result.TextPosition;
             int layoutBoundary = Math.Clamp(rawLayoutBoundary, 0, _layoutTextLength);
@@ -1517,8 +1519,85 @@ public class RichTextEditor : Control
         }
         catch
         {
-            return 0;
+            return HitTestPointFallback(local);
         }
+    }
+
+    /// <summary>
+    /// If the pointer is clearly to the left/right of a visual line, clamp to the line's start/end caret.
+    /// This avoids relying on <see cref="TextLayout.HitTestPoint"/> behaviour for far-off whitespace (which can vary
+    /// and may return a non-edge character without throwing).
+    /// </summary>
+    private bool TryClampHitToLineEdge(Point local, out int logicalCaret)
+    {
+        logicalCaret = 0;
+        if (_textLayout == null)
+            return false;
+
+        var lines = _textLayout.TextLines;
+        if (lines.Count == 0)
+            return false;
+
+        var (lineIndex, _) = GetLineIndexAtY(lines, local.Y);
+        var line = lines[Math.Clamp(lineIndex, 0, lines.Count - 1)];
+
+        // Use width including trailing whitespace so the right edge is a valid hit target.
+        var maxX = line.WidthIncludingTrailingWhitespace;
+        if (double.IsNaN(maxX) || double.IsInfinity(maxX) || maxX <= 0)
+            maxX = Math.Max(line.Width, 0);
+
+        const double edgeSlop = 1.0;
+        if (local.X >= -edgeSlop && local.X <= maxX + edgeSlop)
+            return false;
+
+        int lineStart = line.FirstTextSourceIndex;
+        int lineEnd = lineStart + LineContentCharCount(line);
+        int layoutBoundary = local.X < 0 ? lineStart : lineEnd;
+        layoutBoundary = Math.Clamp(layoutBoundary, 0, _layoutTextLength);
+        logicalCaret = Math.Clamp(LayoutBoundaryIndexToLogicalCaret(layoutBoundary), 0, TextLength);
+        return true;
+    }
+
+    private static (int LineIndex, double LineTop) GetLineIndexAtY(IReadOnlyList<TextLine> lines, double y)
+    {
+        if (lines.Count == 0)
+            return (0, 0);
+        if (y <= 0)
+            return (0, 0);
+
+        double top = 0;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            var bottom = top + line.Height;
+            if (y <= bottom)
+                return (i, top);
+            top = bottom;
+        }
+        return (lines.Count - 1, Math.Max(0, top - lines[^1].Height));
+    }
+
+    /// <summary>
+    /// Robust fallback when <see cref="TextLayout.HitTestPoint"/> throws for points outside glyph geometry.
+    /// Maps to the nearest caret edge on the nearest visual line so drag-start from block padding still works.
+    /// </summary>
+    private int HitTestPointFallback(Point local)
+    {
+        if (_textLayout == null)
+            return 0;
+
+        var lines = _textLayout.TextLines;
+        if (lines.Count == 0)
+            return Math.Clamp(local.X <= 0 ? 0 : TextLength, 0, TextLength);
+
+        var (lineIndex, _) = GetLineIndexAtY(lines, local.Y);
+
+        var targetLine = lines[lineIndex];
+        int lineStart = targetLine.FirstTextSourceIndex;
+        int lineEnd = lineStart + LineContentCharCount(targetLine);
+        int layoutBoundary = local.X <= 0 ? lineStart : lineEnd;
+        layoutBoundary = Math.Clamp(layoutBoundary, 0, _layoutTextLength);
+        return Math.Clamp(LayoutBoundaryIndexToLogicalCaret(layoutBoundary), 0, TextLength);
     }
 
     /// <summary>
