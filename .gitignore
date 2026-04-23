@@ -159,4 +159,4 @@ logs/
 .temp-teacher/
 docs/
 training/
-mnemo-sim/
+tmp.build/

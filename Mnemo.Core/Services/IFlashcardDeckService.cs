@@ -28,13 +28,18 @@ public interface IFlashcardDeckService
     Task SaveDeckAsync(FlashcardDeck deck, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Records the outcome of a practice session (stub for future persistence and statistics).
+    /// Records and applies a completed practice session outcome.
     /// </summary>
     Task RecordSessionOutcomeAsync(
+        FlashcardSessionResult sessionResult,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns retention trend points for sparkline rendering.
+    /// </summary>
+    Task<IReadOnlyList<FlashcardRetentionTrendPoint>> GetDeckRetentionTrendAsync(
         string deckId,
-        FlashcardSessionConfig sessionConfig,
-        int correctCount,
-        int incorrectCount,
+        int days = 14,
         CancellationToken cancellationToken = default);
 
     /// <summary>

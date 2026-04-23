@@ -1,3 +1,5 @@
+using Mnemo.Core.Models;
+
 namespace Mnemo.Core.Models.Flashcards;
 
 /// <summary>
@@ -13,4 +15,7 @@ public sealed record Flashcard(
     DateTimeOffset DueDate,
     double? Stability,
     double? Difficulty,
-    double? Retrievability);
+    double? Retrievability,
+    FlashcardSourceInfo? SourceInfo = null,
+    IReadOnlyList<Block>? FrontBlocks = null,
+    IReadOnlyList<Block>? BackBlocks = null);

@@ -14,6 +14,59 @@
              ClipToBounds="False">
 
     <UserControl.Styles>
+        <Style Selector="Border.library-pane">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,1,0" />
+        </Style>
+
+        <Style Selector="Button.library-nav">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.library-nav:pointerover">
+            <Setter Property="Background" Value="{DynamicResource WidgetBackgroundPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        </Style>
+        <Style Selector="Button.library-nav:pressed">
+            <Setter Property="Background" Value="{DynamicResource WidgetBackgroundPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.library-section">
+            <Setter Property="FontFamily" Value="{DynamicResource Font.SemiBold}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSize.Body.ExtraSmall}" />
+            <Setter Property="Margin" Value="12,10,0,8" />
+        </Style>
+
+        <Style Selector="Border.library-divider">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="Margin" Value="12,10" />
+            <Setter Property="Opacity" Value="0.8" />
+        </Style>
+
+        <Style Selector="Border.search-surface">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+
+        <Style Selector="TextBox.deck-search">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0,2,0,2" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSize.Body.Medium}" />
+        </Style>
+
         <!-- Deck cards: Border only (no Button / ContentPresenter theme = no square grey plate) -->
         <Style Selector="Border.deck-card">
             <Setter Property="Width" Value="280" />
@@ -25,7 +78,7 @@
             <Setter Property="CornerRadius" Value="16" />
             <Setter Property="Padding" Value="18,16" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="BoxShadow" Value="0 1 4 0 #14000000" />
+            <Setter Property="BoxShadow" Value="0 6 18 -10 #3A000000" />
             <Setter Property="Transitions">
                 <Transitions>
                     <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" Easing="CubicEaseOut" />
@@ -33,10 +86,11 @@
             </Setter>
         </Style>
         <Style Selector="Border.deck-card:pointerover">
-            <Setter Property="BoxShadow" Value="0 18 36 -4 #32000000" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
+            <Setter Property="BoxShadow" Value="0 18 36 -8 #46000000" />
         </Style>
         <Style Selector="Border.deck-card:pressed">
-            <Setter Property="BoxShadow" Value="0 8 18 -2 #28000000" />
+            <Setter Property="BoxShadow" Value="0 10 22 -8 #3A000000" />
         </Style>
 
         <Style Selector="ItemsControl.deck-library-grid WrapPanel > ContentPresenter">
@@ -45,68 +99,102 @@
 
         <Style Selector="Border.deck-due-pill">
             <Setter Property="Background" Value="{DynamicResource WidgetBackgroundPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource LinksBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="8,4" />
         </Style>
     </UserControl.Styles>
 
-    <Grid ColumnDefinitions="260,*">
-        <!-- Library sidebar -->
-        <Border Grid.Column="0" Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
-            <ScrollViewer>
-                <StackPanel Margin="16" Spacing="4">
-                    <TextBlock Text="{markup:T Ns=Flashcards, Key=Folders}"
-                               FontFamily="{DynamicResource Font.SemiBold}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="12,8,0,8" />
+    <SplitView DisplayMode="Inline"
+               IsPaneOpen="{Binding IsSidebarOpen}"
+               OpenPaneLength="280"
+               CompactPaneLength="0"
+               Background="Transparent">
+        <SplitView.Pane>
+            <!-- Library sidebar -->
+            <Border Classes="library-pane">
+                <ScrollViewer>
+                    <StackPanel Margin="16,20,16,16" Spacing="4">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,2">
+                            <TextBlock Grid.Column="0"
+                                       Classes="library-section"
+                                       Text="{markup:T Ns=Flashcards, Key=Folders}" />
+                            <Button Grid.Column="1"
+                                    Command="{Binding ToggleSidebarCommand}"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="6"
+                                    CornerRadius="8"
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="{markup:T Ns=Flashcards, Key=ToggleSidebar}">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-sidebar.svg"
+                                                  Width="18"
+                                                  Height="18"
+                                                  Color="{DynamicResource TextSecondaryBrush}" />
+                            </Button>
+                        </Grid>
 
-                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Command="{Binding SelectAllDecksCommand}" Padding="12,10" CornerRadius="8">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg"
-                                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
-                            <TextBlock Text="{markup:T Ns=Flashcards, Key=AllDecks}" VerticalAlignment="Center" />
-                        </StackPanel>
+                        <Button Classes="ghost library-nav"
+                                Command="{Binding SelectAllDecksCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/book.svg"
+                                                  Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=AllDecks}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="ghost library-nav"
+                                Command="{Binding SelectDueDecksCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/bell.svg"
+                                                  Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=DueToday}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Border Classes="library-divider" />
+
+                        <ItemsControl ItemsSource="{Binding Folders}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:FlashcardFolder">
+                                    <Button Classes="ghost library-nav"
+                                            Command="{Binding #root.SelectFolderCommandProxy}"
+                                            CommandParameter="{Binding Id}">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
+                                                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </SplitView.Pane>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" ClipToBounds="False">
+            <StackPanel Margin="36,28,36,32" Spacing="28" ClipToBounds="False">
+
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <Button Grid.Column="0"
+                            Command="{Binding ToggleSidebarCommand}"
+                            IsVisible="{Binding !IsSidebarOpen}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="6"
+                            CornerRadius="8"
+                            VerticalAlignment="Top"
+                            ToolTip.Tip="{markup:T Ns=Flashcards, Key=ToggleSidebar}">
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-sidebar.svg"
+                                          Width="20"
+                                          Height="20"
+                                          Color="{DynamicResource TextSecondaryBrush}" />
                     </Button>
 
-                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Command="{Binding SelectDueDecksCommand}" Padding="12,10" CornerRadius="8">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/bell.svg"
-                                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
-                            <TextBlock Text="{markup:T Ns=Flashcards, Key=DueToday}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-
-                    <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="12,8" />
-
-                    <ItemsControl ItemsSource="{Binding Folders}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="models:FlashcardFolder">
-                                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                                        Command="{Binding #root.DataContext.SelectFolderCommand}"
-                                        CommandParameter="{Binding Id}" Padding="12,10" CornerRadius="8">
-                                    <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
-                                                          Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
-                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
-
-        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled" ClipToBounds="False">
-            <StackPanel Margin="40" Spacing="32" ClipToBounds="False">
-
-                <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                         <TextBlock Text="{markup:T Ns=Flashcards, Key=Title}"
                                    FontSize="{DynamicResource FontSize.Heading1}"
                                    FontFamily="{DynamicResource Font.Bold}" />
@@ -114,7 +202,7 @@
                                    FontSize="{DynamicResource FontSize.Body.Medium}"
                                    Foreground="{DynamicResource TextSecondaryBrush}" />
                     </StackPanel>
-                    <Button Grid.Column="1" VerticalAlignment="Center"
+                    <Button Grid.Column="2" VerticalAlignment="Center"
                             Classes="accent"
                             Command="{Binding CreateDeckCommand}"
                             BorderThickness="0"
@@ -130,19 +218,20 @@
                     </Button>
                 </Grid>
 
-                <TextBox Text="{Binding SearchText}"
-                         HorizontalAlignment="Left"
-                         Watermark="{markup:T Ns=Flashcards, Key=SearchPlaceholder}"
-                         Width="360" MaxWidth="480"
-                         Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                         BorderBrush="{DynamicResource BorderBrush}" CornerRadius="10" Padding="8,10">
-                    <TextBox.InnerLeftContent>
-                        <Border Margin="12,0,4,0">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg"
-                                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
-                        </Border>
-                    </TextBox.InnerLeftContent>
-                </TextBox>
+                <Border Classes="search-surface" Width="420" MaxWidth="560" HorizontalAlignment="Left">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                        <controls:SvgIcon Grid.Column="0"
+                                          SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg"
+                                          Width="18" Height="18"
+                                          VerticalAlignment="Center"
+                                          Color="{DynamicResource TextSecondaryBrush}" />
+                        <TextBox Grid.Column="1"
+                                 Classes="deck-search"
+                                 Text="{Binding SearchText}"
+                                 HorizontalAlignment="Stretch"
+                                 Watermark="{markup:T Ns=Flashcards, Key=SearchPlaceholder}" />
+                    </Grid>
+                </Border>
 
                 <ItemsControl Classes="deck-library-grid" ItemsSource="{Binding FilteredDecks}" ClipToBounds="False">
                     <ItemsControl.ItemsPanel>
@@ -156,25 +245,46 @@
                                     PointerPressed="OnDeckCardPointerPressed">
                                 <Grid RowDefinitions="Auto,*,Auto">
                                     <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-                                        <TextBlock Grid.Column="0" Text="{Binding Name}" TextWrapping="Wrap"
-                                                   FontFamily="{DynamicResource Font.SemiBold}"
-                                                   FontSize="{DynamicResource FontSize.Heading3}"
-                                                   MaxLines="2" TextTrimming="CharacterEllipsis"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                   VerticalAlignment="Top" Margin="0,0,8,0" />
-                                        <Border Grid.Column="1" Classes="deck-due-pill"
-                                                VerticalAlignment="Top"
-                                                IsVisible="{Binding ShowDueBadge}">
-                                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-play.svg"
-                                                                  Width="12" Height="12" Color="{DynamicResource LinksBrush}" />
-                                                <TextBlock Text="{Binding DueBadgeText}"
-                                                           FontSize="12"
-                                                           FontFamily="{DynamicResource Font.SemiBold}"
-                                                           Foreground="{DynamicResource LinksBrush}"
-                                                           VerticalAlignment="Center" />
-                                            </StackPanel>
-                                        </Border>
+                                        <Grid Grid.Column="0" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                            <Border Width="24" Height="24"
+                                                    Background="{DynamicResource WidgetBackgroundPrimaryBrush}"
+                                                    CornerRadius="6"
+                                                    VerticalAlignment="Top">
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
+                                                                  Width="14" Height="14"
+                                                                  HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"
+                                                                  Color="{DynamicResource TextSecondaryBrush}" />
+                                            </Border>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Name}" TextWrapping="Wrap"
+                                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                                       FontSize="{DynamicResource FontSize.Heading3}"
+                                                       MaxLines="2" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       VerticalAlignment="Top" Margin="0,0,8,0" />
+                                        </Grid>
+                                        <Button Grid.Column="1"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Padding="0"
+                                                Command="{Binding #root.StartQuickSessionCommandProxy}"
+                                                CommandParameter="{Binding}"
+                                                IsVisible="{Binding ShowDueBadge}"
+                                                ToolTip.Tip="{markup:T Ns=Flashcards, Key=SessionQuickStart}">
+                                            <Border Classes="deck-due-pill"
+                                                    VerticalAlignment="Top">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-play.svg"
+                                                                      Width="12" Height="12" Color="{DynamicResource AccentPrimaryBrush}" />
+                                                    <TextBlock Text="{Binding DueBadgeText}"
+                                                               FontSize="12"
+                                                               FontFamily="{DynamicResource Font.SemiBold}"
+                                                               Foreground="{DynamicResource AccentPrimaryBrush}"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Button>
                                     </Grid>
 
                                     <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="8" Margin="0,12,0,12">
@@ -188,10 +298,18 @@
                                                        FontSize="{DynamicResource FontSize.Body.Small}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}" />
                                         </Grid>
-                                        <ProgressBar Minimum="0" Maximum="100"
-                                                     Value="{Binding RetentionPercent}"
-                                                     Height="6" CornerRadius="3"
-                                                     Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        <Button Background="Transparent"
+                                                BorderThickness="0"
+                                                Padding="0"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding #root.StartQuickSessionCommandProxy}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip.Tip="{markup:T Ns=Flashcards, Key=SessionQuickStart}">
+                                            <ProgressBar Minimum="0" Maximum="100"
+                                                         Value="{Binding RetentionPercent}"
+                                                         Height="6" CornerRadius="3"
+                                                         Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        </Button>
                                     </StackPanel>
 
                                     <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
@@ -211,5 +329,5 @@
 
             </StackPanel>
         </ScrollViewer>
-    </Grid>
+    </SplitView>
 </UserControl>

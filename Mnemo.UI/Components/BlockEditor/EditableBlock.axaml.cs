@@ -66,6 +66,8 @@ public partial class EditableBlock : UserControl
 
     private bool _isNestedInColumn;
 
+    private bool IsReadOnly => FindParentBlockEditor()?.IsReadOnly == true;
+
     /// <summary>Column cells hide the add/drag gutter; the parent row keeps the handle.</summary>
     public bool IsNestedInColumn
     {
@@ -298,6 +300,7 @@ public partial class EditableBlock : UserControl
             if (editor != null)
             {
                 _currentEditor = editor;
+                editor.IsReadOnly = IsReadOnly;
                 editor.ExternalLinkNavigationRequested = OnExternalLinkNavigationRequestedAsync;
                 _backspaceTunnelHandler = OnBackspaceTunnelKeyDown;
                 editor.AddHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler, Avalonia.Interactivity.RoutingStrategies.Tunnel);
@@ -318,7 +321,21 @@ public partial class EditableBlock : UserControl
             _currentEditor = null;
         }
 
+        ApplyReadOnlyState();
         UpdateGutterVerticalAlignment();
+    }
+
+    private void ApplyReadOnlyState()
+    {
+        var readOnly = IsReadOnly;
+        if (AddBlockBelowBorder != null)
+            AddBlockBelowBorder.IsVisible = !readOnly && !_isNestedInColumn;
+        if (DragHandleBorder != null)
+            DragHandleBorder.IsVisible = !readOnly && !_isNestedInColumn;
+        if (BlockContainer != null)
+            DragDrop.SetAllowDrop(BlockContainer, !readOnly);
+        if (_currentEditor != null)
+            _currentEditor.IsReadOnly = readOnly;
     }
 
     /// <summary>
@@ -719,6 +736,8 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
+        if (IsReadOnly)
+            return;
         if (sender is not RichTextEditor editor || _viewModel == null || _stateManager == null)
             return;
         
@@ -754,6 +773,8 @@ public partial class EditableBlock : UserControl
 
     private void TextBox_KeyDown(object? sender, KeyEventArgs e)
     {
+        if (IsReadOnly)
+            return;
         if (_viewModel == null || sender is not RichTextEditor editor || _keyboardHandler == null)
             return;
 
@@ -838,7 +859,7 @@ public partial class EditableBlock : UserControl
     /// </summary>
     private bool TryHandleInlineFormatShortcut(KeyEventArgs e, RichTextEditor editor)
     {
-        if (e.Handled || _viewModel == null || _viewModel.Type == BlockType.Code)
+        if (IsReadOnly || e.Handled || _viewModel == null || _viewModel.Type == BlockType.Code)
             return false;
 
         var mods = e.KeyModifiers;

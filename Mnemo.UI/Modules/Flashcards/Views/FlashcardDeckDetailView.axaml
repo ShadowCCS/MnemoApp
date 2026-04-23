@@ -19,6 +19,8 @@
         <conv:FlashcardDueDateIsFutureDayConverter x:Key="FlashcardDueIsFutureDayConverter" />
         <conv:FlashcardDueDateToShortDateConverter x:Key="FlashcardDueShortDateConverter" />
         <conv:FlashcardTypeToBadgeConverter x:Key="FlashcardTypeBadgeConverter" />
+        <conv:FlashcardHasClozeMarkersConverter x:Key="FlashcardHasClozeMarkersConverter" />
+        <conv:FlashcardCollapsedPreviewConverter x:Key="FlashcardCollapsedPreviewConverter" />
         <conv:FlashcardRowIsExpandedMultiConverter x:Key="FlashcardRowExpandedConverter" />
         <conv:FlashcardRowIsCollapsedMultiConverter x:Key="FlashcardRowCollapsedConverter" />
         <conv:BoolNegationConverter x:Key="BoolNegateConverter" />
@@ -50,6 +52,8 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="ClipToBounds" Value="False" />
             <Setter Property="FocusAdorner" Value="{x:Null}" />
+            <!-- Let nested editors (RichTextEditor) receive focus/pointer; the item stays selected via content interaction. -->
+            <Setter Property="Focusable" Value="False" />
         </Style>
         <Style Selector="ListBox.flashcard-deck-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
@@ -73,7 +77,7 @@
             </Setter>
         </Style>
         <Style Selector="ListBox.flashcard-deck-list ListBoxItem:selected Border.card-row-host">
-            <Setter Property="BorderBrush" Value="{DynamicResource LinksBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
             <Setter Property="BoxShadow" Value="0 4 14 0 #15000000" />
         </Style>
         <Style Selector="ListBox.flashcard-deck-list ListBoxItem:pointerover Border.card-row-host">
@@ -152,6 +156,41 @@
         <Style Selector="Border.fc-preview-panel components|MarkdownView">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
+        <Style Selector="MenuFlyout MenuItem">
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <!-- Animated editor container: appears via opacity fade + a brief downward slide. MaxHeight is large enough to fit any realistic card editor; bounding is handled by the outer ScrollViewer. -->
+        <Style Selector="Border.fc-editor-reveal">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="RenderTransform" Value="translateY(-6px)" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="CubicEaseOut" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="CubicEaseOut" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.fc-editor-reveal.is-expanded">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="RenderTransform" Value="translateY(0px)" />
+        </Style>
+
+        <!-- Small derived "Cloze" chip shown only when the card's Front contains {{cN::…}} markers. -->
+        <Style Selector="Border.fc-cloze-chip">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Background" Value="{DynamicResource WorkspaceBackgroundBrush}" />
+        </Style>
+        <Style Selector="Border.fc-cloze-chip TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentPrimaryBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="LetterSpacing" Value="0.4" />
+            <Setter Property="FontFamily" Value="{DynamicResource Font.SemiBold}" />
+        </Style>
     </UserControl.Styles>
 
     <Panel>
@@ -165,11 +204,37 @@
                         <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
                                           Width="20" Height="20" Color="{DynamicResource TextSecondaryBrush}" />
                     </Button>
-                    <TextBox Grid.Column="1" Text="{Binding DeckName}"
-                             Watermark="{markup:T Ns=Flashcards, Key=DefaultDeckName}"
-                             FontSize="{DynamicResource FontSize.Heading3}" FontFamily="{DynamicResource Font.Bold}"
-                             Background="Transparent" BorderThickness="0"
-                             Margin="4,0,16,0" VerticalAlignment="Center" />
+                    <Border Grid.Column="1"
+                            Margin="4,0,16,0"
+                            Padding="6,2"
+                            CornerRadius="8"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="0,0,0,1">
+                        <Border.Styles>
+                            <Style Selector="Border:pointerover">
+                                <Setter Property="Background" Value="{DynamicResource WidgetBackgroundHoverBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                            </Style>
+                            <Style Selector="Border:focus-within">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
+                            </Style>
+                        </Border.Styles>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0" Text="{Binding DeckName}"
+                                     Watermark="{markup:T Ns=Flashcards, Key=DefaultDeckName}"
+                                     FontSize="{DynamicResource FontSize.Heading3}" FontFamily="{DynamicResource Font.Bold}"
+                                     Background="Transparent" BorderThickness="0"
+                                     VerticalAlignment="Center" />
+                            <controls:SvgIcon Grid.Column="1"
+                                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/pencil.svg"
+                                              Width="14"
+                                              Height="14"
+                                              Opacity="0.7"
+                                              Color="{DynamicResource TextSecondaryBrush}"
+                                              VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                         <Border CornerRadius="12" BoxShadow="0 4 12 0 #20000000">
                             <Button Classes="accent" Command="{Binding OpenStudyLauncherCommand}"
@@ -193,8 +258,22 @@
                                               Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
                             <Button.Flyout>
                                 <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=SaveDeck}" Command="{Binding SaveDeckCommand}" />
-                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=DeleteDeck}" Command="{Binding DeleteDeckCommand}" />
+                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=RenameDeck}" Command="{Binding RenameDeckCommand}">
+                                        <MenuItem.Icon>
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg" Width="16" Height="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=DuplicateDeck}" Command="{Binding DuplicateDeckCommand}">
+                                        <MenuItem.Icon>
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
+                                    <MenuItem Classes="danger" Header="{markup:T Ns=Flashcards, Key=DeleteDeck}" Command="{Binding DeleteDeckCommand}">
+                                        <MenuItem.Icon>
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/trashbin.svg" Width="16" Height="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
                                 </MenuFlyout>
                             </Button.Flyout>
                         </Button>
@@ -223,7 +302,7 @@
                         <StackPanel Spacing="2" HorizontalAlignment="Center">
                             <TextBlock Text="{Binding DueTodayCount}"
                                        FontSize="28" FontFamily="{DynamicResource Font.Bold}"
-                                       Foreground="{DynamicResource LinksBrush}" HorizontalAlignment="Center" />
+                                       Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Center" />
                             <TextBlock Text="{markup:T Ns=Flashcards, Key=MetricDueToday}"
                                        FontSize="{DynamicResource FontSize.Body.Small}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
@@ -246,11 +325,92 @@
                     </Border>
                 </Grid>
 
-                <TextBlock Text="{markup:T Ns=Flashcards, Key=Cards}"
-                           VerticalAlignment="Center" Margin="0,8,0,0"
-                           FontSize="{DynamicResource FontSize.Heading4}" FontFamily="{DynamicResource Font.Bold}" />
+                <Border Background="{DynamicResource WorkspaceBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Padding="18,14">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="{markup:T Ns=Flashcards, Key=RetentionTrend}"
+                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{markup:T Ns=Flashcards, Key=RetentionTrendRangeLast14}"
+                                       FontSize="11" LetterSpacing="0.4"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Opacity="0.7" />
+                        </Grid>
+                        <!-- Chart: 100/50/0 guide lines behind, bars in front. UniformGrid Columns=14 stretches bars to full card width.
+                             Bar heights are driven by a percent→pixel proxy on the code-behind (0-100 → 0-100px).
+                             A subtle accent gradient fill gives the bars visual weight without a sparkline control dependency. -->
+                        <Grid Height="120" ClipToBounds="True">
+                            <!-- Horizontal guide lines at 0/50/100%. -->
+                            <Grid RowDefinitions="*,*,Auto" IsHitTestVisible="False">
+                                <Border Grid.Row="0" VerticalAlignment="Top"
+                                        Height="1" HorizontalAlignment="Stretch"
+                                        Background="{DynamicResource BorderBrush}" Opacity="0.35" />
+                                <Border Grid.Row="1" VerticalAlignment="Center"
+                                        Height="1" HorizontalAlignment="Stretch"
+                                        Background="{DynamicResource BorderBrush}" Opacity="0.2" />
+                                <Border Grid.Row="2" VerticalAlignment="Bottom"
+                                        Height="1" HorizontalAlignment="Stretch"
+                                        Background="{DynamicResource BorderBrush}" Opacity="0.6" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding RetentionTrendPointsProxy, ElementName=root}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Rows="1" Columns="14" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="3,0"
+                                                Height="{Binding}"
+                                                MinHeight="3"
+                                                CornerRadius="3,3,0,0"
+                                                VerticalAlignment="Bottom"
+                                                Background="{DynamicResource AccentPrimaryBrush}"
+                                                Opacity="0.85"
+                                                ToolTip.Tip="{Binding StringFormat='{}{0}%'}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Grid ColumnDefinitions="*,Auto"
+                      Margin="0,8,0,0"
+                      VerticalAlignment="Center">
+                    <TextBlock Grid.Column="0"
+                               Text="{markup:T Ns=Flashcards, Key=Cards}"
+                               VerticalAlignment="Center"
+                               FontSize="{DynamicResource FontSize.Heading4}"
+                               FontFamily="{DynamicResource Font.Bold}" />
+                    <Button Grid.Column="1"
+                            Classes="accent"
+                            Command="{Binding AddCardCommand}"
+                            BorderThickness="0"
+                            Padding="16,10"
+                            CornerRadius="10">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=AddCard}"
+                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       Foreground="{DynamicResource AccentButtonForegroundBrush}" />
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
+                                              Width="18"
+                                              Height="18"
+                                              Color="{DynamicResource AccentButtonForegroundBrush}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
 
                 <Border Background="Transparent" ClipToBounds="False">
+                    <StackPanel Spacing="12" HorizontalAlignment="Stretch">
                     <ListBox x:Name="CardList" Classes="flashcard-deck-list"
                              ItemsSource="{Binding Cards}" SelectedItem="{Binding SelectedCard}"
                              MinHeight="160">
@@ -261,12 +421,12 @@
 
                                         <Button Background="Transparent" BorderThickness="0" Padding="0" CornerRadius="12"
                                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                                                Command="{Binding DataContext.ToggleCardRowCommand, ElementName=root}"
+                                                Command="{Binding ToggleCardRowCommandProxy, ElementName=root}"
                                                 CommandParameter="{Binding}"
                                                 ToolTip.Tip="{markup:T Ns=Flashcards, Key=EditCard}">
                                             <Button.IsVisible>
                                                 <MultiBinding Converter="{StaticResource FlashcardRowCollapsedConverter}">
-                                                    <Binding ElementName="root" Path="DataContext.ExpandedCardId" />
+                                                    <Binding ElementName="root" Path="ExpandedCardIdProxy" FallbackValue="{x:Null}" TargetNullValue="{x:Null}" />
                                                     <Binding Path="Id" />
                                                 </MultiBinding>
                                             </Button.IsVisible>
@@ -285,28 +445,35 @@
                                                                   Color="{DynamicResource TextSecondaryBrush}" />
 
                                                 <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,16,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Front}" TextTrimming="CharacterEllipsis"
+                                                    <TextBlock Text="{Binding Front, Converter={StaticResource FlashcardCollapsedPreviewConverter}}" TextTrimming="CharacterEllipsis"
                                                                FontFamily="{DynamicResource Font.SemiBold}"
                                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                                FontSize="{DynamicResource FontSize.Body.Medium}" />
-                                                    <TextBlock Text="{Binding Back}" TextTrimming="CharacterEllipsis"
+                                                    <TextBlock Text="{Binding Back, Converter={StaticResource FlashcardCollapsedPreviewConverter}}" TextTrimming="CharacterEllipsis"
                                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                                FontSize="{DynamicResource FontSize.Body.Small}" MaxLines="1" Opacity="0.8" />
                                                 </StackPanel>
 
-                                                <Border Grid.Column="2" VerticalAlignment="Center" Margin="0,0,16,0" CornerRadius="6"
-                                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8,4"
-                                                        Background="{DynamicResource CardBackgroundSecondaryBrush}">
-                                                    <TextBlock Text="{Binding Type, Converter={StaticResource FlashcardTypeBadgeConverter}}"
-                                                               FontSize="11" LetterSpacing="0.4"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                                               FontFamily="{DynamicResource Font.SemiBold}" />
-                                                </Border>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                    <Border Classes="fc-cloze-chip"
+                                                            IsVisible="{Binding Front, Converter={StaticResource FlashcardHasClozeMarkersConverter}}"
+                                                            ToolTip.Tip="{markup:T Ns=Flashcards, Key=ClozeBadgeTooltip}">
+                                                        <TextBlock Text="{markup:T Ns=Flashcards, Key=ClozeBadge}" />
+                                                    </Border>
+                                                    <Border CornerRadius="6"
+                                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8,4"
+                                                            Background="{DynamicResource CardBackgroundSecondaryBrush}">
+                                                        <TextBlock Text="{Binding Type, Converter={StaticResource FlashcardTypeBadgeConverter}}"
+                                                                   FontSize="11" LetterSpacing="0.4"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   FontFamily="{DynamicResource Font.SemiBold}" />
+                                                    </Border>
+                                                </StackPanel>
 
                                                 <StackPanel Grid.Column="3" VerticalAlignment="Center" MinWidth="76">
                                                     <TextBlock HorizontalAlignment="Right" FontFamily="{DynamicResource Font.SemiBold}"
-                                                               FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource LinksBrush}"
-                                                               Text="{Binding DataContext.LocalizedCardDue, ElementName=root}"
+                                                               FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource AccentPrimaryBrush}"
+                                                               Text="{Binding LocalizedCardDueProxy, ElementName=root, FallbackValue='Due', TargetNullValue='Due'}"
                                                                IsVisible="{Binding DueDate, Converter={StaticResource FlashcardDueIsDueConverter}}" />
                                                     <TextBlock HorizontalAlignment="Right" Foreground="{DynamicResource TextSecondaryBrush}"
                                                                FontSize="{DynamicResource FontSize.Body.Small}"
@@ -316,100 +483,120 @@
                                             </Grid>
                                         </Button>
 
-                                        <Border Background="Transparent" Padding="0">
+                                        <Border Classes="fc-editor-reveal" Background="Transparent" Padding="0">
                                             <Border.IsVisible>
                                                 <MultiBinding Converter="{StaticResource FlashcardRowExpandedConverter}">
-                                                    <Binding ElementName="root" Path="DataContext.ExpandedCardId" />
+                                                    <Binding ElementName="root" Path="ExpandedCardIdProxy" FallbackValue="{x:Null}" TargetNullValue="{x:Null}" />
                                                     <Binding Path="Id" />
                                                 </MultiBinding>
                                             </Border.IsVisible>
+                                            <Classes.is-expanded>
+                                                <MultiBinding Converter="{StaticResource FlashcardRowExpandedConverter}">
+                                                    <Binding ElementName="root" Path="ExpandedCardIdProxy" FallbackValue="{x:Null}" TargetNullValue="{x:Null}" />
+                                                    <Binding Path="Id" />
+                                                </MultiBinding>
+                                            </Classes.is-expanded>
 
                                             <Border Classes="fc-card-editor-shell" Padding="20,16,20,20">
-                                                <StackPanel Spacing="16">
-                                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                                        <Border Grid.Column="0" Classes="fc-pill-track" HorizontalAlignment="Left">
-                                                            <StackPanel Orientation="Horizontal" Spacing="2">
-                                                                <Button Classes="fc-pill-segment" Classes.selected="{Binding DataContext.IsCardEditorWriteMode, ElementName=root}"
-                                                                        Command="{Binding DataContext.SelectCardEditorWriteModeCommand, ElementName=root}">
-                                                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=Write}" />
+                                                <StackPanel Spacing="14">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=CardTypeLabel}" VerticalAlignment="Center" />
+                                                        <Border Classes="fc-pill-track">
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <Button Classes="fc-pill-segment"
+                                                                        Classes.selected="{Binding IsEditorClozeProxy, ElementName=root, Converter={StaticResource BoolNegateConverter}}"
+                                                                        Command="{Binding SetEditorClassicTypeCommandProxy, ElementName=root}">
+                                                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=TypeClassic}" />
                                                                 </Button>
-                                                                <Button Classes="fc-pill-segment" Classes.selected="{Binding DataContext.IsCardEditorWriteMode, ElementName=root, Converter={StaticResource BoolNegateConverter}}"
-                                                                        Command="{Binding DataContext.SelectCardEditorPreviewModeCommand, ElementName=root}">
-                                                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=Preview}" />
+                                                                <Button Classes="fc-pill-segment"
+                                                                        Classes.selected="{Binding IsEditorClozeProxy, ElementName=root}"
+                                                                        Command="{Binding SetEditorClozeTypeCommandProxy, ElementName=root}">
+                                                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=TypeCloze}" />
                                                                 </Button>
                                                             </StackPanel>
                                                         </Border>
-
-                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                                                            <Button Classes="ghost" Padding="8,4" VerticalAlignment="Center"
-                                                                    Click="OnInsertClozeClick" Foreground="{DynamicResource LinksBrush}"
-                                                                    IsVisible="{Binding DataContext.IsCardEditorWriteMode, ElementName=root}">
-                                                                <TextBlock Text="{markup:T Ns=Flashcards, Key=InsertCloze}" FontSize="{DynamicResource FontSize.Body.Small}" />
-                                                            </Button>
-                                                            <Button Classes="ghost" Padding="6" Command="{Binding DataContext.CloseExpandedCardCommand, ElementName=root}"
-                                                                    ToolTip.Tip="{markup:T Ns=Flashcards, Key=CloseCard}">
-                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
-                                                            </Button>
-                                                        </StackPanel>
-                                                    </Grid>
-
-                                                    <StackPanel IsVisible="{Binding DataContext.IsCardEditorWriteMode, ElementName=root}" Spacing="14">
-                                                        <StackPanel Spacing="6">
-                                                            <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=FieldFront}" />
-                                                            <TextBox Classes="fc-editor-multiline fc-editor-front" Text="{Binding DataContext.EditorFront, ElementName=root}" />
-                                                        </StackPanel>
-                                                        <StackPanel Spacing="6">
-                                                            <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=FieldBack}" />
-                                                            <TextBox Classes="fc-editor-multiline" Text="{Binding DataContext.EditorBack, ElementName=root}" />
-                                                        </StackPanel>
-                                                        <StackPanel Spacing="6">
-                                                            <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=TagsLabel}" />
-                                                            <TextBox Classes="fc-editor-tags"
-                                                                     Text="{Binding DataContext.EditorTags, ElementName=root}"
-                                                                     Watermark="{markup:T Ns=Flashcards, Key=TagPlaceholder}" />
-                                                        </StackPanel>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="6">
+                                                        <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=FieldFront}" />
+                                                        <controls:RichDocumentEditor x:Name="FrontRichEditor"
+                                                                                     Tag="{Binding Id}"
+                                                                                     AttachedToVisualTree="OnFrontEditorAttached"
+                                                                                     DetachedFromVisualTree="OnEditorDetached"
+                                                                                     Spans="{Binding EditorFrontSpansProxy, ElementName=root, Mode=OneWay}"
+                                                                                     Watermark="{markup:T Ns=Flashcards, Key=Front}"
+                                                                                     ShowModeToggle="False"
+                                                                                     WriteLabel="{markup:T Ns=Flashcards, Key=Write}"
+                                                                                     PreviewLabel="{markup:T Ns=Flashcards, Key=Preview}"
+                                                                                     KeyDown="OnEditorKeyDown" />
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="6">
+                                                        <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=FieldBack}" />
+                                                        <controls:RichDocumentEditor x:Name="BackRichEditor"
+                                                                                     Tag="{Binding Id}"
+                                                                                     AttachedToVisualTree="OnBackEditorAttached"
+                                                                                     DetachedFromVisualTree="OnEditorDetached"
+                                                                                     Spans="{Binding EditorBackSpansProxy, ElementName=root, Mode=OneWay}"
+                                                                                     Watermark="{markup:T Ns=Flashcards, Key=Back}"
+                                                                                     ShowModeToggle="False"
+                                                                                     IsReadOnly="{Binding IsEditorBackEditableProxy, ElementName=root, Converter={StaticResource BoolNegateConverter}}"
+                                                                                     WriteLabel="{markup:T Ns=Flashcards, Key=Write}"
+                                                                                     PreviewLabel="{markup:T Ns=Flashcards, Key=Preview}"
+                                                                                     KeyDown="OnEditorKeyDown" />
                                                     </StackPanel>
 
-                                                    <StackPanel Spacing="14"
-                                                                IsVisible="{Binding DataContext.IsCardEditorWriteMode, ElementName=root, Converter={StaticResource BoolNegateConverter}}">
-                                                        <StackPanel Spacing="6">
-                                                            <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=FieldFront}" />
-                                                            <Border Classes="fc-preview-panel" MinHeight="96">
-                                                                <components:MarkdownView Source="{Binding DataContext.EditorFrontPreviewMarkdown, ElementName=root}" />
-                                                            </Border>
-                                                        </StackPanel>
-                                                        <StackPanel Spacing="6">
-                                                            <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=FieldBack}" />
-                                                            <Border Classes="fc-preview-panel" MinHeight="96">
-                                                                <components:MarkdownView Source="{Binding DataContext.EditorBackPreviewMarkdown, ElementName=root}" />
-                                                            </Border>
-                                                        </StackPanel>
+                                                    <StackPanel Spacing="6">
+                                                        <TextBlock Classes="fc-field-label" Text="{markup:T Ns=Flashcards, Key=TagsLabel}" />
+                                                        <controls:TagChipInput
+                                                            TagsText="{Binding EditorTagsProxy, ElementName=root, Mode=TwoWay, FallbackValue='', TargetNullValue=''}"
+                                                            Placeholder="{markup:T Ns=Flashcards, Key=TagAddPlaceholder}" />
                                                     </StackPanel>
 
-                                                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
-                                                        <Button Grid.Column="0" Classes="ghost" Padding="0,6" HorizontalAlignment="Left"
-                                                                Command="{Binding DataContext.DeleteCardCommand, ElementName=root}">
-                                                            <TextBlock Text="{markup:T Ns=Flashcards, Key=DeleteCard}"
-                                                                       FontSize="{DynamicResource FontSize.Body.Small}"
-                                                                       Foreground="{DynamicResource DestructiveButtonColorBrush}" />
+                                                    <!-- Single consolidated footer. Fitts's Law: grouping the three primary exit paths (Revert, Done, Cloze helper)
+                                                         on the right puts them within short mouse travel of each other; Delete stays on the far left with visual
+                                                         separation so destructive and non-destructive actions are not adjacent. -->
+                                                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0">
+                                                        <Button Grid.Column="0" Classes="ghost" Padding="8,6" HorizontalAlignment="Left"
+                                                                Command="{Binding DeleteCardCommandProxy, ElementName=root, FallbackValue={x:Null}, TargetNullValue={x:Null}}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/trashbin.svg"
+                                                                                  Width="16" Height="16"
+                                                                                  Color="{DynamicResource DestructiveButtonColorBrush}" />
+                                                                <TextBlock Text="{markup:T Ns=Flashcards, Key=DeleteCard}"
+                                                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                                                           Foreground="{DynamicResource DestructiveButtonColorBrush}" />
+                                                            </StackPanel>
                                                         </Button>
-                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                                            <Button Classes="ghost" Padding="12,8" Command="{Binding DataContext.CancelEditCommand, ElementName=root}">
-                                                                <TextBlock Text="{markup:T Ns=Flashcards, Key=Cancel}"
+                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                            <!-- Focusable=False keeps keyboard focus on the RichTextEditor so the click handler can read the live selection before wrapping it in {{cN::…}}. -->
+                                                            <Button Classes="ghost" Padding="10,6"
+                                                                    Focusable="False"
+                                                                    Click="OnInsertClozeClick"
+                                                                    IsVisible="{Binding IsEditorClozeProxy, ElementName=root}"
+                                                                    ToolTip.Tip="{markup:T Ns=Flashcards, Key=MakeClozeTooltip}">
+                                                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                                    <TextBlock Text="[…]"
+                                                                               FontSize="{DynamicResource FontSize.Body.Small}"
+                                                                               FontFamily="{DynamicResource Font.SemiBold}"
+                                                                               Foreground="{DynamicResource AccentPrimaryBrush}" />
+                                                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=InsertCloze}"
+                                                                               FontSize="{DynamicResource FontSize.Body.Small}"
+                                                                               Foreground="{DynamicResource AccentPrimaryBrush}" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button Classes="ghost" Padding="10,6"
+                                                                    Command="{Binding RevertEditCommandProxy, ElementName=root, FallbackValue={x:Null}, TargetNullValue={x:Null}}"
+                                                                    ToolTip.Tip="{markup:T Ns=Flashcards, Key=RevertTooltip}">
+                                                                <TextBlock Text="{markup:T Ns=Flashcards, Key=Revert}"
                                                                            FontSize="{DynamicResource FontSize.Body.Small}"
                                                                            Foreground="{DynamicResource TextSecondaryBrush}" />
                                                             </Button>
-                                                            <Button Classes="accent" Command="{Binding DataContext.SaveCardCommand, ElementName=root}"
-                                                                    BorderThickness="0" Padding="16,8" CornerRadius="10">
-                                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg"
-                                                                                      Width="14" Height="14"
-                                                                                      Color="{DynamicResource AccentButtonForegroundBrush}" />
-                                                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SaveCard}"
-                                                                               FontSize="{DynamicResource FontSize.Body.Small}"
-                                                                               FontFamily="{DynamicResource Font.SemiBold}"
-                                                                               Foreground="{DynamicResource AccentButtonForegroundBrush}" />
-                                                                </StackPanel>
+                                                            <Button Classes="accent" Padding="14,6" CornerRadius="10"
+                                                                    Command="{Binding CloseExpandedCardCommandProxy, ElementName=root, FallbackValue={x:Null}, TargetNullValue={x:Null}}"
+                                                                    ToolTip.Tip="{markup:T Ns=Flashcards, Key=DoneCardTooltip}">
+                                                                <TextBlock Text="{markup:T Ns=Flashcards, Key=DoneCard}"
+                                                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                                                           FontFamily="{DynamicResource Font.SemiBold}"
+                                                                           Foreground="{DynamicResource AccentButtonForegroundBrush}" />
                                                             </Button>
                                                         </StackPanel>
                                                     </Grid>
@@ -421,126 +608,32 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+
+                    <!-- Persistent "Add another card" row — fixed to the end of the list so users authoring many cards never need to scroll back up. -->
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                            Padding="16,12" CornerRadius="12"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            Background="{DynamicResource WorkspaceBackgroundBrush}"
+                            Command="{Binding AddCardCommand}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <controls:SvgIcon Grid.Column="0"
+                                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
+                                              Width="18" Height="18"
+                                              Color="{DynamicResource AccentPrimaryBrush}"
+                                              VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{markup:T Ns=Flashcards, Key=AddAnotherCard}"
+                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Button>
+                    </StackPanel>
                 </Border>
                 </StackPanel>
             </Border>
         </ScrollViewer>
 
-        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,32,32" ZIndex="1"
-                CornerRadius="28" BoxShadow="0 8 20 0 #40000000">
-            <Button Classes="accent" Width="56" Height="56" CornerRadius="28"
-                    BorderThickness="0"
-                    Command="{Binding AddCardCommand}" ToolTip.Tip="{markup:T Ns=Flashcards, Key=AddCard}"
-                    RenderTransformOrigin="50%,50%">
-                <Button.Transitions>
-                    <Transitions>
-                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" Easing="CubicEaseOut" />
-                    </Transitions>
-                </Button.Transitions>
-                <Button.Styles>
-                    <Style Selector="Button">
-                        <Setter Property="RenderTransform" Value="none" />
-                    </Style>
-                    <Style Selector="Button:pointerover">
-                        <Setter Property="RenderTransform" Value="scale(1.05)" />
-                    </Style>
-                    <Style Selector="Button:pressed">
-                        <Setter Property="RenderTransform" Value="scale(0.95)" />
-                    </Style>
-                </Button.Styles>
-                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg" Width="24" Height="24"
-                                  Color="{DynamicResource AccentButtonForegroundBrush}" />
-            </Button>
-        </Border>
-
-        <Border Background="#B3000000" IsVisible="{Binding IsSessionLauncherOpen}" ZIndex="2">
-            <Border MaxWidth="720" Margin="24" Padding="32" CornerRadius="20"
-                    Background="{DynamicResource CardBackgroundSecondaryBrush}"
-                    VerticalAlignment="Center" HorizontalAlignment="Center"
-                    BoxShadow="0 16 48 0 #50000000">
-                <StackPanel Spacing="24">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Text="{markup:T Ns=Flashcards, Key=SessionTitle}"
-                                   FontSize="{DynamicResource FontSize.Heading2}" FontFamily="{DynamicResource Font.Bold}" />
-                        <Button Grid.Column="1" Classes="ghost" Command="{Binding CloseStudyLauncherCommand}" Padding="8">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" Width="20" Height="20" Color="{DynamicResource TextSecondaryBrush}" />
-                        </Button>
-                    </Grid>
-
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="*,*" ColumnSpacing="16" RowSpacing="16">
-
-                        <Border Grid.Row="0" Grid.Column="0" Padding="20" CornerRadius="16"
-                                Background="{DynamicResource WorkspaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/FormattingToolbar/sparkles.svg" Width="22" Height="22" Color="{DynamicResource LinksBrush}" />
-                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionQuick}" FontSize="{DynamicResource FontSize.Heading4}" FontFamily="{DynamicResource Font.SemiBold}" />
-                                </StackPanel>
-                                <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionQuickDesc}" TextWrapping="Wrap" MinHeight="40"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{DynamicResource FontSize.Body.Small}" />
-                                <Button Classes="accent" Command="{Binding StartQuickSessionCommand}"
-                                        HorizontalAlignment="Stretch" BorderThickness="0" Padding="12,8" CornerRadius="8">
-                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionQuickStart}" HorizontalAlignment="Center"
-                                               FontFamily="{DynamicResource Font.SemiBold}"
-                                               Foreground="{DynamicResource AccentButtonForegroundBrush}" />
-                                </Button>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Grid.Row="0" Grid.Column="1" Padding="20" CornerRadius="16"
-                                Background="{DynamicResource WorkspaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/route-square.svg" Width="22" Height="22" Color="{DynamicResource SystemWarningBackgroundBrush}" />
-                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionFocused}" FontSize="{DynamicResource FontSize.Heading4}" FontFamily="{DynamicResource Font.SemiBold}" />
-                                </StackPanel>
-                                <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionFocusedDesc}" TextWrapping="Wrap" MinHeight="40"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{DynamicResource FontSize.Body.Small}" />
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Text="{markup:T Ns=Flashcards, Key=FocusedCardCount}" />
-                                    <Slider Grid.Column="1" Minimum="1" Maximum="100" Margin="12,0" Value="{Binding FocusedCardCountSlider}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="2" VerticalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}" Text="{Binding FocusedCardCountSlider, StringFormat={}{0:0}}" />
-                                </Grid>
-                                <Button Command="{Binding StartFocusedSessionCommand}" HorizontalAlignment="Stretch" Padding="12,8" CornerRadius="8">
-                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionFocusedStart}" HorizontalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}" />
-                                </Button>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Grid.Row="1" Grid.Column="0" Padding="20" CornerRadius="16"
-                                Background="{DynamicResource WorkspaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Assets/streak.svg" Width="22" Height="22" Color="{DynamicResource DestructiveButtonColorBrush}" />
-                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionCram}" FontSize="{DynamicResource FontSize.Heading4}" FontFamily="{DynamicResource Font.SemiBold}" />
-                                </StackPanel>
-                                <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionCramDesc}" TextWrapping="Wrap" MinHeight="40"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{DynamicResource FontSize.Body.Small}" />
-                                <CheckBox Content="{markup:T Ns=Flashcards, Key=Shuffle}" IsChecked="{Binding CramShuffle}" Margin="0,4" />
-                                <Button Command="{Binding StartCramSessionCommand}" HorizontalAlignment="Stretch" Padding="12,8" CornerRadius="8">
-                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionCramStart}" HorizontalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}" />
-                                </Button>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Grid.Row="1" Grid.Column="1" Padding="20" CornerRadius="16"
-                                Background="{DynamicResource WorkspaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                            <StackPanel Spacing="12">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/States/done-check.svg" Width="22" Height="22" Color="{DynamicResource SystemSuccessBackgroundBrush}" />
-                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionTest}" FontSize="{DynamicResource FontSize.Heading4}" FontFamily="{DynamicResource Font.SemiBold}" />
-                                </StackPanel>
-                                <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionTestDesc}" TextWrapping="Wrap" MinHeight="40"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{DynamicResource FontSize.Body.Small}" />
-                                <Border Height="32" />
-                                <Button Command="{Binding StartTestSessionCommand}" HorizontalAlignment="Stretch" Padding="12,8" CornerRadius="8">
-                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionTestStart}" HorizontalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}" />
-                                </Button>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </StackPanel>
-            </Border>
-        </Border>
     </Panel>
 </UserControl>

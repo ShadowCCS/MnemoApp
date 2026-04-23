@@ -114,6 +114,19 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// <summary>Optional: image import when pasting paths / duplicating / hydrating clipboard blocks.</summary>
     public IImageAssetService? ImageAssetService { get; set; }
 
+    public static readonly StyledProperty<bool> IsReadOnlyProperty =
+        AvaloniaProperty.Register<BlockEditor, bool>(nameof(IsReadOnly), defaultValue: false);
+
+    /// <summary>
+    /// When true, block-structural interactions are disabled (drag/drop, slash menu, block add/delete/reorder).
+    /// Rich text selection stays available for copy scenarios.
+    /// </summary>
+    public bool IsReadOnly
+    {
+        get => GetValue(IsReadOnlyProperty);
+        set => SetValue(IsReadOnlyProperty, value);
+    }
+
     public ObservableCollection<BlockViewModel> Blocks
     {
         get => _blocks;
@@ -1491,6 +1504,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private void Editor_PointerPressedTunnel(object? sender, PointerPressedEventArgs e)
     {
+        if (IsReadOnly)
+            return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
         // Double/triple clicks: clear all blocks so only the block under the tap will get word/line selection from TextBox.
@@ -1709,6 +1724,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private void Editor_PointerPressedBubble(object? sender, PointerPressedEventArgs e)
     {
+        if (IsReadOnly)
+            return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
         if (_boxSelectArmed) return;
@@ -1754,6 +1771,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void Editor_PointerMoved(object? sender, PointerEventArgs e)
     {
+        if (IsReadOnly)
+            return;
         if (_isColumnSplitResizing)
             return;
 
@@ -1832,6 +1851,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void Editor_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (IsReadOnly)
+            return;
         if (e.GetCurrentPoint(this).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonReleased) return;
 
         var wasBoxSelecting = _isBoxSelecting;
@@ -2004,6 +2025,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void Editor_KeyDown(object? sender, KeyEventArgs e)
     {
+        if (IsReadOnly)
+            return;
         if (e.Handled) return;
 
         var hasBlockSelection = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.IsSelected);
@@ -2076,6 +2099,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void Editor_KeyDown_Bubble(object? sender, KeyEventArgs e)
     {
+        if (IsReadOnly)
+            return;
         if (e.Handled) return;
 
         // 6. Ctrl+A: select all blocks

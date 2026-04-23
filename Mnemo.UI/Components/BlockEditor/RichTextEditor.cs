@@ -15,6 +15,7 @@ using Avalonia.Media.TextFormatting;
 using Avalonia.Utilities;
 using Avalonia.Threading;
 using Avalonia.Layout;
+using Avalonia.Rendering;
 using Avalonia.VisualTree;
 using Avalonia.Controls.Primitives.PopupPositioning;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,7 +36,7 @@ namespace Mnemo.UI.Components.BlockEditor;
 /// <see cref="TextLayout"/>, giving pixel-accurate caret and selection geometry that stays
 /// aligned with the visible rich text at all times.
 /// </summary>
-public class RichTextEditor : Control
+public class RichTextEditor : Control, ICustomHitTest
 {
     // ── Avalonia properties ──────────────────────────────────────────────────
 
@@ -67,6 +68,15 @@ public class RichTextEditor : Control
 
     public static readonly StyledProperty<IBrush?> SelectionBrushProperty =
         AvaloniaProperty.Register<RichTextEditor, IBrush?>(nameof(SelectionBrush));
+
+    public static readonly StyledProperty<bool> IsReadOnlyProperty =
+        AvaloniaProperty.Register<RichTextEditor, bool>(nameof(IsReadOnly), defaultValue: false);
+
+    /// <summary>
+    /// When true, inline equations show their raw LaTeX source while hovered.
+    /// </summary>
+    public static readonly StyledProperty<bool> ShowInlineEquationSourceOnHoverProperty =
+        AvaloniaProperty.Register<RichTextEditor, bool>(nameof(ShowInlineEquationSourceOnHover), defaultValue: false);
 
     public static readonly DirectProperty<RichTextEditor, int> CaretIndexProperty =
         AvaloniaProperty.RegisterDirect<RichTextEditor, int>(
@@ -121,6 +131,7 @@ public class RichTextEditor : Control
     private DispatcherTimer? _inlineEqRebuildTimer;
     /// <summary>Escape sets this so <see cref="Closed"/> does not commit to the document.</summary>
     private bool _inlineEqSuppressCloseCommit;
+    private int? _hoveredInlineEquationCharIndex;
 
     private sealed class InlineEquationEntry
     {
@@ -243,6 +254,18 @@ public class RichTextEditor : Control
     /// <summary>Flat text derived from the current runs.</summary>
     public string Text => FlattenRuns(Spans ?? Array.Empty<InlineSpan>());
 
+    public bool IsReadOnly
+    {
+        get => GetValue(IsReadOnlyProperty);
+        set => SetValue(IsReadOnlyProperty, value);
+    }
+
+    public bool ShowInlineEquationSourceOnHover
+    {
+        get => GetValue(ShowInlineEquationSourceOnHoverProperty);
+        set => SetValue(ShowInlineEquationSourceOnHoverProperty, value);
+    }
+
     public int TextLength => Text.Length;
 
     /// <summary>
@@ -256,6 +279,7 @@ public class RichTextEditor : Control
     static RichTextEditor()
     {
         FocusableProperty.OverrideDefaultValue<RichTextEditor>(true);
+        CursorProperty.OverrideDefaultValue<RichTextEditor>(new Cursor(StandardCursorType.Ibeam));
         ClipToBoundsProperty.OverrideDefaultValue<RichTextEditor>(false);
         MinWidthProperty.OverrideDefaultValue<RichTextEditor>(2.0);
         SpansProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.OnSpansChanged());
@@ -271,6 +295,11 @@ public class RichTextEditor : Control
         ForegroundProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
         WatermarkProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateLayout());
         ShowInactiveWatermarkProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateVisual());
+        ShowInlineEquationSourceOnHoverProperty.Changed.AddClassHandler<RichTextEditor>((o, _) =>
+        {
+            o._hoveredInlineEquationCharIndex = null;
+            o.InvalidateVisual();
+        });
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -1006,6 +1035,11 @@ public class RichTextEditor : Control
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Full-bounds hit target: plain <see cref="Control"/> does not hit-test “empty” space, so clicks would pass through.
+    /// </summary>
+    public bool HitTest(Point point) => Bounds.Contains(point);
+
     // ── Focus ────────────────────────────────────────────────────────────────
 
     protected override void OnGotFocus(GotFocusEventArgs e)
@@ -1053,6 +1087,11 @@ public class RichTextEditor : Control
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
+        if (_hoveredInlineEquationCharIndex.HasValue)
+        {
+            _hoveredInlineEquationCharIndex = null;
+            InvalidateVisual();
+        }
         if (string.IsNullOrEmpty(Text) && !string.IsNullOrEmpty(Watermark))
             InvalidateVisual();
     }
@@ -1092,7 +1131,7 @@ public class RichTextEditor : Control
         }
         else if (e.ClickCount == 2)
         {
-            if (TryOpenInlineEquationFlyoutAtPoint(pos))
+            if (!IsReadOnly && TryOpenInlineEquationFlyoutAtPoint(pos))
             {
                 e.Handled = true;
                 return;
@@ -1113,7 +1152,17 @@ public class RichTextEditor : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!_isDragging) return;
+        UpdateInlineEquationHoverState(e.GetPosition(this));
+        var isLeftPressed = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
+        if (!_isDragging)
+        {
+            if (!isLeftPressed)
+                return;
+            _dragAnchor = CaretIndex;
+            _isDragging = true;
+            e.Pointer.Capture(this);
+        }
+
         var pos = e.GetPosition(this);
         var idx = HitTestPoint(pos);
         SelectionStart = Math.Min(_dragAnchor, idx);
@@ -1168,7 +1217,8 @@ public class RichTextEditor : Control
                 break;
 
             case Key.Delete:
-                HandleDelete();
+                if (!IsReadOnly)
+                    HandleDelete();
                 e.Handled = true;
                 break;
 
@@ -1177,10 +1227,13 @@ public class RichTextEditor : Control
                 // in-block backspace (caret not at 0, or active selection).
                 if (_caretIndex > 0 || HasSelection)
                 {
-                    if (ctrl && !HasSelection)
-                        HandleBackspaceWord();
-                    else
-                        HandleBackspace();
+                    if (!IsReadOnly)
+                    {
+                        if (ctrl && !HasSelection)
+                            HandleBackspaceWord();
+                        else
+                            HandleBackspace();
+                    }
                     e.Handled = true;
                 }
                 break;
@@ -1208,7 +1261,7 @@ public class RichTextEditor : Control
     protected override void OnTextInput(TextInputEventArgs e)
     {
         base.OnTextInput(e);
-        if (string.IsNullOrEmpty(e.Text)) return;
+        if (IsReadOnly || string.IsNullOrEmpty(e.Text)) return;
 
         InsertText(e.Text);
         e.Handled = true;
@@ -1280,11 +1333,13 @@ public class RichTextEditor : Control
     {
         int start = Math.Min(_selectionStart, _selectionEnd);
         int end = Math.Max(_selectionStart, _selectionEnd);
-        if (TextLength == 0 && start == 0 && end == 1)
-            end = 0;
-
         var currentRuns = Spans ?? Array.Empty<InlineSpan>();
         var oldFlat = FlattenRuns(currentRuns);
+        var maxIndex = oldFlat.Length;
+        start = Math.Clamp(start, 0, maxIndex);
+        end = Math.Clamp(end, 0, maxIndex);
+        if (end < start)
+            end = start;
         int removeLen = end - start;
         var newFlat = removeLen > 0
             ? oldFlat.Remove(start, removeLen).Insert(start, text)
@@ -1679,6 +1734,36 @@ public class RichTextEditor : Control
         }
 
         return false;
+    }
+
+    private void UpdateInlineEquationHoverState(Point pos)
+    {
+        if (!ShowInlineEquationSourceOnHover || _textLayout == null || _layoutBoundaryAtLogical == null)
+        {
+            if (_hoveredInlineEquationCharIndex.HasValue)
+            {
+                _hoveredInlineEquationCharIndex = null;
+                InvalidateVisual();
+            }
+            return;
+        }
+
+        var local = new Point(pos.X - _mathPadLeft, pos.Y - _mathPadTop);
+        int? hovered = null;
+        foreach (var eq in _inlineEquations)
+        {
+            if (TryGetInlineEquationBounds(eq, pad: 2, out var bounds) && bounds.Contains(local))
+            {
+                hovered = eq.CharIndex;
+                break;
+            }
+        }
+
+        if (_hoveredInlineEquationCharIndex == hovered)
+            return;
+
+        _hoveredInlineEquationCharIndex = hovered;
+        InvalidateVisual();
     }
 
     // ── Word nav helpers ─────────────────────────────────────────────────────
@@ -2369,10 +2454,19 @@ public class RichTextEditor : Control
 
             try
             {
+                var showSource = ShowInlineEquationSourceOnHover
+                    && _hoveredInlineEquationCharIndex.HasValue
+                    && _hoveredInlineEquationCharIndex.Value == eq.CharIndex;
                 if (_inlineEqPreviewActive && eq.CharIndex == _inlineEqCharIndex &&
                     TryGetInlineEquationBounds(eq, pad: 2, out var hl))
                 {
                     context.DrawRectangle(activeHl, null, new RoundedRect(hl, 4, 4));
+                }
+
+                if (showSource)
+                {
+                    DrawInlineEquationSourceText(context, eq, textBrush);
+                    continue;
                 }
 
                 var layoutEq = LogicalCaretToLayoutBoundary(eq.CharIndex);
@@ -2388,6 +2482,29 @@ public class RichTextEditor : Control
                 // Hit test may fail for out-of-bounds positions
             }
         }
+    }
+
+    private void DrawInlineEquationSourceText(DrawingContext context, InlineEquationEntry eq, IBrush foregroundBrush)
+    {
+        if (_textLayout == null)
+            return;
+        if (!TryGetInlineEquationBounds(eq, pad: 2, out var bounds))
+            return;
+
+        using var latexLayout = new TextLayout(
+            eq.Latex ?? string.Empty,
+            new Typeface(MonoFont, FontStyle.Normal, FontWeight.Normal),
+            Math.Max(11, FontSize * 0.88),
+            foregroundBrush,
+            TextAlignment.Left,
+            TextWrapping.NoWrap,
+            TextTrimming.CharacterEllipsis,
+            null,
+            FlowDirection.LeftToRight,
+            Math.Max(bounds.Width - 4, 24));
+
+        var drawPoint = new Point(bounds.X + 2, bounds.Y + Math.Max(0, (bounds.Height - latexLayout.Height) * 0.5));
+        latexLayout.Draw(context, drawPoint);
     }
 
     /// <summary>Y coordinate of the text line baseline at a layout character index (matches TextLayout / surrounding text).</summary>

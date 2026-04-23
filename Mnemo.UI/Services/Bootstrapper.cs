@@ -117,7 +117,7 @@ public static class Bootstrapper
         services.AddSingleton<ILearningPathService, LearningPathService>();
         services.AddSingleton<INoteService, NoteService>();
         services.AddSingleton<INoteFolderService, NoteFolderService>();
-        services.AddSingleton<IFlashcardDeckService, InMemoryFlashcardDeckService>();
+        services.AddSingleton<IFlashcardDeckService, PersistentFlashcardDeckService>();
         services.AddSingleton<ISpeechRecognitionService, WhisperSpeechRecognitionService>();
 
         // 2. Register UI-specific Services

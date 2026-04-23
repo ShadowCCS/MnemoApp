@@ -44,6 +44,22 @@ public static class FlashcardSessionQueueBuilder
         return cards;
     }
 
+    /// <summary>
+    /// Estimates focused card count from a time-box if no explicit card count is set.
+    /// Uses a conservative average pace of 45 seconds/card.
+    /// </summary>
+    public static int? EstimateFocusedCardCount(FlashcardSessionConfig config)
+    {
+        if (config.SessionType != FlashcardSessionType.Focused)
+            return null;
+        if (config.CardCount is > 0)
+            return config.CardCount;
+        if (config.TimeLimitMinutes is not > 0)
+            return null;
+
+        return Math.Max(1, (int)Math.Floor(config.TimeLimitMinutes.Value * 60d / 45d));
+    }
+
     private static void Shuffle(IList<Flashcard> list, Random random)
     {
         for (var i = list.Count - 1; i > 0; i--)

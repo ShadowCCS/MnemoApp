@@ -1,0 +1,265 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mnemo.UI.Modules.Flashcards.ViewModels"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:markup="using:Mnemo.UI.Markup"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="760"
+             d:DesignHeight="560"
+             x:Class="Mnemo.UI.Modules.Flashcards.Views.StudySessionLauncherOverlay"
+             x:DataType="vm:FlashcardDeckDetailViewModel">
+    <UserControl.Styles>
+        <Style Selector="Border.sessionCard">
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="MinHeight" Value="172" />
+            <Setter Property="Background" Value="{DynamicResource WorkspaceBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.sessionCardPrimary">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardAccentBrush}" />
+        </Style>
+        <Style Selector="Border.iconBadge">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.sessionTitle">
+            <Setter Property="FontSize" Value="{DynamicResource FontSize.Heading4}" />
+            <Setter Property="FontFamily" Value="{DynamicResource Font.SemiBold}" />
+        </Style>
+        <Style Selector="TextBlock.sessionDescription">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSize.Body.Small}" />
+        </Style>
+        <Style Selector="Button.sessionAction">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="CornerRadius" Value="7" />
+        </Style>
+        <Style Selector="Grid.sessionCardBody">
+            <Setter Property="RowSpacing" Value="10" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border MaxWidth="720"
+            Margin="24"
+            Padding="24"
+            CornerRadius="18"
+            Background="{DynamicResource OverlayBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            VerticalAlignment="Center"
+            HorizontalAlignment="Center"
+            BoxShadow="0 18 44 0 #42000000">
+        <StackPanel Spacing="18">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{markup:T Ns=Flashcards, Key=SessionTitle}"
+                           FontSize="{DynamicResource FontSize.Heading2}"
+                           FontFamily="{DynamicResource Font.Bold}" />
+                <Button Grid.Column="1"
+                        Classes="ghost"
+                        Command="{Binding CloseStudyLauncherCommand}"
+                        Padding="8">
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                      Width="20"
+                                      Height="20"
+                                      Color="{DynamicResource TextSecondaryBrush}" />
+                </Button>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,*"
+                  RowDefinitions="*,*"
+                  ColumnSpacing="16"
+                  RowSpacing="16">
+                <Border Grid.Row="0"
+                        Grid.Column="0"
+                        Classes="sessionCard sessionCardPrimary">
+                    <Grid Classes="sessionCardBody"
+                          RowDefinitions="Auto,*,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Classes="iconBadge">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flashcard/Practice/bolt.svg"
+                                                  Width="16"
+                                                  Height="16"
+                                                  Color="{DynamicResource AccentPrimaryBrush}" />
+                            </Border>
+                            <TextBlock Classes="sessionTitle"
+                                       Text="{markup:T Ns=Flashcards, Key=SessionQuick}" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1"
+                                   Classes="sessionDescription"
+                                   Text="{markup:T Ns=Flashcards, Key=SessionQuickDesc}" />
+                        <Button Grid.Row="2"
+                                Classes="sessionAction accent"
+                                Command="{Binding StartQuickSessionCommand}"
+                                >
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionQuickStart}"
+                                       HorizontalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       Foreground="{DynamicResource AccentButtonForegroundBrush}" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="0"
+                        Grid.Column="1"
+                        Classes="sessionCard">
+                    <Grid Classes="sessionCardBody"
+                          RowDefinitions="Auto,*,Auto,Auto,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Classes="iconBadge">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flashcard/Practice/briefcase.svg"
+                                                  Width="16"
+                                                  Height="16"
+                                                  Color="{DynamicResource AccentPrimaryBrush}" />
+                            </Border>
+                            <TextBlock Classes="sessionTitle"
+                                       Text="{markup:T Ns=Flashcards, Key=SessionFocused}" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1"
+                                   Classes="sessionDescription"
+                                   Text="{markup:T Ns=Flashcards, Key=SessionFocusedDesc}" />
+                        <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="12"
+                                       Text="{Binding FocusedModeMetricLabel, FallbackValue='Cards'}" />
+                            <Slider Grid.Column="1"
+                                    Minimum="{Binding FocusedSliderMin}"
+                                    Maximum="{Binding FocusedSliderMax}"
+                                    Margin="12,0"
+                                    Value="{Binding FocusedMetricSliderValue}"
+                                    VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       Text="{Binding FocusedMetricSliderValue, StringFormat={}{0:0}}" />
+                        </Grid>
+                        <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                            <Button Grid.Column="0"
+                                    Classes="ghost fc-pill-segment"
+                                    Classes.selected="{Binding !FocusedUseTimeLimit}"
+                                    Command="{Binding SelectFocusedCardCountModeCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=FocusedByCards}" />
+                            </Button>
+                            <Button Grid.Column="1"
+                                    Classes="ghost fc-pill-segment"
+                                    Classes.selected="{Binding FocusedUseTimeLimit}"
+                                    Command="{Binding SelectFocusedTimeLimitModeCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=FocusedByTime}" />
+                            </Button>
+                        </Grid>
+                        <Button Grid.Row="4"
+                                Classes="sessionAction secondary"
+                                Command="{Binding StartFocusedSessionCommand}"
+                                >
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionFocusedStart}"
+                                       HorizontalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.SemiBold}" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="1"
+                        Grid.Column="0"
+                        Classes="sessionCard">
+                    <Grid Classes="sessionCardBody"
+                          RowDefinitions="Auto,*,Auto,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Classes="iconBadge">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flashcard/Practice/moon.svg"
+                                                  Width="16"
+                                                  Height="16"
+                                                  Color="{DynamicResource AccentPrimaryBrush}" />
+                            </Border>
+                            <TextBlock Classes="sessionTitle"
+                                       Text="{markup:T Ns=Flashcards, Key=SessionCram}" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1"
+                                   Classes="sessionDescription"
+                                   Text="{markup:T Ns=Flashcards, Key=SessionCramDesc}" />
+                        <CheckBox Grid.Row="2"
+                                  Content="{markup:T Ns=Flashcards, Key=Shuffle}"
+                                  IsChecked="{Binding CramShuffle}"
+                                  Margin="0,4" />
+                        <Button Grid.Row="3"
+                                Classes="sessionAction secondary"
+                                Command="{Binding StartCramSessionCommand}"
+                                >
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionCramStart}"
+                                       HorizontalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.SemiBold}" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="1"
+                        Grid.Column="1"
+                        Classes="sessionCard">
+                    <Grid Classes="sessionCardBody"
+                          RowDefinitions="Auto,*,Auto,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Classes="iconBadge">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flashcard/Practice/clipboard.svg"
+                                                  Width="16"
+                                                  Height="16"
+                                                  Color="{DynamicResource AccentPrimaryBrush}" />
+                            </Border>
+                            <TextBlock Classes="sessionTitle"
+                                       Text="{markup:T Ns=Flashcards, Key=SessionTest}" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1"
+                                   Classes="sessionDescription"
+                                   Text="{markup:T Ns=Flashcards, Key=SessionTestDesc}" />
+                        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                            <Button Grid.Column="0"
+                                    Classes="ghost fc-pill-segment"
+                                    Command="{Binding SelectExactTestGradingModeCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=TestGradingExact}" />
+                            </Button>
+                            <Button Grid.Column="1"
+                                    Classes="ghost fc-pill-segment"
+                                    Command="{Binding SelectAiTestGradingModeCommand}">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=TestGradingAi}" />
+                            </Button>
+                        </Grid>
+                        <Button Grid.Row="3"
+                                Classes="sessionAction secondary"
+                                Command="{Binding StartTestSessionCommand}"
+                                >
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionTestStart}"
+                                       HorizontalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.SemiBold}" />
+                        </Button>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="{markup:T Ns=Flashcards, Key=InstalledModesTitle}"
+                           FontFamily="{DynamicResource Font.SemiBold}"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                <Border Padding="12"
+                        CornerRadius="10"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        Background="{DynamicResource WorkspaceBackgroundBrush}">
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=InstalledModesPlaceholder}"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -39,6 +39,7 @@
     <AvaloniaResource Include="Icons\States\*.svg" />
     <AvaloniaResource Include="Icons\Editor\*.svg" />
     <AvaloniaResource Include="Icons\Sidebar\*.svg" />
+    <AvaloniaResource Include="Icons\Flashcard\**\*.svg" />
 
     <!-- Specific asset folders -->
     <AvaloniaResource Include="Assets\ProfilePictures\*.png" />

@@ -4,13 +4,14 @@ using Mnemo.Core.Services;
 namespace Mnemo.Infrastructure.Services.Flashcards;
 
 /// <summary>
-/// In-memory flashcard store for UI development until SQLite persistence exists.
+/// In-memory flashcard store for UI development and tests.
 /// </summary>
 public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
 {
     private readonly object _gate = new();
     private readonly List<FlashcardFolder> _folders;
     private readonly List<FlashcardDeck> _decks;
+    private readonly List<FlashcardSessionResult> _sessionHistory = new();
 
     public InMemoryFlashcardDeckService()
     {
@@ -69,14 +70,73 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
 
     /// <inheritdoc />
     public Task RecordSessionOutcomeAsync(
+        FlashcardSessionResult sessionResult,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sessionResult);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            var deckIndex = _decks.FindIndex(d => string.Equals(d.Id, sessionResult.DeckId, StringComparison.Ordinal));
+            if (deckIndex < 0)
+                return Task.CompletedTask;
+
+            var existing = _decks[deckIndex];
+            var cards = existing.Cards.ToDictionary(c => c.Id, StringComparer.Ordinal);
+            if (sessionResult.SessionConfig.SessionType != FlashcardSessionType.Cram)
+            {
+                foreach (var result in sessionResult.CardResults)
+                {
+                    if (!cards.TryGetValue(result.CardId, out var current))
+                        continue;
+
+                    cards[result.CardId] = FlashcardScheduling.ApplyGrade(current, result.Grade, result.ReviewedAt);
+                }
+            }
+
+            _sessionHistory.Add(sessionResult with { CardResults = sessionResult.CardResults.ToArray() });
+            _decks[deckIndex] = existing with
+            {
+                Cards = cards.Values.ToArray(),
+                LastStudied = sessionResult.CompletedAt,
+                RetentionScore = ComputeRetentionPercentForDeck(sessionResult.DeckId)
+            };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<FlashcardRetentionTrendPoint>> GetDeckRetentionTrendAsync(
         string deckId,
-        FlashcardSessionConfig sessionConfig,
-        int correctCount,
-        int incorrectCount,
+        int days = 14,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.CompletedTask;
+        days = Math.Clamp(days, 1, 90);
+
+        lock (_gate)
+        {
+            var start = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(-(days - 1)));
+            var grouped = _sessionHistory
+                .Where(s => string.Equals(s.DeckId, deckId, StringComparison.Ordinal))
+                .SelectMany(s => s.CardResults)
+                .GroupBy(r => DateOnly.FromDateTime(r.ReviewedAt.UtcDateTime.Date))
+                .ToDictionary(
+                    g => g.Key,
+                    g => new FlashcardRetentionTrendPoint(g.Key, ComputeRetentionPercent(g), g.Count()));
+
+            var points = new List<FlashcardRetentionTrendPoint>(days);
+            for (var i = 0; i < days; i++)
+            {
+                var day = start.AddDays(i);
+                points.Add(grouped.TryGetValue(day, out var point)
+                    ? point
+                    : new FlashcardRetentionTrendPoint(day, 0, 0));
+            }
+
+            return Task.FromResult<IReadOnlyList<FlashcardRetentionTrendPoint>>(points);
+        }
     }
 
     /// <inheritdoc />
@@ -90,6 +150,7 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
                 return Task.FromResult(false);
 
             _decks.RemoveAt(index);
+            _sessionHistory.RemoveAll(s => string.Equals(s.DeckId, deckId, StringComparison.Ordinal));
             return Task.FromResult(true);
         }
     }
@@ -152,5 +213,32 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
     {
         var cards = deck.Cards.Select(c => c with { Tags = c.Tags.ToArray() }).ToList();
         return deck with { Tags = deck.Tags.ToArray(), Cards = cards };
+    }
+
+    private int ComputeRetentionPercentForDeck(string deckId)
+    {
+        var results = _sessionHistory
+            .Where(s => string.Equals(s.DeckId, deckId, StringComparison.Ordinal))
+            .SelectMany(s => s.CardResults)
+            .TakeLast(200);
+        return ComputeRetentionPercent(results);
+    }
+
+    private static int ComputeRetentionPercent(IEnumerable<FlashcardSessionCardResult> results)
+    {
+        var list = results.ToList();
+        if (list.Count == 0)
+            return 0;
+
+        var weightedScore = list.Sum(r => r.Grade switch
+        {
+            FlashcardReviewGrade.Again => 0d,
+            FlashcardReviewGrade.Hard => 0.4d,
+            FlashcardReviewGrade.Good => 0.75d,
+            FlashcardReviewGrade.Easy => 1d,
+            _ => 0d
+        });
+        var pct = weightedScore / list.Count * 100d;
+        return (int)Math.Clamp(Math.Round(pct, MidpointRounding.AwayFromZero), 0, 100);
     }
 }

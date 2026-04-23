@@ -5,6 +5,7 @@
     "AllDecks": "All decks",
     "DueToday": "Due today",
     "Folders": "Folders",
+    "ToggleSidebar": "Toggle sidebar",
     "SearchPlaceholder": "Search decks…",
     "NewDeck": "New deck",
     "RetentionFormat": "{0}% retention",
@@ -29,6 +30,9 @@
     "DeleteCardConfirm": "Delete this card from the deck?",
     "DeleteDeck": "Delete deck",
     "DeleteDeckConfirm": "Delete this deck? This cannot be undone.",
+    "RenameDeck": "Rename deck",
+    "DuplicateDeck": "Duplicate deck",
+    "DuplicateDeckTitleFormat": "{0} (copy)",
     "SessionTitle": "Practice",
     "SessionQuick": "Quick",
     "SessionQuickDesc": "Due cards with simple grading.",
@@ -44,6 +48,9 @@
     "SessionTestStart": "Start test",
     "SessionClose": "Close",
     "FocusedCardCount": "Cards",
+    "FocusedByCards": "By cards",
+    "FocusedByTime": "By time",
+    "FocusedTimeLimit": "Minutes",
     "PracticeProgress": "{0} / {1}",
     "Flip": "Show answer",
     "GradeAgain": "Again",
@@ -59,9 +66,10 @@
     "PracticeCompleteDesc": "Nice work.",
     "BackToDeck": "Back to deck",
     "BackToLibrary": "Library",
-    "ExitPractice": "Exit",
+    "ExitPractice": "End Session",
     "Shuffle": "Shuffle",
     "TestGradingExact": "Exact match",
+    "TestGradingAi": "AI graded",
     "TestAnswerPlaceholder": "Type your answer…",
     "TestReveal": "Reveal",
     "TestYourAnswer": "Your answer",
@@ -71,10 +79,31 @@
     "CorrectLabel": "Correct",
     "IncorrectLabel": "Incorrect",
     "TypeClassic": "Classic",
-    "TypeCloze": "Cloze deletion",
+    "TypeCloze": "Cloze",
     "Write": "Write",
     "Preview": "Preview",
-    "InsertCloze": "<> Insert cloze",
+    "InsertCloze": "Cloze",
+    "DoneCard": "Done",
+    "DoneCardTooltip": "Save changes and collapse this card (Esc also works)",
+    "RetentionTrendRangeLast14": "LAST 14 DAYS",
+    "MakeCloze": "Make cloze",
+    "MakeClozeTooltip": "Wrap the selected text as a cloze deletion (Ctrl+Shift+C)",
+    "ClozeBadge": "CLOZE",
+    "ClozeBadgeTooltip": "This card has cloze deletions",
+    "Revert": "Revert",
+    "RevertTooltip": "Discard changes made since the card was opened",
+    "NewCard": "New card",
+    "AddAnotherCard": "Add another card",
+    "EditTitle": "Edit deck title",
+    "Undo": "Undo",
+    "Redo": "Redo",
+    "Cut": "Cut",
+    "Copy": "Copy",
+    "Paste": "Paste",
+    "SelectAll": "Select all",
+    "InsertImage": "Insert image",
+    "InsertEquation": "Insert equation",
+    "TagAddPlaceholder": "Add a tag…",
     "TagsLabel": "TAGS",
     "TagPlaceholder": "Add a tag and press Enter…",
     "SaveCard": "Save card",
@@ -85,5 +114,14 @@
     "DeckCardCountFormat": "{0} cards",
     "DeckLastStudiedFormat": "Last studied {0}",
     "DeckNeverStudied": "Never studied"
+    ,"RetentionTrend": "Retention trend"
+    ,"CardTypeLabel": "TYPE"
+    ,"InstalledModesTitle": "Installed modes"
+    ,"InstalledModesPlaceholder": "No installed custom modes yet."
+    ,"ExitSessionTitle": "End session?"
+    ,"ExitSessionConfirm": "Progress from this session will be saved. Do you want to end now?"
+    ,"SummaryDurationLabel": "Duration"
+    ,"SummaryAccuracyLabel": "Accuracy"
+    ,"SummaryNextDueLabel": "Next due"
   }
 }

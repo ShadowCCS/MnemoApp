@@ -14,11 +14,14 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
 {
     /// <summary>Filter token for due-only decks (used by the library sidebar).</summary>
     public const string DueFilterToken = "__due__";
+    private const string FlashcardsSidebarOpenKey = "Flashcards.SidebarOpen";
 
     private readonly IFlashcardDeckService _deckService;
     private readonly INavigationService _navigation;
     private readonly ILocalizationService _localization;
+    private readonly ISettingsService _settingsService;
     private IReadOnlyList<FlashcardDeck> _loadedDecks = Array.Empty<FlashcardDeck>();
+    private bool _sidebarStateLoaded;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -29,6 +32,9 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private string? _selectedFolderId;
 
+    [ObservableProperty]
+    private bool _isSidebarOpen = true;
+
     public ObservableCollection<FlashcardFolder> Folders { get; } = new();
 
     public ObservableCollection<FlashcardDeckRowViewModel> FilteredDecks { get; } = new();
@@ -36,6 +42,8 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
     public IAsyncRelayCommand RefreshCommand { get; }
 
     public IRelayCommand<FlashcardDeckRowViewModel?> OpenDeckCommand { get; }
+
+    public IRelayCommand<FlashcardDeckRowViewModel?> StartQuickSessionCommand { get; }
 
     public IAsyncRelayCommand CreateDeckCommand { get; }
 
@@ -45,20 +53,26 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
 
     public IRelayCommand<string?> SelectFolderCommand { get; }
 
+    public IRelayCommand ToggleSidebarCommand { get; }
+
     public FlashcardsViewModel(
         IFlashcardDeckService deckService,
         INavigationService navigation,
-        ILocalizationService localization)
+        ILocalizationService localization,
+        ISettingsService settingsService)
     {
         _deckService = deckService;
         _navigation = navigation;
         _localization = localization;
+        _settingsService = settingsService;
 
         RefreshCommand = new AsyncRelayCommand(LoadDecksAsync);
         OpenDeckCommand = new RelayCommand<FlashcardDeckRowViewModel?>(OpenDeck);
+        StartQuickSessionCommand = new RelayCommand<FlashcardDeckRowViewModel?>(StartQuickSession);
         CreateDeckCommand = new AsyncRelayCommand(CreateDeckAsync);
         SelectAllDecksCommand = new RelayCommand(SelectAllDecks);
         SelectDueDecksCommand = new RelayCommand(SelectDueFilter);
+        ToggleSidebarCommand = new RelayCommand(ToggleSidebar);
         SelectFolderCommand = new RelayCommand<string?>(id =>
         {
             if (!string.IsNullOrEmpty(id))
@@ -77,15 +91,26 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
 
     partial void OnSelectedFolderIdChanged(string? value) => ApplyFilter();
 
+    partial void OnIsSidebarOpenChanged(bool value)
+    {
+        if (_sidebarStateLoaded)
+            _ = _settingsService.SetAsync(FlashcardsSidebarOpenKey, value);
+    }
+
     private async Task LoadDecksAsync()
     {
         var folders = await _deckService.ListFoldersAsync().ConfigureAwait(false);
         var decks = await _deckService.ListDecksAsync().ConfigureAwait(false);
+        var sidebarOpen = await _settingsService.GetAsync(FlashcardsSidebarOpenKey, true).ConfigureAwait(false);
 
         _loadedDecks = decks;
 
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
+            _sidebarStateLoaded = false;
+            IsSidebarOpen = sidebarOpen;
+            _sidebarStateLoaded = true;
+
             Folders.Clear();
             foreach (var f in folders)
                 Folders.Add(f);
@@ -149,6 +174,21 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
         _navigation.NavigateTo("flashcard-deck", new FlashcardDeckNavigationParameter(row.Id));
     }
 
+    private void StartQuickSession(FlashcardDeckRowViewModel? row)
+    {
+        if (row == null || string.IsNullOrWhiteSpace(row.Id))
+            return;
+
+        var config = new FlashcardSessionConfig(
+            FlashcardSessionType.Quick,
+            row.Id,
+            null,
+            null,
+            false,
+            null);
+        _navigation.NavigateTo("flashcard-practice", new FlashcardPracticeNavigationParameter(row.Id, config));
+    }
+
     private async Task CreateDeckAsync()
     {
         var id = Guid.NewGuid().ToString("n");
@@ -172,4 +212,6 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
     public void SelectDueFilter() => SelectedFolderId = DueFilterToken;
 
     public void SelectFolder(string folderId) => SelectedFolderId = folderId;
+
+    public void ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
 }
