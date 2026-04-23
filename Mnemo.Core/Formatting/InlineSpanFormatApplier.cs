@@ -17,9 +17,6 @@ public static class InlineSpanFormatApplier
         if (spans.Count == 0 || start < 0 || end <= start)
             return new List<InlineSpan>(spans);
 
-        if (kind == InlineFormatKind.Subscript || kind == InlineFormatKind.Superscript)
-            return new List<InlineSpan>(spans);
-
         if (kind == InlineFormatKind.Equation)
             return ApplyEquation(spans, start, end, color);
 
