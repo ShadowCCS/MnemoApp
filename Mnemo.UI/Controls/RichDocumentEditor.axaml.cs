@@ -9,6 +9,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.Platform.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Formatting;
@@ -113,6 +114,11 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
     }
 
     public bool IsToolbarEnabled => !IsReadOnly && !IsPreviewMode;
+    public bool IsBoldActive { get; private set; }
+    public bool IsItalicActive { get; private set; }
+    public bool IsUnderlineActive { get; private set; }
+    public bool IsStrikethroughActive { get; private set; }
+    public bool IsHighlightActive { get; private set; }
 
     public bool CanInsertImage { get; private set; } = true;
 
@@ -207,6 +213,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
                 finally { _isSyncingFromProperty = false; }
                 UpdatePreviewMarkdown();
                 SyncImageViewItems();
+                UpdateToolbarFormatState();
             }
         }
         else if (change.Property == IsPreviewModeProperty || change.Property == IsReadOnlyProperty)
@@ -214,6 +221,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
             RaisePropertyChanged(nameof(IsToolbarEnabled));
             RefreshCanInsertImage();
             UpdateModeButtonClasses();
+            UpdateToolbarFormatState();
         }
     }
 
@@ -264,6 +272,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
             UpdatePreviewMarkdown();
             SyncImageViewItems();
             _historyBaseline = CaptureSnapshot();
+            UpdateToolbarFormatState();
         }
         finally
         {
@@ -324,6 +333,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
 
         UpdatePreviewMarkdown();
         SyncImageViewItems();
+        UpdateToolbarFormatState();
         SpansChanged?.Invoke(Spans);
         CommitHistoryIfChanged("Edit text");
     }
@@ -332,6 +342,17 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
     {
         if (IsPreviewMode)
             return;
+
+        if (!IsReadOnly
+            && e.Key == Key.Enter
+            && (e.KeyModifiers & KeyModifiers.Control) == 0
+            && (e.KeyModifiers & KeyModifiers.Alt) == 0)
+        {
+            Editor.InsertTextAtCaret("\n");
+            e.Handled = true;
+            return;
+        }
+
         if ((e.KeyModifiers & KeyModifiers.Control) == 0 || (e.KeyModifiers & KeyModifiers.Alt) != 0)
             return;
 
@@ -410,6 +431,16 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
                 e.Handled = true;
                 break;
         }
+    }
+
+    private void OnEditorKeyUp(object? sender, KeyEventArgs e)
+    {
+        Dispatcher.UIThread.Post(UpdateToolbarFormatState, DispatcherPriority.Input);
+    }
+
+    private void OnEditorPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(UpdateToolbarFormatState, DispatcherPriority.Input);
     }
 
     // ── Toolbar button handlers ──────────────────────────────────────────────
@@ -711,7 +742,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
 
         if (result.RemoveLinkRequested)
         {
-            ApplyInlineFormatToRange(start, end, InlineFormatKind.Link, null);
+            ApplyInlineFormatToRange(start, end, InlineFormatKind.Link, null, preserveSelection: true);
             return;
         }
 
@@ -826,15 +857,15 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
             range = (word.Value.Start, word.Value.End);
         }
 
-        ApplyInlineFormatToRange(range.Value.Start, range.Value.End, kind, color);
+        ApplyInlineFormatToRange(range.Value.Start, range.Value.End, kind, color, preserveSelection: true);
     }
 
-    private void ApplyInlineFormatToRange(int start, int end, InlineFormatKind kind, string? color)
+    private void ApplyInlineFormatToRange(int start, int end, InlineFormatKind kind, string? color, bool preserveSelection)
     {
         // Always operate on the text-only editor spans so caret positions stay valid.
         var editorSpans = Editor.Spans ?? new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
         var runs = InlineSpanFormatApplier.Apply(editorSpans, start, end, kind, color);
-        CommitRuns(runs, end);
+        CommitRuns(runs, end, preserveSelection ? (start, end) : null);
     }
 
     private (int Start, int End)? GetSelectionRange()
@@ -850,7 +881,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
     /// Commits <paramref name="textOnlyRuns"/> (text-only spans after a format
     /// operation) to both <see cref="Editor"/> and <see cref="Spans"/> (combined).
     /// </summary>
-    private void CommitRuns(IReadOnlyList<InlineSpan> textOnlyRuns, int caret)
+    private void CommitRuns(IReadOnlyList<InlineSpan> textOnlyRuns, int caret, (int Start, int End)? selection = null)
     {
         var textOnly = InlineSpanFormatApplier.Normalize(textOnlyRuns);
         var combined = BuildCombinedSpans(textOnly);
@@ -859,12 +890,24 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
         {
             Spans = combined;
             Editor.Spans = textOnly;
-            var clamped = Math.Clamp(caret, 0, Editor.TextLength);
-            Editor.CaretIndex = clamped;
-            Editor.SelectionStart = clamped;
-            Editor.SelectionEnd = clamped;
+            if (selection is { } activeSelection)
+            {
+                var start = Math.Clamp(activeSelection.Start, 0, Editor.SelectionIndexUpperBound);
+                var end = Math.Clamp(activeSelection.End, 0, Editor.SelectionIndexUpperBound);
+                Editor.SelectionStart = Math.Min(start, end);
+                Editor.SelectionEnd = Math.Max(start, end);
+                Editor.CaretIndex = Editor.SelectionEnd;
+            }
+            else
+            {
+                var clamped = Math.Clamp(caret, 0, Editor.TextLength);
+                Editor.CaretIndex = clamped;
+                Editor.SelectionStart = clamped;
+                Editor.SelectionEnd = clamped;
+            }
             UpdatePreviewMarkdown();
             SyncImageViewItems();
+            UpdateToolbarFormatState();
             SpansChanged?.Invoke(Spans);
             CommitHistoryIfChanged("Format text");
         }
@@ -986,6 +1029,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
             Editor.CaretIndex = caret;
             Editor.SelectionStart = start;
             Editor.SelectionEnd = end;
+            UpdateToolbarFormatState();
         }
         finally
         {
@@ -1080,6 +1124,131 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
 
         await History.RedoAsync().ConfigureAwait(true);
         _historyBaseline = CaptureSnapshot();
+    }
+
+    private void UpdateToolbarFormatState()
+    {
+        if (Editor == null || IsPreviewMode)
+        {
+            SetToolbarFormatState(false, false, false, false, false);
+            return;
+        }
+
+        var textOnlySpans = Editor.Spans ?? new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
+        var selectionStart = Math.Min(Editor.SelectionStart, Editor.SelectionEnd);
+        var selectionEnd = Math.Max(Editor.SelectionStart, Editor.SelectionEnd);
+
+        if (selectionEnd > selectionStart)
+        {
+            var selectedState = GetFormatStateForRange(textOnlySpans, selectionStart, selectionEnd);
+            SetToolbarFormatState(selectedState.Bold, selectedState.Italic, selectedState.Underline, selectedState.Strikethrough, selectedState.Highlight);
+            return;
+        }
+
+        var caretState = GetFormatStateAtCaret(textOnlySpans, Math.Clamp(Editor.CaretIndex, 0, Editor.TextLength));
+        SetToolbarFormatState(caretState.Bold, caretState.Italic, caretState.Underline, caretState.Strikethrough, caretState.Highlight);
+    }
+
+    private static (bool Bold, bool Italic, bool Underline, bool Strikethrough, bool Highlight) GetFormatStateAtCaret(
+        IReadOnlyList<InlineSpan> runs,
+        int caretIndex)
+    {
+        var totalLength = InlineSpanFormatApplier.Flatten(runs).Length;
+        if (totalLength == 0)
+            return (false, false, false, false, false);
+
+        var start = Math.Clamp(caretIndex - 1, 0, Math.Max(0, totalLength - 1));
+        var end = Math.Clamp(start + 1, 0, totalLength);
+        if (end <= start)
+            return (false, false, false, false, false);
+
+        return GetFormatStateForRange(runs, start, end);
+    }
+
+    private static (bool Bold, bool Italic, bool Underline, bool Strikethrough, bool Highlight) GetFormatStateForRange(
+        IReadOnlyList<InlineSpan> runs,
+        int start,
+        int end)
+    {
+        if (runs.Count == 0 || start >= end)
+            return (false, false, false, false, false);
+
+        var bold = true;
+        var italic = true;
+        var underline = true;
+        var strikethrough = true;
+        var highlight = true;
+        var anyOverlap = false;
+        var pos = 0;
+
+        foreach (var span in runs)
+        {
+            var spanLength = span is TextSpan textSpan ? textSpan.Text.Length : 1;
+            var spanEnd = pos + spanLength;
+            if (spanEnd <= start || pos >= end)
+            {
+                pos = spanEnd;
+                continue;
+            }
+
+            if (span is not TextSpan run)
+            {
+                pos = spanEnd;
+                continue;
+            }
+
+            anyOverlap = true;
+            if (!run.Style.Bold)
+                bold = false;
+            if (!run.Style.Italic)
+                italic = false;
+            if (!run.Style.Underline)
+                underline = false;
+            if (!run.Style.Strikethrough)
+                strikethrough = false;
+            if (!run.Style.Highlight)
+                highlight = false;
+
+            pos = spanEnd;
+        }
+
+        if (!anyOverlap)
+            return (false, false, false, false, false);
+
+        return (bold, italic, underline, strikethrough, highlight);
+    }
+
+    private void SetToolbarFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight)
+    {
+        if (IsBoldActive != bold)
+        {
+            IsBoldActive = bold;
+            RaisePropertyChanged(nameof(IsBoldActive));
+        }
+
+        if (IsItalicActive != italic)
+        {
+            IsItalicActive = italic;
+            RaisePropertyChanged(nameof(IsItalicActive));
+        }
+
+        if (IsUnderlineActive != underline)
+        {
+            IsUnderlineActive = underline;
+            RaisePropertyChanged(nameof(IsUnderlineActive));
+        }
+
+        if (IsStrikethroughActive != strikethrough)
+        {
+            IsStrikethroughActive = strikethrough;
+            RaisePropertyChanged(nameof(IsStrikethroughActive));
+        }
+
+        if (IsHighlightActive != highlight)
+        {
+            IsHighlightActive = highlight;
+            RaisePropertyChanged(nameof(IsHighlightActive));
+        }
     }
 
     private sealed record EditorSnapshot(

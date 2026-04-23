@@ -1038,7 +1038,7 @@ public class RichTextEditor : Control, ICustomHitTest
     /// <summary>
     /// Full-bounds hit target: plain <see cref="Control"/> does not hit-test “empty” space, so clicks would pass through.
     /// </summary>
-    public bool HitTest(Point point) => Bounds.Contains(point);
+    public bool HitTest(Point point) => new Rect(Bounds.Size).Contains(point);
 
     // ── Focus ────────────────────────────────────────────────────────────────
 
@@ -1596,17 +1596,14 @@ public class RichTextEditor : Control, ICustomHitTest
         var (lineIndex, _) = GetLineIndexAtY(lines, local.Y);
         var line = lines[Math.Clamp(lineIndex, 0, lines.Count - 1)];
 
-        // Use width including trailing whitespace so the right edge is a valid hit target.
-        var maxX = line.WidthIncludingTrailingWhitespace;
-        if (double.IsNaN(maxX) || double.IsInfinity(maxX) || maxX <= 0)
-            maxX = Math.Max(line.Width, 0);
-
-        const double edgeSlop = 1.0;
-        if (local.X >= -edgeSlop && local.X <= maxX + edgeSlop)
-            return false;
-
         int lineStart = line.FirstTextSourceIndex;
         int lineEnd = lineStart + LineContentCharCount(line);
+        var (lineMinX, lineMaxX) = GetLineHorizontalHitBounds(line, lineStart, lineEnd);
+
+        const double edgeSlop = 1.0;
+        if (local.X >= -edgeSlop && local.X <= lineMaxX + edgeSlop)
+            return false;
+
         int layoutBoundary = local.X < 0 ? lineStart : lineEnd;
         layoutBoundary = Math.Clamp(layoutBoundary, 0, _layoutTextLength);
         logicalCaret = Math.Clamp(LayoutBoundaryIndexToLogicalCaret(layoutBoundary), 0, TextLength);
@@ -1653,6 +1650,32 @@ public class RichTextEditor : Control, ICustomHitTest
         int layoutBoundary = local.X <= 0 ? lineStart : lineEnd;
         layoutBoundary = Math.Clamp(layoutBoundary, 0, _layoutTextLength);
         return Math.Clamp(LayoutBoundaryIndexToLogicalCaret(layoutBoundary), 0, TextLength);
+    }
+
+    private (double MinX, double MaxX) GetLineHorizontalHitBounds(TextLine line, int lineStart, int lineEnd)
+    {
+        // Use line-local hit-test bounds instead of [0..width] so leading visual slack before the first
+        // rendered glyph still maps to "before first character" instead of an unstable in-line hit.
+        var minX = 0.0;
+        var maxX = line.WidthIncludingTrailingWhitespace;
+        if (double.IsNaN(maxX) || double.IsInfinity(maxX) || maxX <= 0)
+            maxX = Math.Max(line.Width, 0);
+
+        if (_textLayout == null)
+            return (minX, maxX);
+
+        try
+        {
+            var startRect = _textLayout.HitTestTextPosition(Math.Clamp(lineStart, 0, _layoutTextLength));
+            minX = startRect.X;
+            maxX = minX + Math.Max(maxX, 0);
+        }
+        catch
+        {
+            // Keep conservative fallback bounds.
+        }
+
+        return (minX, maxX);
     }
 
     /// <summary>

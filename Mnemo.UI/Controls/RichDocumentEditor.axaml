@@ -36,7 +36,8 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2">
                         <Button x:Name="BoldButton"
-                                Classes="ghost"
+                                Classes="ghost editor-format FormattingToolbarButton FormattingToolbarIcon"
+                                Classes.FormattingToolbarIconActive="{Binding IsBoldActive, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                 Padding="8,6"
                                 Click="OnBoldClick"
                                 IsEnabled="{Binding IsToolbarEnabled, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
@@ -45,7 +46,8 @@
                                               Color="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                         <Button x:Name="ItalicButton"
-                                Classes="ghost"
+                                Classes="ghost editor-format FormattingToolbarButton FormattingToolbarIcon"
+                                Classes.FormattingToolbarIconActive="{Binding IsItalicActive, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                 Padding="8,6"
                                 Click="OnItalicClick"
                                 IsEnabled="{Binding IsToolbarEnabled, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
@@ -54,7 +56,8 @@
                                               Color="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                         <Button x:Name="UnderlineButton"
-                                Classes="ghost"
+                                Classes="ghost editor-format FormattingToolbarButton FormattingToolbarIcon"
+                                Classes.FormattingToolbarIconActive="{Binding IsUnderlineActive, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                 Padding="8,6"
                                 Click="OnUnderlineClick"
                                 IsEnabled="{Binding IsToolbarEnabled, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
@@ -63,7 +66,8 @@
                                               Color="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                         <Button x:Name="StrikethroughButton"
-                                Classes="ghost"
+                                Classes="ghost editor-format FormattingToolbarButton FormattingToolbarIcon"
+                                Classes.FormattingToolbarIconActive="{Binding IsStrikethroughActive, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                 Padding="8,6"
                                 Click="OnStrikethroughClick"
                                 IsEnabled="{Binding IsToolbarEnabled, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
@@ -72,7 +76,8 @@
                                               Color="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                         <Button x:Name="HighlightButton"
-                                Classes="ghost"
+                                Classes="ghost editor-format FormattingToolbarButton FormattingToolbarIcon"
+                                Classes.FormattingToolbarIconActive="{Binding IsHighlightActive, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                 Padding="8,6"
                                 Click="OnHighlightClick"
                                 IsEnabled="{Binding IsToolbarEnabled, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
@@ -95,7 +100,7 @@
                                 Click="OnImageClick"
                                 IsVisible="{Binding ShowImageButton, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                 IsEnabled="{Binding CanInsertImage, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/photo.svg"
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/polaroid.svg"
                                               Width="16" Height="16"
                                               Color="{DynamicResource TextPrimaryBrush}" />
                         </Button>
@@ -234,7 +239,9 @@
                                                 IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                                 ShowInlineEquationSourceOnHover="True"
                                                 TextChanged="OnEditorTextChanged"
-                                                KeyDown="OnEditorKeyDown" />
+                                                KeyDown="OnEditorKeyDown"
+                                                KeyUp="OnEditorKeyUp"
+                                                PointerReleased="OnEditorPointerReleased" />
                 </Grid>
             </Grid>
         </Grid>
