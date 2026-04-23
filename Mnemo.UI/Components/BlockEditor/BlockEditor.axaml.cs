@@ -2693,25 +2693,19 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
                             if (focusedVm.Type == BlockType.Code)
                             {
-                                focusedVm.Content = textBefore + firstContent;
-                                editableBlock!.SetCaretIndex(textBefore.Length + firstContent.Length);
-
+                                // Keep single inline paste in the same line/block.
                                 if (pasted.Length == 1)
                                 {
-                                    if (textAfter.Length > 0)
-                                    {
-                                        var tailBlock = BlockFactory.CreateBlock(BlockType.Text, topInsert + 1);
-                                        tailBlock.Content = textAfter;
-                                        SubscribeToBlock(tailBlock);
-                                        int insertAtTail = GetPasteSiblingInsertStartIndex(focusedVm, topInsert);
-                                        InsertPasteSiblingBlock(focusedVm, ref insertAtTail, tailBlock);
-                                        ReorderBlocks();
-                                    }
+                                    focusedVm.Content = textBefore + firstContent + textAfter;
+                                    editableBlock!.SetCaretIndex(textBefore.Length + firstContent.Length);
                                     ClearBlockSelection();
                                     CommitStructuralChange("Paste");
                                     BlocksChanged?.Invoke();
                                     return;
                                 }
+
+                                focusedVm.Content = textBefore + firstContent;
+                                editableBlock!.SetCaretIndex(textBefore.Length + firstContent.Length);
 
                                 int insertAtCode = GetPasteSiblingInsertStartIndex(focusedVm, topInsert);
                                 for (int i = 1; i < pasted.Length; i++)
@@ -2746,8 +2740,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                             else
                             {
                                 var pasteFirstRuns = pasted[0].CloneSpans();
-                                var mergedFirst = InlineSpanFormatApplier.Normalize(
-                                    new List<InlineSpan>([..beforeRuns, ..pasteFirstRuns]));
+                                var mergedFirst = (pasted.Length == 1 && pasted[0].Type == BlockType.Text)
+                                    ? InlineSpanFormatApplier.Normalize(
+                                        new List<InlineSpan>([..beforeRuns, ..pasteFirstRuns, ..tailRuns]))
+                                    : InlineSpanFormatApplier.Normalize(
+                                        new List<InlineSpan>([..beforeRuns, ..pasteFirstRuns]));
                                 focusedVm.CommitSpansFromEditor(mergedFirst);
                                 caretAfterPaste = start + InlineSpanFormatApplier.Flatten(pasteFirstRuns).Length;
                             }
@@ -2756,7 +2753,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
                             if (pasted.Length == 1)
                             {
-                                if (InlineSpanFormatApplier.Flatten(tailRuns).Length > 0)
+                                if (pasted[0].Type != BlockType.Text && InlineSpanFormatApplier.Flatten(tailRuns).Length > 0)
                                 {
                                     var tailBlockRich = BlockFactory.CreateBlock(BlockType.Text, topInsert + 1);
                                     tailBlockRich.SetSpans(tailRuns);
