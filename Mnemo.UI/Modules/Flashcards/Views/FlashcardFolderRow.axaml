@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             xmlns:converters="using:Mnemo.UI.Converters"
+             xmlns:markup="using:Mnemo.UI.Markup"
+             xmlns:vm="using:Mnemo.UI.Modules.Flashcards.ViewModels"
+             x:Class="Mnemo.UI.Modules.Flashcards.Views.FlashcardFolderRow"
+             x:DataType="vm:FlashcardFolderItemViewModel">
+    <UserControl.Resources>
+        <converters:IntToLeftIndentConverter x:Key="IndentConverter" />
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Border.folder-row">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.folder-row:pointerover">
+            <Setter Property="Background" Value="{DynamicResource WidgetBackgroundPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        </Style>
+        <Style Selector="Button.folder-row-more">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Button.folder-row-more:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOverBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border x:Name="RowBorder"
+            Classes="folder-row"
+            Margin="{Binding Depth, Converter={x:Static converters:IntToLeftIndentConverter.Instance}}"
+            Padding="12,8"
+            CornerRadius="10"
+            Cursor="Hand">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <controls:SvgIcon Grid.Column="0"
+                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
+                              Width="18" Height="18"
+                              VerticalAlignment="Center"
+                              Color="{DynamicResource TextSecondaryBrush}" />
+
+            <TextBlock Grid.Column="1"
+                       x:Name="FolderNameTextBlock"
+                       Text="{Binding Name}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       ToolTip.Tip="{Binding Name}" />
+
+            <TextBox Grid.Column="1"
+                     x:Name="FolderNameTextBox"
+                     IsVisible="False"
+                     Text="{Binding Name, Mode=TwoWay}"
+                     VerticalAlignment="Center"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Padding="0"
+                     LostFocus="OnNameEditLostFocus"
+                     KeyDown="OnNameEditKeyDown" />
+
+            <Button Grid.Column="2"
+                    x:Name="MoreButton"
+                    Classes="folder-row-more"
+                    ToolTip.Tip="{markup:T Ns=Flashcards, Key=FolderActions}">
+                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
+                                  Width="16" Height="16"
+                                  Color="{DynamicResource TextSecondaryBrush}" />
+                <Button.Flyout>
+                    <MenuFlyout>
+                        <MenuItem Header="{markup:T Ns=Flashcards, Key=RenameFolder}"
+                                  Click="OnRenameClick" />
+                        <Separator />
+                        <MenuItem Classes="danger"
+                                  Header="{markup:T Ns=Flashcards, Key=DeleteFolder}"
+                                  Click="OnDeleteClick" />
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

@@ -18,6 +18,31 @@
         <conv:LocalPathToBitmapConverter x:Key="LocalPathToBitmapConverter" />
     </UserControl.Resources>
 
+    <UserControl.Styles>
+        <Style Selector="Border.hotkeyChip">
+            <Setter Property="Padding" Value="8,1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource WidgetBackgroundPrimaryBrush}" />
+            <Setter Property="MinWidth" Value="24" />
+            <Setter Property="MinHeight" Value="24" />
+        </Style>
+        <Style Selector="Border.hotkeyChipWide">
+            <Setter Property="Padding" Value="12,1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource WidgetBackgroundPrimaryBrush}" />
+            <Setter Property="MinHeight" Value="24" />
+        </Style>
+        <Style Selector="TextBlock.practiceFieldLabel">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="LetterSpacing" Value="0.6" />
+            <Setter Property="FontFamily" Value="{DynamicResource Font.SemiBold}" />
+        </Style>
+    </UserControl.Styles>
+
     <UserControl.KeyBindings>
         <KeyBinding Gesture="Space" Command="{Binding FlipCommand}"/>
         <KeyBinding Gesture="Escape" Command="{Binding ExitToDeckCommand}"/>
@@ -33,13 +58,63 @@
         <Border Grid.Row="0" Padding="20,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
                 Background="{DynamicResource CardBackgroundSecondaryBrush}">
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding DeckName}" Foreground="{DynamicResource TextSecondaryBrush}" FontFamily="{DynamicResource Font.SemiBold}"/>
-                    <TextBlock Text="•" Foreground="{DynamicResource TextTertiaryBrush}" FontFamily="{DynamicResource Font.SemiBold}"/>
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Button Command="{Binding ExitToLibraryCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="0"
+                            CornerRadius="0"
+                            Cursor="Hand">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                            </Style>
+                        </Button.Styles>
+                        <TextBlock Text="{Binding FolderName}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontFamily="{DynamicResource Font.SemiBold}" />
+                    </Button>
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                      Color="{DynamicResource TextTertiaryBrush}"
+                                      Width="12"
+                                      Height="12"
+                                      VerticalAlignment="Center" />
+                    <Button Command="{Binding ExitToDeckCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="0"
+                            CornerRadius="0"
+                            Cursor="Hand">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                            </Style>
+                        </Button.Styles>
+                        <TextBlock Text="{Binding DeckName}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontFamily="{DynamicResource Font.SemiBold}" />
+                    </Button>
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                      Color="{DynamicResource TextTertiaryBrush}"
+                                      Width="12"
+                                      Height="12"
+                                      VerticalAlignment="Center" />
+                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionReview}" IsVisible="{Binding IsReviewSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
                     <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionQuick}" IsVisible="{Binding IsQuickSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
                     <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionFocused}" IsVisible="{Binding IsFocusedSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
                     <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionCram}" IsVisible="{Binding IsCramSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
                     <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionTest}" IsVisible="{Binding IsTestSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                      Color="{DynamicResource TextTertiaryBrush}"
+                                      Width="12"
+                                      Height="12"
+                                      VerticalAlignment="Center"
+                                      IsVisible="{Binding IsReviewSession}" />
+                    <TextBlock Text="{Binding SchedulingEngineLabel}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{DynamicResource FontSize.Body.Small}"
+                               FontFamily="{DynamicResource Font.SemiBold}"
+                               IsVisible="{Binding IsReviewSession}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <ProgressBar Width="200" Height="6" Maximum="100" Value="{Binding ProgressPercent}"/>
@@ -85,7 +160,7 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"
                                    HorizontalAlignment="Center" TextAlignment="Center" FontSize="{DynamicResource FontSize.Body.Medium}"/>
                     </StackPanel>
-                    <UniformGrid Columns="2" Margin="0,8">
+                    <UniformGrid Columns="2" Margin="0,8" IsVisible="{Binding ShowCorrectIncorrectSummary}">
                         <Border Margin="8" Padding="20" CornerRadius="16"
                                 Background="{DynamicResource CardBackgroundSecondaryBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
@@ -106,6 +181,56 @@
                                 <TextBlock Text="{Binding IncorrectCount}" FontSize="36" FontFamily="{DynamicResource Font.Bold}"
                                            HorizontalAlignment="Center" Foreground="{DynamicResource DestructiveButtonColorBrush}"/>
                                 <TextBlock Text="{markup:T Ns=Flashcards, Key=IncorrectLabel}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                    <UniformGrid Columns="4" Margin="0,8" IsVisible="{Binding ShowGradeDistributionSummary}">
+                        <Border Margin="8" Padding="20" CornerRadius="16"
+                                Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                BoxShadow="0 4 12 0 #1A000000">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding AgainCount}" FontSize="30" FontFamily="{DynamicResource Font.Bold}"
+                                           HorizontalAlignment="Center" Foreground="{DynamicResource DestructiveButtonColorBrush}"/>
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeAgain}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="8" Padding="20" CornerRadius="16"
+                                Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                BoxShadow="0 4 12 0 #1A000000">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding HardCount}" FontSize="30" FontFamily="{DynamicResource Font.Bold}"
+                                           HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeHard}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="8" Padding="20" CornerRadius="16"
+                                Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                BoxShadow="0 4 12 0 #1A000000">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding GoodCount}" FontSize="30" FontFamily="{DynamicResource Font.Bold}"
+                                           HorizontalAlignment="Center" Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeGood}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="8" Padding="20" CornerRadius="16"
+                                Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                BoxShadow="0 4 12 0 #1A000000">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding EasyCount}" FontSize="30" FontFamily="{DynamicResource Font.Bold}"
+                                           HorizontalAlignment="Center" Foreground="{DynamicResource SystemSuccessBackgroundBrush}"/>
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeEasy}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            HorizontalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}"/>
                             </StackPanel>
@@ -153,16 +278,20 @@
                 <!-- Active card -->
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20"
                             IsVisible="{Binding ShowActivePractice}">
-                    <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" CornerRadius="16"
-                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="32"
+                    <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" CornerRadius="22"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="0"
                             MinWidth="620" Width="760" MinHeight="320" MaxHeight="420"
-                            BoxShadow="0 10 24 -14 #2A000000">
-                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            BoxShadow="0 16 40 -24 #45000000">
+                        <Grid RowDefinitions="*,Auto">
+                        <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="32">
                         <StackPanel Spacing="0">
                             <!-- Front side: always visible while the card is active. Markdown view + image carousel
                                  live in the same stack so spacing is consistent whether the card has text, images,
                                  or both. -->
                             <StackPanel Spacing="16" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                <TextBlock Classes="practiceFieldLabel"
+                                           Text="{markup:T Ns=Flashcards, Key=FieldFront}"
+                                           Foreground="{DynamicResource DestructiveButtonColorBrush}" />
                                 <blockEditor:RichTextEditor IsReadOnly="True"
                                                             IsHitTestVisible="False"
                                                             Cursor="Arrow"
@@ -192,6 +321,9 @@
                             <StackPanel Spacing="0" IsVisible="{Binding IsFlipped}">
                                 <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Margin="0,32" />
                                 <StackPanel Spacing="16" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                    <TextBlock Classes="practiceFieldLabel"
+                                               Text="{markup:T Ns=Flashcards, Key=FieldBack}"
+                                               Foreground="{DynamicResource SystemSuccessBackgroundBrush}" />
                                     <blockEditor:RichTextEditor IsReadOnly="True"
                                                                 IsHitTestVisible="False"
                                                                 Cursor="Arrow"
@@ -216,6 +348,30 @@
                             </StackPanel>
                         </StackPanel>
                         </ScrollViewer>
+                        <Border Grid.Row="1"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="0"
+                                Padding="20,6"
+                                IsVisible="{Binding !IsTestSession}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="6">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeRevealPrefix}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                           FontFamily="{DynamicResource Font.SemiBold}" />
+                                <Border Classes="hotkeyChipWide">
+                                    <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeRevealSpacebar}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               FontSize="{DynamicResource FontSize.Body.Small}"
+                                               VerticalAlignment="Center"
+                                               FontFamily="{DynamicResource Font.SemiBold}" />
+                                </Border>
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeRevealSuffix}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                           FontFamily="{DynamicResource Font.SemiBold}" />
+                            </StackPanel>
+                        </Border>
+                        </Grid>
                     </Border>
 
                     <!-- Test: answer before reveal -->
@@ -295,6 +451,52 @@
                             <Button MinWidth="140" MinHeight="48" Command="{Binding TestCorrectCommand}" Classes="accent">
                                 <TextBlock Text="{markup:T Ns=Flashcards, Key=TestCorrect}" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="{DynamicResource Font.SemiBold}"/>
                             </Button>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,20,0,0"
+                                    IsVisible="{Binding ShowStandardGrades}">
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeKeyboardShortcutsLabel}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                       VerticalAlignment="Center" />
+                            <Border Classes="hotkeyChip">
+                                <TextBlock Text="1" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </Border>
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeAgain}" VerticalAlignment="Center" />
+                            <Border Classes="hotkeyChip">
+                                <TextBlock Text="2" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </Border>
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeHard}" VerticalAlignment="Center" />
+                            <Border Classes="hotkeyChip">
+                                <TextBlock Text="3" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </Border>
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeGood}" VerticalAlignment="Center" />
+                            <Border Classes="hotkeyChip">
+                                <TextBlock Text="4" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </Border>
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeEasy}" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,20,0,0"
+                                    IsVisible="{Binding ShowQuickGrades}">
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=PracticeKeyboardShortcutsLabel}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                       VerticalAlignment="Center" />
+                            <Border Classes="hotkeyChip">
+                                <TextBlock Text="1" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </Border>
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeLearning}" VerticalAlignment="Center" />
+                            <Border Classes="hotkeyChip">
+                                <TextBlock Text="2" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </Border>
+                            <TextBlock Text="{markup:T Ns=Flashcards, Key=GradeGotIt}" VerticalAlignment="Center" />
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>

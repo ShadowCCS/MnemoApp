@@ -50,6 +50,12 @@ public partial class EditableBlock : UserControl
     private InlineFormattingToolbar? _currentFormattingToolbar;
     private TopLevel? _toolbarPointerTopLevel;
 
+    /// <summary>
+    /// Tracks sticky sub/sup typing mode. Null = off; Subscript or Superscript = active.
+    /// When active, all typed characters receive that format until explicitly toggled off or the caret navigates away.
+    /// </summary>
+    private InlineFormatKind? _stickySubSup;
+
     /// <summary>True while the pointer is over the block chrome (gutter icons visible). Gutter borders stay hit-testable so hover works; handlers gate on this.</summary>
     private bool _blockGutterChromeVisible;
 
@@ -778,6 +784,13 @@ public partial class EditableBlock : UserControl
         if (_viewModel == null || sender is not RichTextEditor editor || _keyboardHandler == null)
             return;
 
+        if (e.Key == Key.Escape && _stickySubSup != null)
+        {
+            ClearStickySubSup(editor);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Back && _backspaceHandledInTunnel)
         {
             _backspaceHandledInTunnel = false;
@@ -789,6 +802,18 @@ public partial class EditableBlock : UserControl
 
         if (TryHandleInlineFormatShortcut(e, editor))
             return;
+
+        // Navigation keys clear sticky sub/sup mode; the right-arrow case at a sub/sup span boundary
+        // additionally forces the next insertion to be non-sub/sup (escape from trailing style).
+        if (IsNavigationKey(e.Key))
+        {
+            bool isRightArrow = e.Key == Key.Right;
+            bool atSubSupBoundary = isRightArrow && IsCaretAtTrailingSubSupBoundary(editor);
+            if (_stickySubSup != null)
+                ClearStickySubSup(editor);
+            if (atSubSupBoundary)
+                editor.SetPendingSubSup(false, false); // escape one char, then natural
+        }
 
         if (_viewModel.Type != BlockType.Image)
         {
@@ -854,8 +879,10 @@ public partial class EditableBlock : UserControl
     #region Keyboard and Input Handling
 
     /// <summary>
-    /// Ctrl+B/I/U, Ctrl+Shift+S (strikethrough), Ctrl+Shift+H (highlight), Ctrl+Shift+L (link / unlink).
-    /// With no selection, toggles format on the word at the caret except for links (caret must be inside a link span to unlink, or select text to add a link).
+    /// Ctrl+B/I/U, Ctrl+Shift+S (strikethrough), Ctrl+Shift+H (highlight), Ctrl+Shift+L (link / unlink),
+    /// Ctrl+, (subscript), Ctrl+. (superscript).
+    /// Sub/sup use sticky toggle mode when there is no selection: press once to enter, once more to exit.
+    /// All other formats apply to the word at caret when there is no selection.
     /// </summary>
     private bool TryHandleInlineFormatShortcut(KeyEventArgs e, RichTextEditor editor)
     {
@@ -878,6 +905,15 @@ public partial class EditableBlock : UserControl
         if (e.Key == Key.E && shift)
         {
             ApplyInlineEquation();
+            e.Handled = true;
+            return true;
+        }
+
+        // Sub/superscript use sticky toggle mode (no shift, no Alt already gated above).
+        if (e.Key == Key.OemComma || e.Key == Key.OemPeriod)
+        {
+            var subSupKind = e.Key == Key.OemComma ? InlineFormatKind.Subscript : InlineFormatKind.Superscript;
+            HandleSubSupShortcut(editor, subSupKind);
             e.Handled = true;
             return true;
         }
@@ -925,6 +961,130 @@ public partial class EditableBlock : UserControl
         ApplyInlineFormat(kind.Value, color);
         e.Handled = true;
         return true;
+    }
+
+    /// <summary>
+    /// Handles Ctrl+, (subscript) and Ctrl+. (superscript).
+    /// With a selection: toggles the format on the selected range.
+    /// Without a selection: enters/exits sticky typing mode. Pressing the same shortcut again exits.
+    /// Pressing the opposite shortcut switches directly to the other mode.
+    /// </summary>
+    private void HandleSubSupShortcut(RichTextEditor editor, InlineFormatKind kind)
+    {
+        var blockEditor = FindParentBlockEditor();
+        bool hasCrossBlock = blockEditor?.HasCrossBlockTextSelection() == true;
+        bool hasSelection = hasCrossBlock || GetSelectionRange() != null;
+
+        if (hasSelection)
+        {
+            // Clear sticky mode — the explicit selection takes precedence.
+            SetStickySubSup(editor, null);
+            ApplyInlineFormat(kind, null);
+            return;
+        }
+
+        // Sticky toggle: same kind → turn off, different kind → switch, none → turn on.
+        var newKind = _stickySubSup == kind ? (InlineFormatKind?)null : kind;
+        SetStickySubSup(editor, newKind);
+    }
+
+    /// <summary>
+    /// Sets or clears sticky sub/sup typing mode and updates the editor's pending insert style.
+    /// When clearing (kind == null) and the caret is inside a sub/sup span, activates escape mode
+    /// so the next character is forced to normal style instead of inheriting the adjacent span.
+    /// </summary>
+    private void SetStickySubSup(RichTextEditor editor, InlineFormatKind? kind)
+    {
+        _stickySubSup = kind;
+        if (kind == InlineFormatKind.Subscript)
+            editor.SetPendingSubSup(true, false);
+        else if (kind == InlineFormatKind.Superscript)
+            editor.SetPendingSubSup(false, true);
+        else if (IsCaretAdjacentToSubSupSpan(editor))
+            editor.SetPendingSubSup(false, false); // escape mode: force next char to normal
+        else
+            editor.SetPendingSubSup(null, null);
+        UpdateFormattingToolbarState();
+    }
+
+    /// <summary>
+    /// Clears sticky sub/sup mode and removes the pending insert style override.
+    /// Should be called on navigation keys (arrow/home/end) and pointer clicks.
+    /// </summary>
+    private void ClearStickySubSup(RichTextEditor editor)
+    {
+        if (_stickySubSup == null) return;
+        SetStickySubSup(editor, null);
+    }
+
+    /// <summary>
+    /// Returns true when either the character immediately to the left <em>or</em> the character
+    /// immediately to the right of the caret belongs to a subscript or superscript span.
+    /// Checking both sides ensures that pressing a navigation key to exit sticky mode always sets
+    /// escape-mode, even when the caret is at the leading edge of a sub/sup span (left is normal,
+    /// right is sub/sup) and the key will move into that span.
+    /// </summary>
+    private bool IsCaretAdjacentToSubSupSpan(RichTextEditor editor)
+    {
+        var spans = _viewModel?.Spans;
+        if (spans == null) return false;
+        int caret = editor.CaretIndex;
+
+        int pos = 0;
+        foreach (var span in spans)
+        {
+            int len = span is Core.Models.TextSpan ts ? ts.Text.Length : 1;
+            int end = pos + len;
+
+            if (span is Core.Models.TextSpan textSpan &&
+                (textSpan.Style.Subscript || textSpan.Style.Superscript))
+            {
+                // Left neighbor: span contains the char just before the caret.
+                if (caret > 0 && pos < caret && end >= caret)
+                    return true;
+                // Right neighbor: span starts right at the caret (char immediately to the right).
+                if (pos == caret && len > 0)
+                    return true;
+            }
+
+            pos = end;
+        }
+        return false;
+    }
+
+    private static bool IsNavigationKey(Key key) =>
+        key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End;
+
+    /// <summary>
+    /// Returns true when the caret is at the position immediately after a sub/sup-styled span,
+    /// and the span (or next position) is NOT already sub/sup — i.e. the boundary where typing
+    /// would undesirably inherit sub/sup style from the left span.
+    /// </summary>
+    private bool IsCaretAtTrailingSubSupBoundary(RichTextEditor editor)
+    {
+        if (_viewModel == null) return false;
+        var spans = _viewModel.Spans;
+        int caret = editor.CaretIndex;
+        if (caret <= 0) return false;
+
+        int pos = 0;
+        Core.Models.TextStyle? leftStyle = null;
+        Core.Models.TextStyle? rightStyle = null;
+        foreach (var span in spans)
+        {
+            int len = span is Core.Models.TextSpan ts ? ts.Text.Length : 1;
+            int runEnd = pos + len;
+            if (runEnd == caret && span is Core.Models.TextSpan lt)
+                leftStyle = lt.Style;
+            if (pos == caret && span is Core.Models.TextSpan rt)
+                rightStyle = rt.Style;
+            pos = runEnd;
+        }
+
+        if (leftStyle == null) return false;
+        bool leftIsSubSup = leftStyle.Value.Subscript || leftStyle.Value.Superscript;
+        bool rightIsSubSup = rightStyle?.Subscript == true || rightStyle?.Superscript == true;
+        return leftIsSubSup && !rightIsSubSup;
     }
 
     private static (int start, int end)? TryGetContiguousLinkSpanAtCaret(RichTextEditor editor, IReadOnlyList<InlineSpan> runs)
@@ -1244,6 +1404,8 @@ public partial class EditableBlock : UserControl
 
     private void OnTextBoxPointerReleasedForToolbar(object? sender, PointerReleasedEventArgs e)
     {
+        if (_stickySubSup != null && sender is RichTextEditor editor)
+            ClearStickySubSup(editor);
         Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
     }
 
@@ -1396,15 +1558,24 @@ public partial class EditableBlock : UserControl
         if (_currentFormattingToolbar == null || _cachedSelectionRange == null || _viewModel == null) return;
         var (start, end) = _cachedSelectionRange.Value;
         var state = GetFormatStateForRange(_viewModel.Spans, start, end);
-        _currentFormattingToolbar.UpdateFormatState(state.bold, state.italic, state.underline, state.strikethrough, state.highlight, state.backgroundColor, state.hasLink);
+
+        // Sticky sub/sup overrides the span-derived state when no selection is active.
+        bool subActive = _stickySubSup == InlineFormatKind.Subscript || state.subscript;
+        bool supActive = _stickySubSup == InlineFormatKind.Superscript || state.superscript;
+
+        _currentFormattingToolbar.UpdateFormatState(
+            state.bold, state.italic, state.underline, state.strikethrough,
+            state.highlight, state.backgroundColor, state.hasLink,
+            subActive, supActive);
         var heading = _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3;
         _currentFormattingToolbar.SetBoldButtonEnabled(!heading);
     }
 
-    private static (bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor, bool hasLink) GetFormatStateForRange(IReadOnlyList<InlineSpan> runs, int start, int end)
+    private static (bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor, bool hasLink, bool subscript, bool superscript) GetFormatStateForRange(IReadOnlyList<InlineSpan> runs, int start, int end)
     {
-        if (runs.Count == 0 || start >= end) return (false, false, false, false, false, null, false);
+        if (runs.Count == 0 || start >= end) return (false, false, false, false, false, null, false, false, false);
         bool bold = true, italic = true, underline = true, strikethrough = true, highlight = true;
+        bool subscript = true, superscript = true;
         string? backgroundColor = null;
         bool backgroundMixed = false;
         bool anyOverlap = false;
@@ -1426,6 +1597,8 @@ public partial class EditableBlock : UserControl
             if (!run.Style.Underline) underline = false;
             if (!run.Style.Strikethrough) strikethrough = false;
             if (!run.Style.Highlight) highlight = false;
+            if (!run.Style.Subscript) subscript = false;
+            if (!run.Style.Superscript) superscript = false;
             if (!backgroundMixed && run.Style.BackgroundColor != null)
             {
                 if (backgroundColor == null) backgroundColor = run.Style.BackgroundColor;
@@ -1438,8 +1611,8 @@ public partial class EditableBlock : UserControl
             if (run.Style.LinkUrl != null) hasLink = true;
             pos = runEnd;
         }
-        if (!anyOverlap) return (false, false, false, false, false, null, false);
-        return (bold, italic, underline, strikethrough, highlight, backgroundColor, hasLink);
+        if (!anyOverlap) return (false, false, false, false, false, null, false, false, false);
+        return (bold, italic, underline, strikethrough, highlight, backgroundColor, hasLink, subscript, superscript);
     }
 
     private void OnFormatRequested(InlineFormatKind kind)
@@ -1447,6 +1620,14 @@ public partial class EditableBlock : UserControl
         if (kind == InlineFormatKind.Link)
         {
             _ = HandleLinkFormatRequestedAsync();
+            return;
+        }
+
+        if (kind is InlineFormatKind.Subscript or InlineFormatKind.Superscript)
+        {
+            var editor = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
+            if (editor != null)
+                HandleSubSupShortcut(editor, kind);
             return;
         }
 

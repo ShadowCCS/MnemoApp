@@ -154,30 +154,28 @@
                     Foreground="{DynamicResource TextPrimaryBrush}" />
             </Button>
 
-            <!-- Subscript (placeholder) -->
+            <!-- Subscript -->
             <Button
                 x:Name="SubscriptButton"
                 Classes="FormattingToolbarButton FormattingToolbarIcon"
-                ToolTip.Tip="Subscript (coming soon)"
-                IsEnabled="False"
+                ToolTip.Tip="Subscript (Ctrl+,)"
                 Click="OnSubscriptClick">
                 <controls:SvgIcon
                     Width="16" Height="16"
                     SvgPath="avares://Mnemo.UI/Icons/FormattingToolbar/subscript.svg"
-                    Color="{DynamicResource TextTertiaryBrush}" />
+                    Color="{DynamicResource TextPrimaryBrush}" />
             </Button>
 
-            <!-- Superscript (placeholder) -->
+            <!-- Superscript -->
             <Button
                 x:Name="SuperscriptButton"
                 Classes="FormattingToolbarButton FormattingToolbarIcon"
-                ToolTip.Tip="Superscript (coming soon)"
-                IsEnabled="False"
+                ToolTip.Tip="Superscript (Ctrl+.)"
                 Click="OnSuperscriptClick">
                 <controls:SvgIcon
                     Width="16" Height="16"
                     SvgPath="avares://Mnemo.UI/Icons/FormattingToolbar/superscript.svg"
-                    Color="{DynamicResource TextTertiaryBrush}" />
+                    Color="{DynamicResource TextPrimaryBrush}" />
             </Button>
         </StackPanel>
     </Border>

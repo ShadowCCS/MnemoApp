@@ -12,13 +12,18 @@ public sealed class PersistentFlashcardDeckService : IFlashcardDeckService
 
     private readonly IStorageProvider _storageProvider;
     private readonly ILoggerService _logger;
+    private readonly IFlashcardSchedulerResolver _schedulerResolver;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private FlashcardState? _state;
 
-    public PersistentFlashcardDeckService(IStorageProvider storageProvider, ILoggerService logger)
+    public PersistentFlashcardDeckService(
+        IStorageProvider storageProvider,
+        ILoggerService logger,
+        IFlashcardSchedulerResolver schedulerResolver)
     {
         _storageProvider = storageProvider;
         _logger = logger;
+        _schedulerResolver = schedulerResolver;
     }
 
     /// <inheritdoc />
@@ -33,6 +38,31 @@ public sealed class PersistentFlashcardDeckService : IFlashcardDeckService
     {
         var state = await GetStateAsync(cancellationToken).ConfigureAwait(false);
         return state.Folders.Select(f => f with { }).ToArray();
+    }
+
+    /// <inheritdoc />
+    public async Task SaveFolderAsync(FlashcardFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var state = await GetStateCoreAsync(cancellationToken).ConfigureAwait(false);
+            var index = state.Folders.FindIndex(f => string.Equals(f.Id, folder.Id, StringComparison.Ordinal));
+            var snapshot = folder with { };
+            if (index >= 0)
+                state.Folders[index] = snapshot;
+            else
+                state.Folders.Add(snapshot);
+
+            await PersistStateCoreAsync(state).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     /// <inheritdoc />
@@ -87,13 +117,14 @@ public sealed class PersistentFlashcardDeckService : IFlashcardDeckService
             var deck = state.Decks[deckIndex];
             var cards = deck.Cards.ToDictionary(c => c.Id, StringComparer.Ordinal);
 
-            if (sessionResult.SessionConfig.SessionType != FlashcardSessionType.Cram)
+            if (sessionResult.SessionConfig.SessionType == FlashcardSessionType.Review)
             {
+                var scheduler = _schedulerResolver.Resolve(deck.SchedulingAlgorithm);
                 foreach (var result in sessionResult.CardResults)
                 {
                     if (!cards.TryGetValue(result.CardId, out var card))
                         continue;
-                    cards[result.CardId] = FlashcardScheduling.ApplyGrade(card, result.Grade, result.ReviewedAt);
+                    cards[result.CardId] = scheduler.ApplyGrade(card, result.Grade, result.ReviewedAt);
                 }
             }
 
@@ -171,6 +202,29 @@ public sealed class PersistentFlashcardDeckService : IFlashcardDeckService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<bool> DeleteFolderAsync(string folderId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var state = await GetStateCoreAsync(cancellationToken).ConfigureAwait(false);
+            var index = state.Folders.FindIndex(f => string.Equals(f.Id, folderId, StringComparison.Ordinal));
+            if (index < 0)
+                return false;
+
+            state.Folders.RemoveAt(index);
+            await PersistStateCoreAsync(state).ConfigureAwait(false);
+            return true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     private async Task<FlashcardState> GetStateAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -221,9 +275,9 @@ public sealed class PersistentFlashcardDeckService : IFlashcardDeckService
     {
         var folders = new List<FlashcardFolder>
         {
-            new("f1", "Languages"),
-            new("f2", "Computer Science"),
-            new("f3", "Medical")
+            new("f1", "Languages", null, 0),
+            new("f2", "Computer Science", null, 1),
+            new("f3", "Medical", null, 2)
         };
 
         var day = TimeSpan.FromDays(1);
@@ -233,19 +287,86 @@ public sealed class PersistentFlashcardDeckService : IFlashcardDeckService
                 "d1",
                 "Spanish Vocabulary",
                 "f1",
+                null,
                 new[] { "spanish", "vocab" },
                 now - day,
                 85,
                 new Flashcard[]
                 {
-                    new("c1", "d1", "El gato", "The cat", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
-                    new("c2", "d1", "El perro", "The dog", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
-                    new("c3", "d1", "La casa", "The house", FlashcardType.Classic, Array.Empty<string>(), now + day, null, null, null)
-                }),
+                    // Animals
+                    new("c1",  "d1", "El gato",        "The cat",          FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c2",  "d1", "El perro",        "The dog",          FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c3",  "d1", "El pájaro",       "The bird",         FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c4",  "d1", "El caballo",      "The horse",        FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c5",  "d1", "El pez",          "The fish",         FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+
+                    // Family
+                    new("c6",  "d1", "La madre",        "The mother",       FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c7",  "d1", "El padre",        "The father",       FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c8",  "d1", "El hermano",      "The brother",      FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c9",  "d1", "La hermana",      "The sister",       FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c10", "d1", "El abuelo",       "The grandfather",  FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+
+                    // Food & Drink
+                    new("c11", "d1", "El pan",          "The bread",        FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c12", "d1", "La manzana",      "The apple",        FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c13", "d1", "El agua",         "The water",        FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c14", "d1", "La leche",        "The milk",         FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c15", "d1", "El café",         "The coffee",       FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c16", "d1", "La naranja",      "The orange",       FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c17", "d1", "El queso",        "The cheese",       FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c18", "d1", "La carne",        "The meat",         FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+
+                    // Places
+                    new("c19", "d1", "La casa",         "The house",        FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c20", "d1", "La escuela",      "The school",       FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c21", "d1", "El hospital",     "The hospital",     FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c22", "d1", "La tienda",       "The shop/store",   FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c23", "d1", "El banco",        "The bank",         FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c24", "d1", "La biblioteca",   "The library",      FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+
+                    // Colors
+                    new("c25", "d1", "Rojo",            "Red",              FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c26", "d1", "Azul",            "Blue",             FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c27", "d1", "Verde",           "Green",            FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c28", "d1", "Amarillo",        "Yellow",           FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c29", "d1", "Negro",           "Black",            FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c30", "d1", "Blanco",          "White",            FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+
+                    // Common Verbs
+                    new("c31", "d1", "Hablar",          "To speak",         FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c32", "d1", "Comer",           "To eat",           FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c33", "d1", "Beber",           "To drink",         FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c34", "d1", "Correr",          "To run",           FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c35", "d1", "Dormir",          "To sleep",         FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c36", "d1", "Trabajar",        "To work",          FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c37", "d1", "Escribir",        "To write",         FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c38", "d1", "Leer",            "To read",          FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+
+                    // Numbers
+                    new("c39", "d1", "Uno",             "One",              FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c40", "d1", "Dos",             "Two",              FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c41", "d1", "Tres",            "Three",            FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c42", "d1", "Cuatro",          "Four",             FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c43", "d1", "Cinco",           "Five",             FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+
+                    // Days of the Week
+                    new("c44", "d1", "El lunes",        "Monday",           FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c45", "d1", "El martes",       "Tuesday",          FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                    new("c46", "d1", "El miércoles",    "Wednesday",        FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c47", "d1", "El jueves",       "Thursday",         FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c48", "d1", "El viernes",      "Friday",           FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+
+                    // Common Adjectives
+                    new("c49", "d1", "Grande",          "Big/Large",        FlashcardType.Classic, Array.Empty<string>(), now,         null, null, null),
+                    new("c50", "d1", "Pequeño",         "Small/Little",     FlashcardType.Classic, Array.Empty<string>(), now + day,   null, null, null),
+                },
+                FlashcardSchedulingAlgorithm.Fsrs),
             new(
                 "d2",
                 "Data Structures",
                 "f2",
+                null,
                 new[] { "cs", "algorithms" },
                 now - TimeSpan.FromDays(2),
                 62,
@@ -254,18 +375,21 @@ public sealed class PersistentFlashcardDeckService : IFlashcardDeckService
                     new("c4", "d2", "What is a Hash Table?", "A data structure that implements an associative array abstract data type, a structure that can map keys to values.", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
                     new("c5", "d2", "Time complexity of Binary Search", "O(log n)", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
                     new("c6", "d2", "{{c1::Quick Sort}} has an average time complexity of O(n log n).", "Quick Sort", FlashcardType.Cloze, Array.Empty<string>(), now, null, null, null)
-                }),
+                },
+                FlashcardSchedulingAlgorithm.Sm2),
             new(
                 "d3",
                 "Anatomy: Bones",
                 "f3",
+                null,
                 new[] { "anatomy", "biology" },
                 null,
                 0,
                 new Flashcard[]
                 {
                     new("c7", "d3", "Longest bone in the human body", "Femur", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null)
-                })
+                },
+                FlashcardSchedulingAlgorithm.Leitner)
         };
 
         return (folders, decks);

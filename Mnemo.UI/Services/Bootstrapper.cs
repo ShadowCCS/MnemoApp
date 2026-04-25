@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Models;
+using Mnemo.Core.Models.Flashcards;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services;
 
@@ -117,6 +118,12 @@ public static class Bootstrapper
         services.AddSingleton<ILearningPathService, LearningPathService>();
         services.AddSingleton<INoteService, NoteService>();
         services.AddSingleton<INoteFolderService, NoteFolderService>();
+        services.AddSingleton(FlashcardFsrsParameters.Default);
+        services.AddSingleton<IFlashcardScheduler, FsrsFlashcardScheduler>();
+        services.AddSingleton<IFlashcardScheduler, Sm2FlashcardScheduler>();
+        services.AddSingleton<IFlashcardScheduler, LeitnerFlashcardScheduler>();
+        services.AddSingleton<IFlashcardScheduler, BaselineFlashcardScheduler>();
+        services.AddSingleton<IFlashcardSchedulerResolver, FlashcardSchedulerResolver>();
         services.AddSingleton<IFlashcardDeckService, PersistentFlashcardDeckService>();
         services.AddSingleton<ISpeechRecognitionService, WhisperSpeechRecognitionService>();
 

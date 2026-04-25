@@ -85,6 +85,28 @@
                                               Width="16" Height="16"
                                               Color="{DynamicResource TextPrimaryBrush}" />
                         </Button>
+                        <Button x:Name="SubscriptButton"
+                                Classes="ghost editor-format FormattingToolbarButton FormattingToolbarIcon"
+                                Classes.FormattingToolbarIconActive="{Binding IsSubscriptActive, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
+                                Padding="8,6"
+                                ToolTip.Tip="Subscript (Ctrl+,)"
+                                Click="OnSubscriptClick"
+                                IsEnabled="{Binding IsToolbarEnabled, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/FormattingToolbar/subscript.svg"
+                                              Width="16" Height="16"
+                                              Color="{DynamicResource TextPrimaryBrush}" />
+                        </Button>
+                        <Button x:Name="SuperscriptButton"
+                                Classes="ghost editor-format FormattingToolbarButton FormattingToolbarIcon"
+                                Classes.FormattingToolbarIconActive="{Binding IsSuperscriptActive, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
+                                Padding="8,6"
+                                ToolTip.Tip="Superscript (Ctrl+.)"
+                                Click="OnSuperscriptClick"
+                                IsEnabled="{Binding IsToolbarEnabled, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/FormattingToolbar/superscript.svg"
+                                              Width="16" Height="16"
+                                              Color="{DynamicResource TextPrimaryBrush}" />
+                        </Button>
                         <Button x:Name="LinkButton"
                                 Classes="ghost"
                                 Padding="8,6"

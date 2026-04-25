@@ -8,13 +8,15 @@ namespace Mnemo.Infrastructure.Services.Flashcards;
 /// </summary>
 public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
 {
+    private readonly IFlashcardSchedulerResolver _schedulerResolver;
     private readonly object _gate = new();
     private readonly List<FlashcardFolder> _folders;
     private readonly List<FlashcardDeck> _decks;
     private readonly List<FlashcardSessionResult> _sessionHistory = new();
 
-    public InMemoryFlashcardDeckService()
+    public InMemoryFlashcardDeckService(IFlashcardSchedulerResolver schedulerResolver)
     {
+        _schedulerResolver = schedulerResolver;
         var now = DateTimeOffset.UtcNow;
         (_folders, _decks) = CreateSeedData(now);
     }
@@ -37,6 +39,24 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
         {
             return Task.FromResult<IReadOnlyList<FlashcardFolder>>(_folders.Select(f => f with { }).ToList());
         }
+    }
+
+    /// <inheritdoc />
+    public Task SaveFolderAsync(FlashcardFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            var index = _folders.FindIndex(f => string.Equals(f.Id, folder.Id, StringComparison.Ordinal));
+            var snapshot = folder with { };
+            if (index >= 0)
+                _folders[index] = snapshot;
+            else
+                _folders.Add(snapshot);
+        }
+
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -83,14 +103,15 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
 
             var existing = _decks[deckIndex];
             var cards = existing.Cards.ToDictionary(c => c.Id, StringComparer.Ordinal);
-            if (sessionResult.SessionConfig.SessionType != FlashcardSessionType.Cram)
+            if (sessionResult.SessionConfig.SessionType == FlashcardSessionType.Review)
             {
+                var scheduler = _schedulerResolver.Resolve(existing.SchedulingAlgorithm);
                 foreach (var result in sessionResult.CardResults)
                 {
                     if (!cards.TryGetValue(result.CardId, out var current))
                         continue;
 
-                    cards[result.CardId] = FlashcardScheduling.ApplyGrade(current, result.Grade, result.ReviewedAt);
+                    cards[result.CardId] = scheduler.ApplyGrade(current, result.Grade, result.ReviewedAt);
                 }
             }
 
@@ -155,13 +176,28 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
         }
     }
 
+    /// <inheritdoc />
+    public Task<bool> DeleteFolderAsync(string folderId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            var index = _folders.FindIndex(f => string.Equals(f.Id, folderId, StringComparison.Ordinal));
+            if (index < 0)
+                return Task.FromResult(false);
+
+            _folders.RemoveAt(index);
+            return Task.FromResult(true);
+        }
+    }
+
     private static (List<FlashcardFolder> Folders, List<FlashcardDeck> Decks) CreateSeedData(DateTimeOffset now)
     {
         var folders = new List<FlashcardFolder>
         {
-            new("f1", "Languages"),
-            new("f2", "Computer Science"),
-            new("f3", "Medical")
+            new("f1", "Languages", null, 0),
+            new("f2", "Computer Science", null, 1),
+            new("f3", "Medical", null, 2)
         };
 
         var day = TimeSpan.FromDays(1);
@@ -171,6 +207,7 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
                 "d1",
                 "Spanish Vocabulary",
                 "f1",
+                null,
                 new[] { "spanish", "vocab" },
                 now - day,
                 85,
@@ -179,11 +216,13 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
                     new("c1", "d1", "El gato", "The cat", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
                     new("c2", "d1", "El perro", "The dog", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
                     new("c3", "d1", "La casa", "The house", FlashcardType.Classic, Array.Empty<string>(), now + day, null, null, null)
-                }),
+                },
+                FlashcardSchedulingAlgorithm.Fsrs),
             new FlashcardDeck(
                 "d2",
                 "Data Structures",
                 "f2",
+                null,
                 new[] { "cs", "algorithms" },
                 now - TimeSpan.FromDays(2),
                 62,
@@ -192,18 +231,21 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
                     new("c4", "d2", "What is a Hash Table?", "A data structure that implements an associative array abstract data type, a structure that can map keys to values.", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
                     new("c5", "d2", "Time complexity of Binary Search", "O(log n)", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
                     new("c6", "d2", "{{c1::Quick Sort}} has an average time complexity of O(n log n).", "Quick Sort", FlashcardType.Cloze, Array.Empty<string>(), now, null, null, null)
-                }),
+                },
+                FlashcardSchedulingAlgorithm.Sm2),
             new FlashcardDeck(
                 "d3",
                 "Anatomy: Bones",
                 "f3",
+                null,
                 new[] { "anatomy", "biology" },
                 null,
                 0,
                 new Flashcard[]
                 {
                     new("c7", "d3", "Longest bone in the human body", "Femur", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null)
-                })
+                },
+                FlashcardSchedulingAlgorithm.Leitner)
         };
 
         return (folders, decks);

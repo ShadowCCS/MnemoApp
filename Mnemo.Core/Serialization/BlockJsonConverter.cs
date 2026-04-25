@@ -175,6 +175,10 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
         if (st.LinkUrl != null)
             writer.WriteString("linkUrl", st.LinkUrl);
         writer.WriteBoolean("suppressAutoLink", st.SuppressAutoLink);
+        if (st.Subscript)
+            writer.WriteBoolean("subscript", true);
+        if (st.Superscript)
+            writer.WriteBoolean("superscript", true);
         writer.WriteEndObject();
     }
 
@@ -342,7 +346,9 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
             Highlight: highlight,
             BackgroundColor: backgroundColor,
             LinkUrl: S("linkUrl"),
-            SuppressAutoLink: B("suppressAutoLink"));
+            SuppressAutoLink: B("suppressAutoLink"),
+            Subscript: B("subscript"),
+            Superscript: B("superscript"));
     }
 
     public override void Write(Utf8JsonWriter writer, Block value, JsonSerializerOptions options)

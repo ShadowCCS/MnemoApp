@@ -24,18 +24,38 @@ public static class FlashcardSessionQueueBuilder
 
         switch (config.SessionType)
         {
+            case FlashcardSessionType.Review:
             case FlashcardSessionType.Quick:
-                cards = cards.Where(c => c.DueDate < now).ToList();
+                cards = cards
+                    .Where(c => c.DueDate <= now)
+                    .OrderBy(c => c.DueDate)
+                    .ThenBy(c => c.Retrievability ?? 0.5d)
+                    .ToList();
                 break;
             case FlashcardSessionType.Focused:
+                cards = cards
+                    .OrderBy(c => c.DueDate <= now ? 0 : 1)
+                    .ThenBy(c => c.DueDate)
+                    .ThenBy(c => c.Retrievability ?? 0.5d)
+                    .ThenBy(c => c.Stability ?? 0d)
+                    .ToList();
                 if (config.CardCount is { } count && count > 0)
                     cards = cards.Take(count).ToList();
                 break;
             case FlashcardSessionType.Cram:
+                cards = cards
+                    .OrderBy(c => c.DueDate <= now ? 0 : 1)
+                    .ThenBy(c => c.DueDate)
+                    .ToList();
                 if (config.Shuffle)
                     Shuffle(cards, random ?? new Random());
                 break;
             case FlashcardSessionType.Test:
+                cards = cards
+                    .OrderBy(c => c.DueDate <= now ? 0 : 1)
+                    .ThenBy(c => c.DueDate)
+                    .ThenBy(c => c.Retrievability ?? 0.5d)
+                    .ToList();
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(config));

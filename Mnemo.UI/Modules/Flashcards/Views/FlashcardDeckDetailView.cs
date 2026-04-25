@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls;
@@ -16,6 +17,9 @@ namespace Mnemo.UI.Modules.Flashcards.Views;
 
 public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChanged
 {
+    private const double RetentionChartMaxBarHeight = 56d;
+    private const double RetentionChartMinVisibleNonZeroHeight = 3d;
+
     private FlashcardDeckDetailViewModel? _viewModel;
     private readonly Dictionary<string, RichEditorBinding> _frontEditorBindings = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RichEditorBinding> _backEditorBindings = new(StringComparer.Ordinal);
@@ -67,8 +71,13 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         }
     }
 
-    public IReadOnlyList<int> RetentionTrendPointsProxy =>
-        _viewModel is null ? Array.Empty<int>() : _viewModel.RetentionTrendPoints;
+    public IReadOnlyList<FlashcardRetentionTrendPoint> RetentionTrendPointsProxy =>
+        _viewModel is null ? Array.Empty<FlashcardRetentionTrendPoint>() : _viewModel.RetentionTrendPoints;
+
+    public IReadOnlyList<RetentionTrendBarPoint> RetentionTrendBarsProxy =>
+        _viewModel is null
+            ? Array.Empty<RetentionTrendBarPoint>()
+            : BuildRetentionTrendBars(_viewModel.RetentionTrendPoints);
 
     public IAsyncRelayCommand? DeleteCardCommandProxy => _viewModel?.DeleteCardCommand;
 
@@ -90,14 +99,26 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
             return;
 
         if (_viewModel is not null)
+        {
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _viewModel.RetentionTrendPoints.CollectionChanged -= OnRetentionTrendPointsChanged;
+        }
 
         _viewModel = next;
 
         if (_viewModel is not null)
+        {
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _viewModel.RetentionTrendPoints.CollectionChanged += OnRetentionTrendPointsChanged;
+        }
 
         RaiseAllProxyPropertiesChanged();
+    }
+
+    private void OnRetentionTrendPointsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RaisePropertyChanged(nameof(RetentionTrendPointsProxy));
+        RaisePropertyChanged(nameof(RetentionTrendBarsProxy));
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -147,6 +168,7 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         RaisePropertyChanged(nameof(EditorBackSpansProxy));
         RaisePropertyChanged(nameof(EditorTagsProxy));
         RaisePropertyChanged(nameof(RetentionTrendPointsProxy));
+        RaisePropertyChanged(nameof(RetentionTrendBarsProxy));
         RaisePropertyChanged(nameof(DeleteCardCommandProxy));
         RaisePropertyChanged(nameof(CancelEditCommandProxy));
     }
@@ -331,6 +353,37 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         }
     }
 
+    private static IReadOnlyList<RetentionTrendBarPoint> BuildRetentionTrendBars(IReadOnlyList<FlashcardRetentionTrendPoint> values)
+    {
+        if (values.Count == 0)
+            return Array.Empty<RetentionTrendBarPoint>();
+
+        var latestReviewedIndex = -1;
+        for (var i = values.Count - 1; i >= 0; i--)
+        {
+            if (values[i].ReviewsCount > 0)
+            {
+                latestReviewedIndex = i;
+                break;
+            }
+        }
+
+        var result = new RetentionTrendBarPoint[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            var hasReviews = values[i].ReviewsCount > 0;
+            var percent = Math.Clamp(values[i].RetentionPercent, 0, 100);
+            var normalizedHeight = (percent / 100d) * RetentionChartMaxBarHeight;
+            var height = hasReviews && percent > 0
+                ? Math.Max(RetentionChartMinVisibleNonZeroHeight, normalizedHeight)
+                : 0d;
+            var isLatest = i == latestReviewedIndex;
+            result[i] = new RetentionTrendBarPoint(height, percent, values[i].ReviewsCount, hasReviews, isLatest);
+        }
+
+        return result;
+    }
+
     private sealed class RichEditorBinding
     {
         public RichEditorBinding(RichDocumentEditor editor, string cardId, FlashcardEditorField field)
@@ -345,4 +398,6 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         public FlashcardEditorField Field { get; }
         public Action<IReadOnlyList<InlineSpan>>? Handler { get; set; }
     }
+
+    public sealed record RetentionTrendBarPoint(double Height, int Percent, int ReviewsCount, bool HasReviews, bool IsLatest);
 }

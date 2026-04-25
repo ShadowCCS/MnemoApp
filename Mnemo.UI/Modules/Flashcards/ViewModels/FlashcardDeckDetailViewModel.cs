@@ -54,6 +54,8 @@ public enum FlashcardEditorField
 
 public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAware
 {
+    private const int RetentionTrendWindowDays = 14;
+
     private static readonly Regex ClozeOrdinalPattern = new(@"\{\{c(\d+)::", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly Regex ClozeContentPattern = new(@"\{\{c\d+::(.*?)}}", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
@@ -67,6 +69,7 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
     private string? _studyLauncherOverlayId;
     private bool _isLoadingDeck;
     private bool _isSyncingEditorFromSelection;
+    private FlashcardSchedulingAlgorithm _deckSchedulingAlgorithm = FlashcardSchedulingAlgorithm.Fsrs;
     private CancellationTokenSource? _deckAutosaveCts;
     private CancellationTokenSource? _cardAutosaveCts;
 
@@ -98,9 +101,6 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
     private double _focusedTimeLimitSlider = 20;
 
     [ObservableProperty]
-    private FlashcardTestGradingMode _testGradingMode = FlashcardTestGradingMode.Exact;
-
-    [ObservableProperty]
     private int _totalCardsCount;
 
     [ObservableProperty]
@@ -108,6 +108,9 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
 
     [ObservableProperty]
     private int _retentionPercent;
+
+    [ObservableProperty]
+    private string _retentionTrendDeltaText = string.Empty;
 
     [ObservableProperty]
     private string? _expandedCardId;
@@ -130,9 +133,60 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
     public bool IsEditorBackEditable => !IsEditorClozeType;
 
     public ObservableCollection<Flashcard> Cards { get; } = new();
-    public ObservableCollection<int> RetentionTrendPoints { get; } = new();
+    public ObservableCollection<FlashcardRetentionTrendPoint> RetentionTrendPoints { get; } = new();
 
     public string LocalizedCardDue => _localization.T("CardDue", "Flashcards");
+
+    public bool HasRetentionTrendData => RetentionTrendPoints.Any(point => point.ReviewsCount > 0);
+
+    public string RetentionTrendSummaryPercentText
+    {
+        get
+        {
+            var activePoints = GetActiveRetentionTrendPoints().ToList();
+            if (activePoints.Count == 0)
+                return "--";
+
+            var average = (int)Math.Round(
+                activePoints.Average(point => point.RetentionPercent),
+                MidpointRounding.AwayFromZero);
+            return string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                "{0}%",
+                average);
+        }
+    }
+
+    public string RetentionTrendSummaryLabel =>
+        HasRetentionTrendData
+            ? _localization.T("RetentionTrendSummaryAverage", "Flashcards")
+            : _localization.T("RetentionTrendSummaryEmpty", "Flashcards");
+
+    public string RetentionTrendActivityText
+    {
+        get
+        {
+            var activeDays = GetActiveRetentionTrendPoints().Count();
+            return activeDays switch
+            {
+                0 => string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    _localization.T("RetentionTrendActivityNone", "Flashcards"),
+                    RetentionTrendWindowDays),
+                1 => string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    _localization.T("RetentionTrendActivitySingle", "Flashcards"),
+                    RetentionTrendWindowDays),
+                _ => string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    _localization.T("RetentionTrendActivityPlural", "Flashcards"),
+                    activeDays,
+                    RetentionTrendWindowDays)
+            };
+        }
+    }
+
+    public string RetentionTrendEmptyStateText => _localization.T("RetentionTrendEmptyState", "Flashcards");
 
     /// <summary>Front source for markdown preview in the card editor (cloze → hidden blanks).</summary>
     public string EditorFrontPreviewMarkdown =>
@@ -152,6 +206,8 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
 
     public IRelayCommand CloseStudyLauncherCommand { get; }
 
+    public IRelayCommand StartReviewSessionCommand { get; }
+
     public IRelayCommand StartQuickSessionCommand { get; }
 
     public IRelayCommand StartFocusedSessionCommand { get; }
@@ -165,6 +221,8 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
     public IAsyncRelayCommand DuplicateDeckCommand { get; }
 
     public IRelayCommand RenameDeckCommand { get; }
+
+    public IRelayCommand OpenDeckSettingsCommand { get; }
 
     public IRelayCommand CancelEditCommand { get; }
 
@@ -186,10 +244,6 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
 
     public IRelayCommand SelectFocusedTimeLimitModeCommand { get; }
 
-    public IRelayCommand SelectExactTestGradingModeCommand { get; }
-
-    public IRelayCommand SelectAiTestGradingModeCommand { get; }
-
     public IRelayCommand SetEditorClassicTypeCommand { get; }
 
     public IRelayCommand SetEditorClozeTypeCommand { get; }
@@ -208,6 +262,8 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
         GoBackCommand = new RelayCommand(() => _navigation.NavigateTo("flashcards"));
         OpenStudyLauncherCommand = new RelayCommand(OpenStudyLauncher);
         CloseStudyLauncherCommand = new RelayCommand(CloseStudyLauncher);
+        StartReviewSessionCommand = new RelayCommand(() => StartPractice(new FlashcardSessionConfig(
+            FlashcardSessionType.Review, _deckId, null, null, false, null)));
         StartQuickSessionCommand = new RelayCommand(() => StartPractice(new FlashcardSessionConfig(
             FlashcardSessionType.Quick, _deckId, null, null, false, null)));
         StartFocusedSessionCommand = new RelayCommand(() => StartPractice(new FlashcardSessionConfig(
@@ -220,10 +276,11 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
         StartCramSessionCommand = new RelayCommand(() => StartPractice(new FlashcardSessionConfig(
             FlashcardSessionType.Cram, _deckId, null, null, CramShuffle, null)));
         StartTestSessionCommand = new RelayCommand(() => StartPractice(new FlashcardSessionConfig(
-            FlashcardSessionType.Test, _deckId, null, null, false, TestGradingMode)));
+            FlashcardSessionType.Test, _deckId, null, null, false, null)));
         AddCardCommand = new RelayCommand(AddCard);
         DuplicateDeckCommand = new AsyncRelayCommand(DuplicateDeckAsync);
         RenameDeckCommand = new RelayCommand(OpenRenameDeckDialog);
+        OpenDeckSettingsCommand = new RelayCommand(() => _ = OpenDeckSettingsAsync());
         CancelEditCommand = new RelayCommand(RevertEdit);
         RevertEditCommand = new RelayCommand(RevertEdit);
         SaveAndAddCardCommand = new RelayCommand(SaveAndAddCard);
@@ -234,8 +291,6 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
         CloseExpandedCardCommand = new RelayCommand(CommitAndCollapse);
         SelectFocusedCardCountModeCommand = new RelayCommand(() => FocusedUseTimeLimit = false);
         SelectFocusedTimeLimitModeCommand = new RelayCommand(() => FocusedUseTimeLimit = true);
-        SelectExactTestGradingModeCommand = new RelayCommand(() => TestGradingMode = FlashcardTestGradingMode.Exact);
-        SelectAiTestGradingModeCommand = new RelayCommand(() => TestGradingMode = FlashcardTestGradingMode.Ai);
         SetEditorClassicTypeCommand = new RelayCommand(() => EditorCardType = FlashcardType.Classic);
         SetEditorClozeTypeCommand = new RelayCommand(() => EditorCardType = FlashcardType.Cloze);
 
@@ -511,6 +566,7 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
         {
             _isLoadingDeck = true;
             DeckName = deck.Name;
+            _deckSchedulingAlgorithm = deck.SchedulingAlgorithm;
             RetentionPercent = deck.RetentionScore;
             Cards.Clear();
             foreach (var c in deck.Cards)
@@ -518,6 +574,8 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
             SelectedCard = null;
             ExpandedCardId = null;
             RefreshCardStats();
+            OnPropertyChanged(nameof(CurrentSchedulingEngineLabel));
+            OnPropertyChanged(nameof(ReviewSessionDescription));
             _ = LoadRetentionTrendAsync();
             _isLoadingDeck = false;
         });
@@ -525,8 +583,9 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
 
     private void RefreshCardStats()
     {
+        var now = DateTimeOffset.UtcNow;
         TotalCardsCount = Cards.Count;
-        DueTodayCount = Cards.Count(c => c.DueDate.LocalDateTime.Date <= DateTime.Today);
+        DueTodayCount = Cards.Count(c => c.DueDate <= now);
     }
 
     private void StartPractice(FlashcardSessionConfig config)
@@ -579,10 +638,12 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
             _deckId,
             DeckName,
             existing?.FolderId,
+            existing?.Description,
             existing?.Tags ?? Array.Empty<string>(),
             existing?.LastStudied,
             existing?.RetentionScore ?? 0,
-            (cardsOverride ?? Cards).ToArray()));
+            (cardsOverride ?? Cards).ToArray(),
+            existing?.SchedulingAlgorithm ?? FlashcardSchedulingAlgorithm.Fsrs));
     }
 
     private void AddCard()
@@ -842,6 +903,53 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
         };
     }
 
+    private async Task OpenDeckSettingsAsync()
+    {
+        var deck = await _deckService.GetDeckByIdAsync(_deckId, default).ConfigureAwait(false);
+        if (deck is null)
+            return;
+        var folders = await _deckService.ListFoldersAsync(default).ConfigureAwait(false);
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var overlay = new FlashcardDeckSettingsOverlay
+            {
+                Title = "Deck settings",
+                SaveText = _localization.T("Save", "Common"),
+                CancelText = _localization.T("Cancel", "Common")
+            };
+            overlay.Initialize(deck.Name, deck.SchedulingAlgorithm, deck.FolderId, deck.Description, folders);
+            var overlayId = _overlay.CreateOverlay(overlay, new OverlayOptions
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                ShowBackdrop = true,
+                CloseOnOutsideClick = true,
+                CloseOnEscape = true
+            }, "FlashcardDeckSettings");
+
+            overlay.OnResult = async result =>
+            {
+                _overlay.CloseOverlay(overlayId);
+                if (result is null)
+                    return;
+
+                var refreshed = await _deckService.GetDeckByIdAsync(_deckId, default).ConfigureAwait(false);
+                if (refreshed is null)
+                    return;
+
+                await _deckService.SaveDeckAsync(refreshed with
+                {
+                    SchedulingAlgorithm = result.SchedulingAlgorithm,
+                    FolderId = result.FolderId,
+                    Description = result.Description
+                }).ConfigureAwait(false);
+
+                await LoadDeckAsync().ConfigureAwait(false);
+            };
+        });
+    }
+
     private async Task DuplicateDeckAsync()
     {
         var sourceDeck = await _deckService.GetDeckByIdAsync(_deckId, default).ConfigureAwait(false);
@@ -942,19 +1050,102 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
 
     private async Task LoadRetentionTrendAsync()
     {
-        var points = await _deckService.GetDeckRetentionTrendAsync(_deckId, 14, default).ConfigureAwait(false);
+        var points = await _deckService.GetDeckRetentionTrendAsync(_deckId, RetentionTrendWindowDays, default).ConfigureAwait(false);
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             RetentionTrendPoints.Clear();
             foreach (var point in points)
-                RetentionTrendPoints.Add(point.RetentionPercent);
+                RetentionTrendPoints.Add(point);
+            UpdateRetentionTrendDeltaText();
+            RaiseRetentionTrendStateChanged();
         });
+    }
+
+    private void UpdateRetentionTrendDeltaText()
+    {
+        if (RetentionTrendPoints.Count < 2)
+        {
+            RetentionTrendDeltaText = _localization.T("RetentionTrendDeltaInsufficient", "Flashcards");
+            return;
+        }
+
+        var split = RetentionTrendPoints.Count / 2;
+        if (split == 0 || split >= RetentionTrendPoints.Count)
+        {
+            RetentionTrendDeltaText = _localization.T("RetentionTrendDeltaInsufficient", "Flashcards");
+            return;
+        }
+
+        var previousPoints = RetentionTrendPoints
+            .Take(split)
+            .Where(point => point.ReviewsCount > 0)
+            .ToList();
+        var currentPoints = RetentionTrendPoints
+            .Skip(split)
+            .Where(point => point.ReviewsCount > 0)
+            .ToList();
+
+        if (previousPoints.Count == 0 || currentPoints.Count == 0)
+        {
+            RetentionTrendDeltaText = _localization.T("RetentionTrendDeltaInsufficient", "Flashcards");
+            return;
+        }
+
+        var previousAverage = previousPoints.Average(point => point.RetentionPercent);
+        var currentAverage = currentPoints.Average(point => point.RetentionPercent);
+        var diff = (int)Math.Round(currentAverage - previousAverage, MidpointRounding.AwayFromZero);
+        var absDiff = Math.Abs(diff);
+
+        if (diff > 0)
+        {
+            RetentionTrendDeltaText = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                _localization.T("RetentionTrendDeltaUpFormat", "Flashcards"),
+                absDiff);
+            return;
+        }
+
+        if (diff < 0)
+        {
+            RetentionTrendDeltaText = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                _localization.T("RetentionTrendDeltaDownFormat", "Flashcards"),
+                absDiff);
+            return;
+        }
+
+        RetentionTrendDeltaText = _localization.T("RetentionTrendDeltaFlat", "Flashcards");
+    }
+
+    private IEnumerable<FlashcardRetentionTrendPoint> GetActiveRetentionTrendPoints() =>
+        RetentionTrendPoints.Where(point => point.ReviewsCount > 0);
+
+    private void RaiseRetentionTrendStateChanged()
+    {
+        OnPropertyChanged(nameof(HasRetentionTrendData));
+        OnPropertyChanged(nameof(RetentionTrendSummaryPercentText));
+        OnPropertyChanged(nameof(RetentionTrendSummaryLabel));
+        OnPropertyChanged(nameof(RetentionTrendActivityText));
     }
 
     public string FocusedModeMetricLabel =>
         FocusedUseTimeLimit
             ? _localization.T("FocusedTimeLimit", "Flashcards")
             : _localization.T("FocusedCardCount", "Flashcards");
+
+    public string CurrentSchedulingEngineLabel => _deckSchedulingAlgorithm switch
+    {
+        FlashcardSchedulingAlgorithm.Fsrs => _localization.T("SchedulingEngineSmart", "Flashcards"),
+        FlashcardSchedulingAlgorithm.Sm2 => _localization.T("SchedulingEngineClassic", "Flashcards"),
+        FlashcardSchedulingAlgorithm.Leitner => _localization.T("SchedulingEngineBoxed", "Flashcards"),
+        _ => _localization.T("SchedulingEngineSimple", "Flashcards")
+    };
+
+    public string ReviewSessionDescription =>
+        string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            _localization.T("SessionReviewDescFormat", "Flashcards"),
+            CurrentSchedulingEngineLabel);
 
     public double FocusedSliderMin => FocusedUseTimeLimit ? 5 : 5;
 

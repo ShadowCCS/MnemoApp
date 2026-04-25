@@ -123,6 +123,36 @@ public static class InlineSpanFormatApplier
         return result;
     }
 
+    /// <summary>
+    /// Unconditionally forces <paramref name="subscript"/> and <paramref name="superscript"/> flags
+    /// on all spans within [<paramref name="start"/>, <paramref name="end"/>) without toggling.
+    /// Used to enforce the sticky-typing-mode override on newly inserted characters.
+    /// </summary>
+    public static List<InlineSpan> ForceSubSup(
+        IReadOnlyList<InlineSpan> spans, int start, int end, bool subscript, bool superscript)
+    {
+        if (spans.Count == 0 || start >= end)
+            return new List<InlineSpan>(spans);
+
+        var split = SplitAtBoundaries(spans, start, end);
+        var result = new List<InlineSpan>(split.Count);
+        int offset = 0;
+        foreach (var span in split)
+        {
+            int runEnd = offset + SpanLen(span);
+            bool isInRange = offset < end && runEnd > start;
+            if (isInRange)
+            {
+                var style = GetStyle(span) with { Subscript = subscript, Superscript = superscript };
+                result.Add(SetStyle(span, style));
+            }
+            else
+                result.Add(span);
+            offset = runEnd;
+        }
+        return Normalize(result);
+    }
+
     public static List<InlineSpan> SliceRuns(IReadOnlyList<InlineSpan> spans, int start, int end)
     {
         if (spans.Count == 0 || start >= end)

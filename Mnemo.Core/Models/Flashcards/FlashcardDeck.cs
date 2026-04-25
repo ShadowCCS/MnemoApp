@@ -7,7 +7,9 @@ public sealed record FlashcardDeck(
     string Id,
     string Name,
     string? FolderId,
+    string? Description,
     IReadOnlyList<string> Tags,
     DateTimeOffset? LastStudied,
     int RetentionScore,
-    IReadOnlyList<Flashcard> Cards);
+    IReadOnlyList<Flashcard> Cards,
+    FlashcardSchedulingAlgorithm SchedulingAlgorithm = FlashcardSchedulingAlgorithm.Fsrs);

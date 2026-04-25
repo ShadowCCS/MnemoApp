@@ -113,6 +113,8 @@ public static class NoteClipboardMapper
             Code = eq.Style.Code,
             Highlight = eq.Style.Highlight,
             BackgroundColor = eq.Style.BackgroundColor,
+            Subscript = eq.Style.Subscript,
+            Superscript = eq.Style.Superscript,
             EquationLatex = eq.Latex
         },
         FractionSpan f => new NoteClipboardRunDto
@@ -125,6 +127,8 @@ public static class NoteClipboardMapper
             Code = f.Style.Code,
             Highlight = f.Style.Highlight,
             BackgroundColor = f.Style.BackgroundColor,
+            Subscript = f.Style.Subscript,
+            Superscript = f.Style.Superscript,
             FractionNumerator = f.Numerator,
             FractionDenominator = f.Denominator
         },
@@ -138,6 +142,8 @@ public static class NoteClipboardMapper
             Code = t.Style.Code,
             Highlight = t.Style.Highlight,
             BackgroundColor = t.Style.BackgroundColor,
+            Subscript = t.Style.Subscript,
+            Superscript = t.Style.Superscript,
             EquationLatex = null
         },
         _ => new NoteClipboardRunDto()
@@ -250,7 +256,9 @@ public static class NoteClipboardMapper
             Strikethrough: dto.Strikethrough,
             Code: dto.Code,
             Highlight: dto.Highlight,
-            BackgroundColor: dto.BackgroundColor);
+            BackgroundColor: dto.BackgroundColor,
+            Subscript: dto.Subscript,
+            Superscript: dto.Superscript);
         if (!string.IsNullOrEmpty(dto.EquationLatex))
             return new EquationSpan(dto.EquationLatex, style);
         if (dto.FractionNumerator.HasValue && dto.FractionDenominator.HasValue)

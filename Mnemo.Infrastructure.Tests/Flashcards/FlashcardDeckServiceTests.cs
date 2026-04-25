@@ -10,9 +10,33 @@ namespace Mnemo.Infrastructure.Tests.Flashcards;
 public sealed class FlashcardDeckServiceTests
 {
     [Fact]
-    public async Task InMemory_RecordSessionOutcome_UpdatesDueDateOutsideCram()
+    public async Task InMemory_RecordSessionOutcome_UpdatesDueDateForReview()
     {
-        var service = new InMemoryFlashcardDeckService();
+        var service = new InMemoryFlashcardDeckService(CreateSchedulerResolver());
+        var deck = (await service.ListDecksAsync())[0];
+        var card = deck.Cards[0];
+        var initialDue = card.DueDate;
+        var now = DateTimeOffset.UtcNow;
+
+        var result = new FlashcardSessionResult(
+            deck.Id,
+            new FlashcardSessionConfig(FlashcardSessionType.Review, deck.Id, null, null, false, null),
+            now.AddMinutes(-5),
+            now,
+            new[] { new FlashcardSessionCardResult(card.Id, FlashcardReviewGrade.Good, now) });
+
+        await service.RecordSessionOutcomeAsync(result);
+        var updated = await service.GetDeckByIdAsync(deck.Id);
+
+        Assert.NotNull(updated);
+        var updatedCard = Assert.Single(updated!.Cards, c => c.Id == card.Id);
+        Assert.True(updatedCard.DueDate > initialDue);
+    }
+
+    [Fact]
+    public async Task InMemory_RecordSessionOutcome_DoesNotMutateScheduleForQuickPractice()
+    {
+        var service = new InMemoryFlashcardDeckService(CreateSchedulerResolver());
         var deck = (await service.ListDecksAsync())[0];
         var card = deck.Cards[0];
         var initialDue = card.DueDate;
@@ -30,13 +54,13 @@ public sealed class FlashcardDeckServiceTests
 
         Assert.NotNull(updated);
         var updatedCard = Assert.Single(updated!.Cards, c => c.Id == card.Id);
-        Assert.True(updatedCard.DueDate > initialDue);
+        Assert.Equal(initialDue, updatedCard.DueDate);
     }
 
     [Fact]
     public async Task InMemory_RecordSessionOutcome_DoesNotMutateScheduleForCram()
     {
-        var service = new InMemoryFlashcardDeckService();
+        var service = new InMemoryFlashcardDeckService(CreateSchedulerResolver());
         var deck = (await service.ListDecksAsync())[0];
         var card = deck.Cards[0];
         var initialDue = card.DueDate;
@@ -62,18 +86,19 @@ public sealed class FlashcardDeckServiceTests
         var storage = new InMemoryStorageProvider();
         var logger = new NullLoggerService();
 
-        var serviceA = new PersistentFlashcardDeckService(storage, logger);
+        var schedulerResolver = CreateSchedulerResolver();
+        var serviceA = new PersistentFlashcardDeckService(storage, logger, schedulerResolver);
         var deck = (await serviceA.ListDecksAsync())[0];
         var now = DateTimeOffset.UtcNow;
         var result = new FlashcardSessionResult(
             deck.Id,
-            new FlashcardSessionConfig(FlashcardSessionType.Quick, deck.Id, null, null, false, null),
+            new FlashcardSessionConfig(FlashcardSessionType.Review, deck.Id, null, null, false, null),
             now.AddMinutes(-3),
             now,
             new[] { new FlashcardSessionCardResult(deck.Cards[0].Id, FlashcardReviewGrade.Good, now) });
         await serviceA.RecordSessionOutcomeAsync(result);
 
-        var serviceB = new PersistentFlashcardDeckService(storage, logger);
+        var serviceB = new PersistentFlashcardDeckService(storage, logger, schedulerResolver);
         var reloadedDeck = await serviceB.GetDeckByIdAsync(deck.Id);
         Assert.NotNull(reloadedDeck);
         Assert.True(reloadedDeck!.RetentionScore >= 0);
@@ -111,5 +136,18 @@ public sealed class FlashcardDeckServiceTests
     private sealed class NullLoggerService : ILoggerService
     {
         public void Log(LogLevel level, string category, string message, Exception? exception = null) { }
+    }
+
+    private static IFlashcardSchedulerResolver CreateSchedulerResolver()
+    {
+        var fsrs = new FsrsFlashcardScheduler(FlashcardFsrsParameters.Default);
+        var schedulers = new IFlashcardScheduler[]
+        {
+            fsrs,
+            new Sm2FlashcardScheduler(),
+            new LeitnerFlashcardScheduler(),
+            new BaselineFlashcardScheduler()
+        };
+        return new FlashcardSchedulerResolver(schedulers);
     }
 }

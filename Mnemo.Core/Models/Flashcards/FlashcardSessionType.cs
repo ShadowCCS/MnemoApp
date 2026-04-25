@@ -5,6 +5,7 @@ namespace Mnemo.Core.Models.Flashcards;
 /// </summary>
 public enum FlashcardSessionType
 {
+    Review,
     Quick,
     Focused,
     Cram,

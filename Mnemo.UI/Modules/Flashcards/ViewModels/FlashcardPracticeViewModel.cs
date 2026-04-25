@@ -34,6 +34,7 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private readonly IFlashcardDeckService _deckService;
+    private readonly IFlashcardSchedulerResolver _schedulerResolver;
     private readonly INavigationService _navigation;
     private readonly IOverlayService _overlay;
     private readonly ILocalizationService _localization;
@@ -41,11 +42,15 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     private readonly List<Flashcard> _queue = new();
     private readonly List<FlashcardSessionCardResult> _sessionResults = new();
     private FlashcardSessionConfig _sessionConfig = null!;
+    private FlashcardSchedulingAlgorithm _activeSchedulingAlgorithm = FlashcardSchedulingAlgorithm.Fsrs;
     private string _deckId = string.Empty;
     private DateTimeOffset _sessionStartedAt;
 
     [ObservableProperty]
     private string _deckName = string.Empty;
+
+    [ObservableProperty]
+    private string _folderName = string.Empty;
 
     [ObservableProperty]
     private int _currentIndex;
@@ -86,6 +91,18 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     [ObservableProperty]
     private string _summaryNextDue = "-";
 
+    [ObservableProperty]
+    private int _againCount;
+
+    [ObservableProperty]
+    private int _hardCount;
+
+    [ObservableProperty]
+    private int _goodCount;
+
+    [ObservableProperty]
+    private int _easyCount;
+
     public Flashcard? CurrentCard =>
         _queue.Count > 0 && CurrentIndex >= 0 && CurrentIndex < _queue.Count
             ? _queue[CurrentIndex]
@@ -109,6 +126,10 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     public bool ShowEmptyQueue => IsSessionComplete && _queue.Count == 0;
 
     public bool ShowSummary => IsSessionComplete && _queue.Count > 0;
+
+    public bool ShowCorrectIncorrectSummary => ShowSummary && !ShowGradeDistributionSummary;
+
+    public bool ShowGradeDistributionSummary => ShowSummary && _sessionConfig?.SessionType is FlashcardSessionType.Review or FlashcardSessionType.Focused or FlashcardSessionType.Cram;
 
     public bool ShowActivePractice => !IsSessionComplete && _queue.Count > 0;
 
@@ -144,7 +165,11 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
 
     public bool HasBackImages => CurrentBackImages.Count > 0;
 
-    public int CardsReviewed => CorrectCount + IncorrectCount;
+    public int CardsReviewed => UsesFullGradeCounts
+        ? AgainCount + HardCount + GoodCount + EasyCount
+        : CorrectCount + IncorrectCount;
+
+    public bool IsReviewSession => _sessionConfig?.SessionType == FlashcardSessionType.Review;
 
     public bool IsQuickSession => _sessionConfig?.SessionType == FlashcardSessionType.Quick;
 
@@ -155,7 +180,18 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     public bool IsTestSession => _sessionConfig?.SessionType == FlashcardSessionType.Test;
 
     public bool ShowFullGrades =>
-        _sessionConfig?.SessionType is FlashcardSessionType.Focused or FlashcardSessionType.Cram;
+        _sessionConfig?.SessionType is FlashcardSessionType.Review or FlashcardSessionType.Focused or FlashcardSessionType.Cram;
+
+    private bool UsesFullGradeCounts =>
+        _sessionConfig?.SessionType is FlashcardSessionType.Review or FlashcardSessionType.Focused or FlashcardSessionType.Cram;
+
+    public string SchedulingEngineLabel => _activeSchedulingAlgorithm switch
+    {
+        FlashcardSchedulingAlgorithm.Fsrs => _localization.T("SchedulingEngineSmart", "Flashcards"),
+        FlashcardSchedulingAlgorithm.Sm2 => _localization.T("SchedulingEngineClassic", "Flashcards"),
+        FlashcardSchedulingAlgorithm.Leitner => _localization.T("SchedulingEngineBoxed", "Flashcards"),
+        _ => _localization.T("SchedulingEngineSimple", "Flashcards")
+    };
 
     public IRelayCommand FlipCommand { get; }
 
@@ -189,11 +225,13 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
 
     public FlashcardPracticeViewModel(
         IFlashcardDeckService deckService,
+        IFlashcardSchedulerResolver schedulerResolver,
         INavigationService navigation,
         IOverlayService overlay,
         ILocalizationService localization)
     {
         _deckService = deckService;
+        _schedulerResolver = schedulerResolver;
         _navigation = navigation;
         _overlay = overlay;
         _localization = localization;
@@ -225,6 +263,7 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
 
         _deckId = p.DeckId;
         _sessionConfig = p.SessionConfig;
+        OnPropertyChanged(nameof(IsReviewSession));
         OnPropertyChanged(nameof(IsQuickSession));
         OnPropertyChanged(nameof(IsFocusedSession));
         OnPropertyChanged(nameof(IsCramSession));
@@ -251,6 +290,8 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
             DeckName = deck.Name;
+            FolderName = _localization.T("AllDecks", "Flashcards");
+            _activeSchedulingAlgorithm = deck.SchedulingAlgorithm;
             _queue.Clear();
             _queue.AddRange(built);
             CurrentIndex = 0;
@@ -261,15 +302,34 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
             IncorrectCount = 0;
             _sessionStartedAt = DateTimeOffset.UtcNow;
             _sessionResults.Clear();
+            AgainCount = 0;
+            HardCount = 0;
+            GoodCount = 0;
+            EasyCount = 0;
             NotifyCardUi();
             RefreshCommandStates();
             OnPropertyChanged(nameof(IsTestSession));
+            OnPropertyChanged(nameof(IsReviewSession));
             OnPropertyChanged(nameof(IsQuickSession));
             OnPropertyChanged(nameof(IsFocusedSession));
             OnPropertyChanged(nameof(IsCramSession));
             OnPropertyChanged(nameof(ShowFullGrades));
             OnPropertyChanged(nameof(ShowFlipButton));
+            OnPropertyChanged(nameof(SchedulingEngineLabel));
         });
+
+        if (!string.IsNullOrWhiteSpace(deck.FolderId))
+        {
+            var folders = await _deckService.ListFoldersAsync(default).ConfigureAwait(false);
+            var folder = folders.FirstOrDefault(f => f.Id == deck.FolderId);
+            if (folder != null)
+            {
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    FolderName = folder.Name;
+                });
+            }
+        }
     }
 
     private bool CanFlip() =>
@@ -335,7 +395,25 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         if (CurrentCard == null || !IsFlipped || IsSessionComplete)
             return;
 
-        if (grade is FlashcardReviewGrade.Good or FlashcardReviewGrade.Easy)
+        if (UsesFullGradeCounts)
+        {
+            switch (grade)
+            {
+                case FlashcardReviewGrade.Again:
+                    AgainCount++;
+                    break;
+                case FlashcardReviewGrade.Hard:
+                    HardCount++;
+                    break;
+                case FlashcardReviewGrade.Good:
+                    GoodCount++;
+                    break;
+                case FlashcardReviewGrade.Easy:
+                    EasyCount++;
+                    break;
+            }
+        }
+        else if (grade is FlashcardReviewGrade.Good or FlashcardReviewGrade.Easy)
             CorrectCount++;
         else
             IncorrectCount++;
@@ -386,7 +464,10 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     private void BuildSummary(DateTimeOffset completedAt)
     {
         var reviewed = Math.Max(1, CardsReviewed);
-        var accuracy = (double)CorrectCount / reviewed * 100d;
+        var positive = UsesFullGradeCounts
+            ? GoodCount + EasyCount
+            : CorrectCount;
+        var accuracy = (double)positive / reviewed * 100d;
         SummaryAccuracy = $"{Math.Round(accuracy, MidpointRounding.AwayFromZero):0}%";
 
         var duration = completedAt - _sessionStartedAt;
@@ -395,9 +476,28 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
             : $"{Math.Max(1, Math.Round(duration.TotalSeconds, MidpointRounding.AwayFromZero)):0}s";
 
         var now = DateTimeOffset.UtcNow;
+        var scheduler = _schedulerResolver.Resolve(_activeSchedulingAlgorithm);
+        var cardsById = _queue.ToDictionary(c => c.Id, StringComparer.Ordinal);
         var earliest = _sessionResults
-            .Select(r => FlashcardScheduling.ApplyGrade(CurrentCard ?? new Flashcard(
-                r.CardId, _deckId, string.Empty, string.Empty, FlashcardType.Classic, Array.Empty<string>(), now, 1d, 5d, 0.8d), r.Grade, now).DueDate)
+            .Select(r =>
+            {
+                if (!cardsById.TryGetValue(r.CardId, out var card))
+                {
+                    card = new Flashcard(
+                        r.CardId,
+                        _deckId,
+                        string.Empty,
+                        string.Empty,
+                        FlashcardType.Classic,
+                        Array.Empty<string>(),
+                        now,
+                        2.5d,
+                        5d,
+                        0.8d);
+                }
+
+                return scheduler.ApplyGrade(card, r.Grade, r.ReviewedAt).DueDate;
+            })
             .DefaultIfEmpty(now)
             .Min();
         var delta = earliest - now;
@@ -411,10 +511,11 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         if (CurrentCard is null)
             return;
         var now = DateTimeOffset.UtcNow;
-        NextAgainInterval = FlashcardScheduling.DescribeInterval(CurrentCard, FlashcardReviewGrade.Again, now);
-        NextHardInterval = FlashcardScheduling.DescribeInterval(CurrentCard, FlashcardReviewGrade.Hard, now);
-        NextGoodInterval = FlashcardScheduling.DescribeInterval(CurrentCard, FlashcardReviewGrade.Good, now);
-        NextEasyInterval = FlashcardScheduling.DescribeInterval(CurrentCard, FlashcardReviewGrade.Easy, now);
+        var scheduler = _schedulerResolver.Resolve(_activeSchedulingAlgorithm);
+        NextAgainInterval = scheduler.DescribeInterval(CurrentCard, FlashcardReviewGrade.Again, now);
+        NextHardInterval = scheduler.DescribeInterval(CurrentCard, FlashcardReviewGrade.Hard, now);
+        NextGoodInterval = scheduler.DescribeInterval(CurrentCard, FlashcardReviewGrade.Good, now);
+        NextEasyInterval = scheduler.DescribeInterval(CurrentCard, FlashcardReviewGrade.Easy, now);
     }
 
     private void NotifyCardUi()
@@ -433,6 +534,8 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         OnPropertyChanged(nameof(HasBackImages));
         OnPropertyChanged(nameof(ShowEmptyQueue));
         OnPropertyChanged(nameof(ShowSummary));
+        OnPropertyChanged(nameof(ShowCorrectIncorrectSummary));
+        OnPropertyChanged(nameof(ShowGradeDistributionSummary));
         OnPropertyChanged(nameof(ShowActivePractice));
         OnPropertyChanged(nameof(ShowFlipButton));
         OnPropertyChanged(nameof(ShowQuickGrades));

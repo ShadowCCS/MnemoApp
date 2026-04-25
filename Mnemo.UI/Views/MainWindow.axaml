@@ -15,10 +15,12 @@
         Icon="{Binding AppIconPath, Converter={x:Static converters:PathToWindowIconConverter.Instance}}"
         Title="{markup:T Ns=App, Key=AppTitle}"
         WindowStartupLocation="CenterScreen"
-        SystemDecorations="None"
+        SystemDecorations="Full"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
         CanMinimize="True"
         CanResize="True"
-        Background="transparent">
+        Background="{DynamicResource WorkspaceBackgroundBrush}">
 
 <Border CornerRadius="8" Background="{DynamicResource WorkspaceBackgroundBrush}" ClipToBounds="True">
     <Grid>

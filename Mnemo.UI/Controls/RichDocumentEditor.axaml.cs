@@ -9,6 +9,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using Avalonia.Platform.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -119,6 +120,10 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
     public bool IsUnderlineActive { get; private set; }
     public bool IsStrikethroughActive { get; private set; }
     public bool IsHighlightActive { get; private set; }
+    public bool IsSubscriptActive { get; private set; }
+    public bool IsSuperscriptActive { get; private set; }
+
+    private InlineFormatKind? _stickySubSup;
 
     public bool CanInsertImage { get; private set; } = true;
 
@@ -343,6 +348,13 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
         if (IsPreviewMode)
             return;
 
+        if (e.Key == Key.Escape && _stickySubSup != null)
+        {
+            ClearStickySubSup();
+            e.Handled = true;
+            return;
+        }
+
         if (!IsReadOnly
             && e.Key == Key.Enter
             && (e.KeyModifiers & KeyModifiers.Control) == 0
@@ -412,6 +424,25 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
+        // Ctrl+, = Subscript, Ctrl+. = Superscript (sticky toggle mode when no selection).
+        if (e.Key == Key.OemComma || e.Key == Key.OemPeriod)
+        {
+            var subSupKind = e.Key == Key.OemComma ? InlineFormatKind.Subscript : InlineFormatKind.Superscript;
+            HandleSubSupShortcut(subSupKind);
+            e.Handled = true;
+            return;
+        }
+
+        // Clear sticky sub/sup on navigation.
+        if (IsNavigationKey(e.Key))
+        {
+            bool isRight = e.Key == Key.Right;
+            if (_stickySubSup != null)
+                ClearStickySubSup();
+            if (isRight)
+                Editor?.SetPendingSubSup(false, false);
+        }
+
         switch (e.Key)
         {
             case Key.B:
@@ -440,6 +471,8 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
 
     private void OnEditorPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_stickySubSup != null)
+            ClearStickySubSup();
         Dispatcher.UIThread.Post(UpdateToolbarFormatState, DispatcherPriority.Input);
     }
 
@@ -455,9 +488,45 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
 
     private void OnHighlightClick(object? sender, RoutedEventArgs e) => ApplyInlineFormat(InlineFormatKind.Highlight, ResolveHighlightColor());
 
+    private void OnSubscriptClick(object? sender, RoutedEventArgs e) => HandleSubSupShortcut(InlineFormatKind.Subscript);
+
+    private void OnSuperscriptClick(object? sender, RoutedEventArgs e) => HandleSubSupShortcut(InlineFormatKind.Superscript);
+
     private void OnWriteModeClick(object? sender, RoutedEventArgs e) => IsPreviewMode = false;
 
     private void OnPreviewModeClick(object? sender, RoutedEventArgs e) => IsPreviewMode = true;
+
+    private void HandleSubSupShortcut(InlineFormatKind kind)
+    {
+        var range = GetSelectionRange();
+        if (range != null)
+        {
+            ClearStickySubSup();
+            ApplyInlineFormatToRange(range.Value.Start, range.Value.End, kind, null, preserveSelection: true);
+            return;
+        }
+
+        var newKind = _stickySubSup == kind ? (InlineFormatKind?)null : kind;
+        _stickySubSup = newKind;
+        if (newKind == InlineFormatKind.Subscript)
+            Editor?.SetPendingSubSup(true, false);
+        else if (newKind == InlineFormatKind.Superscript)
+            Editor?.SetPendingSubSup(false, true);
+        else
+            Editor?.SetPendingSubSup(null, null);
+        Dispatcher.UIThread.Post(UpdateToolbarFormatState, DispatcherPriority.Input);
+    }
+
+    private void ClearStickySubSup()
+    {
+        if (_stickySubSup == null) return;
+        _stickySubSup = null;
+        Editor?.SetPendingSubSup(null, null);
+        Dispatcher.UIThread.Post(UpdateToolbarFormatState, DispatcherPriority.Input);
+    }
+
+    private static bool IsNavigationKey(Key key) =>
+        key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End;
 
     private async void OnLinkClick(object? sender, RoutedEventArgs e) => await EditLinkAsync();
 
@@ -1101,7 +1170,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
         if (clipboard == null)
             return;
 
-        var text = await clipboard.GetTextAsync().ConfigureAwait(true);
+        var text = await clipboard.TryGetTextAsync().ConfigureAwait(true);
         if (string.IsNullOrEmpty(text))
             return;
 
@@ -1141,43 +1210,49 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
         if (selectionEnd > selectionStart)
         {
             var selectedState = GetFormatStateForRange(textOnlySpans, selectionStart, selectionEnd);
-            SetToolbarFormatState(selectedState.Bold, selectedState.Italic, selectedState.Underline, selectedState.Strikethrough, selectedState.Highlight);
+            bool subSel = _stickySubSup == InlineFormatKind.Subscript || selectedState.Subscript;
+            bool supSel = _stickySubSup == InlineFormatKind.Superscript || selectedState.Superscript;
+            SetToolbarFormatState(selectedState.Bold, selectedState.Italic, selectedState.Underline, selectedState.Strikethrough, selectedState.Highlight, subSel, supSel);
             return;
         }
 
         var caretState = GetFormatStateAtCaret(textOnlySpans, Math.Clamp(Editor.CaretIndex, 0, Editor.TextLength));
-        SetToolbarFormatState(caretState.Bold, caretState.Italic, caretState.Underline, caretState.Strikethrough, caretState.Highlight);
+        bool subCaret = _stickySubSup == InlineFormatKind.Subscript || caretState.Subscript;
+        bool supCaret = _stickySubSup == InlineFormatKind.Superscript || caretState.Superscript;
+        SetToolbarFormatState(caretState.Bold, caretState.Italic, caretState.Underline, caretState.Strikethrough, caretState.Highlight, subCaret, supCaret);
     }
 
-    private static (bool Bold, bool Italic, bool Underline, bool Strikethrough, bool Highlight) GetFormatStateAtCaret(
+    private static (bool Bold, bool Italic, bool Underline, bool Strikethrough, bool Highlight, bool Subscript, bool Superscript) GetFormatStateAtCaret(
         IReadOnlyList<InlineSpan> runs,
         int caretIndex)
     {
         var totalLength = InlineSpanFormatApplier.Flatten(runs).Length;
         if (totalLength == 0)
-            return (false, false, false, false, false);
+            return (false, false, false, false, false, false, false);
 
         var start = Math.Clamp(caretIndex - 1, 0, Math.Max(0, totalLength - 1));
         var end = Math.Clamp(start + 1, 0, totalLength);
         if (end <= start)
-            return (false, false, false, false, false);
+            return (false, false, false, false, false, false, false);
 
         return GetFormatStateForRange(runs, start, end);
     }
 
-    private static (bool Bold, bool Italic, bool Underline, bool Strikethrough, bool Highlight) GetFormatStateForRange(
+    private static (bool Bold, bool Italic, bool Underline, bool Strikethrough, bool Highlight, bool Subscript, bool Superscript) GetFormatStateForRange(
         IReadOnlyList<InlineSpan> runs,
         int start,
         int end)
     {
         if (runs.Count == 0 || start >= end)
-            return (false, false, false, false, false);
+            return (false, false, false, false, false, false, false);
 
         var bold = true;
         var italic = true;
         var underline = true;
         var strikethrough = true;
         var highlight = true;
+        var subscript = true;
+        var superscript = true;
         var anyOverlap = false;
         var pos = 0;
 
@@ -1208,17 +1283,21 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
                 strikethrough = false;
             if (!run.Style.Highlight)
                 highlight = false;
+            if (!run.Style.Subscript)
+                subscript = false;
+            if (!run.Style.Superscript)
+                superscript = false;
 
             pos = spanEnd;
         }
 
         if (!anyOverlap)
-            return (false, false, false, false, false);
+            return (false, false, false, false, false, false, false);
 
-        return (bold, italic, underline, strikethrough, highlight);
+        return (bold, italic, underline, strikethrough, highlight, subscript, superscript);
     }
 
-    private void SetToolbarFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight)
+    private void SetToolbarFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight, bool subscript = false, bool superscript = false)
     {
         if (IsBoldActive != bold)
         {
@@ -1248,6 +1327,18 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
         {
             IsHighlightActive = highlight;
             RaisePropertyChanged(nameof(IsHighlightActive));
+        }
+
+        if (IsSubscriptActive != subscript)
+        {
+            IsSubscriptActive = subscript;
+            RaisePropertyChanged(nameof(IsSubscriptActive));
+        }
+
+        if (IsSuperscriptActive != superscript)
+        {
+            IsSuperscriptActive = superscript;
+            RaisePropertyChanged(nameof(IsSuperscriptActive));
         }
     }
 

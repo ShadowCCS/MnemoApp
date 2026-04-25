@@ -18,4 +18,9 @@ public sealed record Flashcard(
     double? Retrievability,
     FlashcardSourceInfo? SourceInfo = null,
     IReadOnlyList<Block>? FrontBlocks = null,
-    IReadOnlyList<Block>? BackBlocks = null);
+    IReadOnlyList<Block>? BackBlocks = null,
+    int? ReviewCount = null,
+    int? LapseCount = null,
+    int? LeitnerBox = null,
+    DateTimeOffset? LastReviewedAt = null,
+    FlashcardFsrsState? FsrsState = null);

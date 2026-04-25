@@ -18,6 +18,11 @@ public interface IFlashcardDeckService
     Task<IReadOnlyList<FlashcardFolder>> ListFoldersAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Creates or updates a folder snapshot.
+    /// </summary>
+    Task SaveFolderAsync(FlashcardFolder folder, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns a deck by id, or <c>null</c> if it does not exist.
     /// </summary>
     Task<FlashcardDeck?> GetDeckByIdAsync(string deckId, CancellationToken cancellationToken = default);
@@ -46,4 +51,9 @@ public interface IFlashcardDeckService
     /// Removes a deck by id. Returns <c>false</c> if the deck was not found.
     /// </summary>
     Task<bool> DeleteDeckAsync(string deckId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a folder by id. Returns <c>false</c> if the folder was not found.
+    /// </summary>
+    Task<bool> DeleteFolderAsync(string folderId, CancellationToken cancellationToken = default);
 }

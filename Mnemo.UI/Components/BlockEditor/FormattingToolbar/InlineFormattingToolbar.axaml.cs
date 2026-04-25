@@ -39,7 +39,7 @@ public partial class InlineFormattingToolbar : UserControl
     }
 
     /// <summary>Updates toggle state of format buttons from the current selection.</summary>
-    public void UpdateFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor, bool hasLink)
+    public void UpdateFormatState(bool bold, bool italic, bool underline, bool strikethrough, bool highlight, string? backgroundColor, bool hasLink, bool subscript = false, bool superscript = false)
     {
         SetButtonActive("BoldButton", bold);
         SetButtonActive("ItalicButton", italic);
@@ -47,6 +47,8 @@ public partial class InlineFormattingToolbar : UserControl
         SetButtonActive("UnlinkButton", hasLink);
         SetButtonActive("StrikethroughButton", strikethrough);
         SetButtonActive("HighlightButton", highlight);
+        SetButtonActive("SubscriptButton", subscript);
+        SetButtonActive("SuperscriptButton", superscript);
         if (this.FindControl<Ellipse>("ColorSwatch") is { } swatch && backgroundColor != null)
         {
             Color newColor = Colors.Transparent;
@@ -208,8 +210,8 @@ public partial class InlineFormattingToolbar : UserControl
     private void OnStrikethroughClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Strikethrough);
     private void OnHighlightClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Highlight);
     private void OnEquationClick(object? sender, RoutedEventArgs e) => EquationRequested?.Invoke();
-    private void OnSubscriptClick(object? sender, RoutedEventArgs e) { }
-    private void OnSuperscriptClick(object? sender, RoutedEventArgs e) { }
+    private void OnSubscriptClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Subscript);
+    private void OnSuperscriptClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Superscript);
 
     private void OnToolbarPointerPressed(object? sender, PointerPressedEventArgs e)
     {

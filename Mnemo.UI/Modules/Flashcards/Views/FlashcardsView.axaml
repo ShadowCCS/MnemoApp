@@ -4,6 +4,8 @@
              xmlns:controls="using:Mnemo.UI.Controls"
              xmlns:markup="using:Mnemo.UI.Markup"
              xmlns:models="using:Mnemo.Core.Models.Flashcards"
+             xmlns:flashcardsVm="using:Mnemo.UI.Modules.Flashcards.ViewModels"
+             xmlns:views="using:Mnemo.UI.Modules.Flashcards.Views"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
@@ -106,20 +108,21 @@
         </Style>
     </UserControl.Styles>
 
-    <SplitView DisplayMode="Inline"
-               IsPaneOpen="{Binding IsSidebarOpen}"
-               OpenPaneLength="280"
-               CompactPaneLength="0"
-               Background="Transparent">
-        <SplitView.Pane>
-            <!-- Library sidebar -->
-            <Border Classes="library-pane">
-                <ScrollViewer>
-                    <StackPanel Margin="16,20,16,16" Spacing="4">
+    <Panel>
+        <SplitView DisplayMode="Inline"
+                   IsPaneOpen="{Binding IsSidebarOpen}"
+                   OpenPaneLength="280"
+                   CompactPaneLength="0"
+                   Background="Transparent">
+            <SplitView.Pane>
+                <!-- Library sidebar -->
+                <Border Classes="library-pane">
+                    <ScrollViewer>
+                        <StackPanel Margin="16,20,16,16" Spacing="4">
                         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,2">
                             <TextBlock Grid.Column="0"
                                        Classes="library-section"
-                                       Text="{markup:T Ns=Flashcards, Key=Folders}" />
+                                       Text="{markup:T Ns=Flashcards, Key=Title}" />
                             <Button Grid.Column="1"
                                     Command="{Binding ToggleSidebarCommand}"
                                     Background="Transparent"
@@ -155,28 +158,40 @@
 
                         <Border Classes="library-divider" />
 
-                        <ItemsControl ItemsSource="{Binding Folders}">
+                        <Grid ColumnDefinitions="*,Auto" Margin="12,4,8,4">
+                            <TextBlock Grid.Column="0"
+                                       Text="{markup:T Ns=Flashcards, Key=Folders}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Column="1"
+                                    Command="{Binding CreateFolderCommand}"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="4"
+                                    ToolTip.Tip="{markup:T Ns=Flashcards, Key=NewFolder}">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder-plus-corner.svg"
+                                                  Width="16"
+                                                  Height="16"
+                                                  Color="{DynamicResource TextSecondaryBrush}" />
+                            </Button>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding FlatFolderItems}">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="models:FlashcardFolder">
-                                    <Button Classes="ghost library-nav"
-                                            Command="{Binding #root.SelectFolderCommandProxy}"
-                                            CommandParameter="{Binding Id}">
-                                        <StackPanel Orientation="Horizontal" Spacing="10">
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
-                                                              Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
-                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </Button>
+                                <DataTemplate x:DataType="flashcardsVm:FlashcardFolderItemViewModel">
+                                    <views:FlashcardFolderRow />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
-        </SplitView.Pane>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </SplitView.Pane>
 
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" ClipToBounds="False">
-            <StackPanel Margin="36,28,36,32" Spacing="28" ClipToBounds="False">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" ClipToBounds="False">
+                <StackPanel Margin="36,28,36,32" Spacing="28" ClipToBounds="False">
 
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                     <Button Grid.Column="0"
@@ -242,9 +257,11 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:FlashcardDeckRowViewModel">
                             <Border Classes="deck-card"
-                                    PointerPressed="OnDeckCardPointerPressed">
+                                    PointerPressed="OnDeckCardPointerPressed"
+                                    PointerMoved="OnDeckCardPointerMoved"
+                                    PointerReleased="OnDeckCardPointerReleased">
                                 <Grid RowDefinitions="Auto,*,Auto">
-                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                         <Grid Grid.Column="0" ColumnDefinitions="Auto,*" ColumnSpacing="8">
                                             <Border Width="24" Height="24"
                                                     Background="{DynamicResource WidgetBackgroundPrimaryBrush}"
@@ -284,6 +301,33 @@
                                                                VerticalAlignment="Center" />
                                                 </StackPanel>
                                             </Border>
+                                        </Button>
+                                        <Button Grid.Column="2"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Padding="4"
+                                                CornerRadius="8">
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/dots-vertical.svg"
+                                                              Width="16" Height="16"
+                                                              Color="{DynamicResource TextSecondaryBrush}" />
+                                            <Button.Flyout>
+                                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=OpenDeck}"
+                                                              Command="{Binding #root.OpenDeckCommandProxy}"
+                                                              CommandParameter="{Binding}" />
+                                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=Practice}"
+                                                              Command="{Binding #root.StartQuickSessionCommandProxy}"
+                                                              CommandParameter="{Binding}" />
+                                                    <MenuItem Header="Settings"
+                                                              Command="{Binding #root.OpenDeckSettingsCommandProxy}"
+                                                              CommandParameter="{Binding}" />
+                                                    <Separator />
+                                                    <MenuItem Classes="danger"
+                                                              Header="{markup:T Ns=Flashcards, Key=DeleteDeck}"
+                                                              Command="{Binding #root.DeleteDeckCommandProxy}"
+                                                              CommandParameter="{Binding}" />
+                                                </MenuFlyout>
+                                            </Button.Flyout>
                                         </Button>
                                     </Grid>
 
@@ -327,7 +371,10 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-            </StackPanel>
-        </ScrollViewer>
-    </SplitView>
+                </StackPanel>
+            </ScrollViewer>
+        </SplitView>
+
+        <Canvas x:Name="DragOverlayCanvas" IsHitTestVisible="False" ZIndex="999" />
+    </Panel>
 </UserControl>

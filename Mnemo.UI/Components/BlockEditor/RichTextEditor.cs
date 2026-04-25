@@ -112,6 +112,15 @@ public class RichTextEditor : Control, ICustomHitTest
     private int _dragAnchor;
     private AutoShortcutUndoState? _pendingAutoShortcutUndo;
 
+    /// <summary>
+    /// When set, the sub/sup flags of this style are forced onto every newly inserted character run,
+    /// overriding style inheritance from adjacent spans. Used for sticky sub/sup typing mode.
+    /// Set <c>null</c> to resume natural style inheritance.
+    /// Set <c>ClearPendingInsertStyleAfterNextInsert = true</c> to auto-clear after one insertion.
+    /// </summary>
+    private Core.Models.TextStyle? _pendingInsertStyle;
+    private bool _clearPendingInsertStyleAfterNextInsert;
+
     private static readonly FontFamily MonoFont =
         new("Cascadia Code, Consolas, Courier New, monospace");
     private static readonly Regex TailFractionTokenRegex = new(@"\\\d+/\d+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -322,6 +331,8 @@ public class RichTextEditor : Control, ICustomHitTest
     private const double MinLayoutWidth = 200;
     /// <summary>Max width when measure is unconstrained; avoids infinite desired size and layout loops.</summary>
     private const double MaxLayoutWidth = 4096;
+    /// <summary>Font size ratio for subscript and superscript text relative to the base font size.</summary>
+    private const double SubSuperscriptFontSizeRatio = 0.75;
 
     /// <summary>
     /// Width for <see cref="BuildLayout"/> / hit-test sync: <see cref="Bounds"/> can still be narrow before the
@@ -474,19 +485,34 @@ public class RichTextEditor : Control, ICustomHitTest
 
                 var background = ResolveInlineBackgroundBrush(style);
 
+                double runFontSize = FontSize;
+                var runBaseline = BaselineAlignment.Baseline;
+                if (style.Subscript)
+                {
+                    runFontSize = FontSize * SubSuperscriptFontSizeRatio;
+                    runBaseline = BaselineAlignment.Subscript;
+                }
+                else if (style.Superscript)
+                {
+                    runFontSize = FontSize * SubSuperscriptFontSizeRatio;
+                    runBaseline = BaselineAlignment.Superscript;
+                }
+
                 var bgProps = new GenericTextRunProperties(
                     runTypeface,
-                    fontRenderingEmSize: FontSize,
+                    fontRenderingEmSize: runFontSize,
                     textDecorations: null,
                     foregroundBrush: Brushes.Transparent,
-                    backgroundBrush: background);
+                    backgroundBrush: background,
+                    baselineAlignment: runBaseline);
 
                 var fgProps = new GenericTextRunProperties(
                     runTypeface,
-                    fontRenderingEmSize: FontSize,
+                    fontRenderingEmSize: runFontSize,
                     textDecorations: decorations,
                     foregroundBrush: runForeground,
-                    backgroundBrush: null);
+                    backgroundBrush: null,
+                    baselineAlignment: runBaseline);
 
                 sb.Append(run.Text);
                 backgroundSpans.Add(new ValueSpan<TextRunProperties>(layoutOffset, run.Text.Length, bgProps));
@@ -816,6 +842,7 @@ public class RichTextEditor : Control, ICustomHitTest
         return new SolidColorBrush(Color.FromArgb(0xCC, 0x46, 0x45, 0x49));
     }
 
+
     // ── Rendering ────────────────────────────────────────────────────────────
 
     public override void Render(DrawingContext context)
@@ -900,6 +927,7 @@ public class RichTextEditor : Control, ICustomHitTest
                 var caretRect = GetCaretRect();
                 context.FillRectangle(caretBrush, caretRect);
             }
+
         }
     }
 
@@ -999,12 +1027,99 @@ public class RichTextEditor : Control, ICustomHitTest
         {
             var layoutIdx = LogicalCaretToLayoutBoundary(_caretIndex);
             var charRect = _textLayout.HitTestTextPosition(layoutIdx);
-            return new Rect(charRect.X, charRect.Y, 1.5, charRect.Height > 0 ? charRect.Height : FontSize);
+            double x = charRect.X;
+            double lineH = charRect.Height > 0 ? charRect.Height : FontSize;
+            double lineY = charRect.Y;
+
+            var (isSub, isSup) = GetCaretSubSupStyle();
+            if (isSub || isSup)
+            {
+                var (subY, subH) = GetSubSupVerticalMetrics(lineY, lineH, isSub, isSup);
+                return new Rect(x, subY, 1.5, subH);
+            }
+            return new Rect(x, lineY, 1.5, lineH);
         }
         catch
         {
             return new Rect(0, 0, 1.5, FontSize);
         }
+    }
+
+    /// <summary>
+    /// Returns whether the caret should render as subscript or superscript.
+    /// <para>
+    /// When a pending insert style is active (sticky mode or escape mode) it takes full priority,
+    /// so the caret immediately reflects the typing mode and correctly shows normal height even right
+    /// after exiting sticky mode while the caret is still inside a sub/sup span.
+    /// </para>
+    /// <para>
+    /// When no pending style is active (plain navigation), the style of the character immediately
+    /// to the left of the caret is used, matching the visual expected from the next keystroke.
+    /// </para>
+    /// </summary>
+    private (bool sub, bool sup) GetCaretSubSupStyle()
+    {
+        if (_pendingInsertStyle.HasValue)
+            return (_pendingInsertStyle.Value.Subscript, _pendingInsertStyle.Value.Superscript);
+
+        // Navigation: reflect the style of the character to the left of the caret.
+        if (_caretIndex <= 0) return (false, false);
+        var spans = Spans;
+        int pos = 0;
+        foreach (var span in spans)
+        {
+            int len = span is Core.Models.TextSpan ts ? ts.Text.Length : 1;
+            int end = pos + len;
+            if (pos < _caretIndex && end >= _caretIndex)
+            {
+                if (span is Core.Models.TextSpan textSpan)
+                    return (textSpan.Style.Subscript, textSpan.Style.Superscript);
+                return (false, false);
+            }
+            pos = end;
+        }
+        return (false, false);
+    }
+
+    /// <summary>
+    /// Computes the Y offset and height for a sub/sup caret or bracket,
+    /// preferring live glyph metrics from the text layout when an actual sub/sup character exists.
+    /// </summary>
+    private (double y, double height) GetSubSupVerticalMetrics(double lineY, double lineH, bool isSub, bool isSup)
+    {
+        double subH = FontSize * SubSuperscriptFontSizeRatio;
+
+        // Try to sample actual glyph metrics from an existing sub/sup run in the layout.
+        if (_textLayout != null)
+        {
+            var spans = Spans;
+            int pos = 0;
+            foreach (var span in spans)
+            {
+                if (span is Core.Models.TextSpan ts && ts.Text.Length > 0)
+                {
+                    bool match = (isSub && ts.Style.Subscript) || (isSup && ts.Style.Superscript);
+                    if (match)
+                    {
+                        try
+                        {
+                            var idx = LogicalCaretToLayoutBoundary(pos);
+                            var rect = _textLayout.HitTestTextPosition(idx);
+                            if (rect.Height > 0 && rect.Height < lineH - 0.5)
+                                return (rect.Y, rect.Height);
+                        }
+                        catch { }
+                    }
+                    pos += ts.Text.Length;
+                }
+                else pos++;
+            }
+        }
+
+        // Fallback: approximate from line proportions.
+        if (isSup)
+            return (lineY, subH);
+        return (lineY + lineH - subH, subH);
     }
 
     // ── Caret timer ──────────────────────────────────────────────────────────
@@ -1374,6 +1489,19 @@ public class RichTextEditor : Control, ICustomHitTest
             _pendingAutoShortcutUndo = null;
 
         IReadOnlyList<InlineSpan> runs = Core.Formatting.InlineSpanFormatApplier.ApplyTextEdit(currentRuns, oldFlat, newFlat);
+
+        // Sticky sub/sup mode: force the desired flags on the inserted character range.
+        if (_pendingInsertStyle is { } pending && text.Length > 0 && newCaret > start)
+        {
+            runs = Core.Formatting.InlineSpanFormatApplier.ForceSubSup(
+                runs, start, newCaret, pending.Subscript, pending.Superscript);
+            if (_clearPendingInsertStyleAfterNextInsert)
+            {
+                _pendingInsertStyle = null;
+                _clearPendingInsertStyleAfterNextInsert = false;
+            }
+        }
+
         if (TryPromoteFractionAtCaret(runs, newCaret, out var fractionRuns, out var fractionCaret))
         {
             runs = fractionRuns;
@@ -1468,6 +1596,40 @@ public class RichTextEditor : Control, ICustomHitTest
 
     /// <summary>Inserts text at the caret (replacing selection), same as typed input.</summary>
     public void InsertTextAtCaret(string text) => InsertText(text);
+
+    /// <summary>
+    /// Activates sticky sub/sup typing mode: subsequent insertions are forced to
+    /// <paramref name="subscript"/>/<paramref name="superscript"/> regardless of adjacent span style.
+    /// Pass both <c>false</c> to escape from an active sub/sup span (disables one insertion then auto-clears).
+    /// Pass <c>null</c> to fully disable the override and resume natural style inheritance.
+    /// </summary>
+    internal void SetPendingSubSup(bool? subscript, bool? superscript)
+    {
+        if (subscript == null && superscript == null)
+        {
+            _pendingInsertStyle = null;
+            _clearPendingInsertStyleAfterNextInsert = false;
+            InvalidateVisual();
+            return;
+        }
+
+        bool sub = subscript ?? false;
+        bool sup = superscript ?? false;
+
+        if (!sub && !sup)
+        {
+            // Escape mode: force-clear sub/sup for exactly one insertion, then return to natural.
+            _pendingInsertStyle = Core.Models.TextStyle.Default;
+            _clearPendingInsertStyleAfterNextInsert = true;
+            InvalidateVisual();
+        }
+        else
+        {
+            _pendingInsertStyle = new Core.Models.TextStyle(Subscript: sub, Superscript: sup);
+            _clearPendingInsertStyleAfterNextInsert = false;
+            InvalidateVisual();
+        }
+    }
 
     // ── Run mutation helpers ─────────────────────────────────────────────────
 

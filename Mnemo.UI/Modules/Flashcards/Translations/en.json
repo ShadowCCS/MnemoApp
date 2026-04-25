@@ -8,6 +8,10 @@
     "ToggleSidebar": "Toggle sidebar",
     "SearchPlaceholder": "Search decks…",
     "NewDeck": "New deck",
+    "NewFolder": "New folder",
+    "RenameFolder": "Rename folder",
+    "FolderActions": "Folder actions",
+    "NewFolderName": "New folder",
     "RetentionFormat": "{0}% retention",
     "DueCountFormat": "{0} due",
     "DefaultDeckName": "New deck",
@@ -28,23 +32,31 @@
     "Cancel": "Cancel",
     "DeleteCard": "Delete card",
     "DeleteCardConfirm": "Delete this card from the deck?",
+    "DeleteFolder": "Delete folder",
+    "DeleteFolderConfirm": "Delete \"{0}\"? Decks and subfolders will be moved to root.",
     "DeleteDeck": "Delete deck",
     "DeleteDeckConfirm": "Delete this deck? This cannot be undone.",
     "RenameDeck": "Rename deck",
     "DuplicateDeck": "Duplicate deck",
     "DuplicateDeckTitleFormat": "{0} (copy)",
-    "SessionTitle": "Practice",
+    "SessionTitle": "Choose study mode",
+    "SessionModesHelp": "Review updates your schedule. Quick, Cram, and Test are practice-only.",
+    "SessionPrimaryBadge": "PRIMARY",
+    "SessionPracticeNoSchedule": "Does not affect schedule",
+    "SessionReview": "Review",
+    "SessionReviewDescFormat": "Study due cards with {0} scheduling and full grading.",
+    "SessionReviewStart": "Start review",
     "SessionQuick": "Quick",
-    "SessionQuickDesc": "Due cards with simple grading.",
+    "SessionQuickDesc": "Fast due-card practice with simple feedback.",
     "SessionQuickStart": "Start quick",
     "SessionFocused": "Focused",
-    "SessionFocusedDesc": "Limit by card count.",
+    "SessionFocusedDesc": "Deep review with limits by cards or time.",
     "SessionFocusedStart": "Start focused",
     "SessionCram": "Cram",
-    "SessionCramDesc": "All cards; optional shuffle.",
+    "SessionCramDesc": "Practice all cards in one pass. Shuffle if you want.",
     "SessionCramStart": "Start cram",
     "SessionTest": "Test",
-    "SessionTestDesc": "Type the answer, then reveal.",
+    "SessionTestDesc": "Type your answer first, then reveal and self-check.",
     "SessionTestStart": "Start test",
     "SessionClose": "Close",
     "FocusedCardCount": "Cards",
@@ -115,6 +127,29 @@
     "DeckLastStudiedFormat": "Last studied {0}",
     "DeckNeverStudied": "Never studied"
     ,"RetentionTrend": "Retention trend"
+    ,"RetentionTrendSubtitle": "Daily retention across recent reviews"
+    ,"RetentionTrendSummaryAverage": "Avg on review days"
+    ,"RetentionTrendSummaryEmpty": "Awaiting review data"
+    ,"RetentionTrendDeltaUpFormat": "+{0}% vs previous period"
+    ,"RetentionTrendDeltaDownFormat": "-{0}% vs previous period"
+    ,"RetentionTrendDeltaFlat": "No change vs previous period"
+    ,"RetentionTrendDeltaInsufficient": "Need review activity in both periods to compare"
+    ,"RetentionTrendActivityNone": "No review days in the last {0}"
+    ,"RetentionTrendActivitySingle": "1 active day in the last {0}"
+    ,"RetentionTrendActivityPlural": "{0} active days in the last {1}"
+    ,"RetentionTrendEmptyState": "Complete a review session to start seeing a trend"
+    ,"RetentionTrend14DaysAgo": "14d ago"
+    ,"RetentionTrendToday": "Today"
+    ,"SchedulingSectionTitle": "Scheduling"
+    ,"SchedulingEngineLabel": "Scheduling engine"
+    ,"SchedulingEngineHint": "This engine is used in Review mode. Quick, Cram, and Test do not change the schedule."
+    ,"DescriptionLabel": "Description"
+    ,"GeneralSectionTitle": "General"
+    ,"FolderLabel": "Folder"
+    ,"SchedulingEngineSmart": "Smart (FSRS)"
+    ,"SchedulingEngineClassic": "Classic (SM-2)"
+    ,"SchedulingEngineBoxed": "Boxed (Leitner)"
+    ,"SchedulingEngineSimple": "Simple"
     ,"CardTypeLabel": "TYPE"
     ,"InstalledModesTitle": "Installed modes"
     ,"InstalledModesPlaceholder": "No installed custom modes yet."
@@ -123,5 +158,9 @@
     ,"SummaryDurationLabel": "Duration"
     ,"SummaryAccuracyLabel": "Accuracy"
     ,"SummaryNextDueLabel": "Next due"
+    ,"PracticeKeyboardShortcutsLabel": "Keyboard shortcuts:"
+    ,"PracticeRevealPrefix": "Press"
+    ,"PracticeRevealSpacebar": "Spacebar"
+    ,"PracticeRevealSuffix": "to reveal"
   }
 }

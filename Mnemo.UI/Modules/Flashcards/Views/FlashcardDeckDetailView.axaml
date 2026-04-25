@@ -191,6 +191,72 @@
             <Setter Property="LetterSpacing" Value="0.4" />
             <Setter Property="FontFamily" Value="{DynamicResource Font.SemiBold}" />
         </Style>
+
+        <Style Selector="Border.retention-trend-shell">
+            <Setter Property="Background" Value="{DynamicResource WorkspaceBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="BoxShadow" Value="0 8 26 -18 #50000000, 0 2 8 0 #08000000" />
+        </Style>
+        <Style Selector="TextBlock.retention-trend-supporting-text">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSize.Body.Small}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.retention-trend-axis-text">
+            <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+            <Setter Property="FontSize" Value="10" />
+        </Style>
+        <Style Selector="TextBlock.retention-trend-stat-value">
+            <Setter Property="FontSize" Value="25" />
+            <Setter Property="FontFamily" Value="{DynamicResource Font.Bold}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="LineHeight" Value="28" />
+        </Style>
+        <Style Selector="Border.retention-trend-reference-line">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="Border.retention-trend-baseline-segment">
+            <Setter Property="Height" Value="3" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Background" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="Opacity" Value="0.3" />
+        </Style>
+        <Style Selector="Border.retention-trend-baseline-segment.latest">
+            <Setter Property="Background" Value="{DynamicResource AccentPrimaryBrush}" />
+            <Setter Property="Opacity" Value="0.8" />
+        </Style>
+        <Style Selector="Border.retention-trend-bar-fill">
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="4,4,2,2" />
+            <Setter Property="Background" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="Border.retention-trend-bar-fill.latest">
+            <Setter Property="Background" Value="{DynamicResource AccentPrimaryBrush}" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.retention-trend-point-value">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontFamily" Value="{DynamicResource Font.SemiBold}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
+        <Style Selector="TextBlock.retention-trend-point-value.latest">
+            <Setter Property="Foreground" Value="{DynamicResource AccentPrimaryBrush}" />
+        </Style>
+        <Style Selector="TextBlock.retention-trend-empty-text">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSize.Body.Small}" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
     </UserControl.Styles>
 
     <Panel>
@@ -258,6 +324,12 @@
                                               Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
                             <Button.Flyout>
                                 <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuItem Header="Settings" Command="{Binding OpenDeckSettingsCommand}">
+                                        <MenuItem.Icon>
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/settings.svg" Width="16" Height="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
                                     <MenuItem Header="{markup:T Ns=Flashcards, Key=RenameDeck}" Command="{Binding RenameDeckCommand}">
                                         <MenuItem.Icon>
                                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg" Width="16" Height="16" />
@@ -279,6 +351,85 @@
                         </Button>
                     </StackPanel>
                 </Grid>
+
+                <Border Classes="retention-trend-shell">
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                        <Grid Grid.Row="0" ColumnDefinitions="*">
+                            <StackPanel Spacing="0">
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=RetentionTrend}"
+                                           FontSize="{DynamicResource FontSize.Body.Small}"
+                                           FontFamily="{DynamicResource Font.SemiBold}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                            <TextBlock Classes="retention-trend-stat-value"
+                                       Text="{Binding RetentionTrendSummaryPercentText}" />
+                        </StackPanel>
+
+                        <Grid Grid.Row="2"
+                              Height="72"
+                              ColumnDefinitions="*"
+                              RowDefinitions="*,Auto"
+                              ColumnSpacing="8"
+                              ClipToBounds="True">
+                            <Grid Grid.Column="0"
+                                  Grid.Row="0"
+                                  ClipToBounds="True">
+                                <ItemsControl ItemsSource="{Binding RetentionTrendBarsProxy, ElementName=root}"
+                                              IsVisible="{Binding HasRetentionTrendData}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1" Columns="14" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="3,0"
+                                                  ToolTip.Tip="{Binding Percent, StringFormat='{}{0}%'}">
+                                                <Border Classes="retention-trend-baseline-segment"
+                                                        Classes.latest="{Binding IsLatest}" />
+                                                <Border Height="{Binding Height}"
+                                                        Classes="retention-trend-bar-fill"
+                                                        Classes.latest="{Binding IsLatest}"
+                                                        IsVisible="{Binding HasReviews}"
+                                                        VerticalAlignment="Bottom" />
+                                                <TextBlock Classes="retention-trend-point-value"
+                                                           Classes.latest="{Binding IsLatest}"
+                                                           IsVisible="{Binding IsLatest}"
+                                                           Text="{Binding Percent, StringFormat='{}{0}%'}"
+                                                           VerticalAlignment="Bottom"
+                                                           Margin="0,0,0,16" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Classes="retention-trend-empty-text"
+                                           IsVisible="{Binding HasRetentionTrendData, Converter={StaticResource BoolNegateConverter}}"
+                                           Text="{Binding RetentionTrendEmptyStateText}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Margin="28,0" />
+                            </Grid>
+
+                            <Grid Grid.Column="0"
+                                  Grid.Row="1"
+                                  ColumnDefinitions="Auto,*"
+                                  Margin="3,5,3,0"
+                                  IsHitTestVisible="False">
+                                <TextBlock Grid.Column="0"
+                                           Classes="retention-trend-axis-text"
+                                           Text="{markup:T Ns=Flashcards, Key=RetentionTrend14DaysAgo}" />
+                                <TextBlock Grid.Column="1"
+                                           Classes="retention-trend-axis-text"
+                                           HorizontalAlignment="Right"
+                                           Text="{markup:T Ns=Flashcards, Key=RetentionTrendToday}" />
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Border>
 
                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16" MinHeight="80">
                     <Border Grid.Column="0" Padding="16,14" CornerRadius="16"
@@ -324,63 +475,6 @@
                         </StackPanel>
                     </Border>
                 </Grid>
-
-                <Border Background="{DynamicResource WorkspaceBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="14"
-                        Padding="18,14">
-                    <StackPanel Spacing="10">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0"
-                                       Text="{markup:T Ns=Flashcards, Key=RetentionTrend}"
-                                       FontSize="{DynamicResource FontSize.Body.Small}"
-                                       FontFamily="{DynamicResource Font.SemiBold}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" />
-                            <TextBlock Grid.Column="1"
-                                       Text="{markup:T Ns=Flashcards, Key=RetentionTrendRangeLast14}"
-                                       FontSize="11" LetterSpacing="0.4"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Opacity="0.7" />
-                        </Grid>
-                        <!-- Chart: 100/50/0 guide lines behind, bars in front. UniformGrid Columns=14 stretches bars to full card width.
-                             Bar heights are driven by a percent→pixel proxy on the code-behind (0-100 → 0-100px).
-                             A subtle accent gradient fill gives the bars visual weight without a sparkline control dependency. -->
-                        <Grid Height="120" ClipToBounds="True">
-                            <!-- Horizontal guide lines at 0/50/100%. -->
-                            <Grid RowDefinitions="*,*,Auto" IsHitTestVisible="False">
-                                <Border Grid.Row="0" VerticalAlignment="Top"
-                                        Height="1" HorizontalAlignment="Stretch"
-                                        Background="{DynamicResource BorderBrush}" Opacity="0.35" />
-                                <Border Grid.Row="1" VerticalAlignment="Center"
-                                        Height="1" HorizontalAlignment="Stretch"
-                                        Background="{DynamicResource BorderBrush}" Opacity="0.2" />
-                                <Border Grid.Row="2" VerticalAlignment="Bottom"
-                                        Height="1" HorizontalAlignment="Stretch"
-                                        Background="{DynamicResource BorderBrush}" Opacity="0.6" />
-                            </Grid>
-                            <ItemsControl ItemsSource="{Binding RetentionTrendPointsProxy, ElementName=root}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <UniformGrid Rows="1" Columns="14" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Margin="3,0"
-                                                Height="{Binding}"
-                                                MinHeight="3"
-                                                CornerRadius="3,3,0,0"
-                                                VerticalAlignment="Bottom"
-                                                Background="{DynamicResource AccentPrimaryBrush}"
-                                                Opacity="0.85"
-                                                ToolTip.Tip="{Binding StringFormat='{}{0}%'}" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Grid>
-                    </StackPanel>
-                </Border>
 
                 <Grid ColumnDefinitions="*,Auto"
                       Margin="0,8,0,0"
