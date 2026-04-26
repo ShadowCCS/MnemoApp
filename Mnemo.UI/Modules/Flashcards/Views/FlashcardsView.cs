@@ -194,7 +194,6 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
 
         var coordinator = services.GetService<IImportExportCoordinator>();
         var overlayService = services.GetService<IOverlayService>();
-        var deckService = services.GetService<IFlashcardDeckService>();
         if (coordinator == null || overlayService == null)
             return;
 
@@ -249,10 +248,22 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
                 FilePath = file.Path.LocalPath
             }).ConfigureAwait(true);
 
-            await overlayService.CreateDialogAsync(result.IsSuccess ? "Import complete" : "Import failed",
-                result.IsSuccess ? "Flashcards import finished." : result.ErrorMessage ?? "Import failed.").ConfigureAwait(true);
-            if (result.IsSuccess)
+            var importSucceeded = result.IsSuccess && result.Value is { Success: true };
+            var importedDecks = result.Value?.ProcessedCounts.TryGetValue("decks", out var deckCount) == true ? deckCount : 0;
+            var importedCards = result.Value?.ProcessedCounts.TryGetValue("flashcards", out var cardCount) == true ? cardCount : 0;
+            var importMessage = importSucceeded
+                ? $"Flashcards import finished. Imported {importedDecks} deck(s), {importedCards} card(s)."
+                : result.Value?.ErrorMessage ?? result.ErrorMessage ?? "Import failed.";
+
+            await overlayService.CreateDialogAsync(
+                importSucceeded ? "Import complete" : "Import failed",
+                importMessage).ConfigureAwait(true);
+
+            if (importSucceeded)
+            {
+                vm.SelectAllDecks();
                 await vm.RefreshCommand.ExecuteAsync(null);
+            }
             return;
         }
 
@@ -267,11 +278,18 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             return;
 
         object? payload = null;
-        if (selected.Format.FormatId == "flashcards.csv" && deckService != null)
+        var filteredDeckIds = vm.FilteredDecks
+            .Where(deck => !string.IsNullOrWhiteSpace(deck.Id))
+            .Select(deck => deck.Id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (filteredDeckIds.Length == 0)
         {
-            var decks = await deckService.ListDecksAsync().ConfigureAwait(true);
-            payload = decks.FirstOrDefault();
+            await overlayService.CreateDialogAsync("Export failed", "No decks are currently visible to export.").ConfigureAwait(true);
+            return;
         }
+        if (filteredDeckIds.Length > 0)
+            payload = filteredDeckIds;
 
         var export = await coordinator.ExportAsync(new ImportExportRequest
         {
@@ -281,8 +299,11 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             Payload = payload
         }).ConfigureAwait(true);
 
-        await overlayService.CreateDialogAsync(export.IsSuccess ? "Export complete" : "Export failed",
-            export.IsSuccess ? "Flashcards export finished." : export.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
+        var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
+        var exportMessage = exportSucceeded
+            ? "Flashcards export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
+        await overlayService.CreateDialogAsync(exportSucceeded ? "Export complete" : "Export failed", exportMessage).ConfigureAwait(true);
     }
 
     private async void OnDeckRenameClick(object? sender, RoutedEventArgs e)
@@ -404,8 +425,11 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             FilePath = saveFile.Path.LocalPath,
             Payload = payload
         }).ConfigureAwait(true);
-        await overlayService.CreateDialogAsync(export.IsSuccess ? "Export complete" : "Export failed",
-            export.IsSuccess ? "Deck export finished." : export.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
+        var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
+        var exportMessage = exportSucceeded
+            ? "Deck export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
+        await overlayService.CreateDialogAsync(exportSucceeded ? "Export complete" : "Export failed", exportMessage).ConfigureAwait(true);
         await vm.RefreshCommand.ExecuteAsync(null);
     }
 

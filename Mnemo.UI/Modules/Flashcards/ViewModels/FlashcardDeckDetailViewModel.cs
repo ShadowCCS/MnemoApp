@@ -66,6 +66,8 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
     private readonly ILocalizationService _localization;
 
     private string _deckId = string.Empty;
+    public string DeckId => _deckId;
+
     private string? _studyLauncherOverlayId;
     private bool _isLoadingDeck;
     private bool _isSyncingEditorFromSelection;
@@ -121,6 +123,9 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
     [ObservableProperty]
     private FlashcardType _editorCardType = FlashcardType.Classic;
 
+    [ObservableProperty]
+    private string _cardSearchQuery = string.Empty;
+
     private IReadOnlyList<InlineSpan> _editorFrontSpans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
 
     private IReadOnlyList<InlineSpan> _editorBackSpans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
@@ -133,6 +138,7 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
     public bool IsEditorBackEditable => !IsEditorClozeType;
 
     public ObservableCollection<Flashcard> Cards { get; } = new();
+    public ObservableCollection<Flashcard> FilteredCards { get; } = new();
     public ObservableCollection<FlashcardRetentionTrendPoint> RetentionTrendPoints { get; } = new();
 
     public string LocalizedCardDue => _localization.T("CardDue", "Flashcards");
@@ -344,6 +350,8 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
         ScheduleDeckAutosave();
     }
 
+    partial void OnCardSearchQueryChanged(string value) => RefreshFilteredCards();
+
     private void ToggleCardRow(Flashcard? card)
     {
         if (card is null)
@@ -506,7 +514,14 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
         }
     }
 
-    private void OnCardsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshCardStats();
+    private void OnCardsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (_isLoadingDeck)
+            return;
+
+        RefreshCardStats();
+        RefreshFilteredCards();
+    }
 
     public void OnNavigatedTo(object? parameter)
     {
@@ -574,6 +589,7 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
             SelectedCard = null;
             ExpandedCardId = null;
             RefreshCardStats();
+            RefreshFilteredCards();
             OnPropertyChanged(nameof(CurrentSchedulingEngineLabel));
             OnPropertyChanged(nameof(ReviewSessionDescription));
             _ = LoadRetentionTrendAsync();
@@ -586,6 +602,47 @@ public partial class FlashcardDeckDetailViewModel : ViewModelBase, INavigationAw
         var now = DateTimeOffset.UtcNow;
         TotalCardsCount = Cards.Count;
         DueTodayCount = Cards.Count(c => c.DueDate <= now);
+    }
+
+    private void RefreshFilteredCards()
+    {
+        var search = CardSearchQuery.Trim();
+        var selectedId = SelectedCard?.Id;
+        var expandedId = ExpandedCardId;
+
+        IEnumerable<Flashcard> query = Cards;
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(card => CardMatchesSearch(card, search));
+
+        var visibleCards = query.ToList();
+        FilteredCards.Clear();
+        foreach (var card in visibleCards)
+            FilteredCards.Add(card);
+
+        if (!string.IsNullOrEmpty(selectedId)
+            && !visibleCards.Any(card => string.Equals(card.Id, selectedId, StringComparison.Ordinal)))
+        {
+            SelectedCard = null;
+        }
+
+        if (!string.IsNullOrEmpty(expandedId)
+            && !visibleCards.Any(card => string.Equals(card.Id, expandedId, StringComparison.Ordinal)))
+        {
+            ExpandedCardId = null;
+            _editSnapshot = null;
+        }
+    }
+
+    private static bool CardMatchesSearch(Flashcard card, string search)
+    {
+        if (card.Front.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || card.Back.Contains(search, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (card.Tags.Any(tag => tag.Contains(search, StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        return card.Type.ToString().Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
     private void StartPractice(FlashcardSessionConfig config)

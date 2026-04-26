@@ -122,6 +122,8 @@
     "CloseCard": "Cerrar",
     "FieldFront": "ANVERSO",
     "FieldBack": "REVERSO",
+    "SearchCardsPlaceholder": "Buscar tarjetas…",
+    "BackToTop": "Volver arriba",
     "DeckRetentionLabel": "Retención",
     "DeckCardCountFormat": "{0} tarjetas",
     "DeckLastStudiedFormat": "Último estudio {0}",

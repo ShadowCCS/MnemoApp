@@ -83,9 +83,12 @@ public partial class MindmapOverviewView : UserControl
                 FormatId = selected.Format.FormatId,
                 FilePath = file.Path.LocalPath
             }).ConfigureAwait(true);
-            await overlayService.CreateDialogAsync(result.IsSuccess ? "Import complete" : "Import failed",
-                result.IsSuccess ? "Mindmap import finished." : result.ErrorMessage ?? "Import failed.").ConfigureAwait(true);
-            if (result.IsSuccess)
+            var importSucceeded = result.IsSuccess && result.Value is { Success: true };
+            var importMessage = importSucceeded
+                ? "Mindmap import finished."
+                : result.Value?.ErrorMessage ?? result.ErrorMessage ?? "Import failed.";
+            await overlayService.CreateDialogAsync(importSucceeded ? "Import complete" : "Import failed", importMessage).ConfigureAwait(true);
+            if (importSucceeded)
                 await vm.RefreshAsync().ConfigureAwait(true);
             return;
         }
@@ -106,8 +109,11 @@ public partial class MindmapOverviewView : UserControl
             FormatId = selected.Format.FormatId,
             FilePath = saveFile.Path.LocalPath
         }).ConfigureAwait(true);
-        await overlayService.CreateDialogAsync(export.IsSuccess ? "Export complete" : "Export failed",
-            export.IsSuccess ? "Mindmap export finished." : export.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
+        var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
+        var exportMessage = exportSucceeded
+            ? "Mindmap export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
+        await overlayService.CreateDialogAsync(exportSucceeded ? "Export complete" : "Export failed", exportMessage).ConfigureAwait(true);
     }
 
     private async void OnMindmapDeleteClick(object? sender, RoutedEventArgs e)
@@ -235,8 +241,11 @@ public partial class MindmapOverviewView : UserControl
             FilePath = saveFile.Path.LocalPath,
             Payload = item.Id
         }).ConfigureAwait(true);
-        await overlayService.CreateDialogAsync(export.IsSuccess ? "Export complete" : "Export failed",
-            export.IsSuccess ? "Mindmap export finished." : export.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
+        var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
+        var exportMessage = exportSucceeded
+            ? "Mindmap export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
+        await overlayService.CreateDialogAsync(exportSucceeded ? "Export complete" : "Export failed", exportMessage).ConfigureAwait(true);
     }
 
     private static Mnemo.Core.Models.Mindmap.Mindmap CloneMindmap(Mnemo.Core.Models.Mindmap.Mindmap source, string title)

@@ -55,14 +55,23 @@ public sealed class MindmapsMnemoFormatAdapter : IContentFormatAdapter
             PayloadTypes = ["mindmaps"]
         }, cancellationToken).ConfigureAwait(false);
 
+        var importedCount = import.Value?.ImportedCountsByPayload.TryGetValue("mindmaps", out var importedMindmaps) == true
+            ? importedMindmaps
+            : 0;
+        var success = import.IsSuccess && import.Value != null && import.Value.Success && importedCount > 0;
+
         return new ImportExportResult
         {
-            Success = import.IsSuccess && import.Value != null && import.Value.Success,
+            Success = success,
             ContentType = ContentType,
             FormatId = FormatId,
             ProcessedCounts = import.Value?.ImportedCountsByPayload ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
             Warnings = import.Value?.Warnings ?? new List<string>(),
-            ErrorMessage = import.IsSuccess ? null : import.ErrorMessage
+            ErrorMessage = success
+                ? null
+                : import.IsSuccess
+                    ? import.Value?.ErrorMessage ?? "No mindmaps were imported from the selected package."
+                    : import.ErrorMessage
         };
     }
 

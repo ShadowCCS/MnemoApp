@@ -260,7 +260,7 @@
     </UserControl.Styles>
 
     <Panel>
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer x:Name="DeckScrollViewer" HorizontalScrollBarVisibility="Disabled">
             <Border Margin="32,24,32,120" MaxWidth="880" HorizontalAlignment="Stretch">
                 <StackPanel Spacing="24" HorizontalAlignment="Stretch">
 
@@ -338,6 +338,11 @@
                                     <MenuItem Header="{markup:T Ns=Flashcards, Key=DuplicateDeck}" Command="{Binding DuplicateDeckCommand}">
                                         <MenuItem.Icon>
                                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="Transfer" Click="OnDeckTransferClick">
+                                        <MenuItem.Icon>
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg" Width="16" Height="16" />
                                         </MenuItem.Icon>
                                     </MenuItem>
                                     <Separator />
@@ -503,11 +508,37 @@
                     </Button>
                 </Grid>
 
+                <Border Background="{DynamicResource WorkspaceBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="12,8">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                        <controls:SvgIcon Grid.Column="0"
+                                          SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg"
+                                          Width="16"
+                                          Height="16"
+                                          Color="{DynamicResource TextSecondaryBrush}"
+                                          VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding CardSearchQuery}"
+                                 Watermark="{markup:T Ns=Flashcards, Key=SearchCardsPlaceholder}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
                 <Border Background="Transparent" ClipToBounds="False">
                     <StackPanel Spacing="12" HorizontalAlignment="Stretch">
                     <ListBox x:Name="CardList" Classes="flashcard-deck-list"
-                             ItemsSource="{Binding Cards}" SelectedItem="{Binding SelectedCard}"
+                             ItemsSource="{Binding FilteredCards}" SelectedItem="{Binding SelectedCard}"
                              MinHeight="160">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="models:Flashcard">
                                 <Border Classes="card-row-host">
@@ -728,6 +759,24 @@
                 </StackPanel>
             </Border>
         </ScrollViewer>
+
+        <Button HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Margin="0,0,84,24"
+                Width="40"
+                Height="40"
+                Padding="0"
+                CornerRadius="999"
+                Classes="accent"
+                Click="OnBackToTopClick"
+                ToolTip.Tip="{markup:T Ns=Flashcards, Key=BackToTop}"
+                IsVisible="{Binding IsBackToTopVisibleProxy, ElementName=root}">
+            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-down.svg"
+                              Width="18"
+                              Height="18"
+                              RenderTransform="rotate(180deg)"
+                              Color="{DynamicResource AccentButtonForegroundBrush}" />
+        </Button>
 
     </Panel>
 </UserControl>

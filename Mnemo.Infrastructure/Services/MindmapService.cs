@@ -123,7 +123,22 @@ public class MindmapService : IMindmapService
 
     public async Task<Result> SaveMindmapAsync(Mindmap mindmap)
     {
-        return await _storage.SaveAsync(MindmapPrefix + mindmap.Id, mindmap).ConfigureAwait(false);
+        var saveResult = await _storage.SaveAsync(MindmapPrefix + mindmap.Id, mindmap).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+            return saveResult;
+
+        // Keep the index in sync so mindmaps saved via import are visible in overview.
+        var listResult = await _storage.LoadAsync<List<string>>(MindmapListKey).ConfigureAwait(false);
+        var list = listResult.Value ?? new List<string>();
+        if (!list.Contains(mindmap.Id))
+        {
+            list.Add(mindmap.Id);
+            var listSave = await _storage.SaveAsync(MindmapListKey, list).ConfigureAwait(false);
+            if (!listSave.IsSuccess)
+                return listSave;
+        }
+
+        return Result.Success();
     }
 
     public async Task<Result> DeleteMindmapAsync(string id)

@@ -122,6 +122,8 @@
     "CloseCard": "閉じる",
     "FieldFront": "表面",
     "FieldBack": "裏面",
+    "SearchCardsPlaceholder": "カードを検索…",
+    "BackToTop": "一番上へ",
     "DeckRetentionLabel": "定着率",
     "DeckCardCountFormat": "{0} 枚",
     "DeckLastStudiedFormat": "最終学習 {0}",

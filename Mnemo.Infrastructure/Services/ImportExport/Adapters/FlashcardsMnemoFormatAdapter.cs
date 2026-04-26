@@ -73,6 +73,15 @@ public sealed class FlashcardsMnemoFormatAdapter : IContentFormatAdapter
             payloadOptions["flashcards.deckIds"] = new[] { deck.Id };
         if (request.Payload is string deckId && !string.IsNullOrWhiteSpace(deckId))
             payloadOptions["flashcards.deckIds"] = new[] { deckId };
+        if (request.Payload is IEnumerable<string> deckIds)
+        {
+            var filteredDeckIds = deckIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (filteredDeckIds.Length > 0)
+                payloadOptions["flashcards.deckIds"] = filteredDeckIds;
+        }
 
         var export = await _packageService.ExportAsync(request.FilePath, new MnemoPackageExportOptions
         {

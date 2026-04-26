@@ -3,13 +3,18 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Models;
 using Mnemo.Core.Models.Flashcards;
+using Mnemo.Core.Services;
+using Mnemo.UI.Components.Overlays;
 using Mnemo.UI.Controls;
 using Mnemo.UI.Modules.Flashcards.ViewModels;
 
@@ -23,6 +28,7 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
     private FlashcardDeckDetailViewModel? _viewModel;
     private readonly Dictionary<string, RichEditorBinding> _frontEditorBindings = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RichEditorBinding> _backEditorBindings = new(StringComparer.Ordinal);
+    private bool _isBackToTopVisible;
 
     public new event PropertyChangedEventHandler? PropertyChanged;
 
@@ -82,11 +88,13 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
     public IAsyncRelayCommand? DeleteCardCommandProxy => _viewModel?.DeleteCardCommand;
 
     public IRelayCommand? CancelEditCommandProxy => _viewModel?.CancelEditCommand;
+    public bool IsBackToTopVisibleProxy => _isBackToTopVisible;
 
     public FlashcardDeckDetailView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        DeckScrollViewer.ScrollChanged += OnDeckScrollChanged;
         AttachViewModel(DataContext as FlashcardDeckDetailViewModel);
     }
 
@@ -171,6 +179,7 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         RaisePropertyChanged(nameof(RetentionTrendBarsProxy));
         RaisePropertyChanged(nameof(DeleteCardCommandProxy));
         RaisePropertyChanged(nameof(CancelEditCommandProxy));
+        RaisePropertyChanged(nameof(IsBackToTopVisibleProxy));
     }
 
     private void RaisePropertyChanged(string propertyName) =>
@@ -246,6 +255,21 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         _viewModel.UpdateEditorSpans(binding.Field, spans);
     }
 
+    private void OnDeckScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        var next = DeckScrollViewer.Offset.Y > 320;
+        if (_isBackToTopVisible == next)
+            return;
+
+        _isBackToTopVisible = next;
+        RaisePropertyChanged(nameof(IsBackToTopVisibleProxy));
+    }
+
+    private void OnBackToTopClick(object? sender, RoutedEventArgs e)
+    {
+        DeckScrollViewer.Offset = new Vector(DeckScrollViewer.Offset.X, 0);
+    }
+
     private static bool SpansEquivalent(IReadOnlyList<InlineSpan>? left, IReadOnlyList<InlineSpan>? right)
     {
         if (ReferenceEquals(left, right))
@@ -319,6 +343,89 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
 
     private static Border? FindShell(Control source) =>
         source.GetVisualAncestors().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("fc-card-editor-shell"));
+
+    private async void OnDeckTransferClick(object? sender, RoutedEventArgs e)
+    {
+        if (_viewModel is null || string.IsNullOrWhiteSpace(_viewModel.DeckId))
+            return;
+
+        var app = Application.Current as App;
+        var services = app?.Services;
+        if (services == null)
+            return;
+
+        var coordinator = services.GetService<IImportExportCoordinator>();
+        var overlayService = services.GetService<IOverlayService>();
+        if (coordinator == null || overlayService == null)
+            return;
+
+        var capabilities = coordinator.GetCapabilities("flashcards").Where(c => c.SupportsExport).ToArray();
+        var overlay = new TransferOverlay
+        {
+            Title = "Transfer Deck",
+            Description = "Choose format and settings.",
+            ConfirmText = "Export"
+        };
+        overlay.Initialize(capabilities, defaultImport: false);
+
+        var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true
+        }, "TransferOverlay");
+
+        var tcs = new TaskCompletionSource<TransferOverlayResult?>();
+        overlay.OnResult = result =>
+        {
+            overlayService.CloseOverlay(overlayId);
+            tcs.TrySetResult(result);
+        };
+
+        var selected = await tcs.Task.ConfigureAwait(true);
+        if (selected == null)
+            return;
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.StorageProvider == null)
+            return;
+
+        var suggestedName = string.IsNullOrWhiteSpace(_viewModel.DeckName) ? "deck" : SanitizeFileName(_viewModel.DeckName);
+        var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export deck",
+            SuggestedFileName = $"{suggestedName}{selected.Format.Extensions.FirstOrDefault() ?? ".mnemo"}",
+            DefaultExtension = selected.Format.Extensions.FirstOrDefault()?.TrimStart('.'),
+            FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
+        });
+        if (saveFile == null)
+            return;
+
+        var export = await coordinator.ExportAsync(new ImportExportRequest
+        {
+            ContentType = "flashcards",
+            FormatId = selected.Format.FormatId,
+            FilePath = saveFile.Path.LocalPath,
+            Payload = _viewModel.DeckId
+        }).ConfigureAwait(true);
+
+        var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
+        var exportMessage = exportSucceeded
+            ? "Deck export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
+        await overlayService.CreateDialogAsync(
+            exportSucceeded ? "Export complete" : "Export failed",
+            exportMessage).ConfigureAwait(true);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var name = string.IsNullOrWhiteSpace(value) ? "flashcards" : value.Trim();
+        foreach (var invalid in System.IO.Path.GetInvalidFileNameChars())
+            name = name.Replace(invalid, '_');
+        return name;
+    }
 
     /// <summary>Ctrl+Enter saves and adds a new card; Ctrl+Shift+C wraps front selection in cloze markers; Esc collapses.</summary>
     private void OnEditorKeyDown(object? sender, KeyEventArgs e)

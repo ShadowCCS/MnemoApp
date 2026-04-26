@@ -122,6 +122,8 @@
     "CloseCard": "Schließen",
     "FieldFront": "VORDERSEITE",
     "FieldBack": "RÜCKSEITE",
+    "SearchCardsPlaceholder": "Karten suchen…",
+    "BackToTop": "Nach oben",
     "DeckRetentionLabel": "Behalten",
     "DeckCardCountFormat": "{0} Karten",
     "DeckLastStudiedFormat": "Zuletzt gelernt {0}",

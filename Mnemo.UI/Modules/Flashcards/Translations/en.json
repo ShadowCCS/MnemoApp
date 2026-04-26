@@ -122,6 +122,8 @@
     "CloseCard": "Close",
     "FieldFront": "FRONT",
     "FieldBack": "BACK",
+    "SearchCardsPlaceholder": "Search cards…",
+    "BackToTop": "Back to top",
     "DeckRetentionLabel": "Retention",
     "DeckCardCountFormat": "{0} cards",
     "DeckLastStudiedFormat": "Last studied {0}",

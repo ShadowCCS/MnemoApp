@@ -111,6 +111,15 @@ public sealed class FlashcardsCsvFormatAdapter : IContentFormatAdapter
         {
             sb.AppendLine("deck,front,back");
             var decks = await _deckService.ListDecksAsync(cancellationToken).ConfigureAwait(false);
+            if (request.Payload is IEnumerable<string> deckIds)
+            {
+                var idSet = new HashSet<string>(
+                    deckIds.Where(id => !string.IsNullOrWhiteSpace(id)),
+                    StringComparer.Ordinal);
+                if (idSet.Count > 0)
+                    decks = decks.Where(currentDeck => idSet.Contains(currentDeck.Id)).ToArray();
+            }
+
             exportedCards = 0;
             foreach (var currentDeck in decks)
             {
