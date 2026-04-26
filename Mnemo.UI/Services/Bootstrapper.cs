@@ -21,6 +21,10 @@ using Mnemo.Infrastructure.Services.Flashcards;
 using Mnemo.Infrastructure.Services.Speech;
 using Mnemo.Infrastructure.Services.TextShortcuts;
 using Mnemo.Infrastructure.Services.Tools;
+using Mnemo.Infrastructure.Services.Packaging;
+using Mnemo.Infrastructure.Services.Packaging.PayloadHandlers;
+using Mnemo.Infrastructure.Services.ImportExport;
+using Mnemo.Infrastructure.Services.ImportExport.Adapters;
 
 namespace Mnemo.UI.Services;
 
@@ -126,6 +130,18 @@ public static class Bootstrapper
         services.AddSingleton<IFlashcardSchedulerResolver, FlashcardSchedulerResolver>();
         services.AddSingleton<IFlashcardDeckService, PersistentFlashcardDeckService>();
         services.AddSingleton<ISpeechRecognitionService, WhisperSpeechRecognitionService>();
+        services.AddSingleton<IMnemoPackageService, MnemoPackageService>();
+        services.AddSingleton<IMnemoPayloadHandler, NotesMnemoPayloadHandler>();
+        services.AddSingleton<IMnemoPayloadHandler, SettingsMnemoPayloadHandler>();
+        services.AddSingleton<IMnemoPayloadHandler, MindmapsMnemoPayloadHandler>();
+        services.AddSingleton<IMnemoPayloadHandler, FlashcardsMnemoPayloadHandler>();
+        services.AddSingleton<IImportExportCoordinator, ImportExportCoordinator>();
+        services.AddSingleton<IContentFormatAdapter, NotesMnemoFormatAdapter>();
+        services.AddSingleton<IContentFormatAdapter, NotesMarkdownFormatAdapter>();
+        services.AddSingleton<IContentFormatAdapter, FlashcardsMnemoFormatAdapter>();
+        services.AddSingleton<IContentFormatAdapter, FlashcardsCsvFormatAdapter>();
+        services.AddSingleton<IContentFormatAdapter, FlashcardsAnkiFormatAdapter>();
+        services.AddSingleton<IContentFormatAdapter, MindmapsMnemoFormatAdapter>();
 
         // 2. Register UI-specific Services
         services.AddSingleton<IThemeService, ThemeService>();

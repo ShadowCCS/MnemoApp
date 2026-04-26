@@ -91,6 +91,12 @@
                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16"/>
                            </MenuItem.Icon>
                        </MenuItem>
+                       <MenuItem Header="Export" Tag="{Binding}" Click="OnExportClick"
+                                 IsVisible="{Binding IsFolder, Converter={StaticResource BoolNegationConverter}}">
+                           <MenuItem.Icon>
+                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/download.svg" Width="16" Height="16"/>
+                           </MenuItem.Icon>
+                       </MenuItem>
                        <Separator />
                        <MenuItem Classes="danger" Header="{markup:T Ns=Notes, Key=Delete}" Tag="{Binding}" Click="OnDeleteClick"
                                  controls:MenuItemGestureHint.GestureHint="⌫">

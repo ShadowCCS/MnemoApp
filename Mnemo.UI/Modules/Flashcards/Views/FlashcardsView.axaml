@@ -217,20 +217,32 @@
                                    FontSize="{DynamicResource FontSize.Body.Medium}"
                                    Foreground="{DynamicResource TextSecondaryBrush}" />
                     </StackPanel>
-                    <Button Grid.Column="2" VerticalAlignment="Center"
-                            Classes="accent"
-                            Command="{Binding CreateDeckCommand}"
-                            BorderThickness="0"
-                            Padding="16,10" CornerRadius="10">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
-                                              Width="18" Height="18"
-                                              Color="{DynamicResource AccentButtonForegroundBrush}" />
-                            <TextBlock Text="{markup:T Ns=Flashcards, Key=NewDeck}"
-                                       FontFamily="{DynamicResource Font.SemiBold}"
-                                       Foreground="{DynamicResource AccentButtonForegroundBrush}" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Classes="ghost"
+                                Padding="10,8"
+                                Click="OnTransferClick"
+                                Tag="transfer">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg"
+                                                  Width="16" Height="16" />
+                                <TextBlock Text="Transfer" />
+                            </StackPanel>
+                        </Button>
+                        <Button VerticalAlignment="Center"
+                                Classes="accent"
+                                Command="{Binding CreateDeckCommand}"
+                                BorderThickness="0"
+                                Padding="16,10" CornerRadius="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
+                                                  Width="18" Height="18"
+                                                  Color="{DynamicResource AccentButtonForegroundBrush}" />
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=NewDeck}"
+                                           FontFamily="{DynamicResource Font.SemiBold}"
+                                           Foreground="{DynamicResource AccentButtonForegroundBrush}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
 
                 <Border Classes="search-surface" Width="420" MaxWidth="560" HorizontalAlignment="Left">
@@ -318,6 +330,15 @@
                                                     <MenuItem Header="{markup:T Ns=Flashcards, Key=Practice}"
                                                               Command="{Binding #root.StartQuickSessionCommandProxy}"
                                                               CommandParameter="{Binding}" />
+                                                    <MenuItem Header="Rename"
+                                                              Tag="{Binding}"
+                                                              Click="OnDeckRenameClick" />
+                                                    <MenuItem Header="Duplicate"
+                                                              Tag="{Binding}"
+                                                              Click="OnDeckDuplicateClick" />
+                                                    <MenuItem Header="Export"
+                                                              Tag="{Binding}"
+                                                              Click="OnDeckExportClick" />
                                                     <MenuItem Header="Settings"
                                                               Command="{Binding #root.OpenDeckSettingsCommandProxy}"
                                                               CommandParameter="{Binding}" />

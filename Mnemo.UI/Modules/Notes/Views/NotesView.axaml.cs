@@ -1,16 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.History;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.UI.Components.Overlays;
 using Mnemo.UI.Components.BlockEditor;
 using Mnemo.UI.Services;
 using Mnemo.UI.Controls;
@@ -296,5 +299,123 @@ public partial class NotesView : UserControl
         var titleBox = sender as TextBox;
         if (titleBox != null)
             await vm.SaveCurrentNoteAsync(null, titleBox.Text);
+    }
+
+    private async void OnTransferClick(object? sender, RoutedEventArgs e)
+    {
+        var app = Application.Current as App;
+        var services = app?.Services;
+        var vm = DataContext as NotesViewModel;
+        if (services == null || vm == null)
+            return;
+
+        var coordinator = services.GetService<IImportExportCoordinator>();
+        var overlayService = services.GetService<IOverlayService>();
+        if (coordinator == null || overlayService == null)
+            return;
+
+        var button = sender as Button;
+        var startTransfer = string.Equals(button?.Tag?.ToString(), "transfer", StringComparison.OrdinalIgnoreCase);
+        var capabilities = coordinator.GetCapabilities("notes");
+        var overlay = new TransferOverlay
+        {
+            Title = "Notes Import / Export",
+            Description = "Choose format and settings.",
+            ConfirmText = "Continue",
+            CancelText = "Cancel"
+        };
+        overlay.Initialize(capabilities, startTransfer);
+
+        var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true
+        }, "TransferOverlay");
+
+        var tcs = new TaskCompletionSource<TransferOverlayResult?>();
+        overlay.OnResult = result =>
+        {
+            overlayService.CloseOverlay(overlayId);
+            tcs.TrySetResult(result);
+        };
+
+        var selected = await tcs.Task.ConfigureAwait(true);
+        if (selected == null)
+            return;
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.StorageProvider == null)
+            return;
+
+        if (selected.IsImport)
+        {
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                AllowMultiple = false,
+                Title = "Import notes",
+                FileTypeFilter = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(e => $"*{e}").ToArray() }]
+            });
+            var file = files.FirstOrDefault();
+            if (file == null)
+                return;
+
+            var preview = await coordinator.PreviewImportAsync(new ImportExportRequest
+            {
+                ContentType = "notes",
+                FormatId = selected.Format.FormatId,
+                FilePath = file.Path.LocalPath
+            }).ConfigureAwait(true);
+            if (!preview.IsSuccess || preview.Value == null)
+            {
+                await overlayService.CreateDialogAsync("Import failed", preview.ErrorMessage ?? "Could not preview file.").ConfigureAwait(true);
+                return;
+            }
+
+            var summary = string.Join(", ", preview.Value.DiscoveredCounts.Select(p => $"{p.Value} {p.Key}"));
+            var confirm = await overlayService.CreateDialogAsync("Confirm Import", $"This file contains: {summary}", "Import", "Cancel").ConfigureAwait(true);
+            if (!string.Equals(confirm, "Import", StringComparison.Ordinal))
+                return;
+
+            var result = await coordinator.ImportAsync(new ImportExportRequest
+            {
+                ContentType = "notes",
+                FormatId = selected.Format.FormatId,
+                FilePath = file.Path.LocalPath,
+                Options = new Dictionary<string, object?>
+                {
+                    ["DuplicateOnConflict"] = selected.DuplicateOnConflict,
+                    ["StrictUnknownPayloads"] = selected.StrictUnknownPayloads
+                }
+            }).ConfigureAwait(true);
+
+            await overlayService.CreateDialogAsync(result.IsSuccess ? "Import complete" : "Import failed",
+                result.IsSuccess ? "Notes import finished." : result.ErrorMessage ?? "Import failed.").ConfigureAwait(true);
+            if (result.IsSuccess)
+                await vm.LoadNotesCommand.ExecuteAsync(null);
+            return;
+        }
+
+        var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export notes",
+            SuggestedFileName = $"notes{selected.Format.Extensions.FirstOrDefault() ?? ".mnemo"}",
+            DefaultExtension = selected.Format.Extensions.FirstOrDefault()?.TrimStart('.'),
+            FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
+        });
+        if (saveFile == null)
+            return;
+
+        var exportResult = await coordinator.ExportAsync(new ImportExportRequest
+        {
+            ContentType = "notes",
+            FormatId = selected.Format.FormatId,
+            FilePath = saveFile.Path.LocalPath,
+            Payload = vm.SelectedNote
+        }).ConfigureAwait(true);
+
+        await overlayService.CreateDialogAsync(exportResult.IsSuccess ? "Export complete" : "Export failed",
+            exportResult.IsSuccess ? "Notes export finished." : exportResult.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
     }
 }

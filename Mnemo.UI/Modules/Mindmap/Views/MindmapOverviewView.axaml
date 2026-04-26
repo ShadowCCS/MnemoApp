@@ -125,19 +125,30 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
                 
-                <Button Grid.Column="1" Command="{Binding CreateCommand}" 
-                        Background="Transparent" 
-                        BorderThickness="1"
-                        BorderBrush="{DynamicResource CardAccentBrush}"
-                        Padding="20,10" CornerRadius="12">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg" 
-                                          Width="18" Height="18" Color="{DynamicResource CardAccentBrush}"/>
-                        <TextBlock Text="{markup:T Ns=Mindmap, Key=NewMindmap}" 
-                                   FontFamily="{DynamicResource Font.SemiBold}" 
-                                   Foreground="{DynamicResource CardAccentBrush}"/>
-                    </StackPanel>
-                </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Classes="ghost"
+                            Padding="10,8"
+                            Click="OnTransferClick"
+                            Tag="transfer">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg" Width="16" Height="16"/>
+                            <TextBlock Text="Transfer"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding CreateCommand}" 
+                            Background="Transparent" 
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource CardAccentBrush}"
+                            Padding="20,10" CornerRadius="12">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg" 
+                                              Width="18" Height="18" Color="{DynamicResource CardAccentBrush}"/>
+                            <TextBlock Text="{markup:T Ns=Mindmap, Key=NewMindmap}" 
+                                       FontFamily="{DynamicResource Font.SemiBold}" 
+                                       Foreground="{DynamicResource CardAccentBrush}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
 
             <!-- Featured / Recently Active -->
@@ -218,16 +229,23 @@
                                                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                         </StackPanel>
                                                     </Border>
-                                                    <Button HorizontalAlignment="Right" 
-                                                            Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource DeleteMindmapCommandConverter}}"
-                                                            CommandParameter="{Binding}"
-                                                            Background="Transparent" 
-                                                            BorderThickness="0" 
+                                                    <Button HorizontalAlignment="Right"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
                                                             Padding="6"
                                                             Cursor="Hand">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/dots-vertical.svg"
                                                                           Width="16" Height="16"
                                                                           Color="{DynamicResource TextTertiaryBrush}"/>
+                                                        <Button.Flyout>
+                                                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                                <MenuItem Header="Rename" Tag="{Binding}" Click="OnMindmapRenameClick"/>
+                                                                <MenuItem Header="Duplicate" Tag="{Binding}" Click="OnMindmapDuplicateClick"/>
+                                                                <MenuItem Header="Export" Tag="{Binding}" Click="OnMindmapExportClick"/>
+                                                                <Separator/>
+                                                                <MenuItem Header="Delete" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick"/>
+                                                            </MenuFlyout>
+                                                        </Button.Flyout>
                                                     </Button>
                                                 </Grid>
                                                 
@@ -338,16 +356,23 @@
                                                                     FontFamily="{DynamicResource Font.SemiBold}"/>
                                                     </StackPanel>
                                                 </StackPanel>
-                                                <Button HorizontalAlignment="Right" 
-                                                        Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource DeleteMindmapCommandConverter}}"
-                                                        CommandParameter="{Binding}"
-                                                        Background="Transparent" 
-                                                        BorderThickness="0" 
+                                                <Button HorizontalAlignment="Right"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
                                                         Padding="6"
                                                         Cursor="Hand">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/dots-vertical.svg"
                                                                       Width="14" Height="14"
                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                            <MenuItem Header="Rename" Tag="{Binding}" Click="OnMindmapRenameClick"/>
+                                                            <MenuItem Header="Duplicate" Tag="{Binding}" Click="OnMindmapDuplicateClick"/>
+                                                            <MenuItem Header="Export" Tag="{Binding}" Click="OnMindmapExportClick"/>
+                                                            <Separator/>
+                                                            <MenuItem Header="Delete" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick"/>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
                                                 </Button>
                                             </Grid>
                                             
@@ -455,15 +480,22 @@
                                                 <Button Grid.Column="4"
                                                         HorizontalAlignment="Center"
                                                         VerticalAlignment="Center"
-                                                        Command="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource DeleteMindmapCommandConverter}}"
-                                                        CommandParameter="{Binding}"
-                                                        Background="Transparent" 
-                                                        BorderThickness="0" 
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
                                                         Padding="6"
                                                         Cursor="Hand">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/dots-vertical.svg"
                                                                       Width="16" Height="16"
                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                            <MenuItem Header="Rename" Tag="{Binding}" Click="OnMindmapRenameClick"/>
+                                                            <MenuItem Header="Duplicate" Tag="{Binding}" Click="OnMindmapDuplicateClick"/>
+                                                            <MenuItem Header="Export" Tag="{Binding}" Click="OnMindmapExportClick"/>
+                                                            <Separator/>
+                                                            <MenuItem Header="Delete" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick"/>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
                                                 </Button>
                                             </Grid>
                                         </Border>

@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             x:Name="Root"
+             x:Class="Mnemo.UI.Controls.SegmentedToggle"
+             x:DataType="controls:SegmentedToggle"
+             SelectedForegroundBrush="{DynamicResource AccentButtonForegroundBrush}"
+             UnselectedForegroundBrush="{DynamicResource TextSecondaryBrush}">
+
+    <UserControl.Styles>
+        <Style Selector="Button.segment">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="999"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="FontFamily" Value="{DynamicResource Font.SemiBold}"/>
+        </Style>
+
+        <Style Selector="Button.segment:pointerover">
+            <Setter Property="Background" Value="#12000000"/>
+        </Style>
+
+        <Style Selector="Button.segment:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.98)"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border CornerRadius="999"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            Background="{DynamicResource CardBackgroundSecondaryBrush}"
+            Padding="4"
+            MinHeight="46">
+
+        <Grid ColumnDefinitions="*,*" ClipToBounds="True">
+
+            <!-- selected pill -->
+            <Border Grid.Column="{Binding #Root.SelectedIndex}"
+                    CornerRadius="999"
+                    Background="{DynamicResource AccentButtonBackgroundBrush}"
+                    BoxShadow="0 2 8 #22000000"/>
+
+            <Button Grid.Column="0"
+                    Classes="segment"
+                    Command="{Binding #Root.LeftCommand}"
+                    Click="OnLeftClicked">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <controls:SvgIcon SvgPath="{Binding #Root.LeftIconPath}" Width="16" Height="16" Color="{Binding #Root.LeftForeground}"/>
+                    <TextBlock Text="{Binding #Root.LeftText}"
+                               Foreground="{Binding #Root.LeftForeground}"/>
+                </StackPanel>
+            </Button>
+
+            <Button Grid.Column="1"
+                    Classes="segment"
+                    Command="{Binding #Root.RightCommand}"
+                    Click="OnRightClicked">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <controls:SvgIcon SvgPath="{Binding #Root.RightIconPath}" Width="16" Height="16" Color="{Binding #Root.RightForeground}"/>
+                    <TextBlock Text="{Binding #Root.RightText}"
+                               Foreground="{Binding #Root.RightForeground}"/>
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

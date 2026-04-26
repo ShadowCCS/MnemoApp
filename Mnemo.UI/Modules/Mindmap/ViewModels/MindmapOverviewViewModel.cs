@@ -149,6 +149,8 @@ public partial class MindmapOverviewViewModel : ViewModelBase
         }
     }
 
+    public Task RefreshAsync() => LoadMindmapsAsync();
+
     private void OpenMindmap(MindmapItemViewModel? item)
     {
         if (item != null)

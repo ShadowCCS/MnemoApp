@@ -1,12 +1,17 @@
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.UI.Components.Overlays;
 using Mnemo.UI.Controls;
 using Mnemo.UI.Modules.Notes.ViewModels;
 
@@ -304,6 +309,70 @@ public partial class NoteTreeRow : UserControl
         BeginRename(item);
     }
 
+    private async void OnExportClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control c || c.Tag is not NoteTreeItemViewModel item || item.Note == null)
+            return;
+        var app = Application.Current as App;
+        var services = app?.Services;
+        if (services == null)
+            return;
+
+        var coordinator = services.GetService<IImportExportCoordinator>();
+        var overlayService = services.GetService<IOverlayService>();
+        if (coordinator == null || overlayService == null)
+            return;
+
+        var capabilities = coordinator.GetCapabilities("notes").Where(x => x.SupportsExport).ToArray();
+        var overlay = new TransferOverlay
+        {
+            Title = "Export Note",
+            Description = "Choose export format.",
+            ConfirmText = "Export"
+        };
+        overlay.Initialize(capabilities, defaultImport: false);
+        var id = overlayService.CreateOverlay(overlay, new OverlayOptions
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            ShowBackdrop = true
+        }, "TransferOverlay");
+
+        var tcs = new TaskCompletionSource<TransferOverlayResult?>();
+        overlay.OnResult = result =>
+        {
+            overlayService.CloseOverlay(id);
+            tcs.TrySetResult(result);
+        };
+        var selected = await tcs.Task.ConfigureAwait(true);
+        if (selected == null)
+            return;
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.StorageProvider == null)
+            return;
+        var ext = selected.Format.Extensions.FirstOrDefault() ?? ".mnemo";
+        var save = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export note",
+            SuggestedFileName = $"{SanitizeFileName(item.Name)}{ext}",
+            DefaultExtension = ext.TrimStart('.'),
+            FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(e => $"*{e}").ToArray() }]
+        });
+        if (save == null)
+            return;
+
+        var result = await coordinator.ExportAsync(new ImportExportRequest
+        {
+            ContentType = "notes",
+            FormatId = selected.Format.FormatId,
+            FilePath = save.Path.LocalPath,
+            Payload = item.Note
+        }).ConfigureAwait(true);
+        await overlayService.CreateDialogAsync(result.IsSuccess ? "Export complete" : "Export failed",
+            result.IsSuccess ? "Note exported." : result.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
+    }
+
     private TopLevel? _editTopLevel;
 
     private void BeginRename(NoteTreeItemViewModel item)
@@ -384,5 +453,13 @@ public partial class NoteTreeRow : UserControl
         StopGlobalEditListener();
         NameTextBox.IsVisible = false;
         NameTextBlock!.IsVisible = true;
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var name = string.IsNullOrWhiteSpace(value) ? "note" : value.Trim();
+        foreach (var invalid in System.IO.Path.GetInvalidFileNameChars())
+            name = name.Replace(invalid, '_');
+        return name;
     }
 }

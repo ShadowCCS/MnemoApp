@@ -2,10 +2,18 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Models.Flashcards;
 using Mnemo.UI.Modules.Flashcards.ViewModels;
 using System;
 using System.ComponentModel;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.Models;
+using Mnemo.Core.Services;
+using Mnemo.UI.Components.Overlays;
 
 namespace Mnemo.UI.Modules.Flashcards.Views;
 
@@ -175,6 +183,238 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
     {
         EnsureDragCoordinator();
         _dragCoordinator?.BeginFolderDrag(item, row, pointer);
+    }
+
+    private async void OnTransferClick(object? sender, RoutedEventArgs e)
+    {
+        var app = Application.Current as App;
+        var services = app?.Services;
+        if (services == null || DataContext is not FlashcardsViewModel vm)
+            return;
+
+        var coordinator = services.GetService<IImportExportCoordinator>();
+        var overlayService = services.GetService<IOverlayService>();
+        var deckService = services.GetService<IFlashcardDeckService>();
+        if (coordinator == null || overlayService == null)
+            return;
+
+        var button = sender as Button;
+        var startTransfer = string.Equals(button?.Tag?.ToString(), "transfer", StringComparison.OrdinalIgnoreCase);
+        var capabilities = coordinator.GetCapabilities("flashcards");
+        var overlay = new TransferOverlay
+        {
+            Title = "Transfer Flashcards",
+            Description = "Choose format and settings."
+        };
+        overlay.Initialize(capabilities, startTransfer);
+
+        var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true
+        }, "TransferOverlay");
+
+        var tcs = new TaskCompletionSource<TransferOverlayResult?>();
+        overlay.OnResult = result =>
+        {
+            overlayService.CloseOverlay(overlayId);
+            tcs.TrySetResult(result);
+        };
+        var selected = await tcs.Task.ConfigureAwait(true);
+        if (selected == null)
+            return;
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.StorageProvider == null)
+            return;
+
+        if (selected.IsImport)
+        {
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                AllowMultiple = false,
+                Title = "Import flashcards",
+                FileTypeFilter = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
+            });
+            var file = files.FirstOrDefault();
+            if (file == null)
+                return;
+
+            var result = await coordinator.ImportAsync(new ImportExportRequest
+            {
+                ContentType = "flashcards",
+                FormatId = selected.Format.FormatId,
+                FilePath = file.Path.LocalPath
+            }).ConfigureAwait(true);
+
+            await overlayService.CreateDialogAsync(result.IsSuccess ? "Import complete" : "Import failed",
+                result.IsSuccess ? "Flashcards import finished." : result.ErrorMessage ?? "Import failed.").ConfigureAwait(true);
+            if (result.IsSuccess)
+                await vm.RefreshCommand.ExecuteAsync(null);
+            return;
+        }
+
+        var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export flashcards",
+            SuggestedFileName = $"flashcards{selected.Format.Extensions.FirstOrDefault() ?? ".mnemo"}",
+            DefaultExtension = selected.Format.Extensions.FirstOrDefault()?.TrimStart('.'),
+            FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
+        });
+        if (saveFile == null)
+            return;
+
+        object? payload = null;
+        if (selected.Format.FormatId == "flashcards.csv" && deckService != null)
+        {
+            var decks = await deckService.ListDecksAsync().ConfigureAwait(true);
+            payload = decks.FirstOrDefault();
+        }
+
+        var export = await coordinator.ExportAsync(new ImportExportRequest
+        {
+            ContentType = "flashcards",
+            FormatId = selected.Format.FormatId,
+            FilePath = saveFile.Path.LocalPath,
+            Payload = payload
+        }).ConfigureAwait(true);
+
+        await overlayService.CreateDialogAsync(export.IsSuccess ? "Export complete" : "Export failed",
+            export.IsSuccess ? "Flashcards export finished." : export.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
+    }
+
+    private async void OnDeckRenameClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control { Tag: FlashcardDeckRowViewModel row })
+            return;
+        var app = Application.Current as App;
+        var services = app?.Services;
+        if (services == null || DataContext is not FlashcardsViewModel vm)
+            return;
+        var overlayService = services.GetService<IOverlayService>();
+        var deckService = services.GetService<IFlashcardDeckService>();
+        if (overlayService == null || deckService == null)
+            return;
+
+        var input = new InputDialogOverlay
+        {
+            Title = "Rename deck",
+            Placeholder = "Deck name",
+            InputValue = row.Name,
+            ConfirmText = "Save",
+            CancelText = "Cancel"
+        };
+        var id = overlayService.CreateOverlay(input, new OverlayOptions { ShowBackdrop = true, CloseOnOutsideClick = true });
+        var tcs = new TaskCompletionSource<string?>();
+        input.OnResult = value =>
+        {
+            overlayService.CloseOverlay(id);
+            tcs.TrySetResult(value);
+        };
+        var newName = (await tcs.Task.ConfigureAwait(true) ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(newName) || string.Equals(newName, row.Name, StringComparison.Ordinal))
+            return;
+        var deck = await deckService.GetDeckByIdAsync(row.Id).ConfigureAwait(true);
+        if (deck == null)
+            return;
+        await deckService.SaveDeckAsync(deck with { Name = newName }).ConfigureAwait(true);
+        await vm.RefreshCommand.ExecuteAsync(null);
+    }
+
+    private async void OnDeckDuplicateClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control { Tag: FlashcardDeckRowViewModel row })
+            return;
+        var app = Application.Current as App;
+        var services = app?.Services;
+        if (services == null || DataContext is not FlashcardsViewModel vm)
+            return;
+        var deckService = services.GetService<IFlashcardDeckService>();
+        if (deckService == null)
+            return;
+        var deck = await deckService.GetDeckByIdAsync(row.Id).ConfigureAwait(true);
+        if (deck == null)
+            return;
+        var copy = deck with
+        {
+            Id = Guid.NewGuid().ToString("n"),
+            Name = $"{deck.Name} Copy",
+            Cards = deck.Cards.Select(card => card with { Id = Guid.NewGuid().ToString("n") }).ToArray(),
+            LastStudied = null
+        };
+        await deckService.SaveDeckAsync(copy).ConfigureAwait(true);
+        await vm.RefreshCommand.ExecuteAsync(null);
+    }
+
+    private async void OnDeckExportClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control { Tag: FlashcardDeckRowViewModel row })
+            return;
+        var app = Application.Current as App;
+        var services = app?.Services;
+        if (services == null || DataContext is not FlashcardsViewModel vm)
+            return;
+        var coordinator = services.GetService<IImportExportCoordinator>();
+        var overlayService = services.GetService<IOverlayService>();
+        var deckService = services.GetService<IFlashcardDeckService>();
+        if (coordinator == null || overlayService == null || deckService == null)
+            return;
+        var deck = await deckService.GetDeckByIdAsync(row.Id).ConfigureAwait(true);
+        if (deck == null)
+            return;
+
+        var capabilities = coordinator.GetCapabilities("flashcards").Where(c => c.SupportsExport).ToArray();
+        var overlay = new TransferOverlay { Title = "Export Deck", Description = "Choose format and settings.", ConfirmText = "Export" };
+        overlay.Initialize(capabilities, defaultImport: false);
+        var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true
+        }, "TransferOverlay");
+        var tcs = new TaskCompletionSource<TransferOverlayResult?>();
+        overlay.OnResult = result =>
+        {
+            overlayService.CloseOverlay(overlayId);
+            tcs.TrySetResult(result);
+        };
+        var selected = await tcs.Task.ConfigureAwait(true);
+        if (selected == null)
+            return;
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.StorageProvider == null)
+            return;
+        var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export deck",
+            SuggestedFileName = $"{SanitizeFileName(deck.Name)}{selected.Format.Extensions.FirstOrDefault() ?? ".mnemo"}",
+            DefaultExtension = selected.Format.Extensions.FirstOrDefault()?.TrimStart('.'),
+            FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
+        });
+        if (saveFile == null)
+            return;
+        object? payload = selected.Format.FormatId == "flashcards.csv" ? deck : deck.Id;
+        var export = await coordinator.ExportAsync(new ImportExportRequest
+        {
+            ContentType = "flashcards",
+            FormatId = selected.Format.FormatId,
+            FilePath = saveFile.Path.LocalPath,
+            Payload = payload
+        }).ConfigureAwait(true);
+        await overlayService.CreateDialogAsync(export.IsSuccess ? "Export complete" : "Export failed",
+            export.IsSuccess ? "Deck export finished." : export.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
+        await vm.RefreshCommand.ExecuteAsync(null);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var name = string.IsNullOrWhiteSpace(value) ? "flashcards" : value.Trim();
+        foreach (var invalid in System.IO.Path.GetInvalidFileNameChars())
+            name = name.Replace(invalid, '_');
+        return name;
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
