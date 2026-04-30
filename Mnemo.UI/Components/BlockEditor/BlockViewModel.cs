@@ -71,7 +71,7 @@ public class BlockViewModel : INotifyPropertyChanged
         { 
             if (_type != value)
             {
-                var wasHeading = _type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3;
+                var wasHeading = _type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4;
                 var prevType = _type;
                 _type = value;
                 if (value != BlockType.Checklist)
@@ -83,7 +83,7 @@ public class BlockViewModel : INotifyPropertyChanged
                         OnPropertyChanged(nameof(Meta));
                 }
 
-                if (value is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+                if (value is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
                 {
                     EnsureHeadingBold();
                     OnPropertyChanged(nameof(Content));
@@ -259,7 +259,7 @@ public class BlockViewModel : INotifyPropertyChanged
 
     private void EnsureHeadingBold()
     {
-        if (_type is not (BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3))
+        if (_type is not (BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4))
             return;
         var boldRuns = _spans
             .Select(s => s is TextSpan t ? t with { Style = t.Style.WithSet(InlineFormatKind.Bold) } : s)
@@ -354,7 +354,7 @@ public class BlockViewModel : INotifyPropertyChanged
     /// </summary>
     public (int Start, int End) ApplyFormat(int start, int end, InlineFormatKind kind, string? color = null)
     {
-        if (kind == InlineFormatKind.Bold && _type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+        if (kind == InlineFormatKind.Bold && _type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
             return (start, end);
 
         _previousContent = _cachedFlatContent;
@@ -554,6 +554,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 BlockType.Heading1 => T("Heading1"),
                 BlockType.Heading2 => T("Heading2"),
                 BlockType.Heading3 => T("Heading3"),
+                BlockType.Heading4 => T("Heading4"),
                 BlockType.Quote => T("Quote"),
                 BlockType.Code => T("Code"),
                 BlockType.BulletList => T("ListItem"),
@@ -614,7 +615,7 @@ public class BlockViewModel : INotifyPropertyChanged
     {
         _id = Guid.NewGuid().ToString();
         _type = type;
-        var defaultStyle = type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 ? new TextStyle(Bold: true) : TextStyle.Default;
+        var defaultStyle = type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4 ? new TextStyle(Bold: true) : TextStyle.Default;
         _spans = new List<InlineSpan> { new TextSpan(content ?? string.Empty, defaultStyle) };
         _cachedFlatContent = content ?? string.Empty;
         _meta = new Dictionary<string, object>();

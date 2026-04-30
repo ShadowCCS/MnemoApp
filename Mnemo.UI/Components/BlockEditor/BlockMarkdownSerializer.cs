@@ -43,6 +43,7 @@ public static class BlockMarkdownSerializer
             BlockType.Heading1 => $"# {body}",
             BlockType.Heading2 => $"## {body}",
             BlockType.Heading3 => $"### {body}",
+            BlockType.Heading4 => $"#### {body}",
             BlockType.BulletList => $"- {body}",
             BlockType.NumberedList => $"{block.ListNumberIndex}. {body}",
             BlockType.Checklist => block.IsChecked ? $"- [x] {body}" : $"- [ ] {body}",
@@ -161,7 +162,13 @@ public static class BlockMarkdownSerializer
                 continue;
             }
 
-            // Headings (must check ### before ## before #)
+            // Headings (must check #### before ### before ## before #)
+            if (trimmed.StartsWith("#### ", StringComparison.Ordinal))
+            {
+                result.Add(CreateBlockWithContent(BlockType.Heading4, trimmed["#### ".Length..].Trim(), order++));
+                i++;
+                continue;
+            }
             if (trimmed.StartsWith("### ", StringComparison.Ordinal))
             {
                 result.Add(CreateBlockWithContent(BlockType.Heading3, trimmed["### ".Length..].Trim(), order++));

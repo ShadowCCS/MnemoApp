@@ -44,6 +44,7 @@ public static class NoteBlockMarkdownConverter
             BlockType.Heading1 => $"# {body}",
             BlockType.Heading2 => $"## {body}",
             BlockType.Heading3 => $"### {body}",
+            BlockType.Heading4 => $"#### {body}",
             BlockType.BulletList => $"- {body}",
             BlockType.NumberedList => $"{listNum}. {body}",
             BlockType.Checklist => isChecked ? $"- [x] {body}" : $"- [ ] {body}",
@@ -152,6 +153,13 @@ public static class NoteBlockMarkdownConverter
                     Meta = new Dictionary<string, object>()
                 };
                 result.Add(codeBlock);
+                continue;
+            }
+
+            if (trimmed.StartsWith("#### ", StringComparison.Ordinal))
+            {
+                result.Add(CreateRichBlock(BlockType.Heading4, trimmed["#### ".Length..].Trim(), order++));
+                i++;
                 continue;
             }
 
@@ -272,7 +280,7 @@ public static class NoteBlockMarkdownConverter
         if (type == BlockType.Divider)
             return b;
         b.Spans = InlineMarkdownParser.ToSpans(content ?? string.Empty);
-        if (type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+        if (type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
             EnsureHeadingBold(b);
         return b;
     }

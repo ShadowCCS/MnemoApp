@@ -38,6 +38,7 @@ public sealed class SettingsToolService
         ["User.ProfilePicture"] = new("User", false, string.Empty, v => v?.ToString() ?? string.Empty),
         ["Editor.AutoSave"] = new("Editor", true, true, CoerceBool),
         ["Editor.SpellCheck"] = new("Editor", true, true, CoerceBool),
+        ["Editor.SpellCheckLanguages"] = new("Editor", true, "en", v => v?.ToString() ?? "en"),
         ["Editor.Width"] = new("Editor", true, "Wide", v => v?.ToString() ?? "Wide"),
         ["AI.EnableAssistant"] = new("AI", true, true, CoerceBool),
         ["AI.SmartUnitGeneration"] = new("AI", true, false, CoerceBool),

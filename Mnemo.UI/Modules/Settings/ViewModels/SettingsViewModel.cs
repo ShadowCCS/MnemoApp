@@ -220,6 +220,14 @@ public partial class SettingsViewModel : ViewModelBase
         var editorGroup = new SettingsGroupViewModel(T("WritingExperience"), isCollapsible: true);
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.AutoSave", T("AutoSave"), T("AutoSaveDescription"), true));
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.SpellCheck", T("SpellCheck"), T("SpellCheckDescription"), true));
+        editorGroup.Items.Add(new DropdownSettingViewModel(
+            _settingsService,
+            "Editor.SpellCheckLanguages",
+            T("SpellCheckLanguages"),
+            T("SpellCheckLanguagesDescription"),
+            new[] { "en", "de", "es", "nb" },
+            new[] { T("SpellCheckLanguageEnglish"), T("SpellCheckLanguageGerman"), T("SpellCheckLanguageSpanish"), T("SpellCheckLanguageNorwegianBokmal") },
+            "en"));
         editorGroup.Items.Add(new StepSliderSettingViewModel(_settingsService, "Editor.Width", T("EditorWidth"), T("EditorWidthDescription"), new[] { T("SuperCompact"), T("Compact"), T("Wide"), T("SuperWide") }, T("Wide")));
 
         var markdownGroup = new SettingsGroupViewModel(T("MarkdownRendering"), isCollapsible: true);

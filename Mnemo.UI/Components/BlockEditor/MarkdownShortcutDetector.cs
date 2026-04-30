@@ -14,6 +14,7 @@ public class MarkdownShortcutDetector
         ["#"] = (BlockType.Heading1, null),
         ["##"] = (BlockType.Heading2, null),
         ["###"] = (BlockType.Heading3, null),
+        ["####"] = (BlockType.Heading4, null),
         ["-"] = (BlockType.BulletList, null),
         ["*"] = (BlockType.BulletList, null),
         ["[]"] = (BlockType.Checklist, null),

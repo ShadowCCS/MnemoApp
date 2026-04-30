@@ -13,6 +13,7 @@
     <PackageReference Include="PvRecorder" Version="1.2.13" />
     <PackageReference Include="System.Management" Version="10.0.0" />
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
+    <PackageReference Include="WeCantSpell.Hunspell" Version="7.0.1" />
     <PackageReference Include="Whisper.net" Version="1.9.0" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
     <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.0" />
@@ -28,6 +29,9 @@
     <EmbeddedResource Include="Languages\*.json" />
     <EmbeddedResource Include="Seed\WelcomeNote.json" />
     <EmbeddedResource Include="Seed\welcome-mitochondrion.png" />
+    <Content Include="Dictionaries\Spellcheck\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="skills\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

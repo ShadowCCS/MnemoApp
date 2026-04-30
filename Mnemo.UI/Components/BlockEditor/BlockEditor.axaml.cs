@@ -18,6 +18,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Formatting;
@@ -113,6 +114,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     /// <summary>Optional: image import when pasting paths / duplicating / hydrating clipboard blocks.</summary>
     public IImageAssetService? ImageAssetService { get; set; }
+    private static readonly TimeSpan OrphanImageDeleteDelay = TimeSpan.FromSeconds(2);
+    private static readonly object PendingOrphanImageDeletesGate = new();
+    private static readonly Dictionary<string, CancellationTokenSource> PendingOrphanImageDeletes = new(StringComparer.OrdinalIgnoreCase);
 
     public static readonly StyledProperty<bool> IsReadOnlyProperty =
         AvaloniaProperty.Register<BlockEditor, bool>(nameof(IsReadOnly), defaultValue: false);
@@ -205,6 +209,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         DataContext = this;
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragOverEvent, Editor_DragOver_BlockGhost, RoutingStrategies.Bubble);
+        AddHandler(DragDrop.DropEvent, Editor_Drop, RoutingStrategies.Bubble);
         AddHandler(DragDrop.DragLeaveEvent, Editor_DragLeave, RoutingStrategies.Bubble);
         AddHandler(PointerPressedEvent, Editor_PointerPressedTunnel, RoutingStrategies.Tunnel);
         AddHandler(PointerPressedEvent, Editor_PointerPressedBubble, RoutingStrategies.Bubble, handledEventsToo: true);
@@ -267,11 +272,68 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private void Editor_DragOver_BlockGhost(object? sender, DragEventArgs e)
     {
-        if (_blockDragGhostBorder == null || _blockDragGhostOverlay == null) return;
         if (!e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat)
-            && !e.DataTransfer.Contains(BlockViewModel.BlockReorderDragPayload.Format)) return;
+            && !e.DataTransfer.Contains(BlockViewModel.BlockReorderDragPayload.Format))
+        {
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+
+        if (!TryResolveBlockReorderPayload(e, out var payload) || payload == null)
+        {
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+
         var pos = e.GetPosition(this);
-        UpdateBlockDragGhostFromEditorPoint(pos);
+        if (_blockDragGhostBorder != null && _blockDragGhostOverlay != null)
+            UpdateBlockDragGhostFromEditorPoint(pos);
+
+        e.DragEffects = DragDropEffects.Move;
+        HandleBlockDragOver(pos, payload);
+    }
+
+    private static bool TryResolveBlockReorderPayload(DragEventArgs e, out BlockViewModel.BlockReorderDragPayload? payload)
+    {
+        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockReorderDragPayload.Format) is BlockViewModel.BlockReorderDragPayload p)
+        {
+            payload = p;
+            return true;
+        }
+
+        if (e.DataTransfer.TryGetValue(BlockViewModel.BlockDragDataFormat) is not { } vm)
+        {
+            payload = null;
+            return false;
+        }
+
+        payload = new BlockViewModel.BlockReorderDragPayload
+        {
+            Primary = vm,
+            BlocksInDocumentOrder = new[] { vm }
+        };
+        return true;
+    }
+
+    private void Editor_Drop(object? sender, DragEventArgs e)
+    {
+        if (e.Handled) return;
+        if (!TryResolveBlockReorderPayload(e, out var payload) || payload == null) return;
+
+        try
+        {
+            if (!TryPerformDrop(payload))
+                BlockEditorLogger.LogError("Drop failed: invalid insert index or block", null);
+            e.Handled = true;
+        }
+        catch (Exception ex)
+        {
+            BlockEditorLogger.LogError("Error during drop operation", ex);
+        }
+        finally
+        {
+            ClearDropIndicator();
+        }
     }
 
     private void Editor_DragLeave(object? sender, DragEventArgs e)
@@ -489,6 +551,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void SubscribeToBlock(BlockViewModel block)
     {
+        CancelPendingOrphanImageDeletesForBlock(block);
         block.ContentChanged += OnBlockContentChanged;
         block.PropertyChanged += OnBlockPropertyChanged;
         block.DeleteRequested += OnBlockDeleteRequested;
@@ -1975,7 +2038,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// (e.g. "# Title" must become a heading, not literal text in a Text block).
     /// </summary>
     private static bool IsStructuralBlockTypeForLineStartPaste(BlockType t) =>
-        t is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3
+        t is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4
         or BlockType.BulletList or BlockType.NumberedList or BlockType.Checklist
         or BlockType.Quote;
 
@@ -2914,22 +2977,78 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (string.IsNullOrWhiteSpace(path)) return;
         if (!MnemoAppPaths.IsPathUnderImagesDirectory(path)) return;
         if (AnyOtherImageBlockUsesPath(path, removedBlock)) return;
+        var normalizedPath = NormalizePathForImageCompare(path);
+        if (normalizedPath == null) return;
 
         var svc = ResolveImageAssetService();
         if (svc == null) return;
-        var pathCopy = path;
-        _ = DeleteOrphanImageFileAsync(svc, pathCopy);
+        var cts = new CancellationTokenSource();
+        lock (PendingOrphanImageDeletesGate)
+        {
+            if (PendingOrphanImageDeletes.TryGetValue(normalizedPath, out var previous))
+            {
+                previous.Cancel();
+                previous.Dispose();
+            }
+            PendingOrphanImageDeletes[normalizedPath] = cts;
+        }
+        _ = DeleteOrphanImageFileAfterDelayAsync(svc, normalizedPath, removedBlock, cts);
     }
 
-    private static async Task DeleteOrphanImageFileAsync(IImageAssetService svc, string path)
+    private async Task DeleteOrphanImageFileAfterDelayAsync(
+        IImageAssetService svc,
+        string normalizedPath,
+        BlockViewModel removedBlock,
+        CancellationTokenSource cts)
     {
         try
         {
-            await svc.DeleteStoredFileAsync(path).ConfigureAwait(false);
+            await Task.Delay(OrphanImageDeleteDelay, cts.Token).ConfigureAwait(false);
+            if (cts.IsCancellationRequested) return;
+            if (AnyOtherImageBlockUsesPath(normalizedPath, removedBlock)) return;
+            await svc.DeleteStoredFileAsync(normalizedPath, cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when undo/redo or reparenting reuses the same image path.
         }
         catch
         {
             // Best-effort; avoid surfacing IO errors from background cleanup.
+        }
+        finally
+        {
+            lock (PendingOrphanImageDeletesGate)
+            {
+                if (PendingOrphanImageDeletes.TryGetValue(normalizedPath, out var current) && ReferenceEquals(current, cts))
+                    PendingOrphanImageDeletes.Remove(normalizedPath);
+            }
+            cts.Dispose();
+        }
+    }
+
+    private void CancelPendingOrphanImageDeletesForBlock(BlockViewModel block)
+    {
+        if (block.Type == BlockType.Image)
+            CancelPendingOrphanImageDelete(block.ImagePath);
+
+        if (block is not TwoColumnBlockViewModel tc) return;
+        foreach (var c in tc.LeftColumnBlocks)
+            CancelPendingOrphanImageDeletesForBlock(c);
+        foreach (var c in tc.RightColumnBlocks)
+            CancelPendingOrphanImageDeletesForBlock(c);
+    }
+
+    private void CancelPendingOrphanImageDelete(string? path)
+    {
+        var normalizedPath = NormalizePathForImageCompare(path);
+        if (normalizedPath == null) return;
+        lock (PendingOrphanImageDeletesGate)
+        {
+            if (!PendingOrphanImageDeletes.Remove(normalizedPath, out var cts))
+                return;
+            cts.Cancel();
+            cts.Dispose();
         }
     }
 
@@ -4202,10 +4321,27 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private CaretState? CaptureCaretState()
     {
         var focused = BlockHierarchy.FindFocused(Blocks);
-        if (focused == null) return null;
-        var editableBlock = GetEditableBlockForViewModel(focused);
-        var caretIdx = editableBlock?.GetCaretIndex();
-        return new CaretState { BlockId = focused.Id, CaretPosition = caretIdx ?? 0 };
+        if (focused != null)
+            return CaptureCaretStateForBlock(focused);
+
+        // Context menus (spellcheck suggestions, etc.) can temporarily move keyboard focus
+        // away from the editor while still editing the last focused block.
+        if (!string.IsNullOrEmpty(_focusedBlockId))
+        {
+            var lastFocused = BlockHierarchy.FindById(Blocks, _focusedBlockId);
+            if (lastFocused != null)
+                return CaptureCaretStateForBlock(lastFocused);
+        }
+
+        return null;
+    }
+
+    private CaretState CaptureCaretStateForBlock(BlockViewModel block, int fallbackPosition = 0)
+    {
+        var editableBlock = GetEditableBlockForViewModel(block);
+        var max = Math.Max(0, block.Content?.Length ?? 0);
+        var caretPos = Math.Clamp(editableBlock?.GetCaretIndex() ?? fallbackPosition, 0, max);
+        return new CaretState { BlockId = block.Id, CaretPosition = caretPos };
     }
 
     /// <summary>
@@ -4434,7 +4570,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                         _typingBatchRunsBefore, block.Content, previousText);
                 }
             }
-            _typingBatchCaretBefore = CaptureCaretState() ?? new CaretState { BlockId = block.Id, CaretPosition = 0 };
+            _typingBatchCaretBefore = CaptureCaretState()
+                ?? CaptureCaretStateForBlock(block);
             BlockEditorLogger.Log($"TrackTypingEdit: NEW batch for block {block.Id} before={Truncate(previousText)} current={Truncate(block.Content)}");
         }
 
@@ -4491,9 +4628,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var textBefore = Core.Formatting.InlineSpanFormatApplier.Flatten(runsBefore);
         var textAfter = vm.Content ?? string.Empty;
 
-        var editableBlock = GetEditableBlockForViewModel(vm);
-        var caretIdx = editableBlock?.GetCaretIndex();
-        var caretAfter = new CaretState { BlockId = vm.Id, CaretPosition = caretIdx ?? 0 };
+        var caretAfter = CaptureCaretStateForBlock(vm);
 
         BlockEditorLogger.Log($"FlushTypingBatch: PUSH TextEditOp block={vm.Id} before={Truncate(textBefore)} after={Truncate(textAfter)}");
 

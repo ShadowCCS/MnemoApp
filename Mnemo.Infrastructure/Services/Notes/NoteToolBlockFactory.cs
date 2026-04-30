@@ -48,7 +48,7 @@ internal static class NoteToolBlockFactory
         }
 
         b.Spans = InlineMarkdownParser.ToSpans(p.Content ?? string.Empty);
-        if (bt is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+        if (bt is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
             EnsureHeadingBold(b);
 
         if (bt == BlockType.Checklist)

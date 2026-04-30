@@ -80,22 +80,23 @@ public class KeyboardHandler
     private void HandleEnter(KeyEventArgs e, RichTextEditor editor, BlockViewModel viewModel, string text, int caretIndex, int selectionLength)
     {
         e.Handled = true;
+
+        // Unified behavior across regular blocks and split columns:
+        // Enter => structural split/new block, Ctrl/Cmd+Enter => in-block newline.
+        bool explicitNewLine = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Meta)) != 0
+            && (e.KeyModifiers & KeyModifiers.Alt) == 0;
+        if (explicitNewLine)
+        {
+            editor.InsertTextAtCaret("\n");
+            return;
+        }
+
         if (viewModel.Type == BlockType.Image)
         {
-            editor.InsertTextAtCaret("\n");
+            EnterPressed?.Invoke();
             return;
         }
-        // Split column: Enter inserts a newline in non-empty text; whitespace-only line exits (handled in EditableBlock).
-        if (viewModel.OwnerTwoColumn != null)
-        {
-            if (selectionLength == 0 && QuoteEnterBehavior.IsCaretOnWhitespaceOnlyLine(text, caretIndex))
-            {
-                EnterPressed?.Invoke();
-                return;
-            }
-            editor.InsertTextAtCaret("\n");
-            return;
-        }
+
         if (viewModel.Type == BlockType.Quote)
         {
             if (selectionLength == 0 && QuoteEnterBehavior.IsCaretOnWhitespaceOnlyLine(text, caretIndex))
@@ -104,7 +105,7 @@ public class KeyboardHandler
                 return;
             }
 
-            editor.InsertTextAtCaret("\n");
+            EnterPressed?.Invoke();
             return;
         }
 

@@ -12,6 +12,7 @@ public static class BlockFactory
             BlockType.Heading1 => new BlockViewModel(type, "", order),
             BlockType.Heading2 => new BlockViewModel(type, "", order),
             BlockType.Heading3 => new BlockViewModel(type, "", order),
+            BlockType.Heading4 => new BlockViewModel(type, "", order),
             BlockType.Code => CreateCodeBlock(order),
             BlockType.BulletList => new BlockViewModel(type, "", order),
             BlockType.NumberedList => new BlockViewModel(type, "", order),

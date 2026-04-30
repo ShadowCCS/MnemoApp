@@ -96,6 +96,7 @@ public partial class SlashCommandMenu : UserControl
             new() { IconPath = iconBase + "h-1.svg", Name = T("Heading1"), Description = T("Heading1Description"), Shortcut = "#", BlockType = BlockType.Heading1 },
             new() { IconPath = iconBase + "h-2.svg", Name = T("Heading2"), Description = T("Heading2Description"), Shortcut = "##", BlockType = BlockType.Heading2 },
             new() { IconPath = iconBase + "h-3.svg", Name = T("Heading3"), Description = T("Heading3Description"), Shortcut = "###", BlockType = BlockType.Heading3 },
+            new() { IconPath = iconBase + "h-3.svg", Name = T("Heading4"), Description = T("Heading4Description"), Shortcut = "####", BlockType = BlockType.Heading4 },
             new() { IconPath = iconBase + "list.svg", Name = T("BulletList"), Description = T("BulletListDescription"), Shortcut = "-", BlockType = BlockType.BulletList },
             new() { IconPath = iconBase + "list-numbers.svg", Name = T("NumberedList"), Description = T("NumberedListDescription"), Shortcut = "1.", BlockType = BlockType.NumberedList },
             new() { IconPath = iconBase + "list-check.svg", Name = T("Checklist"), Description = T("ChecklistDescription"), Shortcut = "[]", BlockType = BlockType.Checklist },

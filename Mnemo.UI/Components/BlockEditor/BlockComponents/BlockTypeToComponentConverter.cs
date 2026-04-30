@@ -6,6 +6,7 @@ using Mnemo.UI.Components.BlockEditor.BlockComponents.Text;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Heading1;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Heading2;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Heading3;
+using Mnemo.UI.Components.BlockEditor.BlockComponents.Heading4;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Quote;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Code;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Divider;
@@ -32,6 +33,7 @@ public class BlockTypeToComponentConverter : IValueConverter
             BlockType.Heading1 => new Heading1BlockComponent(),
             BlockType.Heading2 => new Heading2BlockComponent(),
             BlockType.Heading3 => new Heading3BlockComponent(),
+            BlockType.Heading4 => new Heading4BlockComponent(),
             BlockType.Quote => new QuoteBlockComponent(),
             BlockType.Code => new CodeBlockComponent(),
             BlockType.Divider => new DividerBlockComponent(),

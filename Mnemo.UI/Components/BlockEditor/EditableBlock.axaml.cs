@@ -42,6 +42,8 @@ public partial class EditableBlock : UserControl
     private BlockEditor? _cachedParentEditor;
     private BlockComponentBase? _currentBlockComponent;
     private RichTextEditor? _currentEditor;
+    private IDisposable? _selectionStartSubscription;
+    private IDisposable? _selectionEndSubscription;
     private EventHandler<KeyEventArgs>? _backspaceTunnelHandler;
     private bool _backspaceHandledInTunnel;
     private string? _slashMenuOverlayId;
@@ -312,9 +314,8 @@ public partial class EditableBlock : UserControl
                 editor.AddHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler, Avalonia.Interactivity.RoutingStrategies.Tunnel);
 
                 editor.PointerReleased += OnTextBoxPointerReleasedForToolbar;
-                editor.PointerMoved += OnTextBoxPointerMovedForToolbar;
-                editor.KeyUp += OnTextBoxKeyUpForToolbar;
                 editor.InlineEquationEdited += OnInlineEquationEdited;
+                AttachSelectionChangeHandlers(editor);
             }
             else
             {
@@ -397,17 +398,54 @@ public partial class EditableBlock : UserControl
 
     private void RemoveBackspaceTunnelHandler()
     {
+        DetachSelectionChangeHandlers();
         if (_currentEditor != null)
         {
             _currentEditor.ExternalLinkNavigationRequested = null;
             if (_backspaceTunnelHandler != null)
                 _currentEditor.RemoveHandler(InputElement.KeyDownEvent, _backspaceTunnelHandler);
             _currentEditor.PointerReleased -= OnTextBoxPointerReleasedForToolbar;
-            _currentEditor.PointerMoved -= OnTextBoxPointerMovedForToolbar;
-            _currentEditor.KeyUp -= OnTextBoxKeyUpForToolbar;
             _currentEditor = null;
             _backspaceTunnelHandler = null;
         }
+    }
+
+    private void AttachSelectionChangeHandlers(RichTextEditor editor)
+    {
+        DetachSelectionChangeHandlers();
+        _selectionStartSubscription = editor.GetObservable(RichTextEditor.SelectionStartProperty)
+            .Subscribe(new SelectionChangedObserver(OnEditorSelectionChanged));
+        _selectionEndSubscription = editor.GetObservable(RichTextEditor.SelectionEndProperty)
+            .Subscribe(new SelectionChangedObserver(OnEditorSelectionChanged));
+    }
+
+    private void DetachSelectionChangeHandlers()
+    {
+        _selectionStartSubscription?.Dispose();
+        _selectionStartSubscription = null;
+        _selectionEndSubscription?.Dispose();
+        _selectionEndSubscription = null;
+    }
+
+    private void OnEditorSelectionChanged()
+    {
+        Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
+    }
+
+    private sealed class SelectionChangedObserver : IObserver<int>
+    {
+        private readonly Action _onNext;
+
+        public SelectionChangedObserver(Action onNext)
+        {
+            _onNext = onNext;
+        }
+
+        public void OnCompleted() { }
+
+        public void OnError(Exception error) { }
+
+        public void OnNext(int value) => _onNext();
     }
     
     private void OnBackspaceTunnelKeyDown(object? sender, KeyEventArgs e)
@@ -931,7 +969,7 @@ public partial class EditableBlock : UserControl
             return false;
 
         if (kind == InlineFormatKind.Bold
-            && _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+            && _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
             return false;
 
         string? color = null;
@@ -1406,35 +1444,18 @@ public partial class EditableBlock : UserControl
     {
         if (_stickySubSup != null && sender is RichTextEditor editor)
             ClearStickySubSup(editor);
-        Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
-    }
-
-    private void OnTextBoxPointerMovedForToolbar(object? sender, PointerEventArgs e)
-    {
-        if (sender is not RichTextEditor editor) return;
-        if (!e.GetCurrentPoint(editor).Properties.IsLeftButtonPressed) return;
-        var start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
-        var end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
-        if (end <= start) return;
-        _cachedSelectionRange = (start, end);
-        if (_formattingToolbarOverlayId == null)
-            ShowFormattingToolbar();
-        else
-            UpdateFormattingToolbarState();
-    }
-
-    private void OnTextBoxKeyUpForToolbar(object? sender, KeyEventArgs e)
-    {
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ||
-            e.Key == Key.Left || e.Key == Key.Right || e.Key == Key.Up || e.Key == Key.Down ||
-            e.Key == Key.Home || e.Key == Key.End)
-        {
-            Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
-        }
     }
 
     private void CheckSelectionAndToggleToolbar()
     {
+        var parentEditor = FindParentBlockEditor();
+        if (parentEditor?.HasCrossBlockTextSelection() == true && _viewModel?.IsFocused != true)
+        {
+            _cachedSelectionRange = null;
+            CloseFormattingToolbar();
+            return;
+        }
+
         var range = GetSelectionRange();
         if (range != null && range.Value.end > range.Value.start)
         {
@@ -1567,7 +1588,7 @@ public partial class EditableBlock : UserControl
             state.bold, state.italic, state.underline, state.strikethrough,
             state.highlight, state.backgroundColor, state.hasLink,
             subActive, supActive);
-        var heading = _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3;
+        var heading = _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4;
         _currentFormattingToolbar.SetBoldButtonEnabled(!heading);
     }
 
@@ -1992,7 +2013,7 @@ public partial class EditableBlock : UserControl
         if (editor == null || _viewModel == null) return;
 
         if (kind == InlineFormatKind.Bold
-            && _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+            && _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
             return;
 
         var range = GetSelectionRange() ?? _cachedSelectionRange;
@@ -2292,6 +2313,7 @@ public partial class EditableBlock : UserControl
         if (parent == null) return;
 
         parent.HandleBlockDragOver(cursorInEditor, payload);
+        e.Handled = true;
     }
 
     public void ShowDropLineAtLeft()
@@ -2344,6 +2366,8 @@ public partial class EditableBlock : UserControl
         {
             parent.ClearDropIndicator();
         }
+
+        e.Handled = true;
     }
 
     /// <summary>This block's RTE only — never the globally focused editor (cross-block selection must paint on each block).</summary>

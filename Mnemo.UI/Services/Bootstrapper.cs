@@ -25,6 +25,7 @@ using Mnemo.Infrastructure.Services.Packaging;
 using Mnemo.Infrastructure.Services.Packaging.PayloadHandlers;
 using Mnemo.Infrastructure.Services.ImportExport;
 using Mnemo.Infrastructure.Services.ImportExport.Adapters;
+using Mnemo.Infrastructure.Services.Spellcheck;
 
 namespace Mnemo.UI.Services;
 
@@ -50,6 +51,9 @@ public static class Bootstrapper
         services.AddSingleton<INoteClipboardPlatformService, NoteClipboardPlatformService>();
         services.AddSingleton<IImageAssetService, ImageAssetService>();
         services.AddSingleton<ITextShortcutService, TextShortcutService>();
+        services.AddSingleton<ISpellDictionaryCatalogService, SpellDictionaryCatalogService>();
+        services.AddSingleton<IUserSpellbookService, UserSpellbookService>();
+        services.AddSingleton<ISpellcheckService, HunspellSpellcheckService>();
 
         // AI Services
         services.AddSingleton<IPlatformHardwareGpuProvider>(sp =>

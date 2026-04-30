@@ -553,7 +553,7 @@ public sealed class NotesToolService
 
         NoteDocumentHelper.EnsureBlocks(note);
         var headings = note.Blocks!
-            .Where(b => b.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3)
+            .Where(b => b.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
             .OrderBy(b => b.Order)
             .Select(b =>
             {

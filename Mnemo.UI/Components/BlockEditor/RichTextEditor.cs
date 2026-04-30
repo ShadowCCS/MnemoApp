@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -141,6 +142,23 @@ public class RichTextEditor : Control, ICustomHitTest
     /// <summary>Escape sets this so <see cref="Closed"/> does not commit to the document.</summary>
     private bool _inlineEqSuppressCloseCommit;
     private int? _hoveredInlineEquationCharIndex;
+    private readonly object _spellcheckSync = new();
+    private readonly List<SpellcheckIssue> _spellcheckIssues = [];
+    private DispatcherTimer? _spellcheckDebounceTimer;
+    private CancellationTokenSource? _spellcheckCts;
+    private bool _spellcheckEnabled = true;
+    private List<string> _spellcheckLanguages = ["en"];
+    private bool _spellcheckInitialized;
+    private string _lastSpellcheckText = string.Empty;
+
+    private static readonly string[] SpellcheckSettingKeys =
+    [
+        "Editor.SpellCheck",
+        "Editor.SpellCheckLanguages"
+    ];
+
+    private static ISpellcheckService? _spellcheckService;
+    private static ISettingsService? _settingsService;
 
     private sealed class InlineEquationEntry
     {
@@ -315,6 +333,7 @@ public class RichTextEditor : Control, ICustomHitTest
     {
         base.OnAttachedToVisualTree(e);
         StartCaretTimer();
+        _ = InitializeSpellcheckAsync();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -323,6 +342,13 @@ public class RichTextEditor : Control, ICustomHitTest
         StopCaretTimer();
         _inlineEqRebuildTimer?.Stop();
         _inlineEqRebuildTimer = null;
+        _spellcheckDebounceTimer?.Stop();
+        _spellcheckDebounceTimer = null;
+        _spellcheckCts?.Cancel();
+        _spellcheckCts?.Dispose();
+        _spellcheckCts = null;
+        if (_settingsService != null)
+            _settingsService.SettingChanged -= OnSettingChanged;
         DisposeLayouts();
     }
 
@@ -721,6 +747,7 @@ public class RichTextEditor : Control, ICustomHitTest
         if (_selectionEnd > selMax) SelectionEnd = selMax;
         RaiseEvent(new TextChangedEventArgs(TextChangedEvent));
         _ = RebuildInlineEquationsAsync();
+        ScheduleSpellcheck();
         var runs = Spans ?? Array.Empty<InlineSpan>();
         if (runs.Any(static s => s is EquationSpan))
         {
@@ -916,6 +943,7 @@ public class RichTextEditor : Control, ICustomHitTest
             if (_textLayout != null)
             {
                 _textLayout.Draw(context, origin);
+                RenderSpellcheckUnderlines(context);
                 RenderInlineEquations(context);
                 if (ShouldDrawWatermark() && _watermarkLayout != null)
                     _watermarkLayout.Draw(context, origin);
@@ -1214,6 +1242,13 @@ public class RichTextEditor : Control, ICustomHitTest
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
+        {
+            if (TryOpenSpellcheckContextMenu(e.GetPosition(this)))
+                e.Handled = true;
+            return;
+        }
+
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
         var pos = e.GetPosition(this);
@@ -1525,6 +1560,254 @@ public class RichTextEditor : Control, ICustomHitTest
         if ((Application.Current as App)?.Services is { } sp)
             _textShortcutService = sp.GetService<ITextShortcutService>();
         return _textShortcutService;
+    }
+
+    private static ISpellcheckService? ResolveSpellcheckService()
+    {
+        if (_spellcheckService != null) return _spellcheckService;
+        if ((Application.Current as App)?.Services is { } sp)
+            _spellcheckService = sp.GetService<ISpellcheckService>();
+        return _spellcheckService;
+    }
+
+    private static ISettingsService? ResolveSettingsService()
+    {
+        if (_settingsService != null) return _settingsService;
+        if ((Application.Current as App)?.Services is { } sp)
+            _settingsService = sp.GetService<ISettingsService>();
+        return _settingsService;
+    }
+
+    private async Task InitializeSpellcheckAsync()
+    {
+        if (_spellcheckInitialized)
+            return;
+        _spellcheckInitialized = true;
+
+        var settings = ResolveSettingsService();
+        if (settings == null)
+            return;
+
+        _spellcheckEnabled = await settings.GetAsync("Editor.SpellCheck", true).ConfigureAwait(false);
+        var languages = await settings.GetAsync("Editor.SpellCheckLanguages", "en").ConfigureAwait(false);
+        _spellcheckLanguages = ParseLanguageCodes(languages);
+        settings.SettingChanged += OnSettingChanged;
+        ScheduleSpellcheck(force: true);
+    }
+
+    private async void OnSettingChanged(object? sender, string key)
+    {
+        if (!SpellcheckSettingKeys.Contains(key, StringComparer.Ordinal))
+            return;
+
+        var settings = ResolveSettingsService();
+        if (settings == null)
+            return;
+
+        _spellcheckEnabled = await settings.GetAsync("Editor.SpellCheck", true).ConfigureAwait(false);
+        var languages = await settings.GetAsync("Editor.SpellCheckLanguages", "en").ConfigureAwait(false);
+        _spellcheckLanguages = ParseLanguageCodes(languages);
+        ScheduleSpellcheck(force: true);
+    }
+
+    private void ScheduleSpellcheck(bool force = false)
+    {
+        if (VisualRoot == null)
+            return;
+        if (force)
+            _lastSpellcheckText = string.Empty;
+
+        _spellcheckDebounceTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _spellcheckDebounceTimer.Tick -= OnSpellcheckDebounceTick;
+        _spellcheckDebounceTimer.Tick += OnSpellcheckDebounceTick;
+        _spellcheckDebounceTimer.Stop();
+        _spellcheckDebounceTimer.Start();
+    }
+
+    private async void OnSpellcheckDebounceTick(object? sender, EventArgs e)
+    {
+        _spellcheckDebounceTimer?.Stop();
+        await RunSpellcheckAsync().ConfigureAwait(false);
+    }
+
+    private async Task RunSpellcheckAsync()
+    {
+        var service = ResolveSpellcheckService();
+        if (service == null || !_spellcheckEnabled)
+        {
+            ClearSpellcheckIssues();
+            return;
+        }
+
+        var languages = _spellcheckLanguages.Count == 0 ? ["en"] : _spellcheckLanguages;
+        var spans = Spans ?? Array.Empty<InlineSpan>();
+        var currentText = Text;
+        if (string.Equals(currentText, _lastSpellcheckText, StringComparison.Ordinal))
+            return;
+
+        _spellcheckCts?.Cancel();
+        _spellcheckCts?.Dispose();
+        _spellcheckCts = new CancellationTokenSource();
+        try
+        {
+            var issues = await service.CheckAsync(spans, languages, _spellcheckCts.Token).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                lock (_spellcheckSync)
+                {
+                    _spellcheckIssues.Clear();
+                    _spellcheckIssues.AddRange(issues);
+                    _lastSpellcheckText = currentText;
+                }
+                InvalidateVisual();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Newer text input superseded this run.
+        }
+    }
+
+    private void ClearSpellcheckIssues()
+    {
+        lock (_spellcheckSync)
+        {
+            _spellcheckIssues.Clear();
+            _lastSpellcheckText = string.Empty;
+        }
+        InvalidateVisual();
+    }
+
+    private void RenderSpellcheckUnderlines(DrawingContext context)
+    {
+        if (_textLayout == null || !_spellcheckEnabled)
+            return;
+
+        var pen = new Pen(GetSpellcheckUnderlineBrush(), 1.2);
+        List<SpellcheckIssue> issues;
+        lock (_spellcheckSync)
+            issues = [.. _spellcheckIssues];
+
+        foreach (var issue in issues)
+        {
+            if (issue.Length <= 0)
+                continue;
+            int logicalStart = Math.Clamp(issue.Start, 0, TextLength);
+            int logicalEnd = Math.Clamp(issue.Start + issue.Length, 0, TextLength);
+            if (logicalEnd <= logicalStart)
+                continue;
+
+            var layoutStart = LogicalCaretToLayoutBoundary(logicalStart);
+            var layoutLen = LogicalCaretToLayoutBoundary(logicalEnd) - layoutStart;
+            if (layoutLen <= 0)
+                continue;
+
+            var rects = _textLayout.HitTestTextRange(layoutStart, layoutLen).ToList();
+            foreach (var rect in rects)
+            {
+                if (rect.Width <= 0.5 || rect.Height <= 0.5)
+                    continue;
+                var y = rect.Bottom - 1.0;
+                context.DrawLine(pen, new Point(rect.X, y), new Point(rect.Right, y));
+            }
+        }
+    }
+
+    private IBrush GetSpellcheckUnderlineBrush()
+    {
+        if (Application.Current?.TryFindResource("SystemFillColorCriticalBrush", out var resource) == true
+            && resource is IBrush brush)
+            return brush;
+        return new SolidColorBrush(Color.FromRgb(0xE0, 0x45, 0x45));
+    }
+
+    private bool TryOpenSpellcheckContextMenu(Point point)
+    {
+        if (!_spellcheckEnabled || IsReadOnly)
+            return false;
+
+        var idx = HitTestPoint(point);
+        if (!TryGetIssueAtIndex(idx, out var issue))
+            return false;
+
+        var items = new List<object>();
+        foreach (var suggestion in issue.Suggestions.Take(5))
+        {
+            var captured = suggestion;
+            var menuItem = new MenuItem
+            {
+                Header = captured,
+                Cursor = new Cursor(StandardCursorType.Hand)
+            };
+            menuItem.Click += (_, _) => ReplaceMisspelling(issue, captured);
+            items.Add(menuItem);
+        }
+
+        if (items.Count == 0)
+            items.Add(new MenuItem { Header = TNotes("NoSuggestions"), IsEnabled = false });
+
+        items.Add(new Separator());
+        var addWordItem = new MenuItem
+        {
+            Header = TNotes("AddWordToDictionary"),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        addWordItem.Click += async (_, _) => await AddWordToSpellbookAsync(issue.Word).ConfigureAwait(false);
+        items.Add(addWordItem);
+
+        var menu = new ContextMenu();
+        menu.ItemsSource = items;
+        menu.Open(this);
+        return true;
+    }
+
+    private bool TryGetIssueAtIndex(int index, out SpellcheckIssue issue)
+    {
+        lock (_spellcheckSync)
+        {
+            issue = _spellcheckIssues.FirstOrDefault(i => index >= i.Start && index < i.Start + i.Length)
+                ?? new SpellcheckIssue(0, 0, string.Empty, []);
+            return issue.Length > 0;
+        }
+    }
+
+    private void ReplaceMisspelling(SpellcheckIssue issue, string replacement)
+    {
+        SelectionStart = issue.Start;
+        SelectionEnd = issue.Start + issue.Length;
+        CaretIndex = SelectionEnd;
+        InsertText(replacement);
+        ScheduleSpellcheck(force: true);
+    }
+
+    private async Task AddWordToSpellbookAsync(string word)
+    {
+        var service = ResolveSpellcheckService();
+        if (service == null)
+            return;
+
+        try
+        {
+            await service.AddWordAsync(word, _spellcheckLanguages, CancellationToken.None).ConfigureAwait(false);
+            ScheduleSpellcheck(force: true);
+        }
+        catch (Exception)
+        {
+            // Keep editor responsive even if custom dictionary write fails.
+        }
+    }
+
+    private static List<string> ParseLanguageCodes(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return ["en"];
+
+        var values = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(static value => value.Replace('_', '-'))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return values.Count == 0 ? ["en"] : values;
     }
 
     private static bool TryPromoteFractionAtCaret(
