@@ -73,11 +73,19 @@
                 <Button.Flyout>
                     <MenuFlyout>
                         <MenuItem Header="{markup:T Ns=Flashcards, Key=RenameFolder}"
-                                  Click="OnRenameClick" />
+                                  Click="OnRenameClick">
+                            <MenuItem.Icon>
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/rename.svg" Width="16" Height="16" />
+                            </MenuItem.Icon>
+                        </MenuItem>
                         <Separator />
                         <MenuItem Classes="danger"
                                   Header="{markup:T Ns=Flashcards, Key=DeleteFolder}"
-                                  Click="OnDeleteClick" />
+                                  Click="OnDeleteClick">
+                            <MenuItem.Icon>
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16" />
+                            </MenuItem.Icon>
+                        </MenuItem>
                     </MenuFlyout>
                 </Button.Flyout>
             </Button>

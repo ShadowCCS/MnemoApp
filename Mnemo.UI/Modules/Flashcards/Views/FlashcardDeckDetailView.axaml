@@ -326,29 +326,29 @@
                                 <MenuFlyout Placement="BottomEdgeAlignedRight">
                                     <MenuItem Header="Settings" Command="{Binding OpenDeckSettingsCommand}">
                                         <MenuItem.Icon>
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/settings.svg" Width="16" Height="16" />
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/settings.svg" Width="16" Height="16" />
                                         </MenuItem.Icon>
                                     </MenuItem>
                                     <Separator />
                                     <MenuItem Header="{markup:T Ns=Flashcards, Key=RenameDeck}" Command="{Binding RenameDeckCommand}">
                                         <MenuItem.Icon>
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg" Width="16" Height="16" />
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/rename.svg" Width="16" Height="16" />
                                         </MenuItem.Icon>
                                     </MenuItem>
                                     <MenuItem Header="{markup:T Ns=Flashcards, Key=DuplicateDeck}" Command="{Binding DuplicateDeckCommand}">
                                         <MenuItem.Icon>
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16" />
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/duplicate.svg" Width="16" Height="16" />
                                         </MenuItem.Icon>
                                     </MenuItem>
-                                    <MenuItem Header="Transfer" Click="OnDeckTransferClick">
+                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=Transfer}" Click="OnDeckTransferClick">
                                         <MenuItem.Icon>
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg" Width="16" Height="16" />
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg" Width="16" Height="16" />
                                         </MenuItem.Icon>
                                     </MenuItem>
                                     <Separator />
                                     <MenuItem Classes="danger" Header="{markup:T Ns=Flashcards, Key=DeleteDeck}" Command="{Binding DeleteDeckCommand}">
                                         <MenuItem.Icon>
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/trashbin.svg" Width="16" Height="16" />
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16" />
                                         </MenuItem.Icon>
                                     </MenuItem>
                                 </MenuFlyout>

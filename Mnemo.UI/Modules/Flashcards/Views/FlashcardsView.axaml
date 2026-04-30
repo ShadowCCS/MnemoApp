@@ -225,7 +225,7 @@
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg"
                                                   Width="16" Height="16" />
-                                <TextBlock Text="Transfer" />
+                                <TextBlock Text="{markup:T Ns=Flashcards, Key=Transfer}" />
                             </StackPanel>
                         </Button>
                         <Button VerticalAlignment="Center"
@@ -326,27 +326,85 @@
                                                 <MenuFlyout Placement="BottomEdgeAlignedRight">
                                                     <MenuItem Header="{markup:T Ns=Flashcards, Key=OpenDeck}"
                                                               Command="{Binding #root.OpenDeckCommandProxy}"
-                                                              CommandParameter="{Binding}" />
-                                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=Practice}"
-                                                              Command="{Binding #root.StartQuickSessionCommandProxy}"
-                                                              CommandParameter="{Binding}" />
-                                                    <MenuItem Header="Rename"
+                                                              CommandParameter="{Binding}">
+                                                        <MenuItem.Icon>
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/open.svg"
+                                                                              Width="16" Height="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=Practice}">
+                                                        <MenuItem.Icon>
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/practice.svg"
+                                                                              Width="16" Height="16" />
+                                                        </MenuItem.Icon>
+                                                        <MenuItem Header="{markup:T Ns=Flashcards, Key=SessionReview}"
+                                                                  Command="{Binding #root.StartReviewSessionCommandProxy}"
+                                                                  CommandParameter="{Binding}" />
+                                                        <MenuItem Header="{markup:T Ns=Flashcards, Key=SessionQuick}"
+                                                                  Command="{Binding #root.StartQuickSessionCommandProxy}"
+                                                                  CommandParameter="{Binding}" />
+                                                        <MenuItem Header="{markup:T Ns=Flashcards, Key=SessionCram}"
+                                                                  Command="{Binding #root.StartCramSessionCommandProxy}"
+                                                                  CommandParameter="{Binding}" />
+                                                        <MenuItem Header="{markup:T Ns=Flashcards, Key=SessionTest}"
+                                                                  Command="{Binding #root.StartTestSessionCommandProxy}"
+                                                                  CommandParameter="{Binding}" />
+                                                    </MenuItem>
+                                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=RenameDeck}"
                                                               Tag="{Binding}"
-                                                              Click="OnDeckRenameClick" />
-                                                    <MenuItem Header="Duplicate"
+                                                              Click="OnDeckRenameClick">
+                                                        <MenuItem.Icon>
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/rename.svg"
+                                                                              Width="16" Height="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=DuplicateDeck}"
                                                               Tag="{Binding}"
-                                                              Click="OnDeckDuplicateClick" />
-                                                    <MenuItem Header="Export"
-                                                              Tag="{Binding}"
-                                                              Click="OnDeckExportClick" />
-                                                    <MenuItem Header="Settings"
+                                                              Click="OnDeckDuplicateClick">
+                                                        <MenuItem.Icon>
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/duplicate.svg"
+                                                                              Width="16" Height="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=Export}" Tag="{Binding}" Click="OnDeckExportClick">
+                                                        <MenuItem.Icon>
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg"
+                                                                              Width="16" Height="16" />
+                                                        </MenuItem.Icon>
+                                                        <MenuItem Header="{markup:T Ns=Flashcards, Key=ExportFormatMnemo}"
+                                                                  Tag="{Binding}"
+                                                                  CommandParameter="flashcards.mnemo"
+                                                                  Click="OnDeckExportClick" />
+                                                        <MenuItem Header="{markup:T Ns=Flashcards, Key=ExportFormatAnki}"
+                                                                  Tag="{Binding}"
+                                                                  CommandParameter="flashcards.anki"
+                                                                  Click="OnDeckExportClick" />
+                                                        <MenuItem Header="{markup:T Ns=Flashcards, Key=ExportFormatCsv}"
+                                                                  Tag="{Binding}"
+                                                                  CommandParameter="flashcards.csv"
+                                                                  Click="OnDeckExportClick" />
+                                                        <MenuItem Header="{markup:T Ns=Flashcards, Key=ChooseFormat}"
+                                                                  Tag="{Binding}"
+                                                                  Click="OnDeckExportClick" />
+                                                    </MenuItem>
+                                                    <MenuItem Header="{markup:T Ns=Settings, Key=Title}"
                                                               Command="{Binding #root.OpenDeckSettingsCommandProxy}"
-                                                              CommandParameter="{Binding}" />
+                                                              CommandParameter="{Binding}">
+                                                        <MenuItem.Icon>
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/settings.svg"
+                                                                              Width="16" Height="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
                                                     <Separator />
                                                     <MenuItem Classes="danger"
                                                               Header="{markup:T Ns=Flashcards, Key=DeleteDeck}"
                                                               Command="{Binding #root.DeleteDeckCommandProxy}"
-                                                              CommandParameter="{Binding}" />
+                                                              CommandParameter="{Binding}">
+                                                        <MenuItem.Icon>
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg"
+                                                                              Width="16" Height="16" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
                                                 </MenuFlyout>
                                             </Button.Flyout>
                                         </Button>

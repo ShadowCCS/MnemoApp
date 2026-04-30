@@ -31,6 +31,7 @@ public partial class MindmapOverviewView : UserControl
 
         var coordinator = services.GetService<IImportExportCoordinator>();
         var overlayService = services.GetService<IOverlayService>();
+        var localization = services.GetService<ILocalizationService>();
         if (coordinator == null || overlayService == null)
             return;
 
@@ -39,8 +40,8 @@ public partial class MindmapOverviewView : UserControl
         var capabilities = coordinator.GetCapabilities("mindmaps");
         var overlay = new TransferOverlay
         {
-            Title = "Mindmap Import / Export",
-            Description = "Choose format and settings."
+            Title = localization?.T("TransferOverlayTitle", "Mindmap") ?? "Mindmap Import / Export",
+            Description = localization?.T("TransferOverlayDescription", "Mindmap") ?? "Choose format and settings."
         };
         overlay.Initialize(capabilities, startTransfer);
         var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions

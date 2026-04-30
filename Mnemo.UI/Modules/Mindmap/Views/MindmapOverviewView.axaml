@@ -132,7 +132,7 @@
                             Tag="transfer">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg" Width="16" Height="16"/>
-                            <TextBlock Text="Transfer"/>
+                            <TextBlock Text="{markup:T Ns=Mindmap, Key=Transfer}"/>
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding CreateCommand}" 
@@ -239,11 +239,27 @@
                                                                           Color="{DynamicResource TextTertiaryBrush}"/>
                                                         <Button.Flyout>
                                                             <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                                                <MenuItem Header="Rename" Tag="{Binding}" Click="OnMindmapRenameClick"/>
-                                                                <MenuItem Header="Duplicate" Tag="{Binding}" Click="OnMindmapDuplicateClick"/>
-                                                                <MenuItem Header="Export" Tag="{Binding}" Click="OnMindmapExportClick"/>
+                                                                <MenuItem Header="{markup:T Ns=Mindmap, Key=Rename}" Tag="{Binding}" Click="OnMindmapRenameClick">
+                                                                    <MenuItem.Icon>
+                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/rename.svg" Width="16" Height="16"/>
+                                                                    </MenuItem.Icon>
+                                                                </MenuItem>
+                                                                <MenuItem Header="{markup:T Ns=Mindmap, Key=Duplicate}" Tag="{Binding}" Click="OnMindmapDuplicateClick">
+                                                                    <MenuItem.Icon>
+                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/duplicate.svg" Width="16" Height="16"/>
+                                                                    </MenuItem.Icon>
+                                                                </MenuItem>
+                                                                <MenuItem Header="{markup:T Ns=Mindmap, Key=Export}" Tag="{Binding}" Click="OnMindmapExportClick">
+                                                                    <MenuItem.Icon>
+                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg" Width="16" Height="16"/>
+                                                                    </MenuItem.Icon>
+                                                                </MenuItem>
                                                                 <Separator/>
-                                                                <MenuItem Header="Delete" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick"/>
+                                                                <MenuItem Header="{markup:T Ns=Mindmap, Key=Delete}" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick">
+                                                                    <MenuItem.Icon>
+                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16"/>
+                                                                    </MenuItem.Icon>
+                                                                </MenuItem>
                                                             </MenuFlyout>
                                                         </Button.Flyout>
                                                     </Button>
@@ -366,11 +382,27 @@
                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
                                                     <Button.Flyout>
                                                         <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                                            <MenuItem Header="Rename" Tag="{Binding}" Click="OnMindmapRenameClick"/>
-                                                            <MenuItem Header="Duplicate" Tag="{Binding}" Click="OnMindmapDuplicateClick"/>
-                                                            <MenuItem Header="Export" Tag="{Binding}" Click="OnMindmapExportClick"/>
+                                                            <MenuItem Header="{markup:T Ns=Mindmap, Key=Rename}" Tag="{Binding}" Click="OnMindmapRenameClick">
+                                                                <MenuItem.Icon>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/rename.svg" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{markup:T Ns=Mindmap, Key=Duplicate}" Tag="{Binding}" Click="OnMindmapDuplicateClick">
+                                                                <MenuItem.Icon>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/duplicate.svg" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{markup:T Ns=Mindmap, Key=Export}" Tag="{Binding}" Click="OnMindmapExportClick">
+                                                                <MenuItem.Icon>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
                                                             <Separator/>
-                                                            <MenuItem Header="Delete" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick"/>
+                                                            <MenuItem Header="{markup:T Ns=Mindmap, Key=Delete}" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick">
+                                                                <MenuItem.Icon>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
                                                         </MenuFlyout>
                                                     </Button.Flyout>
                                                 </Button>
@@ -489,11 +521,27 @@
                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
                                                     <Button.Flyout>
                                                         <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                                            <MenuItem Header="Rename" Tag="{Binding}" Click="OnMindmapRenameClick"/>
-                                                            <MenuItem Header="Duplicate" Tag="{Binding}" Click="OnMindmapDuplicateClick"/>
-                                                            <MenuItem Header="Export" Tag="{Binding}" Click="OnMindmapExportClick"/>
+                                                            <MenuItem Header="{markup:T Ns=Mindmap, Key=Rename}" Tag="{Binding}" Click="OnMindmapRenameClick">
+                                                                <MenuItem.Icon>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/rename.svg" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{markup:T Ns=Mindmap, Key=Duplicate}" Tag="{Binding}" Click="OnMindmapDuplicateClick">
+                                                                <MenuItem.Icon>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/duplicate.svg" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{markup:T Ns=Mindmap, Key=Export}" Tag="{Binding}" Click="OnMindmapExportClick">
+                                                                <MenuItem.Icon>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
                                                             <Separator/>
-                                                            <MenuItem Header="Delete" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick"/>
+                                                            <MenuItem Header="{markup:T Ns=Mindmap, Key=Delete}" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick">
+                                                                <MenuItem.Icon>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
                                                         </MenuFlyout>
                                                     </Button.Flyout>
                                                 </Button>

@@ -324,27 +324,48 @@ public partial class NoteTreeRow : UserControl
             return;
 
         var capabilities = coordinator.GetCapabilities("notes").Where(x => x.SupportsExport).ToArray();
-        var overlay = new TransferOverlay
+        var requestedFormatId = (sender as MenuItem)?.CommandParameter as string;
+        TransferOverlayResult? selected = null;
+        if (!string.IsNullOrWhiteSpace(requestedFormatId))
         {
-            Title = "Export Note",
-            Description = "Choose export format.",
-            ConfirmText = "Export"
-        };
-        overlay.Initialize(capabilities, defaultImport: false);
-        var id = overlayService.CreateOverlay(overlay, new OverlayOptions
-        {
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            ShowBackdrop = true
-        }, "TransferOverlay");
+            var preferred = capabilities.FirstOrDefault(x => string.Equals(x.FormatId, requestedFormatId, StringComparison.Ordinal));
+            if (preferred == null)
+            {
+                await overlayService.CreateDialogAsync("Export unavailable", "This export format is not available right now.").ConfigureAwait(true);
+                return;
+            }
 
-        var tcs = new TaskCompletionSource<TransferOverlayResult?>();
-        overlay.OnResult = result =>
+            selected = new TransferOverlayResult
+            {
+                IsImport = false,
+                Format = preferred
+            };
+        }
+        else
         {
-            overlayService.CloseOverlay(id);
-            tcs.TrySetResult(result);
-        };
-        var selected = await tcs.Task.ConfigureAwait(true);
+            var overlay = new TransferOverlay
+            {
+                Title = "Export Note",
+                Description = "Choose export format.",
+                ConfirmText = "Export"
+            };
+            overlay.Initialize(capabilities, defaultImport: false);
+            var id = overlayService.CreateOverlay(overlay, new OverlayOptions
+            {
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                ShowBackdrop = true
+            }, "TransferOverlay");
+
+            var tcs = new TaskCompletionSource<TransferOverlayResult?>();
+            overlay.OnResult = result =>
+            {
+                overlayService.CloseOverlay(id);
+                tcs.TrySetResult(result);
+            };
+            selected = await tcs.Task.ConfigureAwait(true);
+        }
+
         if (selected == null)
             return;
 

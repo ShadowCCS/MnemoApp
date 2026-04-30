@@ -23,7 +23,10 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
 
     public new event PropertyChangedEventHandler? PropertyChanged;
 
+    public IRelayCommand<FlashcardDeckRowViewModel?>? StartReviewSessionCommandProxy => (DataContext as FlashcardsViewModel)?.StartReviewSessionCommand;
     public IRelayCommand<FlashcardDeckRowViewModel?>? StartQuickSessionCommandProxy => (DataContext as FlashcardsViewModel)?.StartQuickSessionCommand;
+    public IRelayCommand<FlashcardDeckRowViewModel?>? StartCramSessionCommandProxy => (DataContext as FlashcardsViewModel)?.StartCramSessionCommand;
+    public IRelayCommand<FlashcardDeckRowViewModel?>? StartTestSessionCommandProxy => (DataContext as FlashcardsViewModel)?.StartTestSessionCommand;
     public IRelayCommand<FlashcardDeckRowViewModel?>? OpenDeckCommandProxy => (DataContext as FlashcardsViewModel)?.OpenDeckCommand;
     public IAsyncRelayCommand<FlashcardDeckRowViewModel?>? OpenDeckSettingsCommandProxy => (DataContext as FlashcardsViewModel)?.OpenDeckSettingsCommand;
     public IAsyncRelayCommand<FlashcardDeckRowViewModel?>? DeleteDeckCommandProxy => (DataContext as FlashcardsViewModel)?.DeleteDeckCommand;
@@ -42,7 +45,10 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StartReviewSessionCommandProxy)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StartQuickSessionCommandProxy)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StartCramSessionCommandProxy)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StartTestSessionCommandProxy)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenDeckCommandProxy)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenDeckSettingsCommandProxy)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DeleteDeckCommandProxy)));
@@ -194,6 +200,7 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
 
         var coordinator = services.GetService<IImportExportCoordinator>();
         var overlayService = services.GetService<IOverlayService>();
+        var localization = services.GetService<ILocalizationService>();
         if (coordinator == null || overlayService == null)
             return;
 
@@ -202,8 +209,8 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
         var capabilities = coordinator.GetCapabilities("flashcards");
         var overlay = new TransferOverlay
         {
-            Title = "Transfer Flashcards",
-            Description = "Choose format and settings."
+            Title = localization?.T("TransferOverlayTitle", "Flashcards") ?? "Transfer Flashcards",
+            Description = localization?.T("TransferOverlayDescription", "Flashcards") ?? "Choose format and settings."
         };
         overlay.Initialize(capabilities, startTransfer);
 
@@ -387,22 +394,43 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             return;
 
         var capabilities = coordinator.GetCapabilities("flashcards").Where(c => c.SupportsExport).ToArray();
-        var overlay = new TransferOverlay { Title = "Export Deck", Description = "Choose format and settings.", ConfirmText = "Export" };
-        overlay.Initialize(capabilities, defaultImport: false);
-        var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
+        var requestedFormatId = (sender as MenuItem)?.CommandParameter as string;
+        TransferOverlayResult? selected = null;
+        if (!string.IsNullOrWhiteSpace(requestedFormatId))
         {
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            ShowBackdrop = true,
-            CloseOnOutsideClick = true
-        }, "TransferOverlay");
-        var tcs = new TaskCompletionSource<TransferOverlayResult?>();
-        overlay.OnResult = result =>
+            var preferred = capabilities.FirstOrDefault(c => string.Equals(c.FormatId, requestedFormatId, StringComparison.Ordinal));
+            if (preferred == null)
+            {
+                await overlayService.CreateDialogAsync("Export unavailable", "This export format is not available right now.").ConfigureAwait(true);
+                return;
+            }
+
+            selected = new TransferOverlayResult
+            {
+                IsImport = false,
+                Format = preferred
+            };
+        }
+        else
         {
-            overlayService.CloseOverlay(overlayId);
-            tcs.TrySetResult(result);
-        };
-        var selected = await tcs.Task.ConfigureAwait(true);
+            var overlay = new TransferOverlay { Title = "Export Deck", Description = "Choose format and settings.", ConfirmText = "Export" };
+            overlay.Initialize(capabilities, defaultImport: false);
+            var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
+            {
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                ShowBackdrop = true,
+                CloseOnOutsideClick = true
+            }, "TransferOverlay");
+            var tcs = new TaskCompletionSource<TransferOverlayResult?>();
+            overlay.OnResult = result =>
+            {
+                overlayService.CloseOverlay(overlayId);
+                tcs.TrySetResult(result);
+            };
+            selected = await tcs.Task.ConfigureAwait(true);
+        }
+
         if (selected == null)
             return;
         var topLevel = TopLevel.GetTopLevel(this);

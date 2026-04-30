@@ -49,7 +49,10 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
 
     public IRelayCommand<FlashcardDeckRowViewModel?> OpenDeckCommand { get; }
 
+    public IRelayCommand<FlashcardDeckRowViewModel?> StartReviewSessionCommand { get; }
     public IRelayCommand<FlashcardDeckRowViewModel?> StartQuickSessionCommand { get; }
+    public IRelayCommand<FlashcardDeckRowViewModel?> StartCramSessionCommand { get; }
+    public IRelayCommand<FlashcardDeckRowViewModel?> StartTestSessionCommand { get; }
     public IAsyncRelayCommand<FlashcardDeckRowViewModel?> OpenDeckSettingsCommand { get; }
     public IAsyncRelayCommand<FlashcardDeckRowViewModel?> DeleteDeckCommand { get; }
 
@@ -81,7 +84,10 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
 
         RefreshCommand = new AsyncRelayCommand(LoadDecksAsync);
         OpenDeckCommand = new RelayCommand<FlashcardDeckRowViewModel?>(OpenDeck);
+        StartReviewSessionCommand = new RelayCommand<FlashcardDeckRowViewModel?>(StartReviewSession);
         StartQuickSessionCommand = new RelayCommand<FlashcardDeckRowViewModel?>(StartQuickSession);
+        StartCramSessionCommand = new RelayCommand<FlashcardDeckRowViewModel?>(StartCramSession);
+        StartTestSessionCommand = new RelayCommand<FlashcardDeckRowViewModel?>(StartTestSession);
         OpenDeckSettingsCommand = new AsyncRelayCommand<FlashcardDeckRowViewModel?>(OpenDeckSettingsAsync);
         DeleteDeckCommand = new AsyncRelayCommand<FlashcardDeckRowViewModel?>(DeleteDeckAsync);
         CreateDeckCommand = new AsyncRelayCommand(CreateDeckAsync);
@@ -198,17 +204,31 @@ public partial class FlashcardsViewModel : ViewModelBase, INavigationAware
         _navigation.NavigateTo("flashcard-deck", new FlashcardDeckNavigationParameter(row.Id));
     }
 
+    private void StartReviewSession(FlashcardDeckRowViewModel? row) =>
+        StartSession(row, FlashcardSessionType.Review);
+
     private void StartQuickSession(FlashcardDeckRowViewModel? row)
+    {
+        StartSession(row, FlashcardSessionType.Quick);
+    }
+
+    private void StartCramSession(FlashcardDeckRowViewModel? row) =>
+        StartSession(row, FlashcardSessionType.Cram);
+
+    private void StartTestSession(FlashcardDeckRowViewModel? row) =>
+        StartSession(row, FlashcardSessionType.Test);
+
+    private void StartSession(FlashcardDeckRowViewModel? row, FlashcardSessionType sessionType)
     {
         if (row == null || string.IsNullOrWhiteSpace(row.Id))
             return;
 
         var config = new FlashcardSessionConfig(
-            FlashcardSessionType.Review,
+            sessionType,
             row.Id,
             null,
             null,
-            false,
+            sessionType == FlashcardSessionType.Cram,
             null);
         _navigation.NavigateTo("flashcard-practice", new FlashcardPracticeNavigationParameter(row.Id, config));
     }

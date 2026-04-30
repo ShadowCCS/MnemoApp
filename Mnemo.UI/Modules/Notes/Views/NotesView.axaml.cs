@@ -311,6 +311,7 @@ public partial class NotesView : UserControl
 
         var coordinator = services.GetService<IImportExportCoordinator>();
         var overlayService = services.GetService<IOverlayService>();
+        var localization = services.GetService<ILocalizationService>();
         if (coordinator == null || overlayService == null)
             return;
 
@@ -319,8 +320,8 @@ public partial class NotesView : UserControl
         var capabilities = coordinator.GetCapabilities("notes");
         var overlay = new TransferOverlay
         {
-            Title = "Notes Import / Export",
-            Description = "Choose format and settings.",
+            Title = localization?.T("TransferOverlayTitle", "Notes") ?? "Notes Import / Export",
+            Description = localization?.T("TransferOverlayDescription", "Notes") ?? "Choose format and settings.",
             ConfirmText = "Continue",
             CancelText = "Cancel"
         };

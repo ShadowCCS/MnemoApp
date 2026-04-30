@@ -76,32 +76,43 @@
                        <MenuItem Header="{markup:T Ns=Notes, Key=NewNote}" Tag="{Binding}" Click="OnNewNoteClick"
                                  controls:MenuItemGestureHint.GestureHint="⌘N">
                            <MenuItem.Icon>
-                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg" Width="16" Height="16"/>
+                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/new.svg" Width="16" Height="16"/>
                            </MenuItem.Icon>
                        </MenuItem>
                        <MenuItem Header="{markup:T Ns=Notes, Key=Rename}" Tag="{Binding}" Click="OnRenameClick"
                                  controls:MenuItemGestureHint.GestureHint="⏎">
                            <MenuItem.Icon>
-                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg" Width="16" Height="16"/>
+                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/rename.svg" Width="16" Height="16"/>
                            </MenuItem.Icon>
                        </MenuItem>
                        <MenuItem Header="{markup:T Ns=Notes, Key=Duplicate}" Tag="{Binding}" Click="OnDuplicateClick"
                                  IsVisible="{Binding IsFolder, Converter={StaticResource BoolNegationConverter}}">
                            <MenuItem.Icon>
-                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16"/>
+                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/duplicate.svg" Width="16" Height="16"/>
                            </MenuItem.Icon>
                        </MenuItem>
-                       <MenuItem Header="Export" Tag="{Binding}" Click="OnExportClick"
+                       <MenuItem Header="{markup:T Ns=Notes, Key=Export}" Tag="{Binding}" Click="OnExportClick"
                                  IsVisible="{Binding IsFolder, Converter={StaticResource BoolNegationConverter}}">
                            <MenuItem.Icon>
-                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/download.svg" Width="16" Height="16"/>
+                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg" Width="16" Height="16"/>
                            </MenuItem.Icon>
+                           <MenuItem Header="Mnemo (.mnemo)"
+                                     Tag="{Binding}"
+                                     CommandParameter="notes.mnemo"
+                                     Click="OnExportClick" />
+                           <MenuItem Header="Markdown"
+                                     Tag="{Binding}"
+                                     CommandParameter="notes.markdown"
+                                     Click="OnExportClick" />
+                           <MenuItem Header="Choose format..."
+                                     Tag="{Binding}"
+                                     Click="OnExportClick" />
                        </MenuItem>
                        <Separator />
                        <MenuItem Classes="danger" Header="{markup:T Ns=Notes, Key=Delete}" Tag="{Binding}" Click="OnDeleteClick"
                                  controls:MenuItemGestureHint.GestureHint="⌫">
                            <MenuItem.Icon>
-                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/trashbin.svg" Width="16" Height="16"/>
+                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16"/>
                            </MenuItem.Icon>
                        </MenuItem>
                    </MenuFlyout>
