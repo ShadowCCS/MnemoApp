@@ -8,7 +8,9 @@ using Mnemo.Core.Services;
 using Mnemo.UI;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
@@ -25,6 +27,23 @@ public class CommandItem
 
 public partial class SlashCommandMenu : UserControl
 {
+    private static readonly Dictionary<string, string> DigitToWord = new(StringComparer.Ordinal)
+    {
+        ["0"] = "zero",
+        ["1"] = "one",
+        ["2"] = "two",
+        ["3"] = "three",
+        ["4"] = "four",
+        ["5"] = "five",
+        ["6"] = "six",
+        ["7"] = "seven",
+        ["8"] = "eight",
+        ["9"] = "nine"
+    };
+
+    private static readonly Dictionary<string, string> WordToDigit = DigitToWord
+        .ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.Ordinal);
+
     private readonly List<CommandItem> _allCommandItems;
     private List<CommandItem> _filteredCommandItems;
     private string _filterText = string.Empty;
@@ -128,12 +147,129 @@ public partial class SlashCommandMenu : UserControl
         }
         else
         {
-            var searchTerm = filterText.TrimStart('/').ToLowerInvariant();
+            var searchTerm = NormalizeSearchText(filterText.TrimStart('/'));
+            if (string.IsNullOrEmpty(searchTerm))
+            {
+                _filteredCommandItems = new List<CommandItem>(_allCommandItems);
+                return;
+            }
+
             _filteredCommandItems = _allCommandItems
-                .Where(item => item.Name.ToLowerInvariant().Contains(searchTerm) ||
-                              item.Description.ToLowerInvariant().Contains(searchTerm))
+                .Where(item => IsMatch(item, searchTerm))
                 .ToList();
         }
+    }
+
+    private static bool IsMatch(CommandItem item, string normalizedSearchTerm)
+    {
+        if (string.IsNullOrEmpty(normalizedSearchTerm))
+            return true;
+
+        foreach (var candidate in GetSearchCandidates(item))
+        {
+            if (candidate.Contains(normalizedSearchTerm, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> GetSearchCandidates(CommandItem item)
+    {
+        var rawCandidates = new[]
+        {
+            item.Name,
+            item.Description,
+            item.Shortcut ?? string.Empty,
+            item.BlockType.ToString()
+        };
+
+        var unique = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var raw in rawCandidates)
+        {
+            var normalized = NormalizeSearchText(raw);
+            if (!string.IsNullOrEmpty(normalized))
+                unique.Add(normalized);
+
+            foreach (var expanded in ExpandNumericAliases(normalized))
+                unique.Add(expanded);
+        }
+
+        return unique;
+    }
+
+    private static IEnumerable<string> ExpandNumericAliases(string normalizedText)
+    {
+        if (string.IsNullOrEmpty(normalizedText))
+            yield break;
+
+        var parts = normalizedText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+            yield break;
+
+        var hasAnyReplacement = false;
+        var digitToWordParts = new string[parts.Length];
+        var wordToDigitParts = new string[parts.Length];
+
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var token = parts[i];
+            if (DigitToWord.TryGetValue(token, out var word))
+            {
+                digitToWordParts[i] = word;
+                wordToDigitParts[i] = token;
+                hasAnyReplacement = true;
+            }
+            else if (WordToDigit.TryGetValue(token, out var digit))
+            {
+                digitToWordParts[i] = token;
+                wordToDigitParts[i] = digit;
+                hasAnyReplacement = true;
+            }
+            else
+            {
+                digitToWordParts[i] = token;
+                wordToDigitParts[i] = token;
+            }
+        }
+
+        if (!hasAnyReplacement)
+            yield break;
+
+        yield return string.Join(' ', digitToWordParts);
+        yield return string.Join(' ', wordToDigitParts);
+    }
+
+    private static string NormalizeSearchText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        var normalizedForm = text.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalizedForm.Length);
+        var previousWasSpace = false;
+
+        foreach (var ch in normalizedForm)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (category == UnicodeCategory.NonSpacingMark)
+                continue;
+
+            if (char.IsLetterOrDigit(ch))
+            {
+                builder.Append(char.ToLowerInvariant(ch));
+                previousWasSpace = false;
+            }
+            else if (!previousWasSpace)
+            {
+                builder.Append(' ');
+                previousWasSpace = true;
+            }
+        }
+
+        return builder
+            .ToString()
+            .Trim();
     }
 
     public void HandleEnter()

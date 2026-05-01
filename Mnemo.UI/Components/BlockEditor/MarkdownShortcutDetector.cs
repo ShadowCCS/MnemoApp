@@ -42,6 +42,12 @@ public class MarkdownShortcutDetector
         }
 
         var trimmed = text.Trim();
+        if (IsDividerShortcut(trimmed))
+        {
+            ShortcutDetected?.Invoke(BlockType.Divider, null);
+            return true;
+        }
+
         if (Shortcuts.TryGetValue(trimmed, out var conversion))
         {
             ShortcutDetected?.Invoke(conversion.Type, conversion.Meta);
@@ -63,4 +69,11 @@ public class MarkdownShortcutDetector
 
     public bool IsMarkdownShortcutKey(string text) =>
         !string.IsNullOrWhiteSpace(text) && Shortcuts.ContainsKey(text.Trim());
+
+    private static bool IsDividerShortcut(string trimmed)
+    {
+        // When the text shortcut "-- " -> "– " runs first, typing "--- " can become "-– " (or "–- ").
+        // Treat both forms as divider triggers so users still get a divider from three hyphens.
+        return trimmed is "---" or "-–" or "–-";
+    }
 }

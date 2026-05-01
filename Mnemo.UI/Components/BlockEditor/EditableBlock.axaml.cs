@@ -894,17 +894,8 @@ public partial class EditableBlock : UserControl
                 if (e.Key == Key.Down) { _currentSlashMenu.HandleDown(); e.Handled = true; return; }
             }
 
-            if (_slashMenuOverlayId != null && e.Key != Key.Divide && e.Key != Key.OemQuestion && e.Key != Key.Oem2 && e.Key != Key.Escape && e.Key != Key.Enter && e.Key != Key.Up && e.Key != Key.Down)
-            {
-                Dispatcher.UIThread.Post(() =>
-                {
-                    if (editor.Text != "/" && _stateManager != null)
-                    {
-                        CloseSlashMenu();
-                        _stateManager.SetNormal();
-                    }
-                }, DispatcherPriority.Input);
-            }
+            // Slash menu visibility is managed by TextChanged via HandleSlashMenuToggle.
+            // Keeping close/open logic in one place avoids key-order race conditions.
         }
 
         _keyboardHandler.HandleKeyDown(e, editor, _viewModel);

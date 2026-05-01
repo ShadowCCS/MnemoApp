@@ -25,7 +25,8 @@ internal static class DefaultTextShortcutCatalog
         return new List<TextShortcut>
         {
             // Typography and legal symbols
-            new TextShortcut("--",  "\u2013"), // –
+            // Keep divider markdown ("---") usable: only convert double hyphen after a trailing space.
+            new TextShortcut("-- ", "\u2013 "), // – 
             new TextShortcut("...", "\u2026"), // …
             new TextShortcut("(c)",  "\u00A9"), // ©
             new TextShortcut("(r)",  "\u00AE"), // ®
