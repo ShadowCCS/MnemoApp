@@ -223,7 +223,7 @@
                                 Click="OnTransferClick"
                                 Tag="transfer">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg"
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg"
                                                   Width="16" Height="16" />
                                 <TextBlock Text="{markup:T Ns=Flashcards, Key=Transfer}" />
                             </StackPanel>

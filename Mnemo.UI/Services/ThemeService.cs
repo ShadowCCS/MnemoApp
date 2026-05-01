@@ -53,7 +53,7 @@ public class ThemeService : IThemeService
 
     public Task<IEnumerable<ThemeManifest>> GetAllThemesAsync()
     {
-        // For now, hardcode the two themes as they are baked into the app
+        // Bundled themes baked into the app package.
         var themes = new List<ThemeManifest>
         {
             new ThemeManifest 
@@ -62,6 +62,13 @@ public class ThemeService : IThemeService
                 DisplayName = "Dawn", 
                 Description = "Default light theme",
                 PreviewColors = new List<string> { "#F5F5F7", "#FFFFFF", "#E5E5E7" }
+            },
+            new ThemeManifest 
+            { 
+                Name = "Noon", 
+                DisplayName = "Noon", 
+                Description = "Warm editorial light theme",
+                PreviewColors = new List<string> { "#FBF8F0", "#F5EFE3", "#EADFCB" }
             },
             new ThemeManifest 
             { 

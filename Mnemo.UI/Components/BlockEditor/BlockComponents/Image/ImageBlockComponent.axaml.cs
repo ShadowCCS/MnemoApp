@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Avalonia;
@@ -10,6 +11,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Layout;
@@ -18,6 +20,7 @@ using Avalonia.VisualTree;
 using Mnemo.Core.Formatting;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Common;
 using Mnemo.UI;
 using Mnemo.UI.Components.BlockEditor;
 using Mnemo.UI.Services;
@@ -26,13 +29,27 @@ namespace Mnemo.UI.Components.BlockEditor.BlockComponents.Image;
 
 public partial class ImageBlockComponent : BlockComponentBase
 {
+    private enum PlaceholderVisualState
+    {
+        Empty,
+        Importing,
+        Error
+    }
+
     private readonly IImageAssetService? _imageAssetService;
     private readonly ILocalizationService? _loc;
+    private static readonly HttpClient ImageDropHttpClient = new();
+    private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif"
+    };
 
     private Bitmap? _currentBitmap;
     private bool _isResizing;
     private double _resizeDragStartX;
     private double _resizeDragStartWidth;
+    private double? _resizePendingWidth;
+    private bool _resizeMutationCompleted;
 
     private Point? _imageReorderPressPoint;
     private bool _imageReorderDragLaunched;
@@ -53,6 +70,7 @@ public partial class ImageBlockComponent : BlockComponentBase
     private const double LoadedImageHitPadding = 6;
 
     private string _captionWatermarkText = string.Empty;
+    private PlaceholderVisualState _placeholderVisualState = PlaceholderVisualState.Empty;
 
     public ImageBlockComponent()
     {
@@ -61,6 +79,8 @@ public partial class ImageBlockComponent : BlockComponentBase
         _loc = services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
 
         InitializeComponent();
+        PlaceholderBorder.AddHandler(DragDrop.DragOverEvent, Placeholder_DragOver);
+        PlaceholderBorder.AddHandler(DragDrop.DropEvent, Placeholder_Drop);
 
         WireRichTextEditor(CaptionRichTextEditor);
         EditorTextChanged += (_, _) => RefreshCaptionWatermark();
@@ -94,6 +114,7 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         if (HoverHost != null)
             HoverHost.LayoutUpdated -= OnHoverHostLayoutUpdated;
+        CompleteResizeMutation();
         EndResizeSession();
         base.OnDetachedFromVisualTree(e);
         DisposeBitmap();
@@ -108,8 +129,22 @@ public partial class ImageBlockComponent : BlockComponentBase
     private void SetLocalizationStrings()
     {
         _captionWatermarkText = T("ImageCaptionPlaceholder");
-        if (PlaceholderLabel != null)
-            PlaceholderLabel.Text = T("ImagePlaceholder");
+        if (PlaceholderEmptyTitle != null)
+            PlaceholderEmptyTitle.Text = TFallback("ImagePlaceholderAddTitle", "Add an image");
+        if (PlaceholderEmptySubtitle != null)
+            PlaceholderEmptySubtitle.Text = TFallback("ImagePlaceholderAddSubtitle", "Click to upload, or drag and drop here");
+        if (PlaceholderEmptyFormats != null)
+            PlaceholderEmptyFormats.Text = TFallback("ImagePlaceholderFormats", "PNG, JPG, GIF, or WebP");
+        if (PlaceholderImportingTitle != null)
+            PlaceholderImportingTitle.Text = TFallback("ImagePlaceholderImportingTitle", "Importing image...");
+        if (PlaceholderImportingSubtitle != null)
+            PlaceholderImportingSubtitle.Text = TFallback("ImagePlaceholderImportingSubtitle", "Reading the file and preparing a preview");
+        if (PlaceholderErrorTitle != null)
+            PlaceholderErrorTitle.Text = TFallback("ImagePlaceholderErrorTitle", "Image could not be imported");
+        if (PlaceholderErrorSubtitle != null)
+            PlaceholderErrorSubtitle.Text = TFallback("ImagePlaceholderErrorSubtitle", "Try another file or check the image format.");
+        if (PlaceholderTryAgainButton != null)
+            PlaceholderTryAgainButton.Content = TFallback("ImagePlaceholderTryAgainButton", "Try again");
         RefreshCaptionWatermark();
 
         void SetPh(MenuItem? m, string key) { if (m != null) m.Header = T(key); }
@@ -134,6 +169,14 @@ public partial class ImageBlockComponent : BlockComponentBase
         SetAlignTip(LdAlignFlyoutLeftBtn, "ImageAlignLeftTooltip");
         SetAlignTip(LdAlignFlyoutCenterBtn, "ImageAlignCenterTooltip");
         SetAlignTip(LdAlignFlyoutRightBtn, "ImageAlignRightTooltip");
+
+        ApplyPlaceholderVisualState();
+    }
+
+    private string TFallback(string key, string fallback)
+    {
+        var translated = T(key);
+        return string.Equals(translated, key, StringComparison.Ordinal) ? fallback : translated;
     }
 
     private void RefreshCaptionWatermark()
@@ -195,10 +238,12 @@ public partial class ImageBlockComponent : BlockComponentBase
 
     private void ShowPlaceholder()
     {
+        _placeholderVisualState = PlaceholderVisualState.Empty;
         PlaceholderBorder.IsVisible = true;
         LoadedImageRow.IsVisible = false;
         LoadedToolbar.IsVisible = false;
         PlaceholderToolbar.IsVisible = false;
+        ApplyPlaceholderVisualState();
         ApplyHorizontalLayoutForContentState();
         UpdateCaptionHostWidth();
         UpdateResizeChromeVisibility();
@@ -212,6 +257,34 @@ public partial class ImageBlockComponent : BlockComponentBase
         ApplyHorizontalLayoutForContentState();
         UpdateCaptionHostWidth();
         UpdateResizeChromeVisibility();
+    }
+
+    private void SetPlaceholderVisualState(PlaceholderVisualState state)
+    {
+        _placeholderVisualState = state;
+        ApplyPlaceholderVisualState();
+    }
+
+    private void ApplyPlaceholderVisualState()
+    {
+        if (PlaceholderEmptyState == null || PlaceholderImportingState == null || PlaceholderErrorState == null || PlaceholderBorder == null)
+            return;
+
+        PlaceholderEmptyState.IsVisible = _placeholderVisualState == PlaceholderVisualState.Empty;
+        PlaceholderImportingState.IsVisible = _placeholderVisualState == PlaceholderVisualState.Importing;
+        PlaceholderErrorState.IsVisible = _placeholderVisualState == PlaceholderVisualState.Error;
+
+        if (_placeholderVisualState == PlaceholderVisualState.Error)
+        {
+            if (PlaceholderBorder.TryFindResource("SystemErrorTextColor", out var errorBrushObj)
+                && errorBrushObj is IBrush errorBrush)
+                PlaceholderBorder.BorderBrush = errorBrush;
+        }
+        else if (PlaceholderBorder.TryFindResource("SystemControlForegroundBaseMediumBrush", out var normalBrushObj)
+                 && normalBrushObj is IBrush normalBrush)
+        {
+            PlaceholderBorder.BorderBrush = normalBrush;
+        }
     }
 
     private void LoadedImageRow_PointerEntered(object? sender, PointerEventArgs e) => UpdateResizeChromeVisibility();
@@ -290,7 +363,7 @@ public partial class ImageBlockComponent : BlockComponentBase
             LoadedToolbar.IsVisible = true;
             LoadedToolbar.Opacity = 1;
         }
-        if (PlaceholderBorder.IsVisible)
+        if (PlaceholderBorder.IsVisible && _placeholderVisualState != PlaceholderVisualState.Importing)
         {
             PlaceholderToolbar.IsVisible = true;
             PlaceholderToolbar.Opacity = 1;
@@ -317,10 +390,15 @@ public partial class ImageBlockComponent : BlockComponentBase
 
     private void HideAlignFlyouts()
     {
-        if (AlignMenuButton.Flyout is FlyoutBase f1 && f1.IsOpen)
-            f1.Hide();
-        if (AlignMenuButtonPlaceholder.Flyout is FlyoutBase f2 && f2.IsOpen)
-            f2.Hide();
+        // Defer closing by one UI tick so the current pointer/click route can complete
+        // before PopupRoot is detached; avoids transient "PlatformImpl is null" input logs.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (AlignMenuButton.Flyout is FlyoutBase f1 && f1.IsOpen)
+                f1.Hide();
+            if (AlignMenuButtonPlaceholder.Flyout is FlyoutBase f2 && f2.IsOpen)
+                f2.Hide();
+        }, DispatcherPriority.Background);
     }
 
     private static string NormalizeImageAlign(string? value) =>
@@ -358,8 +436,11 @@ public partial class ImageBlockComponent : BlockComponentBase
         var vm = ViewModel;
         if (vm == null) return;
         var normalized = NormalizeImageAlign(value);
+        if (string.Equals(vm.ImageAlign, normalized, StringComparison.Ordinal))
+            return;
+        vm.NotifyStructuralChangeStarting();
         vm.ImageAlign = normalized;
-        vm.NotifyContentChanged();
+        vm.NotifyStructuralChangeCompleted("Change image alignment");
         UpdateAlignButtonIcons();
         // EditableBlock listens to Meta changes and updates its HorizontalAlignment
     }
@@ -504,11 +585,51 @@ public partial class ImageBlockComponent : BlockComponentBase
 
     private async void Placeholder_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (_placeholderVisualState == PlaceholderVisualState.Importing)
+            return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         if (IsVisualDescendantOf(e.Source as Visual, PlaceholderToolbar))
             return;
         e.Handled = true;
         await ImportImageAsync();
+    }
+
+    private void Placeholder_DragOver(object? sender, DragEventArgs e)
+    {
+        if (CanImportImageFromDataTransfer(e.DataTransfer))
+        {
+            e.DragEffects = DragDropEffects.Copy;
+            e.Handled = true;
+            return;
+        }
+
+        e.DragEffects = DragDropEffects.None;
+    }
+
+    private async void Placeholder_Drop(object? sender, DragEventArgs e)
+    {
+        if (e.DataTransfer is not IAsyncDataTransfer asyncTransfer)
+            return;
+
+        var vm = ViewModel;
+        if (vm == null)
+            return;
+
+        // Mark handled before awaiting so parent BlockEditor drop handlers do not
+        // also process this same external image drop and insert a duplicate block.
+        e.Handled = true;
+        SetPlaceholderVisualState(PlaceholderVisualState.Importing);
+        var importedPath = await TryImportImageFromDropAsync(asyncTransfer, vm.Id).ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(importedPath))
+        {
+            SetPlaceholderVisualState(PlaceholderVisualState.Error);
+            return;
+        }
+
+        vm.NotifyStructuralChangeStarting();
+        vm.ImagePath = importedPath;
+        vm.NotifyStructuralChangeCompleted("Drop image into block");
+        await Dispatcher.UIThread.InvokeAsync(() => LoadBitmap(importedPath));
     }
 
     private static bool IsVisualDescendantOf(Visual? node, Visual? ancestor)
@@ -521,6 +642,208 @@ public partial class ImageBlockComponent : BlockComponentBase
         }
 
         return false;
+    }
+
+    private static bool CanImportImageFromDataTransfer(IDataTransfer data)
+    {
+        if (data.Contains(DataFormat.File))
+            return true;
+        if (data.TryGetValue(DataFormat.Text) is string text
+            && (!string.IsNullOrWhiteSpace(GetImageUrlFromText(text)) || IsLocalImagePath(text)))
+            return true;
+        return data is IAsyncDataTransfer;
+    }
+
+    private async Task<string?> TryImportImageFromDropAsync(IAsyncDataTransfer data, string blockId)
+    {
+        if (_imageAssetService == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var files = await data.TryGetFilesAsync().ConfigureAwait(true);
+            if (files != null)
+            {
+                foreach (var f in files)
+                {
+                    var local = f.TryGetLocalPath();
+                    if (string.IsNullOrWhiteSpace(local) || !File.Exists(local))
+                        continue;
+                    if (!SupportedImageExtensions.Contains(Path.GetExtension(local)))
+                        continue;
+
+                    var import = await _imageAssetService.ImportAndCopyAsync(local, blockId).ConfigureAwait(true);
+                    if (import.IsSuccess && !string.IsNullOrWhiteSpace(import.Value))
+                    {
+                        return import.Value;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Continue to other formats.
+        }
+
+        try
+        {
+            var bmp = await data.TryGetBitmapAsync().ConfigureAwait(true);
+            if (bmp != null)
+            {
+                try
+                {
+                    var dir = MnemoAppPaths.GetImagesDirectory();
+                    Directory.CreateDirectory(dir);
+                    var path = Path.Combine(dir, blockId + ".png");
+                    bmp.Save(path);
+                    return path;
+                }
+                finally
+                {
+                    bmp.Dispose();
+                }
+            }
+        }
+        catch
+        {
+            // Continue to text/URL parsing.
+        }
+
+        var text = ExtractImageText(data);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            try
+            {
+                text = await data.TryGetTextAsync().ConfigureAwait(true);
+            }
+            catch
+            {
+                text = null;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        if (IsLocalImagePath(text))
+        {
+            var local = NormalizeLocalPath(text)!;
+            var import = await _imageAssetService.ImportAndCopyAsync(local, blockId).ConfigureAwait(true);
+            if (import.IsSuccess && !string.IsNullOrWhiteSpace(import.Value))
+            {
+                return import.Value;
+            }
+            return null;
+        }
+
+        var url = GetImageUrlFromText(text);
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        return await DownloadImageUrlAsync(url, blockId).ConfigureAwait(true);
+    }
+
+    private static string? ExtractImageText(IAsyncDataTransfer data) =>
+        (data as IDataTransfer)?.TryGetValue(DataFormat.Text) as string;
+
+    private static bool IsLocalImagePath(string text) => NormalizeLocalPath(text) != null;
+
+    private static string? NormalizeLocalPath(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+        var candidate = text.Trim().Trim('"');
+        if (candidate.IndexOf('\r') >= 0 || candidate.IndexOf('\n') >= 0)
+            return null;
+        if (!File.Exists(candidate))
+            return null;
+        return SupportedImageExtensions.Contains(Path.GetExtension(candidate)) ? candidate : null;
+    }
+
+    private static string? GetImageUrlFromText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+        var line = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+        if (string.IsNullOrWhiteSpace(line))
+            return null;
+        if (!Uri.TryCreate(line, UriKind.Absolute, out var uri))
+            return null;
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            return null;
+        return uri.ToString();
+    }
+
+    private static async Task<string?> DownloadImageUrlAsync(string url, string blockId)
+    {
+        try
+        {
+            using var response = await ImageDropHttpClient.GetAsync(url).ConfigureAwait(true);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            var mediaType = response.Content.Headers.ContentType?.MediaType;
+            if (!string.IsNullOrWhiteSpace(mediaType)
+                && !mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(true);
+            if (bytes.Length == 0)
+                return null;
+
+            if (mediaType is null
+                || mediaType.Equals("image/png", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/jpg", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/gif", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/bmp", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/tiff", StringComparison.OrdinalIgnoreCase))
+            {
+                await using var verify = new MemoryStream(bytes, writable: false);
+                try
+                {
+                    using var _ = new Bitmap(verify);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            var dir = MnemoAppPaths.GetImagesDirectory();
+            Directory.CreateDirectory(dir);
+            var ext = GuessImageExtension(response.Content.Headers.ContentType?.MediaType, url);
+            var path = Path.Combine(dir, blockId + ext);
+            await File.WriteAllBytesAsync(path, bytes).ConfigureAwait(true);
+            return path;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string GuessImageExtension(string? mediaType, string url)
+    {
+        if (!string.IsNullOrWhiteSpace(mediaType))
+        {
+            if (mediaType.Contains("png", StringComparison.OrdinalIgnoreCase)) return ".png";
+            if (mediaType.Contains("jpeg", StringComparison.OrdinalIgnoreCase) || mediaType.Contains("jpg", StringComparison.OrdinalIgnoreCase)) return ".jpg";
+            if (mediaType.Contains("gif", StringComparison.OrdinalIgnoreCase)) return ".gif";
+            if (mediaType.Contains("webp", StringComparison.OrdinalIgnoreCase)) return ".webp";
+            if (mediaType.Contains("bmp", StringComparison.OrdinalIgnoreCase)) return ".bmp";
+            if (mediaType.Contains("tiff", StringComparison.OrdinalIgnoreCase)) return ".tiff";
+        }
+
+        var ext = Path.GetExtension(url);
+        return SupportedImageExtensions.Contains(ext) ? ext : ".png";
     }
 
     private async Task ImportImageAsync()
@@ -544,19 +867,39 @@ public partial class ImageBlockComponent : BlockComponentBase
             }
         });
 
-        if (files.Count == 0) return;
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        SetPlaceholderVisualState(PlaceholderVisualState.Importing);
 
         var sourcePath = files[0].TryGetLocalPath();
-        if (string.IsNullOrEmpty(sourcePath)) return;
+        if (string.IsNullOrEmpty(sourcePath))
+        {
+            SetPlaceholderVisualState(PlaceholderVisualState.Error);
+            return;
+        }
 
         var result = await _imageAssetService.ImportAndCopyAsync(sourcePath, vm.Id);
         if (!result.IsSuccess)
+        {
+            SetPlaceholderVisualState(PlaceholderVisualState.Error);
             return;
+        }
 
+        vm.NotifyStructuralChangeStarting();
         vm.ImagePath = result.Value!;
-        vm.NotifyContentChanged();
+        vm.NotifyStructuralChangeCompleted("Import image");
 
         await Dispatcher.UIThread.InvokeAsync(() => LoadBitmap(result.Value!));
+    }
+
+    private async void PlaceholderTryAgainButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_placeholderVisualState == PlaceholderVisualState.Importing)
+            return;
+        await ImportImageAsync();
     }
 
     // ── Flyout (Button.Flyout opens automatically — no extra Click handler) ───
@@ -595,8 +938,9 @@ public partial class ImageBlockComponent : BlockComponentBase
         if (!string.IsNullOrEmpty(oldPath) && oldPath != result.Value)
             await _imageAssetService.DeleteStoredFileAsync(oldPath);
 
+        vm.NotifyStructuralChangeStarting();
         vm.ImagePath = result.Value!;
-        vm.NotifyContentChanged();
+        vm.NotifyStructuralChangeCompleted("Replace image");
 
         await Dispatcher.UIThread.InvokeAsync(() => LoadBitmap(result.Value!));
     }
@@ -676,12 +1020,15 @@ public partial class ImageBlockComponent : BlockComponentBase
 
         _isResizing = true;
         _resizeDragStartX = e.GetPosition(this).X;
+        _resizePendingWidth = null;
+        _resizeMutationCompleted = false;
         var maxW = GetMaxImageDisplayWidth();
         var currentWidth = DisplayImage.Width;
         var raw = !double.IsNaN(currentWidth) && currentWidth > 0
             ? currentWidth
             : (DisplayImage.Bounds.Width > 0 ? DisplayImage.Bounds.Width : 200);
         _resizeDragStartWidth = Math.Clamp(raw, 80, maxW);
+        ViewModel?.NotifyStructuralChangeStarting();
 
         // We capture the outer border (sender) instead of the inner pill
         if (sender is InputElement element)
@@ -704,6 +1051,7 @@ public partial class ImageBlockComponent : BlockComponentBase
 
     private void ResizeHitArea_PointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
+        CompleteResizeMutation();
         EndResizeSession();
     }
 
@@ -711,6 +1059,7 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         if (!_isResizing) return;
         _isResizing = false;
+        _resizeMutationCompleted = false;
         if (ResizePill != null)
             ResizePill.Opacity = 0.15;
         UpdateResizeChromeVisibility();
@@ -725,21 +1074,41 @@ public partial class ImageBlockComponent : BlockComponentBase
         var newWidth = Math.Clamp(_resizeDragStartWidth + delta, 80, maxW);
 
         DisplayImage.Width = newWidth;
-
-        var vm = ViewModel;
-        if (vm != null)
-        {
-            vm.ImageWidth = newWidth;
-            vm.NotifyContentChanged();
-        }
+        _resizePendingWidth = newWidth;
     }
 
     private void ResizeGlobal_PointerReleased(PointerReleasedEventArgs e)
     {
         if (!_isResizing) return;
 
+        CompleteResizeMutation();
         e.Pointer.Capture(null);
         EndResizeSession();
+    }
+
+    private void CompleteResizeMutation()
+    {
+        if (_resizeMutationCompleted)
+            return;
+
+        var vm = ViewModel;
+        if (vm == null)
+        {
+            _resizePendingWidth = null;
+            _resizeMutationCompleted = true;
+            return;
+        }
+
+        if (_resizePendingWidth.HasValue)
+        {
+            var pending = _resizePendingWidth.Value;
+            if (Math.Abs(vm.ImageWidth - pending) > 0.25)
+                vm.ImageWidth = pending;
+        }
+
+        _resizePendingWidth = null;
+        vm.NotifyStructuralChangeCompleted("Resize image");
+        _resizeMutationCompleted = true;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -825,7 +1194,6 @@ public partial class ImageBlockComponent : BlockComponentBase
         var cur = vm.ImageWidth;
         if (Math.Abs(cur - width) < 0.5) return;
         vm.ImageWidth = width;
-        vm.NotifyContentChanged();
     }
 
     private void ApplyImageWidth(double width)

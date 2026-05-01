@@ -97,8 +97,24 @@ public partial class TwoColumnBlockComponent : BlockComponentBase
         editor?.CommitColumnSplitResize();
     }
 
+    private void Splitter_OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (!_splitDragging) return;
+        _splitDragging = false;
+        RefreshSplitterGripOpacity();
+        var editor = this.GetVisualAncestors().OfType<BlockEditor>().FirstOrDefault();
+        editor?.CommitColumnSplitResize();
+    }
+
     protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
+        if (_splitDragging)
+        {
+            _splitDragging = false;
+            RefreshSplitterGripOpacity();
+            var editor = this.GetVisualAncestors().OfType<BlockEditor>().FirstOrDefault();
+            editor?.CommitColumnSplitResize();
+        }
         if (_subscribedVm != null)
         {
             _subscribedVm.PropertyChanged -= OnVmPropertyChanged;

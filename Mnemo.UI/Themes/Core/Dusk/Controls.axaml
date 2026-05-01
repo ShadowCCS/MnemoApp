@@ -485,6 +485,7 @@
     
     <!-- Rich Text Highlighting Brushes -->
     <SolidColorBrush x:Key="HighlightedTextBrush" Color="{DynamicResource HighlightedText}"/>
+    <SolidColorBrush x:Key="SearchMatchHighlightBrush" Color="{DynamicResource SearchMatchHighlight}"/>
     <SolidColorBrush x:Key="InlineHighlightBrush" Color="{DynamicResource InlineHighlightColor}"/>
 
     <!-- Generic border / accent -->

@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
@@ -8,6 +9,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Avalonia.Layout;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -16,6 +18,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
@@ -61,6 +64,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private Border? _blockDragGhostBorder;
     private Vector _blockDragGhostPointerOffset;
     private const double BlockDragGhostOpacity = 0.45;
+    private Border? _externalImageDragGhostBorder;
+    private static readonly HttpClient ExternalImageHttpClient = new();
 
     /// <summary>Notes editor: scroll <see cref="ScrollViewer"/> while reordering blocks near viewport top/bottom (same idea as sidebar <see cref="Mnemo.UI.Modules.Notes.Views.DragCoordinator"/>).</summary>
     private DispatcherTimer? _blockDragAutoScrollTimer;
@@ -68,6 +73,26 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private const double BlockDragAutoScrollZone = 40.0;
     private const double BlockDragAutoScrollStep = 9.0;
     private const int BlockDragAutoScrollIntervalMs = 50;
+    private readonly record struct FindMatch(string BlockId, int Start, int Length);
+    private readonly List<FindMatch> _findMatches = new();
+    private int _activeFindMatchIndex = -1;
+    private string _findQuery = string.Empty;
+    private string _replaceQuery = string.Empty;
+    private bool _findPanelVisible;
+    private bool _replacePanelExpanded;
+    private IOverlayService? _overlayService;
+    private string? _findOverlayId;
+    private NoteFindPanel? _findPanel;
+    private ScrollViewer? _findAnchorScrollHost;
+    private EventHandler<SizeChangedEventArgs>? _findAnchorScrollSizeChangedHandler;
+    private double? _lastFindOverlayAnchorX;
+    private double? _lastFindOverlayAnchorY;
+    private bool _isSyncingFindOptionToggles;
+    private CaretState? _findCaretBeforeOpen;
+    private bool _findNavigatedToMatch;
+
+    /// <summary>Fixed width used for top-right anchor math so overlay position does not feed back into layout.</summary>
+    private const double FindOverlayAnchorWidthEstimate = 332.0;
 
     // Cross-block text selection (Mode 1)
     private bool _isCrossBlockSelecting;
@@ -117,6 +142,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private static readonly TimeSpan OrphanImageDeleteDelay = TimeSpan.FromSeconds(2);
     private static readonly object PendingOrphanImageDeletesGate = new();
     private static readonly Dictionary<string, CancellationTokenSource> PendingOrphanImageDeletes = new(StringComparer.OrdinalIgnoreCase);
+    private const string NativeTwoColumnMetaKey = "nativeTwoColumn";
 
     public static readonly StyledProperty<bool> IsReadOnlyProperty =
         AvaloniaProperty.Register<BlockEditor, bool>(nameof(IsReadOnly), defaultValue: false);
@@ -208,9 +234,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _blocks.CollectionChanged += OnBlocksCollectionChanged;
         DataContext = this;
         DragDrop.SetAllowDrop(this, true);
-        AddHandler(DragDrop.DragOverEvent, Editor_DragOver_BlockGhost, RoutingStrategies.Bubble);
-        AddHandler(DragDrop.DropEvent, Editor_Drop, RoutingStrategies.Bubble);
-        AddHandler(DragDrop.DragLeaveEvent, Editor_DragLeave, RoutingStrategies.Bubble);
+        AddHandler(DragDrop.DragOverEvent, Editor_DragOver_BlockGhost, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(DragDrop.DropEvent, Editor_Drop, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(DragDrop.DragLeaveEvent, Editor_DragLeave, RoutingStrategies.Bubble, handledEventsToo: true);
         AddHandler(PointerPressedEvent, Editor_PointerPressedTunnel, RoutingStrategies.Tunnel);
         AddHandler(PointerPressedEvent, Editor_PointerPressedBubble, RoutingStrategies.Bubble, handledEventsToo: true);
         // When we capture the pointer (cross-block or box-select), we receive moves/releases on this control
@@ -221,6 +247,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         AddHandler(KeyDownEvent, Editor_KeyDown_Bubble, RoutingStrategies.Bubble);
         Loaded += Editor_Loaded;
         Unloaded += Editor_Unloaded;
+        _overlayService = ((App?)Application.Current)?.Services?.GetService<IOverlayService>();
 
         // Don't add initial block here - let LoadBlocks handle it
     }
@@ -243,6 +270,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void Editor_Unloaded(object? sender, RoutedEventArgs e)
     {
+        CloseFindPanel(clearQuery: false);
+
         if (_topLevel != null)
         {
             if (_globalPointerMovedHandler != null)
@@ -272,12 +301,24 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private void Editor_DragOver_BlockGhost(object? sender, DragEventArgs e)
     {
-        if (!e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat)
-            && !e.DataTransfer.Contains(BlockViewModel.BlockReorderDragPayload.Format))
+        bool isBlockReorderDrag =
+            e.DataTransfer.Contains(BlockViewModel.BlockDragDataFormat)
+            || e.DataTransfer.Contains(BlockViewModel.BlockReorderDragPayload.Format);
+        if (!isBlockReorderDrag)
         {
+            if (TryHandleExternalImageDragOver(e))
+            {
+                e.DragEffects = DragDropEffects.Copy;
+                e.Handled = true;
+                return;
+            }
+
+            HideExternalImageDragGhost();
             e.DragEffects = DragDropEffects.None;
             return;
         }
+
+        HideExternalImageDragGhost();
 
         if (!TryResolveBlockReorderPayload(e, out var payload) || payload == null)
         {
@@ -315,20 +356,24 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return true;
     }
 
-    private void Editor_Drop(object? sender, DragEventArgs e)
+    private async void Editor_Drop(object? sender, DragEventArgs e)
     {
         if (e.Handled) return;
-        if (!TryResolveBlockReorderPayload(e, out var payload) || payload == null) return;
+
+        if (!TryResolveBlockReorderPayload(e, out var payload) || payload == null)
+        {
+            if (await TryDropExternalImageAsync(e).ConfigureAwait(true))
+                e.Handled = true;
+            return;
+        }
 
         try
         {
-            if (!TryPerformDrop(payload))
-                BlockEditorLogger.LogError("Drop failed: invalid insert index or block", null);
+            TryPerformDrop(payload);
             e.Handled = true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            BlockEditorLogger.LogError("Error during drop operation", ex);
         }
         finally
         {
@@ -343,7 +388,407 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var pos = e.GetPosition(this);
         var bounds = new Rect(0, 0, Bounds.Width, Bounds.Height);
         if (!bounds.Contains(pos))
+        {
             ClearDropIndicator();
+            HideExternalImageDragGhost();
+        }
+    }
+
+    private bool TryHandleExternalImageDragOver(DragEventArgs e)
+    {
+        if (!IsExternalImageDragData(e.DataTransfer))
+            return false;
+
+        var cursor = e.GetPosition(this);
+        ShowExternalImageDragGhost(cursor);
+        if (TryGetUnassignedImageBlockAtPoint(cursor) != null)
+        {
+            ClearDropIndicator();
+            return true;
+        }
+
+        var probeImage = BlockFactory.CreateBlock(BlockType.Image, 0);
+        if (TryGetColumnDropInsert(cursor, probeImage, out var tc, out var leftColumn, out var insertIndex))
+        {
+            if (!(ReferenceEquals(_columnDropTarget, tc)
+                && _columnDropLeft == leftColumn
+                && _columnDropInsertIndex == insertIndex
+                && this.FindControl<Border>("BlockReorderDropLineOverlay") is { IsVisible: true }))
+            {
+                ClearDropIndicator();
+                _columnDropTarget = tc;
+                _columnDropLeft = leftColumn;
+                _columnDropInsertIndex = insertIndex;
+                _currentDropInsertIndex = -1;
+                ShowColumnDropLineInOverlay(tc, leftColumn, insertIndex);
+            }
+
+            return true;
+        }
+
+        var topInsert = GetInsertIndex(cursor.Y);
+        if (topInsert < 0)
+            return false;
+
+        if (_currentDropInsertIndex != topInsert || _columnDropTarget != null)
+        {
+            ClearDropIndicator();
+            _currentDropInsertIndex = topInsert;
+            ShowHorizontalReorderDropLineInOverlay(topInsert);
+        }
+
+        return true;
+    }
+
+    private async Task<bool> TryDropExternalImageAsync(DragEventArgs e)
+    {
+        if (!IsExternalImageDragData(e.DataTransfer))
+            return false;
+
+        if (e.DataTransfer is not IAsyncDataTransfer asyncTransfer)
+        {
+            return false;
+        }
+
+        var droppedImage = await TryCreateImageBlockFromDropDataAsync(asyncTransfer).ConfigureAwait(true);
+        if (droppedImage == null)
+            return false;
+
+        var cursor = e.GetPosition(this);
+        try
+        {
+            BeginStructuralChange();
+
+            var unassignedTarget = TryGetUnassignedImageBlockAtPoint(cursor);
+            if (unassignedTarget != null)
+            {
+                var importedPath = await ImportImagePathForTargetAsync(droppedImage.ImagePath, unassignedTarget.Id).ConfigureAwait(true);
+                if (!string.IsNullOrWhiteSpace(importedPath))
+                    unassignedTarget.ImagePath = importedPath;
+                else
+                    unassignedTarget.ImagePath = droppedImage.ImagePath;
+
+                unassignedTarget.ImageWidth = 0;
+                unassignedTarget.SetSpans(new List<InlineSpan> { InlineSpan.Plain(string.Empty) });
+                ClearBlockSelection();
+                CommitStructuralChange("Drop image");
+                BlocksChanged?.Invoke();
+                Dispatcher.UIThread.Post(() => unassignedTarget.IsFocused = true, DispatcherPriority.Input);
+                return true;
+            }
+
+            await HydratePastedImageBlocksAsync(new BlockViewModel[] { droppedImage }).ConfigureAwait(true);
+
+            if (_columnDropTarget != null && _columnDropInsertIndex >= 0)
+            {
+                var column = _columnDropLeft ? _columnDropTarget.LeftColumnBlocks : _columnDropTarget.RightColumnBlocks;
+                var insertAt = Math.Clamp(_columnDropInsertIndex, 0, column.Count);
+                BlockHierarchy.WireChildOwnership(_columnDropTarget, droppedImage, _columnDropLeft);
+                SubscribeToBlock(droppedImage);
+                column.Insert(insertAt, droppedImage);
+            }
+            else
+            {
+                var insertIndex = _currentDropInsertIndex;
+                if (insertIndex < 0 || insertIndex > Blocks.Count)
+                {
+                    insertIndex = GetInsertIndex(cursor.Y);
+                    if (insertIndex < 0)
+                        insertIndex = Blocks.Count;
+                }
+
+                insertIndex = Math.Clamp(insertIndex, 0, Blocks.Count);
+                SubscribeToBlock(droppedImage);
+                Blocks.Insert(insertIndex, droppedImage);
+                droppedImage.Order = insertIndex;
+            }
+
+            ReorderBlocks();
+            ClearBlockSelection();
+            CommitStructuralChange("Drop image");
+            BlocksChanged?.Invoke();
+            Dispatcher.UIThread.Post(() => droppedImage.IsFocused = true, DispatcherPriority.Input);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        finally
+        {
+            ClearDropIndicator();
+            HideExternalImageDragGhost();
+        }
+    }
+
+    private async Task<BlockViewModel?> TryCreateImageBlockFromDropDataAsync(IAsyncDataTransfer data)
+    {
+        try
+        {
+            var files = await data.TryGetFilesAsync().ConfigureAwait(true);
+            if (files != null)
+            {
+                foreach (var f in files)
+                {
+                    var p = f.TryGetLocalPath();
+                    if (string.IsNullOrWhiteSpace(p) || !File.Exists(p)) continue;
+                    if (!ClipboardImageExtensions.Contains(Path.GetExtension(p))) continue;
+                    return CreateImageBlockStubForPaste(p);
+                }
+            }
+        }
+        catch
+        {
+            // fall through to bitmap/text probes
+        }
+
+        var bitmap = await data.TryGetBitmapAsync().ConfigureAwait(true);
+        if (bitmap != null)
+        {
+            try
+            {
+                return await SaveClipboardBitmapToNewImageBlockAsync(bitmap).ConfigureAwait(true);
+            }
+            finally
+            {
+                bitmap.Dispose();
+            }
+        }
+
+        if (data is IDataTransfer syncTransfer
+            && syncTransfer.TryGetValue(DataFormat.Text) is string text)
+        {
+            var candidate = NormalizeSingleLineImagePathFromClipboard(text);
+            if (!string.IsNullOrWhiteSpace(candidate) && File.Exists(candidate)
+                && ClipboardImageExtensions.Contains(Path.GetExtension(candidate)))
+            {
+                return CreateImageBlockStubForPaste(candidate);
+            }
+
+            var url = NormalizeSingleLineImageUrlFromDragText(text);
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                return await DownloadExternalImageToNewImageBlockAsync(url).ConfigureAwait(true);
+            }
+        }
+
+        try
+        {
+            var asyncText = await data.TryGetTextAsync().ConfigureAwait(true);
+            var candidate = NormalizeSingleLineImagePathFromClipboard(asyncText);
+            if (!string.IsNullOrWhiteSpace(candidate) && File.Exists(candidate)
+                && ClipboardImageExtensions.Contains(Path.GetExtension(candidate)))
+            {
+                return CreateImageBlockStubForPaste(candidate);
+            }
+
+            var url = NormalizeSingleLineImageUrlFromDragText(asyncText);
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                return await DownloadExternalImageToNewImageBlockAsync(url).ConfigureAwait(true);
+            }
+        }
+        catch
+        {
+            // Some sources expose text only through sync formats; ignore.
+        }
+
+        return null;
+    }
+
+    private static bool IsExternalImageDragData(IDataTransfer data)
+    {
+        if (data.Contains(DataFormat.File))
+            return true;
+
+        if (data.TryGetValue(DataFormat.Text) is string text)
+        {
+            var trimmed = text.Trim();
+            if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (NormalizeSingleLineImagePathFromClipboard(trimmed) != null)
+                return true;
+        }
+
+        // Browser drags frequently expose URL text only via async transfer APIs.
+        return data is IAsyncDataTransfer;
+    }
+
+    private BlockViewModel? TryGetUnassignedImageBlockAtPoint(Point cursorPosInEditor)
+    {
+        foreach (var vm in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+        {
+            if (vm.Type != BlockType.Image)
+                continue;
+            if (!string.IsNullOrWhiteSpace(vm.ImagePath))
+                continue;
+
+            var bounds = GetEditableBlockBoundsInEditor(GetEditableBlockForViewModel(vm));
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                continue;
+            if (bounds.Contains(cursorPosInEditor))
+                return vm;
+        }
+
+        return null;
+    }
+
+    private async Task<string?> ImportImagePathForTargetAsync(string? sourcePath, string targetBlockId)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            return sourcePath;
+
+        var svc = ResolveImageAssetService();
+        if (svc == null)
+            return sourcePath;
+
+        try
+        {
+            var imported = await svc.ImportAndCopyAsync(sourcePath, targetBlockId).ConfigureAwait(true);
+            if (imported.IsSuccess && !string.IsNullOrWhiteSpace(imported.Value))
+                return imported.Value;
+        }
+        catch
+        {
+            // Keep original path when import fails (e.g. locked file).
+        }
+
+        return sourcePath;
+    }
+
+    private void ShowExternalImageDragGhost(Point cursorPosInEditor)
+    {
+        var overlay = this.FindControl<LayoutOverlayPanel>("BlockDragGhostOverlay");
+        if (overlay == null)
+            return;
+
+        if (_externalImageDragGhostBorder == null)
+        {
+            _externalImageDragGhostBorder = new Border
+            {
+                Width = 132,
+                Height = 34,
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(Color.FromArgb(230, 33, 33, 33)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
+                BorderThickness = new Thickness(1),
+                IsHitTestVisible = false,
+                Child = new TextBlock
+                {
+                    Text = "Drop image",
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = Brushes.White,
+                    FontSize = 12
+                }
+            };
+
+            overlay.Children.Add(_externalImageDragGhostBorder);
+        }
+
+        Canvas.SetLeft(_externalImageDragGhostBorder, cursorPosInEditor.X + 14);
+        Canvas.SetTop(_externalImageDragGhostBorder, cursorPosInEditor.Y + 14);
+        _externalImageDragGhostBorder.IsVisible = true;
+        overlay.InvalidateArrange();
+    }
+
+    private void HideExternalImageDragGhost()
+    {
+        if (_externalImageDragGhostBorder == null)
+            return;
+        _externalImageDragGhostBorder.IsVisible = false;
+    }
+
+    private static string? NormalizeSingleLineImageUrlFromDragText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        var candidate = text
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .FirstOrDefault(s => !string.IsNullOrWhiteSpace(s) && !s.StartsWith("#", StringComparison.Ordinal));
+        if (string.IsNullOrWhiteSpace(candidate))
+            return null;
+
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri))
+            return null;
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            return null;
+
+        return uri.ToString();
+    }
+
+    private static async Task<BlockViewModel?> DownloadExternalImageToNewImageBlockAsync(string imageUrl)
+    {
+        try
+        {
+            using var response = await ExternalImageHttpClient.GetAsync(imageUrl).ConfigureAwait(true);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            var mediaType = response.Content.Headers.ContentType?.MediaType;
+            if (!string.IsNullOrWhiteSpace(mediaType)
+                && !mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(true);
+            if (bytes.Length == 0)
+                return null;
+
+            // Validate formats that Avalonia reliably decodes before persisting.
+            if (mediaType is null
+                || mediaType.Equals("image/png", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/jpg", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/gif", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/bmp", StringComparison.OrdinalIgnoreCase)
+                || mediaType.Equals("image/tiff", StringComparison.OrdinalIgnoreCase))
+            {
+                await using var probe = new MemoryStream(bytes, writable: false);
+                try
+                {
+                    using var _ = new Bitmap(probe);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            var vm = BlockFactory.CreateBlock(BlockType.Image, 0);
+            var dir = MnemoAppPaths.GetImagesDirectory();
+            Directory.CreateDirectory(dir);
+
+            var ext = GuessImageFileExtension(response.Content.Headers.ContentType?.MediaType, imageUrl);
+            var path = Path.Combine(dir, vm.Id + ext);
+            await File.WriteAllBytesAsync(path, bytes).ConfigureAwait(true);
+
+            vm.ImagePath = path;
+            vm.ImageWidth = 0;
+            vm.SetSpans(new List<InlineSpan> { InlineSpan.Plain(string.Empty) });
+            return vm;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string GuessImageFileExtension(string? mediaType, string sourceUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(mediaType))
+        {
+            if (mediaType.Contains("png", StringComparison.OrdinalIgnoreCase)) return ".png";
+            if (mediaType.Contains("jpeg", StringComparison.OrdinalIgnoreCase) || mediaType.Contains("jpg", StringComparison.OrdinalIgnoreCase)) return ".jpg";
+            if (mediaType.Contains("gif", StringComparison.OrdinalIgnoreCase)) return ".gif";
+            if (mediaType.Contains("webp", StringComparison.OrdinalIgnoreCase)) return ".webp";
+            if (mediaType.Contains("bmp", StringComparison.OrdinalIgnoreCase)) return ".bmp";
+            if (mediaType.Contains("tiff", StringComparison.OrdinalIgnoreCase)) return ".tiff";
+        }
+
+        var ext = Path.GetExtension(sourceUrl);
+        return ClipboardImageExtensions.Contains(ext) ? ext : ".png";
     }
 
     public void LoadBlocks(Block[] blocks)
@@ -462,6 +907,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         Blocks.RemoveAt(index);
 
         var tc = (TwoColumnBlockViewModel)BlockFactory.CreateBlock(BlockType.TwoColumn, block.Order);
+        tc.Meta[NativeTwoColumnMetaKey] = true;
         SubscribeToBlock(tc);
         Blocks.Insert(index, tc);
         ReorderBlocks();
@@ -565,6 +1011,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.MergeWithPreviousRequested += OnMergeWithPreviousRequested;
         block.ExitSplitBelowRequested += OnExitSplitBelowRequested;
         block.StructuralChangeStarting += OnStructuralChangeStarting;
+        block.StructuralChangeCompleted += OnStructuralChangeCompleted;
         if (block is TwoColumnBlockViewModel tc)
         {
             tc.ColumnChildrenChanged += OnTwoColumnColumnChildrenChanged;
@@ -621,6 +1068,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         block.MergeWithPreviousRequested -= OnMergeWithPreviousRequested;
         block.ExitSplitBelowRequested -= OnExitSplitBelowRequested;
         block.StructuralChangeStarting -= OnStructuralChangeStarting;
+        block.StructuralChangeCompleted -= OnStructuralChangeCompleted;
         if (block is TwoColumnBlockViewModel tc)
         {
             tc.ColumnChildrenChanged -= OnTwoColumnColumnChildrenChanged;
@@ -634,6 +1082,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private void OnStructuralChangeStarting()
     {
         BeginStructuralChange();
+    }
+
+    private void OnStructuralChangeCompleted(string description)
+    {
+        CommitStructuralChange(description);
     }
 
     private void OnBlockPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -710,13 +1163,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
             else
             {
-                BlockEditorLogger.Log($"ContentChanged but PreviousContent=null, skipping typing track. blockId={block.Id}");
             }
         }
         else
         {
-            BlockEditorLogger.Log($"ContentChanged during restore/structural op. blockId={block.Id} restoring={_isRestoringFromHistory} pending={_pendingSnapshot != null}");
         }
+        if (_findPanelVisible)
+            RefreshFindMatchesAndHighlights();
         BlocksChanged?.Invoke();
     }
 
@@ -909,22 +1362,34 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         BlocksChanged?.Invoke();
     }
 
+    private static bool IsEffectivelyEmptyForSplitCollapse(BlockViewModel block)
+    {
+        if (block.Type == BlockType.Image)
+        {
+            if (!string.IsNullOrWhiteSpace(block.ImagePath)) return false;
+            if (!string.IsNullOrWhiteSpace(block.Content)) return false;
+            return true;
+        }
+
+        return BlockEditorContentPolicy.IsVisuallyEmpty(block.Content);
+    }
+
     /// <summary>
     /// When every cell in the split is visually empty (including <paramref name="block"/>), backspace
     /// removes the whole TwoColumn and restores a single top-level paragraph.
     /// </summary>
     private static bool ShouldUnwrapTwoColumnBecauseAllCellsEmpty(TwoColumnBlockViewModel tc, BlockViewModel block)
     {
-        if (!BlockEditorContentPolicy.IsVisuallyEmpty(block.Content)) return false;
+        if (!IsEffectivelyEmptyForSplitCollapse(block)) return false;
         foreach (var b in tc.LeftColumnBlocks)
         {
             if (ReferenceEquals(b, block)) continue;
-            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content)) return false;
+            if (!IsEffectivelyEmptyForSplitCollapse(b)) return false;
         }
         foreach (var b in tc.RightColumnBlocks)
         {
             if (ReferenceEquals(b, block)) continue;
-            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content)) return false;
+            if (!IsEffectivelyEmptyForSplitCollapse(b)) return false;
         }
         return true;
     }
@@ -934,7 +1399,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var col = leftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
         foreach (var b in col)
         {
-            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content))
+            if (!IsEffectivelyEmptyForSplitCollapse(b))
                 return false;
         }
         return true;
@@ -947,7 +1412,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private static bool ShouldUnwrapTwoColumnBecauseOneColumnEmptyOtherHasContent(TwoColumnBlockViewModel tc,
         BlockViewModel block)
     {
-        if (!BlockEditorContentPolicy.IsVisuallyEmpty(block.Content)) return false;
+        if (!IsEffectivelyEmptyForSplitCollapse(block)) return false;
         if (ColumnIsEntirelyVisuallyEmpty(tc, true) && !ColumnIsEntirelyVisuallyEmpty(tc, false) && block.IsLeftColumn)
             return true;
         if (ColumnIsEntirelyVisuallyEmpty(tc, false) && !ColumnIsEntirelyVisuallyEmpty(tc, true) && !block.IsLeftColumn)
@@ -1031,12 +1496,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (Blocks.IndexOf(tc) < 0) return;
         foreach (var b in tc.LeftColumnBlocks)
         {
-            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content))
+            if (!IsEffectivelyEmptyForSplitCollapse(b))
                 return;
         }
         foreach (var b in tc.RightColumnBlocks)
         {
-            if (!BlockEditorContentPolicy.IsVisuallyEmpty(b.Content))
+            if (!IsEffectivelyEmptyForSplitCollapse(b))
                 return;
         }
         var topIdx = Blocks.IndexOf(tc);
@@ -1059,10 +1524,29 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (tc == null || Blocks.IndexOf(tc) < 0) return;
         TryCollapseSplitToSingleEmptyIfAllLeavesEmpty(tc);
         if (Blocks.IndexOf(tc) < 0) return;
+        if (IsNativeTwoColumn(tc)) return;
         if (ColumnIsEntirelyVisuallyEmpty(tc, true) && !ColumnIsEntirelyVisuallyEmpty(tc, false))
             UnwrapTwoColumnPromotingFilledColumn(tc, false);
         else if (ColumnIsEntirelyVisuallyEmpty(tc, false) && !ColumnIsEntirelyVisuallyEmpty(tc, true))
             UnwrapTwoColumnPromotingFilledColumn(tc, true);
+    }
+
+    private static bool IsNativeTwoColumn(TwoColumnBlockViewModel tc)
+    {
+        if (!tc.Meta.TryGetValue(NativeTwoColumnMetaKey, out var raw) || raw == null)
+            return false;
+        if (raw is bool b)
+            return b;
+        if (raw is string s && bool.TryParse(s, out var parsed))
+            return parsed;
+        if (raw is JsonElement je)
+        {
+            if (je.ValueKind == JsonValueKind.True) return true;
+            if (je.ValueKind == JsonValueKind.False) return false;
+            if (je.ValueKind == JsonValueKind.String && bool.TryParse(je.GetString(), out var jsonParsed))
+                return jsonParsed;
+        }
+        return false;
     }
 
     private void OnNewBlockRequested(BlockViewModel block, string? initialContent)
@@ -1301,6 +1785,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     public void NotifyBlocksChanged()
     {
+        if (_findPanelVisible)
+            RefreshFindMatchesAndHighlights();
         BlocksChanged?.Invoke();
     }
 
@@ -2088,9 +2574,22 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void Editor_KeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Handled) return;
+
+        bool ctrlF = e.Key == Key.F && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
+        if (ctrlF)
+        {
+            OpenFindPanel();
+            TryPopulateFindQueryFromFocusedSelection();
+            e.Handled = true;
+            return;
+        }
+
+        if (HandleFindPanelNavigationKey(e))
+            return;
+
         if (IsReadOnly)
             return;
-        if (e.Handled) return;
 
         var hasBlockSelection = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.IsSelected);
         bool deferClipboardToNestedTextBox = IsFocusInsideNestedTextBox();
@@ -2175,6 +2674,704 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 block.IsSelected = true;
             e.Handled = true;
         }
+    }
+
+    private bool HandleFindPanelNavigationKey(KeyEventArgs e)
+    {
+        if (!_findPanelVisible)
+            return false;
+        if (e.Key == Key.Escape)
+        {
+            CloseFindPanel(clearQuery: false);
+            e.Handled = true;
+            return true;
+        }
+
+        if (!IsFocusInsideFindPanel())
+            return false;
+        if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0)
+            return false;
+
+        if (e.Key == Key.Down)
+        {
+            NavigateFindMatches(forward: true);
+            e.Handled = true;
+            return true;
+        }
+
+        if (e.Key == Key.Up)
+        {
+            NavigateFindMatches(forward: false);
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsFocusInsideFindPanel()
+    {
+        if (_findPanel == null)
+            return false;
+        var top = TopLevel.GetTopLevel(this);
+        if (top?.FocusManager?.GetFocusedElement() is not Visual focused)
+            return false;
+        return _findPanel.IsVisualAncestorOf(focused) || ReferenceEquals(focused, _findPanel);
+    }
+
+    private void OpenFindPanel()
+    {
+        _overlayService ??= ((App?)Application.Current)?.Services?.GetService<IOverlayService>();
+        if (_overlayService == null)
+            return;
+
+        if (_findPanelVisible && _findPanel != null && !string.IsNullOrEmpty(_findOverlayId))
+        {
+            AttachFindOverlayScrollHost();
+            UpdateFindOverlayAnchor();
+            if (!string.Equals(_findPanel.FindQueryTextBox.Text ?? string.Empty, _findQuery, StringComparison.Ordinal))
+                _findPanel.FindQueryTextBox.Text = _findQuery;
+            UpdateFindMatchCountText();
+            Dispatcher.UIThread.Post(() =>
+            {
+                _findPanel.FindQueryTextBox.Focus();
+                _findPanel.FindQueryTextBox.SelectAll();
+            }, DispatcherPriority.Input);
+            RefreshFindMatchesAndHighlights();
+            return;
+        }
+
+        var panel = new NoteFindPanel { EditorHost = this };
+        if (!string.IsNullOrEmpty(_findQuery))
+            panel.FindQueryTextBox.Text = _findQuery;
+        if (!string.IsNullOrEmpty(_replaceQuery))
+            panel.ReplaceQueryTextBox.Text = _replaceQuery;
+
+        _findPanel = panel;
+
+        TryComputeFindOverlayAnchor(this, out var anchorX, out var anchorY);
+        var options = new OverlayOptions
+        {
+            ShowBackdrop = false,
+            CloseOnOutsideClick = false,
+            CloseOnEscape = false,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            AnchorPosition = AnchorPosition.TopLeft,
+            AnchorPointX = anchorX,
+            AnchorPointY = anchorY
+        };
+        _findOverlayId = _overlayService.CreateOverlay(panel, options, "NoteFindPanel");
+        _findPanelVisible = true;
+        _replacePanelExpanded = false;
+        _findCaretBeforeOpen = CaptureCaretState();
+        _findNavigatedToMatch = false;
+        _lastFindOverlayAnchorX = null;
+        _lastFindOverlayAnchorY = null;
+        ApplyReplacePanelUiState();
+        UpdateFindMatchCountText();
+        AttachFindOverlayScrollHost();
+        Dispatcher.UIThread.Post(() =>
+        {
+            UpdateFindOverlayAnchor();
+            panel.FindQueryTextBox.Focus();
+            panel.FindQueryTextBox.SelectAll();
+        }, DispatcherPriority.Loaded);
+        RefreshFindMatchesAndHighlights();
+    }
+
+    private void CloseFindPanel(bool clearQuery)
+    {
+        var shouldRestoreCaret = _findCaretBeforeOpen != null && (!_findNavigatedToMatch || _findMatches.Count == 0);
+
+        _findPanelVisible = false;
+        _replacePanelExpanded = false;
+        DetachFindOverlayScrollHost();
+        _lastFindOverlayAnchorX = null;
+        _lastFindOverlayAnchorY = null;
+
+        if (!string.IsNullOrEmpty(_findOverlayId) && _overlayService != null)
+        {
+            _overlayService.CloseOverlay(_findOverlayId);
+            _findOverlayId = null;
+        }
+
+        _findPanel = null;
+        _findMatches.Clear();
+        _activeFindMatchIndex = -1;
+        if (clearQuery)
+        {
+            _findQuery = string.Empty;
+            _replaceQuery = string.Empty;
+        }
+        var caretBeforeFind = _findCaretBeforeOpen;
+        _findCaretBeforeOpen = null;
+        _findNavigatedToMatch = false;
+
+        ApplyFindHighlights();
+        UpdateFindMatchCountText();
+        if (shouldRestoreCaret && caretBeforeFind != null)
+            ApplyCaretFocus(caretBeforeFind);
+        else
+            RestoreEditorFocusAfterFindPanelClose();
+    }
+
+    private void RestoreEditorFocusAfterFindPanelClose()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            BlockViewModel? target = null;
+            if (!string.IsNullOrEmpty(_focusedBlockId))
+                target = BlockHierarchy.FindById(Blocks, _focusedBlockId!);
+            target ??= BlockHierarchy.FindFocused(Blocks);
+            target ??= BlockHierarchy.EnumerateInDocumentOrder(Blocks).FirstOrDefault();
+            if (target == null)
+                return;
+
+            if (target.IsFocused)
+            {
+                target.IsFocused = false;
+                target.IsFocused = true;
+            }
+            else
+            {
+                target.IsFocused = true;
+            }
+        }, DispatcherPriority.Input);
+    }
+
+    private void ApplyReplacePanelUiState()
+    {
+        if (_findPanel == null)
+            return;
+        _findPanel.FindReplaceGrid.IsVisible = _replacePanelExpanded;
+        _findPanel.FindToggleReplaceTextBlock.Text = _replacePanelExpanded ? "Replace on" : "Replace off";
+        _findPanel.FindOptionsRow.IsVisible = !_replacePanelExpanded;
+
+        var caseSensitive = _replacePanelExpanded
+            ? (_findPanel.FindCaseSensitiveCheckBoxReplace.IsChecked ?? false)
+            : (_findPanel.FindCaseSensitiveCheckBoxCompact.IsChecked ?? false);
+        var wholeWord = _replacePanelExpanded
+            ? (_findPanel.FindWholeWordCheckBoxReplace.IsChecked ?? false)
+            : (_findPanel.FindWholeWordCheckBoxCompact.IsChecked ?? false);
+
+        _isSyncingFindOptionToggles = true;
+        try
+        {
+            _findPanel.FindCaseSensitiveCheckBoxReplace.IsChecked = caseSensitive;
+            _findPanel.FindCaseSensitiveCheckBoxCompact.IsChecked = caseSensitive;
+            _findPanel.FindWholeWordCheckBoxReplace.IsChecked = wholeWord;
+            _findPanel.FindWholeWordCheckBoxCompact.IsChecked = wholeWord;
+        }
+        finally
+        {
+            _isSyncingFindOptionToggles = false;
+        }
+    }
+
+    private void UpdateFindOverlayAnchor()
+    {
+        if (!_findPanelVisible || string.IsNullOrEmpty(_findOverlayId) || _overlayService == null || _findPanel == null)
+            return;
+        var instance = _overlayService.Overlays.FirstOrDefault(o => o.Id == _findOverlayId);
+        if (instance == null)
+            return;
+        if (!TryComputeFindOverlayAnchor(this, out var x, out var y))
+            return;
+        if (_lastFindOverlayAnchorX is { } lx
+            && _lastFindOverlayAnchorY is { } ly
+            && Math.Abs(lx - x) < 0.5
+            && Math.Abs(ly - y) < 0.5)
+            return;
+
+        _lastFindOverlayAnchorX = x;
+        _lastFindOverlayAnchorY = y;
+        instance.Options.AnchorPointX = x;
+        instance.Options.AnchorPointY = y;
+        instance.Options.AnchorPosition = AnchorPosition.TopLeft;
+    }
+
+    private void AttachFindOverlayScrollHost()
+    {
+        DetachFindOverlayScrollHost();
+        _findAnchorScrollHost = this.FindAncestorOfType<ScrollViewer>();
+        if (_findAnchorScrollHost == null)
+            return;
+        _findAnchorScrollSizeChangedHandler = (_, _) =>
+        {
+            _lastFindOverlayAnchorX = null;
+            _lastFindOverlayAnchorY = null;
+            UpdateFindOverlayAnchor();
+        };
+        _findAnchorScrollHost.SizeChanged += _findAnchorScrollSizeChangedHandler;
+    }
+
+    private void DetachFindOverlayScrollHost()
+    {
+        if (_findAnchorScrollHost != null && _findAnchorScrollSizeChangedHandler != null)
+            _findAnchorScrollHost.SizeChanged -= _findAnchorScrollSizeChangedHandler;
+        _findAnchorScrollHost = null;
+        _findAnchorScrollSizeChangedHandler = null;
+    }
+
+    private static bool TryComputeFindOverlayAnchor(BlockEditor editor, out double anchorLeft, out double anchorTop)
+    {
+        const double padding = 8;
+        anchorLeft = padding;
+        anchorTop = padding;
+        var top = TopLevel.GetTopLevel(editor);
+        if (top == null)
+            return false;
+
+        var w = FindOverlayAnchorWidthEstimate;
+        var scroll = editor.FindAncestorOfType<ScrollViewer>();
+        if (scroll != null)
+        {
+            var tl = scroll.TranslatePoint(new Point(0, 0), top);
+            if (!tl.HasValue)
+                return false;
+            anchorLeft = tl.Value.X + scroll.Bounds.Width - w - padding;
+            anchorTop = tl.Value.Y + padding;
+            return true;
+        }
+
+        var editorTl = editor.TranslatePoint(new Point(0, 0), top);
+        if (!editorTl.HasValue)
+            return false;
+        anchorLeft = editorTl.Value.X + editor.Bounds.Width - w - padding;
+        anchorTop = editorTl.Value.Y + padding;
+        return true;
+    }
+
+    internal void OnNoteFindPanelFindQueryTextChanged(object? sender, TextChangedEventArgs e) =>
+        FindQueryTextBox_OnTextChanged(sender, e);
+
+    internal void OnNoteFindPanelReplaceQueryTextChanged(object? sender, TextChangedEventArgs e) =>
+        ReplaceQueryTextBox_OnTextChanged(sender, e);
+
+    internal void OnNoteFindPanelOptionChanged(object? sender, RoutedEventArgs e) =>
+        FindOptionCheckBox_OnChanged(sender, e);
+
+    internal void OnNoteFindPanelFindPreviousClick(object? sender, RoutedEventArgs e) =>
+        FindPreviousButton_OnClick(sender, e);
+
+    internal void OnNoteFindPanelFindNextClick(object? sender, RoutedEventArgs e) =>
+        FindNextButton_OnClick(sender, e);
+
+    internal void OnNoteFindPanelToggleReplaceClick(object? sender, RoutedEventArgs e) =>
+        FindToggleReplaceButton_OnClick(sender, e);
+
+    internal void OnNoteFindPanelCloseClick(object? sender, RoutedEventArgs e) =>
+        CloseFindPanel(clearQuery: false);
+
+    internal void OnNoteFindPanelReplaceCurrentClick(object? sender, RoutedEventArgs e) =>
+        ReplaceCurrentButton_OnClick(sender, e);
+
+    internal void OnNoteFindPanelReplaceAllClick(object? sender, RoutedEventArgs e) =>
+        ReplaceAllButton_OnClick(sender, e);
+
+    internal void OnNoteFindPanelFindTextKeyDown(object? sender, KeyEventArgs e) =>
+        FindTextBox_OnKeyDown(sender, e);
+
+    internal void OnNoteFindPanelReplaceTextKeyDown(object? sender, KeyEventArgs e) =>
+        ReplaceTextBox_OnKeyDown(sender, e);
+
+    private void FindQueryTextBox_OnTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        _findQuery = (sender as TextBox)?.Text ?? _findPanel?.FindQueryTextBox.Text ?? string.Empty;
+        RefreshFindMatchesAndHighlights();
+    }
+
+    private void ReplaceQueryTextBox_OnTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        _replaceQuery = (sender as TextBox)?.Text ?? _findPanel?.ReplaceQueryTextBox.Text ?? string.Empty;
+    }
+
+    private void FindOptionCheckBox_OnChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_findPanel != null && !_isSyncingFindOptionToggles)
+        {
+            _isSyncingFindOptionToggles = true;
+            try
+            {
+                var caseSensitive = (sender == _findPanel.FindCaseSensitiveCheckBoxReplace
+                                     || sender == _findPanel.FindCaseSensitiveCheckBoxCompact)
+                    ? ((sender as ToggleButton)?.IsChecked ?? false)
+                    : (_findPanel.FindCaseSensitiveCheckBoxReplace.IsChecked
+                       ?? _findPanel.FindCaseSensitiveCheckBoxCompact.IsChecked
+                       ?? false);
+                var wholeWord = (sender == _findPanel.FindWholeWordCheckBoxReplace
+                                 || sender == _findPanel.FindWholeWordCheckBoxCompact)
+                    ? ((sender as ToggleButton)?.IsChecked ?? false)
+                    : (_findPanel.FindWholeWordCheckBoxReplace.IsChecked
+                       ?? _findPanel.FindWholeWordCheckBoxCompact.IsChecked
+                       ?? false);
+
+                _findPanel.FindCaseSensitiveCheckBoxReplace.IsChecked = caseSensitive;
+                _findPanel.FindCaseSensitiveCheckBoxCompact.IsChecked = caseSensitive;
+                _findPanel.FindWholeWordCheckBoxReplace.IsChecked = wholeWord;
+                _findPanel.FindWholeWordCheckBoxCompact.IsChecked = wholeWord;
+            }
+            finally
+            {
+                _isSyncingFindOptionToggles = false;
+            }
+        }
+
+        RefreshFindMatchesAndHighlights();
+    }
+
+    private void FindPreviousButton_OnClick(object? sender, RoutedEventArgs e) => NavigateFindMatches(forward: false);
+
+    private void FindNextButton_OnClick(object? sender, RoutedEventArgs e) => NavigateFindMatches(forward: true);
+
+    private void FindToggleReplaceButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        _replacePanelExpanded = !_replacePanelExpanded;
+        ApplyReplacePanelUiState();
+        if (_replacePanelExpanded && _findPanel != null)
+            Dispatcher.UIThread.Post(() => _findPanel.ReplaceQueryTextBox.Focus(), DispatcherPriority.Input);
+    }
+
+    private void ReplaceCurrentButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        ReplaceCurrentFindMatch();
+    }
+
+    private void ReplaceAllButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        ReplaceAllFindMatches();
+    }
+
+    private void FindTextBox_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && (e.KeyModifiers & KeyModifiers.Shift) == 0)
+        {
+            NavigateFindMatches(forward: true);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Enter && (e.KeyModifiers & KeyModifiers.Shift) != 0)
+        {
+            NavigateFindMatches(forward: false);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Down)
+        {
+            NavigateFindMatches(forward: true);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Up)
+        {
+            NavigateFindMatches(forward: false);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Escape)
+        {
+            CloseFindPanel(clearQuery: false);
+            e.Handled = true;
+        }
+    }
+
+    private void ReplaceTextBox_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            ReplaceCurrentFindMatch();
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Down)
+        {
+            NavigateFindMatches(forward: true);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Up)
+        {
+            NavigateFindMatches(forward: false);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Escape)
+        {
+            CloseFindPanel(clearQuery: false);
+            e.Handled = true;
+        }
+    }
+
+    private void RefreshFindMatchesAndHighlights()
+    {
+        RebuildFindMatches();
+        ApplyFindHighlights();
+        UpdateFindMatchCountText();
+    }
+
+    private void RebuildFindMatches()
+    {
+        var previousActive = _activeFindMatchIndex >= 0 && _activeFindMatchIndex < _findMatches.Count
+            ? _findMatches[_activeFindMatchIndex]
+            : (FindMatch?)null;
+        _findMatches.Clear();
+        _activeFindMatchIndex = -1;
+
+        if (string.IsNullOrEmpty(_findQuery))
+            return;
+
+        foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+        {
+            if (!IsFindSearchableBlock(block))
+                continue;
+            var editable = GetEditableBlockForViewModel(block);
+            var text = editable?.TryGetRichTextEditor()?.Text ?? block.Content ?? string.Empty;
+            if (string.IsNullOrEmpty(text))
+                continue;
+
+            foreach (var start in FindMatchOffsets(text, _findQuery, IsFindCaseSensitive(), IsFindWholeWord()))
+                _findMatches.Add(new FindMatch(block.Id, start, _findQuery.Length));
+        }
+
+        if (_findMatches.Count == 0)
+            return;
+
+        if (previousActive is { } oldActive)
+        {
+            var preservedIndex = _findMatches.FindIndex(m =>
+                m.BlockId == oldActive.BlockId
+                && m.Start == oldActive.Start
+                && m.Length == oldActive.Length);
+            if (preservedIndex >= 0)
+            {
+                _activeFindMatchIndex = preservedIndex;
+                return;
+            }
+        }
+
+        _activeFindMatchIndex = 0;
+    }
+
+    private void ApplyFindHighlights()
+    {
+        var byBlockId = _findMatches.GroupBy(m => m.BlockId).ToDictionary(g => g.Key, g => g.ToList());
+        FindMatch? active = _activeFindMatchIndex >= 0 && _activeFindMatchIndex < _findMatches.Count
+            ? _findMatches[_activeFindMatchIndex]
+            : null;
+
+        foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+        {
+            var rte = GetEditableBlockForViewModel(block)?.TryGetRichTextEditor();
+            if (rte == null)
+                continue;
+
+            if (!byBlockId.TryGetValue(block.Id, out var rangesForBlock))
+            {
+                rte.SearchHighlightRanges = Array.Empty<RichTextEditor.SearchHighlightRange>();
+                rte.ActiveSearchHighlightRange = null;
+                continue;
+            }
+
+            rte.SearchHighlightRanges = rangesForBlock
+                .Select(m => new RichTextEditor.SearchHighlightRange(m.Start, m.Length))
+                .ToArray();
+
+            if (active is { } current && current.BlockId == block.Id)
+                rte.ActiveSearchHighlightRange = new RichTextEditor.SearchHighlightRange(current.Start, current.Length);
+            else
+                rte.ActiveSearchHighlightRange = null;
+        }
+    }
+
+    private void UpdateFindMatchCountText()
+    {
+        if (_findPanel?.FindMatchCountTextBlock is not { } countBlock)
+            return;
+        if (string.IsNullOrEmpty(_findQuery))
+        {
+            countBlock.Text = "0/0";
+            return;
+        }
+        if (_findMatches.Count == 0)
+        {
+            countBlock.Text = "0";
+            return;
+        }
+        countBlock.Text = $"{_activeFindMatchIndex + 1}/{_findMatches.Count}";
+    }
+
+    private void NavigateFindMatches(bool forward)
+    {
+        if (_findMatches.Count == 0)
+        {
+            UpdateFindMatchCountText();
+            return;
+        }
+
+        _activeFindMatchIndex = forward
+            ? (_activeFindMatchIndex + 1 + _findMatches.Count) % _findMatches.Count
+            : (_activeFindMatchIndex - 1 + _findMatches.Count) % _findMatches.Count;
+
+        _findNavigatedToMatch = true;
+        FocusFindMatch(_findMatches[_activeFindMatchIndex]);
+        ApplyFindHighlights();
+        UpdateFindMatchCountText();
+    }
+
+    private void FocusFindMatch(FindMatch match)
+    {
+        var block = BlockHierarchy.FindById(Blocks, match.BlockId);
+        if (block == null)
+            return;
+        var editable = GetEditableBlockForViewModel(block);
+        if (editable == null)
+            return;
+
+        ClearTextSelectionInAllBlocksExcept(block);
+        block.IsFocused = true;
+        editable.ApplyTextSelection(match.Start, match.Start + match.Length);
+        editable.BringIntoView();
+    }
+
+    private void ReplaceCurrentFindMatch()
+    {
+        if (_activeFindMatchIndex < 0 || _activeFindMatchIndex >= _findMatches.Count)
+            return;
+        var current = _findMatches[_activeFindMatchIndex];
+        var block = BlockHierarchy.FindById(Blocks, current.BlockId);
+        if (block == null)
+            return;
+        var editable = GetEditableBlockForViewModel(block);
+        if (editable == null)
+            return;
+
+        BeginStructuralChange();
+        editable.ApplyTextSelection(current.Start, current.Start + current.Length);
+        if (editable.InsertTextAtCursor(_replaceQuery))
+        {
+            CommitStructuralChange("Replace text");
+            NotifyBlocksChanged();
+        }
+        else
+        {
+            CommitStructuralChange("Replace text");
+        }
+        RefreshFindMatchesAndHighlights();
+    }
+
+    private void ReplaceAllFindMatches()
+    {
+        if (_findMatches.Count == 0)
+            return;
+
+        var matchesByBlock = _findMatches.GroupBy(m => m.BlockId).ToList();
+        var didChange = false;
+        BeginStructuralChange();
+        foreach (var group in matchesByBlock)
+        {
+            var block = BlockHierarchy.FindById(Blocks, group.Key);
+            if (block == null)
+                continue;
+            var editable = GetEditableBlockForViewModel(block);
+            var rte = editable?.TryGetRichTextEditor();
+            var originalFlat = rte?.Text ?? block.Content ?? string.Empty;
+            if (string.IsNullOrEmpty(originalFlat))
+                continue;
+            var newFlat = originalFlat;
+
+            foreach (var match in group.OrderByDescending(m => m.Start))
+            {
+                if (match.Start < 0 || match.Start + match.Length > newFlat.Length)
+                    continue;
+                newFlat = newFlat.Remove(match.Start, match.Length).Insert(match.Start, _replaceQuery);
+            }
+
+            if (string.Equals(originalFlat, newFlat, StringComparison.Ordinal))
+                continue;
+
+            var sourceRuns = rte?.Spans ?? block.Spans;
+            var updatedRuns = InlineSpanFormatApplier.ApplyTextEdit(sourceRuns, originalFlat, newFlat);
+            if (rte != null)
+                rte.Spans = updatedRuns;
+            block.CommitSpansFromEditor(updatedRuns);
+            didChange = true;
+        }
+
+        if (didChange)
+        {
+            CommitStructuralChange("Replace all text");
+            NotifyBlocksChanged();
+        }
+        else
+        {
+            CommitStructuralChange("Replace all text");
+        }
+
+        RefreshFindMatchesAndHighlights();
+    }
+
+    private bool IsFindSearchableBlock(BlockViewModel block) =>
+        block.Type is not BlockType.Divider and not BlockType.Image and not BlockType.Equation and not BlockType.Code;
+
+    private bool IsFindCaseSensitive() =>
+        _findPanel != null
+        && ((_findPanel.FindCaseSensitiveCheckBoxReplace.IsChecked ?? false)
+            || (_findPanel.FindCaseSensitiveCheckBoxCompact.IsChecked ?? false));
+
+    private bool IsFindWholeWord() =>
+        _findPanel != null
+        && ((_findPanel.FindWholeWordCheckBoxReplace.IsChecked ?? false)
+            || (_findPanel.FindWholeWordCheckBoxCompact.IsChecked ?? false));
+
+    private static IEnumerable<int> FindMatchOffsets(string text, string query, bool caseSensitive, bool wholeWord)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(query))
+            yield break;
+
+        var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        var start = 0;
+        while (start <= text.Length - query.Length)
+        {
+            var idx = text.IndexOf(query, start, comparison);
+            if (idx < 0)
+                yield break;
+            if (!wholeWord || IsWholeWordBoundary(text, idx, query.Length))
+                yield return idx;
+            start = idx + Math.Max(query.Length, 1);
+        }
+    }
+
+    private static bool IsWholeWordBoundary(string text, int start, int length)
+    {
+        var beforeIsWord = start > 0 && IsWordChar(text[start - 1]);
+        var afterIndex = start + length;
+        var afterIsWord = afterIndex < text.Length && IsWordChar(text[afterIndex]);
+        return !beforeIsWord && !afterIsWord;
+    }
+
+    private static bool IsWordChar(char ch) => char.IsLetterOrDigit(ch) || ch == '_';
+
+    private void TryPopulateFindQueryFromFocusedSelection()
+    {
+        if (!_findPanelVisible || _findPanel == null)
+            return;
+
+        BlockViewModel? focused = null;
+        if (!string.IsNullOrEmpty(_focusedBlockId))
+            focused = BlockHierarchy.FindById(Blocks, _focusedBlockId!);
+        focused ??= BlockHierarchy.FindFocused(Blocks);
+        if (focused == null)
+            return;
+
+        var editable = GetEditableBlockForViewModel(focused);
+        var selected = editable?.GetSelectedText();
+        if (string.IsNullOrEmpty(selected))
+            return;
+
+        if (!string.Equals(_findPanel.FindQueryTextBox.Text, selected, StringComparison.Ordinal))
+            _findPanel.FindQueryTextBox.Text = selected;
+        _findQuery = selected;
     }
 
     /// <summary>
@@ -2638,9 +3835,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             else
                 await topLevel.Clipboard.SetTextAsync(markdown).ConfigureAwait(true);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            BlockEditorLogger.LogError("Clipboard write failed", ex);
         }
         finally
         {
@@ -2877,6 +4073,31 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
             else
             {
+                var focusedVm = BlockHierarchy.FindFocused(Blocks);
+                if (focusedVm?.OwnerTwoColumn is TwoColumnBlockViewModel)
+                {
+                    var insertAtInColumn = GetPasteSiblingInsertStartIndex(focusedVm, GetFocusedBlockIndex());
+                    foreach (var block in pasted)
+                    {
+                        SubscribeToBlock(block);
+                        InsertPasteSiblingBlock(focusedVm, ref insertAtInColumn, block);
+                    }
+                    ReorderBlocks();
+                    ClearBlockSelection();
+                    CommitStructuralChange("Paste");
+                    BlocksChanged?.Invoke();
+
+                    if (pasted.Length > 0)
+                    {
+                        var firstPasted = pasted[0];
+                        Dispatcher.UIThread.Post(
+                            () => firstPasted.IsFocused = true,
+                            DispatcherPriority.Input);
+                    }
+
+                    return;
+                }
+
                 insertIndex = GetFocusedBlockIndex();
                 if (insertIndex < 0) insertIndex = Blocks.Count;
                 else insertIndex++;
@@ -2902,9 +4123,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     DispatcherPriority.Input);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            BlockEditorLogger.LogError("Paste from clipboard failed", ex);
         }
     }
 
@@ -2923,7 +4143,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private static bool IsLastBlockEmptyForBelowBlocksAreaClick(IReadOnlyList<BlockViewModel> blocks)
     {
         if (blocks.Count == 0) return false;
-        var last = blocks[blocks.Count - 1];
+        // Use the last leaf block in document order so a trailing two-column row
+        // does not look "empty" just because the container itself has no Content.
+        var last = BlockHierarchy.EnumerateInDocumentOrder(blocks).LastOrDefault() ?? blocks[blocks.Count - 1];
         if (last.Type == BlockType.Image)
         {
             if (!string.IsNullOrWhiteSpace(last.ImagePath)) return false;
@@ -4353,11 +5575,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (_history == null || _isRestoringFromHistory) return;
         FlushTypingBatch();
-        if (_pendingSnapshot != null)
-            BlockEditorLogger.Log("BeginStructuralChange: overwriting orphaned _pendingSnapshot");
-        _pendingSnapshot = CaptureSnapshot();
+        if (_pendingSnapshot == null)
+            _pendingSnapshot = CaptureSnapshot();
         _pendingCaretBefore = CaptureCaretState();
-        BlockEditorLogger.Log($"BeginStructuralChange: captured {_pendingSnapshot.Length} blocks");
     }
 
     /// <summary>
@@ -4374,7 +5594,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _pendingSnapshot = null;
         _pendingCaretBefore = null;
 
-        BlockEditorLogger.Log($"CommitStructuralChange: PUSH DocumentOp '{description}' before={before.Length}blocks after={after.Length}blocks");
 
         var op = new DocumentOperation(description, before, after, caretBefore, caretAfter, RestoreDocument);
         _history.Push(op);
@@ -4492,11 +5711,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (vm != null)
             {
                 vm.SetSpans(runs);
-                BlockEditorLogger.Log($"RestoreBlockRuns blockId={blockId} text='{Truncate(vm.Content)}'");
             }
             else
             {
-                BlockEditorLogger.Log($"RestoreBlockRuns blockId={blockId} NOT FOUND in Blocks");
             }
 
             ApplyCaretFocus(caret);
@@ -4542,13 +5759,11 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (_history == null || _isRestoringFromHistory)
         {
-            BlockEditorLogger.Log($"TrackTypingEdit skipped: history={_history != null} restoring={_isRestoringFromHistory}");
             return;
         }
 
         if (_typingBatchBlockId != null && _typingBatchBlockId != block.Id)
         {
-            BlockEditorLogger.Log($"TrackTypingEdit: block switch {_typingBatchBlockId} -> {block.Id}, flushing");
             FlushTypingBatch();
         }
 
@@ -4572,7 +5787,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
             _typingBatchCaretBefore = CaptureCaretState()
                 ?? CaptureCaretStateForBlock(block);
-            BlockEditorLogger.Log($"TrackTypingEdit: NEW batch for block {block.Id} before={Truncate(previousText)} current={Truncate(block.Content)}");
         }
 
         _typingBatchTimer?.Stop();
@@ -4604,7 +5818,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var vm = BlockHierarchy.FindById(Blocks, _typingBatchBlockId);
         if (vm == null)
         {
-            BlockEditorLogger.Log($"FlushTypingBatch: block {_typingBatchBlockId} not found, discarding");
             _typingBatchBlockId = null;
             _typingBatchRunsBefore = null;
             _typingBatchCaretBefore = null;
@@ -4618,7 +5831,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         if (runsEqual)
         {
-            BlockEditorLogger.Log($"FlushTypingBatch: no-op (runs equal) block={_typingBatchBlockId}");
             _typingBatchBlockId = null;
             _typingBatchRunsBefore = null;
             _typingBatchCaretBefore = null;
@@ -4630,7 +5842,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         var caretAfter = CaptureCaretStateForBlock(vm);
 
-        BlockEditorLogger.Log($"FlushTypingBatch: PUSH TextEditOp block={vm.Id} before={Truncate(textBefore)} after={Truncate(textAfter)}");
 
         var op = new TextEditOperation(
             "Typing",
@@ -4652,11 +5863,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (_history == null || !_history.CanUndo)
         {
-            BlockEditorLogger.Log($"UndoAsync: nothing to undo (history={_history != null} canUndo={_history?.CanUndo})");
             return;
         }
         FlushTypingBatch();
-        BlockEditorLogger.Log("UndoAsync: executing");
         await _history.UndoAsync();
     }
 
@@ -4664,10 +5873,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (_history == null || !_history.CanRedo)
         {
-            BlockEditorLogger.Log($"RedoAsync: nothing to redo (history={_history != null} canRedo={_history?.CanRedo})");
             return;
         }
-        BlockEditorLogger.Log("RedoAsync: executing");
         await _history.RedoAsync();
     }
 

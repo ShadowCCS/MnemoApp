@@ -39,6 +39,8 @@ namespace Mnemo.UI.Components.BlockEditor;
 /// </summary>
 public class RichTextEditor : Control, ICustomHitTest
 {
+    public readonly record struct SearchHighlightRange(int Start, int Length);
+
     // ── Avalonia properties ──────────────────────────────────────────────────
 
     public static readonly StyledProperty<IReadOnlyList<InlineSpan>> SpansProperty =
@@ -78,6 +80,13 @@ public class RichTextEditor : Control, ICustomHitTest
     /// </summary>
     public static readonly StyledProperty<bool> ShowInlineEquationSourceOnHoverProperty =
         AvaloniaProperty.Register<RichTextEditor, bool>(nameof(ShowInlineEquationSourceOnHover), defaultValue: false);
+
+    public static readonly StyledProperty<IReadOnlyList<SearchHighlightRange>> SearchHighlightRangesProperty =
+        AvaloniaProperty.Register<RichTextEditor, IReadOnlyList<SearchHighlightRange>>(
+            nameof(SearchHighlightRanges), defaultValue: Array.Empty<SearchHighlightRange>());
+
+    public static readonly StyledProperty<SearchHighlightRange?> ActiveSearchHighlightRangeProperty =
+        AvaloniaProperty.Register<RichTextEditor, SearchHighlightRange?>(nameof(ActiveSearchHighlightRange));
 
     public static readonly DirectProperty<RichTextEditor, int> CaretIndexProperty =
         AvaloniaProperty.RegisterDirect<RichTextEditor, int>(
@@ -293,6 +302,18 @@ public class RichTextEditor : Control, ICustomHitTest
         set => SetValue(ShowInlineEquationSourceOnHoverProperty, value);
     }
 
+    public IReadOnlyList<SearchHighlightRange> SearchHighlightRanges
+    {
+        get => GetValue(SearchHighlightRangesProperty);
+        set => SetValue(SearchHighlightRangesProperty, value);
+    }
+
+    public SearchHighlightRange? ActiveSearchHighlightRange
+    {
+        get => GetValue(ActiveSearchHighlightRangeProperty);
+        set => SetValue(ActiveSearchHighlightRangeProperty, value);
+    }
+
     public int TextLength => Text.Length;
 
     /// <summary>
@@ -327,6 +348,8 @@ public class RichTextEditor : Control, ICustomHitTest
             o._hoveredInlineEquationCharIndex = null;
             o.InvalidateVisual();
         });
+        SearchHighlightRangesProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateVisual());
+        ActiveSearchHighlightRangeProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateVisual());
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -819,6 +842,29 @@ public class RichTextEditor : Control, ICustomHitTest
         return Brushes.Black;
     }
 
+    private static IBrush GetSearchHighlightBrush()
+    {
+        if (Application.Current?.TryFindResource("SearchMatchHighlightBrush", out var searchBrushResource) == true
+            && searchBrushResource is IBrush searchBrush)
+            return searchBrush;
+        if (Application.Current?.TryFindResource("SearchMatchHighlight", out var searchColorResource) == true
+            && searchColorResource is Color searchColor)
+            return new SolidColorBrush(searchColor);
+        if (Application.Current?.TryFindResource("HighlightedTextBrush", out var resource) == true
+            && resource is IBrush brush)
+            return brush;
+        if (Application.Current?.TryFindResource("HighlightedText", out var colorResource) == true
+            && colorResource is Color color)
+            return new SolidColorBrush(color);
+        return new SolidColorBrush(Color.FromArgb(0x8A, 0xFB, 0xDC, 0xAB));
+    }
+
+    private static IBrush GetActiveSearchHighlightBrush()
+    {
+        // Keep active and inactive find highlights the same tone to avoid mixed orange + beige markers.
+        return GetSearchHighlightBrush();
+    }
+
     private static IBrush GetInlineHighlightBrush()
     {
         if (Application.Current?.TryFindResource("InlineHighlightColorBrush", out var brushRes) == true
@@ -891,7 +937,10 @@ public class RichTextEditor : Control, ICustomHitTest
             if (_backgroundLayout != null)
                 _backgroundLayout.Draw(context, origin);
 
-            // 2. Selection overlay above run backgrounds.
+            // 2. Search highlights above run backgrounds, but below text selection.
+            RenderSearchHighlights(context);
+
+            // 3. Selection overlay above run/search highlights.
             if (selEnd > selStart && _textLayout != null)
             {
                 var selBrush = SelectionBrush ?? GetThemeSelectionBrush();
@@ -939,7 +988,7 @@ public class RichTextEditor : Control, ICustomHitTest
                 }
             }
 
-            // 3. Foreground glyphs and inline math.
+            // 4. Foreground glyphs and inline math.
             if (_textLayout != null)
             {
                 _textLayout.Draw(context, origin);
@@ -948,7 +997,7 @@ public class RichTextEditor : Control, ICustomHitTest
                 if (ShouldDrawWatermark() && _watermarkLayout != null)
                     _watermarkLayout.Draw(context, origin);
             }
-            // 4. Caret on top.
+            // 5. Caret on top.
             if (IsFocused && _caretVisible && selEnd == selStart && _textLayout != null)
             {
                 var caretBrush = CaretBrush ?? GetThemeCaretBrush();
@@ -956,6 +1005,47 @@ public class RichTextEditor : Control, ICustomHitTest
                 context.FillRectangle(caretBrush, caretRect);
             }
 
+        }
+    }
+
+    private void RenderSearchHighlights(DrawingContext context)
+    {
+        if (_textLayout == null)
+            return;
+
+        var ranges = SearchHighlightRanges;
+        if (ranges == null || ranges.Count == 0)
+            return;
+
+        var activeRange = ActiveSearchHighlightRange;
+        var activeBrush = GetActiveSearchHighlightBrush();
+        var normalBrush = GetSearchHighlightBrush();
+
+        foreach (var range in ranges)
+        {
+            if (range.Length <= 0)
+                continue;
+            int logicalStart = Math.Clamp(range.Start, 0, TextLength);
+            int logicalEnd = Math.Clamp(range.Start + range.Length, 0, TextLength);
+            if (logicalEnd <= logicalStart)
+                continue;
+            int layoutStart = LogicalCaretToLayoutBoundary(logicalStart);
+            int layoutLen = LogicalCaretToLayoutBoundary(logicalEnd) - layoutStart;
+            if (layoutLen <= 0)
+                continue;
+
+            var rects = _textLayout.HitTestTextRange(layoutStart, layoutLen).ToList();
+            var brush = activeRange.HasValue
+                && activeRange.Value.Start == range.Start
+                && activeRange.Value.Length == range.Length
+                ? activeBrush
+                : normalBrush;
+            foreach (var rect in rects)
+            {
+                if (rect.Width <= 0.5 || rect.Height <= 0.5)
+                    continue;
+                context.FillRectangle(brush, rect);
+            }
         }
     }
 

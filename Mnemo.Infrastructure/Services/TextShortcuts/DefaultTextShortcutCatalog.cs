@@ -25,7 +25,6 @@ internal static class DefaultTextShortcutCatalog
         return new List<TextShortcut>
         {
             // Typography and legal symbols
-            new TextShortcut("---", "\u2014"), // —
             new TextShortcut("--",  "\u2013"), // –
             new TextShortcut("...", "\u2026"), // …
             new TextShortcut("(c)",  "\u00A9"), // ©

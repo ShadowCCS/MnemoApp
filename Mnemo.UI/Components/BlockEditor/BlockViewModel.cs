@@ -610,6 +610,7 @@ public class BlockViewModel : INotifyPropertyChanged
     /// so the editor can snapshot the document while VMs are still unmodified.
     /// </summary>
     public event Action? StructuralChangeStarting;
+    public event Action<string>? StructuralChangeCompleted;
 
     public BlockViewModel(BlockType type, string content = "", int order = 0)
     {
@@ -878,6 +879,11 @@ public class BlockViewModel : INotifyPropertyChanged
     public void NotifyStructuralChangeStarting()
     {
         StructuralChangeStarting?.Invoke();
+    }
+
+    public void NotifyStructuralChangeCompleted(string description)
+    {
+        StructuralChangeCompleted?.Invoke(description);
     }
 
     public void RequestDelete()

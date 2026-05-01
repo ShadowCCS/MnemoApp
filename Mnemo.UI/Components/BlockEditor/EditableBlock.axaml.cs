@@ -787,7 +787,6 @@ public partial class EditableBlock : UserControl
         
         if (_stateManager.IsUpdatingFromViewModel)
         {
-            BlockEditorLogger.Log($"TextBox_TextChanged: SKIPPED (updating from VM) blockId={_viewModel.Id}");
             return;
         }
         
@@ -810,7 +809,6 @@ public partial class EditableBlock : UserControl
         var parentEditor = FindParentBlockEditor();
         parentEditor?.TrackTypingEdit(_viewModel, previousText);
 
-        BlockEditorLogger.Log($"TextBox_TextChanged: blockId={_viewModel.Id} prev='{previousText}' -> new='{text}'");
         _viewModel.Content = text;
         _stateManager.PreviousText = text;
     }
@@ -2355,12 +2353,10 @@ public partial class EditableBlock : UserControl
 
         try
         {
-            if (!parent.TryPerformDrop(payload))
-                BlockEditorLogger.LogError("Drop failed: invalid insert index or block", null);
+            parent.TryPerformDrop(payload);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            BlockEditorLogger.LogError("Error during drop operation", ex);
         }
         finally
         {

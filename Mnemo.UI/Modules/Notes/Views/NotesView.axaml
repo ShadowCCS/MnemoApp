@@ -131,7 +131,7 @@
                                         Click="OnTransferClick"
                                         Tag="transfer"
                                         ToolTip.Tip="{markup:T Ns=Notes, Key=Transfer}">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg"
                                                       Width="16" Height="16"
                                                       Color="{DynamicResource TextTertiaryBrush}"/>
                                 </Button>

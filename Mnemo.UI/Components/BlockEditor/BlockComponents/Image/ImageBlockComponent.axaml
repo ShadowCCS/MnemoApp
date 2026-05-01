@@ -81,24 +81,97 @@
                     MinHeight="160"
                     Height="160"
                     IsVisible="False"
+                    DragDrop.AllowDrop="True"
                     PointerPressed="Placeholder_PointerPressed">
                     <Grid HorizontalAlignment="Stretch" Background="Transparent">
                         <StackPanel
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Spacing="8">
-                            <PathIcon
-                                Width="28"
-                                Height="28"
-                                Data="M3 5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5ZM5 5V14.5858L8.29289 11.2929C8.68342 10.9024 9.31658 10.9024 9.70711 11.2929L13 14.5858L14.2929 13.2929C14.6834 12.9024 15.3166 12.9024 15.7071 13.2929L19 16.5858V5H5ZM19 19V19.0001L5 19V16.4142L9 12.4142L12.5858 16H11L14 16L15 15L19 19ZM10 9C10 9.55228 9.55228 10 9 10C8.44772 10 8 9.55228 8 9C8 8.44772 8.44772 8 9 8C9.55228 8 10 8.44772 10 9Z"
-                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                Opacity="0.6" />
-                            <TextBlock
-                                x:Name="PlaceholderLabel"
+                            Spacing="10">
+                            <StackPanel
+                                x:Name="PlaceholderEmptyState"
                                 HorizontalAlignment="Center"
-                                FontSize="13"
-                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                Opacity="0.7" />
+                                Spacing="8">
+                                <PathIcon
+                                    Width="28"
+                                    Height="28"
+                                    HorizontalAlignment="Center"
+                                    Data="M3 5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5ZM5 5V14.5858L8.29289 11.2929C8.68342 10.9024 9.31658 10.9024 9.70711 11.2929L13 14.5858L14.2929 13.2929C14.6834 12.9024 15.3166 12.9024 15.7071 13.2929L19 16.5858V5H5ZM19 19V19.0001L5 19V16.4142L9 12.4142L12.5858 16H11L14 16L15 15L19 19ZM10 9C10 9.55228 9.55228 10 9 10C8.44772 10 8 9.55228 8 9C8 8.44772 8.44772 8 9 8C9.55228 8 10 8.44772 10 9Z"
+                                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                    Opacity="0.6" />
+                                <TextBlock
+                                    x:Name="PlaceholderEmptyTitle"
+                                    HorizontalAlignment="Center"
+                                    FontSize="22"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock
+                                    x:Name="PlaceholderEmptySubtitle"
+                                    HorizontalAlignment="Center"
+                                    FontSize="13"
+                                    Foreground="{DynamicResource TextPrimaryBrush}"
+                                    Opacity="0.75" />
+                                <TextBlock
+                                    x:Name="PlaceholderEmptyFormats"
+                                    HorizontalAlignment="Center"
+                                    FontSize="12"
+                                    Foreground="{DynamicResource TextSecondaryBrush}"
+                                    FontWeight="SemiBold" />
+                            </StackPanel>
+
+                            <StackPanel
+                                x:Name="PlaceholderImportingState"
+                                HorizontalAlignment="Center"
+                                Spacing="8"
+                                IsVisible="False">
+                                <ProgressBar
+                                    Width="160"
+                                    IsIndeterminate="True" />
+                                <TextBlock
+                                    x:Name="PlaceholderImportingTitle"
+                                    HorizontalAlignment="Center"
+                                    FontSize="22"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock
+                                    x:Name="PlaceholderImportingSubtitle"
+                                    HorizontalAlignment="Center"
+                                    FontSize="13"
+                                    Foreground="{DynamicResource TextPrimaryBrush}"
+                                    Opacity="0.75" />
+                            </StackPanel>
+
+                            <StackPanel
+                                x:Name="PlaceholderErrorState"
+                                HorizontalAlignment="Center"
+                                Spacing="8"
+                                IsVisible="False">
+                                <PathIcon
+                                    Width="26"
+                                    Height="26"
+                                    HorizontalAlignment="Center"
+                                    Data="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z"
+                                    Foreground="{DynamicResource SystemErrorTextColor}" />
+                                <TextBlock
+                                    x:Name="PlaceholderErrorTitle"
+                                    HorizontalAlignment="Center"
+                                    FontSize="22"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock
+                                    x:Name="PlaceholderErrorSubtitle"
+                                    HorizontalAlignment="Center"
+                                    FontSize="13"
+                                    Foreground="{DynamicResource TextPrimaryBrush}"
+                                    Opacity="0.75" />
+                                <Button
+                                    x:Name="PlaceholderTryAgainButton"
+                                    HorizontalAlignment="Center"
+                                    Padding="16,8"
+                                    CornerRadius="18"
+                                    Cursor="Hand"
+                                    Click="PlaceholderTryAgainButton_Click" />
+                            </StackPanel>
                         </StackPanel>
                         <StackPanel
                             x:Name="PlaceholderToolbar"
@@ -184,11 +257,27 @@
                                 Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
                                 <Button.Flyout>
                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                        <MenuItem x:Name="PhFlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
-                                        <MenuItem x:Name="PhFlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="PhFlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand">
+                                            <MenuItem.Icon>
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/open.svg" Width="16" Height="16" />
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem x:Name="PhFlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand">
+                                            <MenuItem.Icon>
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16" />
+                                            </MenuItem.Icon>
+                                        </MenuItem>
                                         <Separator />
-                                        <MenuItem x:Name="PhFlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
-                                        <MenuItem x:Name="PhFlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
+                                        <MenuItem x:Name="PhFlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand">
+                                            <MenuItem.Icon>
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/duplicate.svg" Width="16" Height="16" />
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem x:Name="PhFlyoutDeleteItem" Classes="danger" Click="FlyoutDelete_Click" Cursor="Hand">
+                                            <MenuItem.Icon>
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16" />
+                                            </MenuItem.Icon>
+                                        </MenuItem>
                                     </MenuFlyout>
                                 </Button.Flyout>
                                 <PathIcon
@@ -317,11 +406,27 @@
                                     Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
                                     <Button.Flyout>
                                         <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                            <MenuItem x:Name="FlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand" />
-                                            <MenuItem x:Name="FlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand" />
+                                            <MenuItem x:Name="FlyoutReplaceItem" Click="FlyoutReplace_Click" Cursor="Hand">
+                                                <MenuItem.Icon>
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/open.svg" Width="16" Height="16" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem x:Name="FlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand">
+                                                <MenuItem.Icon>
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
                                             <Separator />
-                                            <MenuItem x:Name="FlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand" />
-                                            <MenuItem x:Name="FlyoutDeleteItem" Click="FlyoutDelete_Click" Cursor="Hand" />
+                                            <MenuItem x:Name="FlyoutDuplicateItem" Click="FlyoutDuplicate_Click" Cursor="Hand">
+                                                <MenuItem.Icon>
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/duplicate.svg" Width="16" Height="16" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem x:Name="FlyoutDeleteItem" Classes="danger" Click="FlyoutDelete_Click" Cursor="Hand">
+                                                <MenuItem.Icon>
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
                                         </MenuFlyout>
                                     </Button.Flyout>
                                     <PathIcon

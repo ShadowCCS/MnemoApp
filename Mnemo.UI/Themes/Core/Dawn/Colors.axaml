@@ -393,6 +393,7 @@
     
     <!-- Rich Text Highlighting -->
     <Color x:Key="HighlightedText">#E5E5E5</Color>
+    <Color x:Key="SearchMatchHighlight">#FBDCAB</Color>
     <!-- Inline text highlight (formatting toolbar marker) -->
     <Color x:Key="InlineHighlightColor">#FFD7AA</Color>
 

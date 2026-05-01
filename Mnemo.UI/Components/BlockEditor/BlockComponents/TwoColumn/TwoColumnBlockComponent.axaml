@@ -21,7 +21,8 @@
             Cursor="SizeWestEast"
             PointerPressed="Splitter_OnPointerPressed"
             PointerMoved="Splitter_OnPointerMoved"
-            PointerReleased="Splitter_OnPointerReleased">
+            PointerReleased="Splitter_OnPointerReleased"
+            PointerCaptureLost="Splitter_OnPointerCaptureLost">
             <Border
                 x:Name="SplitterGrip"
                 Width="3"

@@ -35,8 +35,8 @@
                                    Margin="24,0,24,18"
                                    LeftText="Import"
                                    RightText="Export"
-                                   LeftIconPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/download.svg"
-                                   RightIconPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/upload.svg"
+                                   LeftIconPath="avares://Mnemo.UI/Icons/MindmapToolbar/download.svg"
+                                   RightIconPath="avares://Mnemo.UI/Icons/Flyout/export.svg"
                                    IsLeftSelected="{Binding IsImportMode}"
                                    LeftCommand="{Binding SelectImportCommand}"
                                    RightCommand="{Binding SelectExportCommand}" />
