@@ -481,7 +481,21 @@
     "GenerateLearningPath": "Lernpfad generieren"
   },
   "AddWidget": {
-    "Title": "Füge Widget hinzu"
+    "Title": "Widget hinzufügen",
+    "Subtitle": "Wähle ein Widget für die Übersicht.",
+    "SearchPlaceholder": "Widgets durchsuchen",
+    "FilterAll": "Alle",
+    "FilterStudy": "Lernen",
+    "FilterFlashcards": "Karteikarten",
+    "FilterProductivity": "Produktivität",
+    "FilterCommunity": "Community",
+    "ProductMnemo": "Mnemo",
+    "FooterCountFormat": "{0} von {1} Widgets",
+    "PickBadge": "PICK",
+    "AddWidgetButton": "+ Hinzufügen",
+    "WidgetGalleryAdd": "Hinzufügen",
+    "WidgetGalleryAdded": "Hinzugefügt",
+    "WidgetGalleryRemove": "Entfernen"
   },
   "Permissions": {
     "AdditionalPermissionRequired": "Zusätzliche Erlaubnis erforderlich",

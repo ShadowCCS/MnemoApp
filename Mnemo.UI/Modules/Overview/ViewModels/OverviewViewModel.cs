@@ -482,7 +482,7 @@ public partial class OverviewViewModel : ViewModelBase, INavigationAware
     [RelayCommand]
     private void AddWidget()
     {
-        var vm = new AddWidgetViewModel(_widgetRegistry, _overlayService, this);
+        var vm = new AddWidgetViewModel(_widgetRegistry, _overlayService, this, _localizationService);
         var view = new AddWidgetView { DataContext = vm };
         
         var options = new OverlayOptions

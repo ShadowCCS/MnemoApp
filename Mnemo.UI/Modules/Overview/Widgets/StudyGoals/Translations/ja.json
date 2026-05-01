@@ -1,6 +1,9 @@
 {
   "StudyGoals": {
     "Title": "学習目標",
-    "Description": "毎日の学習目標や進捗を管理します"
+    "Description": "毎日の学習目標や進捗を管理します",
+    "GalleryDescription": "カード・セッション・学習時間の日々の進捗を表示します。",
+    "TagGoals": "#目標",
+    "TagProgress": "#進捗"
   }
 }

@@ -1,6 +1,9 @@
 {
   "FlashcardStats": {
     "Title": "Karteikarten-Statistiken",
-    "Description": "Hier sehen Sie Ihre Statistiken zur Karteikartenübung sowie Ihren Lernstreik"
+    "Description": "Hier sehen Sie Ihre Statistiken zur Karteikartenübung sowie Ihren Lernstreik",
+    "GalleryDescription": "Übungssummen, Serien und aktuelle Wiederholungsdynamik.",
+    "TagStats": "#statistik",
+    "TagStreak": "#serie"
   }
 }

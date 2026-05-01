@@ -19,6 +19,9 @@ public partial class SidebarItem : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
+    [ObservableProperty]
+    private bool _isVisible = true;
+
     public SidebarItem(string label, string route, string icon, int order = int.MaxValue)
     {
         _label = label;

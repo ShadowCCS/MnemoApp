@@ -1,6 +1,9 @@
 {
   "RecentDecks": {
     "Title": "Mazos recientes",
-    "Description": "Consulta tus mazos de tarjetas practicados recientemente"
+    "Description": "Consulta tus mazos de tarjetas practicados recientemente",
+    "GalleryDescription": "Acceso rápido a los mazos que estudiaste más recientemente.",
+    "TagDecks": "#mazos",
+    "TagRecent": "#recientes"
   }
 }

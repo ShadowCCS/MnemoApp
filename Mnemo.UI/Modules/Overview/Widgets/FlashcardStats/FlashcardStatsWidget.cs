@@ -25,7 +25,10 @@ public class FlashcardStatsWidget : IWidget
             category: WidgetCategory.Statistics,
             icon: WidgetIconAvares.Uri("FlashcardStats"),
             defaultSize: new WidgetSize(colSpan: 2, rowSpan: 2),
-            translationNamespace: "FlashcardStats");
+            translationNamespace: "FlashcardStats",
+            galleryFilter: WidgetGalleryFilterCategory.Study,
+            galleryTagKeys: ["TagStats", "TagStreak"],
+            isFeatured: true);
     }
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)

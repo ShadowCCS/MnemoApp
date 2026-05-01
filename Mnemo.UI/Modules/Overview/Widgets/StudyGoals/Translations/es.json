@@ -1,6 +1,9 @@
 {
   "StudyGoals": {
     "Title": "Objetivos de estudio",
-    "Description": "Sigue tus objetivos diarios y tu progreso"
+    "Description": "Sigue tus objetivos diarios y tu progreso",
+    "GalleryDescription": "Progreso diario en tarjetas, sesiones y minutos de estudio.",
+    "TagGoals": "#objetivos",
+    "TagProgress": "#progreso"
   }
 }

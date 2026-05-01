@@ -367,6 +367,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
+        var dropPosInEditor = e.GetPosition(this);
+        HandleBlockDragOver(dropPosInEditor, payload);
+
         try
         {
             TryPerformDrop(payload);
@@ -4995,14 +4998,26 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var rowHost = containers[r];
             var splitView = rowHost.GetVisualDescendants().OfType<SplitBlockRowView>().FirstOrDefault();
             if (splitView == null) continue;
-            var leftIc = splitView.FindControl<ItemsControl>("LeftColumnItems");
-            var rightIc = splitView.FindControl<ItemsControl>("RightColumnItems");
-            if (leftIc == null || rightIc == null) continue;
-            var lTl = leftIc.TranslatePoint(new Point(0, 0), this);
-            var rTl = rightIc.TranslatePoint(new Point(0, 0), this);
+            // Use full column grid cells (RootGrid columns 0 / 2), not ItemsControl bounds — when one column
+            // is shorter than the other, empty vertical space below the shorter stack still belongs to that column.
+            var rootGrid = splitView.FindControl<Grid>("RootGrid");
+            if (rootGrid == null) continue;
+            Control? leftColHost = null;
+            Control? rightColHost = null;
+            foreach (var ch in rootGrid.Children)
+            {
+                if (ch is not Control c) continue;
+                var col = Grid.GetColumn(c);
+                if (col == 0) leftColHost = c;
+                else if (col == 2) rightColHost = c;
+            }
+
+            if (leftColHost == null || rightColHost == null) continue;
+            var lTl = leftColHost.TranslatePoint(new Point(0, 0), this);
+            var rTl = rightColHost.TranslatePoint(new Point(0, 0), this);
             if (!lTl.HasValue || !rTl.HasValue) continue;
-            var leftRect = new Rect(lTl.Value, leftIc.Bounds.Size);
-            var rightRect = new Rect(rTl.Value, rightIc.Bounds.Size);
+            var leftRect = new Rect(lTl.Value, leftColHost.Bounds.Size);
+            var rightRect = new Rect(rTl.Value, rightColHost.Bounds.Size);
             if (leftRect.Contains(cursor))
             {
                 leftColumn = true;

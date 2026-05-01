@@ -9,6 +9,6 @@ public interface ISidebarService
     /// <summary>
 /// Registers a sidebar item. <paramref name="labelKey"/> and <paramref name="categoryKey"/> are translation keys in namespace <paramref name="ns"/> (default "Sidebar").
 /// </summary>
-void RegisterItem(string labelKey, string route, string icon, string categoryKey = "General", int? categoryOrder = null, int itemOrder = int.MaxValue, string ns = "Sidebar");
+void RegisterItem(string labelKey, string route, string icon, string categoryKey = "General", int? categoryOrder = null, int itemOrder = int.MaxValue, string ns = "Sidebar", SidebarItemVisibilityRequirement visibilityRequirement = SidebarItemVisibilityRequirement.None);
     bool IsCollapsed { get; set; }
 }

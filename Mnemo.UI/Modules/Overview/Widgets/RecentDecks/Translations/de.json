@@ -1,6 +1,9 @@
 {
   "RecentDecks": {
     "Title": "Letzte Kartenstapel",
-    "Description": "Anzeigen der zuletzt geübten Flashcard-Stapel"
+    "Description": "Anzeigen der zuletzt geübten Flashcard-Stapel",
+    "GalleryDescription": "Schnellzugriff auf die zuletzt geübten Stapel.",
+    "TagDecks": "#stapel",
+    "TagRecent": "#zuletzt"
   }
 }

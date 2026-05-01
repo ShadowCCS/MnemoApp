@@ -2342,6 +2342,9 @@ public partial class EditableBlock : UserControl
         var parent = FindParentBlockEditor();
         if (parent == null) return;
 
+        var dropPosInEditor = e.GetPosition(parent);
+        parent.HandleBlockDragOver(dropPosInEditor, payload);
+
         try
         {
             parent.TryPerformDrop(payload);

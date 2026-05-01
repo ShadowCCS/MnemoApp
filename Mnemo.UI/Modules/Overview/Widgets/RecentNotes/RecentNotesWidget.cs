@@ -23,7 +23,9 @@ public sealed class RecentNotesWidget : IWidget
             category: WidgetCategory.Activity,
             icon: WidgetIconAvares.Uri("RecentNotes"),
             defaultSize: new WidgetSize(colSpan: 3, rowSpan: 2),
-            translationNamespace: "RecentNotes");
+            translationNamespace: "RecentNotes",
+            galleryFilter: WidgetGalleryFilterCategory.Productivity,
+            galleryTagKeys: ["TagNotes", "TagRecent"]);
     }
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)

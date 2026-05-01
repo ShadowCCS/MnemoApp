@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -197,6 +198,25 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         _ => _localization.T("SchedulingEngineSimple", "Flashcards")
     };
 
+    /// <summary>
+    /// Practice header segment for review: session name plus a short engine tag in one crumb (no extra separator).
+    /// </summary>
+    public string ReviewSessionHeaderText =>
+        string.Format(
+            CultureInfo.CurrentCulture,
+            _localization.T("PracticeReviewBreadcrumbFormat", "Flashcards"),
+            _localization.T("SessionReview", "Flashcards"),
+            SchedulingEngineBreadcrumbShort);
+
+    private string SchedulingEngineBreadcrumbShort => _activeSchedulingAlgorithm switch
+    {
+        FlashcardSchedulingAlgorithm.Fsrs => _localization.T("SchedulingBreadcrumbShortFsrs", "Flashcards"),
+        FlashcardSchedulingAlgorithm.Sm2 => _localization.T("SchedulingBreadcrumbShortSm2", "Flashcards"),
+        FlashcardSchedulingAlgorithm.Leitner => _localization.T("SchedulingBreadcrumbShortLeitner", "Flashcards"),
+        FlashcardSchedulingAlgorithm.Baseline => _localization.T("SchedulingBreadcrumbShortBaseline", "Flashcards"),
+        _ => _localization.T("SchedulingBreadcrumbShortBaseline", "Flashcards")
+    };
+
     public IRelayCommand FlipCommand { get; }
 
     public IRelayCommand RevealTestCommand { get; }
@@ -325,6 +345,7 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
             OnPropertyChanged(nameof(ShowFullGrades));
             OnPropertyChanged(nameof(ShowFlipButton));
             OnPropertyChanged(nameof(SchedulingEngineLabel));
+            OnPropertyChanged(nameof(ReviewSessionHeaderText));
         });
 
         if (!string.IsNullOrWhiteSpace(deck.FolderId))

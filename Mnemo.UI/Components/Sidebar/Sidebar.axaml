@@ -69,6 +69,7 @@
                                 <ItemsControl ItemsSource="{Binding Items}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
+                                            <Panel IsVisible="{Binding IsVisible}">
                                             <controls:NavigationButton IsSelected="{Binding IsSelected}"
                                                                        BorderThickness="0" 
                                                                        HorizontalAlignment="Stretch"
@@ -83,6 +84,7 @@
                                                                VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </controls:NavigationButton>
+                                            </Panel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -175,6 +177,7 @@
                                     <ItemsControl ItemsSource="{Binding Items}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
+                                                <Panel IsVisible="{Binding IsVisible}">
                                                 <controls:NavigationButton IsSelected="{Binding IsSelected}"
                                                                             IsCollapsed="True"
                                                                             BorderThickness="0" 
@@ -185,6 +188,7 @@
                                                     <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg'}" 
                                                                       Width="20" Height="20"/>
                                                 </controls:NavigationButton>
+                                                </Panel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>

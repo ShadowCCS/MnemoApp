@@ -1,6 +1,9 @@
 {
   "RecentDecks": {
     "Title": "最近使ったデッキ",
-    "Description": "最近練習したフラッシュカードのセットを見る"
+    "Description": "最近練習したフラッシュカードのセットを見る",
+    "GalleryDescription": "直近で学習したデッキへすぐ開けます。",
+    "TagDecks": "#デッキ",
+    "TagRecent": "#最近"
   }
 }

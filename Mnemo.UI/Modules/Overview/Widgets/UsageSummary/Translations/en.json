@@ -2,6 +2,9 @@
   "UsageSummary": {
     "Title": "Usage",
     "Description": "Launches, notes created, and time on screen today",
+    "GalleryDescription": "At-a-glance usage: sessions, notes activity, and screen time signals for today.",
+    "TagUsage": "#usage",
+    "TagStats": "#stats",
     "Launches": "App launches (lifetime)",
     "NotesCreated": "Notes created (lifetime)",
     "PracticeToday": "Study timer today",

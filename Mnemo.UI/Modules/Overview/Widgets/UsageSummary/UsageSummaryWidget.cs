@@ -21,7 +21,9 @@ public sealed class UsageSummaryWidget : IWidget
             category: WidgetCategory.Statistics,
             icon: WidgetIconAvares.Uri("UsageSummary"),
             defaultSize: new WidgetSize(colSpan: 2, rowSpan: 2),
-            translationNamespace: "UsageSummary");
+            translationNamespace: "UsageSummary",
+            galleryFilter: WidgetGalleryFilterCategory.Study,
+            galleryTagKeys: ["TagUsage", "TagStats"]);
     }
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)

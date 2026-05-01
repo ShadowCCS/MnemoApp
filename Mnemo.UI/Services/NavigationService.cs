@@ -12,16 +12,57 @@ namespace Mnemo.UI.Services;
 
 public class NavigationService : INavigationService, INotifyPropertyChanged
 {
+    public const string AiAssistantEnabledKey = "AI.EnableAssistant";
+
+    private static readonly HashSet<string> AiAssistantGatedRoutes = new(StringComparer.Ordinal)
+    {
+        "chat",
+        "path",
+        "path-detail",
+    };
+
     private readonly IServiceProvider _serviceProvider;
+    private readonly ISettingsService _settingsService;
     private readonly Dictionary<string, Type> _routes = new();
     private readonly Dictionary<string, string> _routeNames = new();
     private object? _currentViewModel;
     private readonly Stack<string> _history = new();
 
-    public NavigationService(IServiceProvider serviceProvider)
+    public NavigationService(IServiceProvider serviceProvider, ISettingsService settingsService)
     {
         _serviceProvider = serviceProvider;
+        _settingsService = settingsService;
         Breadcrumbs = new ObservableCollection<BreadcrumbItem>();
+        _settingsService.SettingChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, string key)
+    {
+        if (key != AiAssistantEnabledKey)
+            return;
+        var enabled = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        if (enabled)
+            return;
+        var route = CurrentRoute;
+        if (route != null && AiAssistantGatedRoutes.Contains(route))
+            ResetStackAndNavigateTo("overview", null);
+    }
+
+    private bool IsAiAssistantEnabled() =>
+        _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+
+    private void ResetStackAndNavigateTo(string route, object? parameter)
+    {
+        while (_history.Count > 0)
+            _history.Pop();
+        if (_currentViewModel is IDisposable disposable)
+            disposable.Dispose();
+        _currentViewModel = null;
+        OnPropertyChanged(nameof(CurrentViewModel));
+        OnPropertyChanged(nameof(CurrentRoute));
+        UpdateBreadcrumbs();
+        CanGoBackChanged?.Invoke();
+        NavigateTo(route, parameter);
     }
 
     public object? CurrentViewModel
@@ -69,6 +110,14 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
 
     public void NavigateTo(string route, object? parameter)
     {
+        if (!IsAiAssistantEnabled() && AiAssistantGatedRoutes.Contains(route))
+        {
+            route = "overview";
+            parameter = null;
+            if (string.Equals(CurrentRoute, "overview", StringComparison.Ordinal))
+                return;
+        }
+
         if (_routes.TryGetValue(route, out var vmType))
         {
             var previousRoute = _history.Count > 0 ? _history.Peek() : null;

@@ -10,8 +10,11 @@ namespace Mnemo.UI.Services;
 
 public class SidebarService : ISidebarService, INotifyPropertyChanged
 {
+    public const string AiAssistantEnabledKey = "AI.EnableAssistant";
+
     private bool _isCollapsed;
     private readonly ILocalizationService _localizationService;
+    private readonly ISettingsService _settingsService;
 
     private static readonly Dictionary<string, int> DefaultCategoryOrder = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -22,6 +25,7 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
 
     private readonly List<(SidebarCategory category, string nameKey, string ns)> _categoryKeys = new();
     private readonly List<(SidebarItem item, string labelKey, string ns)> _itemKeys = new();
+    private readonly List<(SidebarItem item, SidebarItemVisibilityRequirement requirement)> _visibilityItems = new();
 
     public ObservableCollection<SidebarCategory> Categories { get; } = new();
 
@@ -38,10 +42,29 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
         }
     }
 
-    public SidebarService(ILocalizationService localizationService)
+    public SidebarService(ILocalizationService localizationService, ISettingsService settingsService)
     {
         _localizationService = localizationService;
+        _settingsService = settingsService;
         _localizationService.LanguageChanged += OnLanguageChanged;
+        _settingsService.SettingChanged += OnSettingChanged;
+    }
+
+    private void OnSettingChanged(object? sender, string key)
+    {
+        if (key != AiAssistantEnabledKey)
+            return;
+        ApplyAssistantVisibility();
+    }
+
+    private void ApplyAssistantVisibility()
+    {
+        var aiOn = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        foreach (var (item, requirement) in _visibilityItems)
+        {
+            if (requirement == SidebarItemVisibilityRequirement.AiAssistantEnabled)
+                item.IsVisible = aiOn;
+        }
     }
 
     private void OnLanguageChanged(object? sender, EventArgs e)
@@ -52,7 +75,7 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
             item.Label = _localizationService.T(labelKey, ns);
     }
 
-    public void RegisterItem(string labelKey, string route, string icon, string categoryKey = "General", int? categoryOrder = null, int itemOrder = int.MaxValue, string ns = "Sidebar")
+    public void RegisterItem(string labelKey, string route, string icon, string categoryKey = "General", int? categoryOrder = null, int itemOrder = int.MaxValue, string ns = "Sidebar", SidebarItemVisibilityRequirement visibilityRequirement = SidebarItemVisibilityRequirement.None)
     {
         var category = _categoryKeys.FirstOrDefault(t => string.Equals(t.nameKey, categoryKey, StringComparison.OrdinalIgnoreCase) && t.ns == ns).category;
         if (category == null)
@@ -78,6 +101,13 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
         var resolvedLabel = _localizationService.T(labelKey, ns);
         var item = new SidebarItem(resolvedLabel, route, icon, itemOrder);
         _itemKeys.Add((item, labelKey, ns));
+
+        if (visibilityRequirement != SidebarItemVisibilityRequirement.None)
+        {
+            _visibilityItems.Add((item, visibilityRequirement));
+            if (visibilityRequirement == SidebarItemVisibilityRequirement.AiAssistantEnabled)
+                item.IsVisible = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        }
 
         var itemInsertIndex = category.Items.Count;
         for (int i = 0; i < category.Items.Count; i++)

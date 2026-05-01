@@ -86,6 +86,9 @@
     "RenderLatexMathDescription": "Render LaTeX-style equations in notes.",
     "EnableAIAssistant": "Enable AI Assistant",
     "EnableAIAssistantDescription": "Use the assistant to write, summarize, and organize.",
+    "EnableAIAssistantWarningTitle": "AI is still in heavy development",
+    "EnableAIAssistantWarningMessage": "Mnemo AI features are not ready for everyday use yet. Expect instability, mistakes, and frequent changes. Proceed only if you are experimenting.",
+    "EnableAIAssistantWarningConfirm": "Enable anyway",
     "WipeInputForDictation": "Replace text for dictation",
     "WipeInputForDictationDescription": "When on, voice input replaces the current text; when off, it appends.",
     "ChatStreamingReveal": "Streaming response",
@@ -487,7 +490,21 @@
     "GenerateLearningPath": "Generate Learning Path"
   },
   "AddWidget": {
-    "Title": "Add Widget"
+    "Title": "Add Widget",
+    "Subtitle": "Choose a widget to add to your overview.",
+    "SearchPlaceholder": "Search widgets",
+    "FilterAll": "All",
+    "FilterStudy": "Study",
+    "FilterFlashcards": "Flashcards",
+    "FilterProductivity": "Productivity",
+    "FilterCommunity": "Community",
+    "ProductMnemo": "Mnemo",
+    "FooterCountFormat": "{0} of {1} widgets",
+    "PickBadge": "PICK",
+    "AddWidgetButton": "+ Add",
+    "WidgetGalleryAdd": "Add",
+    "WidgetGalleryAdded": "Added",
+    "WidgetGalleryRemove": "Remove"
   },
   "Permissions": {
     "AdditionalPermissionRequired": "Additional Permission Required",

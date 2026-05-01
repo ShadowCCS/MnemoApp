@@ -2,6 +2,9 @@
   "RecentNotes": {
     "Title": "Recent notes",
     "Description": "Notes you edited most recently",
+    "GalleryDescription": "Jump back into the notes you touched last.",
+    "TagNotes": "#notes",
+    "TagRecent": "#recent",
     "Open": "Open",
     "Untitled": "Untitled"
   }

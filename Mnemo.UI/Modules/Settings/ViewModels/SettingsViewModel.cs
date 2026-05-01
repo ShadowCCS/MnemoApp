@@ -261,7 +261,15 @@ public partial class SettingsViewModel : ViewModelBase
                 isInteractionEnabled: true));
         }
 
-        aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableAssistant", T("EnableAIAssistant"), T("EnableAIAssistantDescription"), true, aiInstalled));
+        aiGroup.Items.Add(new EnableAiAssistantToggleSettingViewModel(
+            _settingsService,
+            _overlayService,
+            _localizationService,
+            "AI.EnableAssistant",
+            T("EnableAIAssistant"),
+            T("EnableAIAssistantDescription"),
+            true,
+            aiInstalled));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Chat.WipeInputForDictation", T("WipeInputForDictation"), T("WipeInputForDictationDescription"), false, aiInstalled));
         aiGroup.Items.Add(new DropdownSettingViewModel(
             _settingsService,

@@ -487,7 +487,21 @@
     "GenerateLearningPath": "Generar ruta de aprendizaje"
   },
   "AddWidget": {
-    "Title": "Añadir widget"
+    "Title": "Añadir widget",
+    "Subtitle": "Elige un widget para añadirlo a tu resumen.",
+    "SearchPlaceholder": "Buscar widgets",
+    "FilterAll": "Todos",
+    "FilterStudy": "Estudio",
+    "FilterFlashcards": "Tarjetas",
+    "FilterProductivity": "Productividad",
+    "FilterCommunity": "Comunidad",
+    "ProductMnemo": "Mnemo",
+    "FooterCountFormat": "{0} de {1} widgets",
+    "PickBadge": "PICK",
+    "AddWidgetButton": "+ Añadir",
+    "WidgetGalleryAdd": "Añadir",
+    "WidgetGalleryAdded": "Añadido",
+    "WidgetGalleryRemove": "Quitar"
   },
   "Permissions": {
     "AdditionalPermissionRequired": "Se requiere permisso adicional",

@@ -1,6 +1,9 @@
 {
   "RecentDecks": {
     "Title": "Recent Decks",
-    "Description": "View your recently practiced flashcard decks"
+    "Description": "View your recently practiced flashcard decks",
+    "GalleryDescription": "Quick access to the decks you studied most recently.",
+    "TagDecks": "#decks",
+    "TagRecent": "#recent"
   }
 }

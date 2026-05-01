@@ -48,6 +48,18 @@
             </components:SettingsCard>
         </DataTemplate>
 
+        <DataTemplate x:Key="EnableAiAssistantToggleSettingTemplate" x:DataType="vm:EnableAiAssistantToggleSettingViewModel">
+            <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
+                <components:SettingsCard.RightContent>
+                    <ToggleSwitch IsChecked="{Binding Value}"
+                                  IsEnabled="{Binding IsInteractionEnabled}"
+                                  OnContent=""
+                                  OffContent=""
+                                  MinWidth="0"/>
+                </components:SettingsCard.RightContent>
+            </components:SettingsCard>
+        </DataTemplate>
+
         <!-- Dropdown Setting Template -->
         <DataTemplate x:Key="DropdownSettingTemplate" x:DataType="vm:DropdownSettingViewModel">
             <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
@@ -564,6 +576,7 @@
                                                         <ContentControl Content="{Binding}">
                                                             <ContentControl.DataTemplates>
                                                                 <StaticResource ResourceKey="ToggleSettingTemplate"/>
+                                                                <StaticResource ResourceKey="EnableAiAssistantToggleSettingTemplate"/>
                                                                 <StaticResource ResourceKey="DropdownSettingTemplate"/>
                                                                 <StaticResource ResourceKey="LanguageSettingTemplate"/>
                                                                 <StaticResource ResourceKey="ActionSettingTemplate"/>
@@ -596,6 +609,7 @@
                                                         <ContentControl Content="{Binding}">
                                                             <ContentControl.DataTemplates>
                                                                 <StaticResource ResourceKey="ToggleSettingTemplate"/>
+                                                                <StaticResource ResourceKey="EnableAiAssistantToggleSettingTemplate"/>
                                                                 <StaticResource ResourceKey="DropdownSettingTemplate"/>
                                                                 <StaticResource ResourceKey="LanguageSettingTemplate"/>
                                                                 <StaticResource ResourceKey="ActionSettingTemplate"/>

@@ -487,7 +487,21 @@
     "GenerateLearningPath": "学習パスを生成"
   },
   "AddWidget": {
-    "Title": "ウィジェットを追加"
+    "Title": "ウィジェットを追加",
+    "Subtitle": "概要に追加するウィジェットを選びます。",
+    "SearchPlaceholder": "ウィジェットを検索",
+    "FilterAll": "すべて",
+    "FilterStudy": "学習",
+    "FilterFlashcards": "フラッシュカード",
+    "FilterProductivity": "生産性",
+    "FilterCommunity": "コミュニティ",
+    "ProductMnemo": "Mnemo",
+    "FooterCountFormat": "{1}個中{0}件を表示",
+    "PickBadge": "PICK",
+    "AddWidgetButton": "+ 追加",
+    "WidgetGalleryAdd": "追加",
+    "WidgetGalleryAdded": "追加済み",
+    "WidgetGalleryRemove": "削除"
   },
   "Permissions": {
     "AdditionalPermissionRequired": "追加の許可が必要です。",

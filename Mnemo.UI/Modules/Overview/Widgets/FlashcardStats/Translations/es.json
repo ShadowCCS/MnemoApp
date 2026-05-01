@@ -1,6 +1,9 @@
 {
   "FlashcardStats": {
     "Title": "Estadísticas de tarjetas",
-    "Description": "Consulta tus estadísticas de práctica y racha de estudio"
+    "Description": "Consulta tus estadísticas de práctica y racha de estudio",
+    "GalleryDescription": "Totales de práctica, rachas e impulso reciente de repaso.",
+    "TagStats": "#estadísticas",
+    "TagStreak": "#racha"
   }
 }

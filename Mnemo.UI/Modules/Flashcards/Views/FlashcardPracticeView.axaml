@@ -99,22 +99,11 @@
                                       Width="12"
                                       Height="12"
                                       VerticalAlignment="Center" />
-                    <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionReview}" IsVisible="{Binding IsReviewSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
+                    <TextBlock Text="{Binding ReviewSessionHeaderText}" IsVisible="{Binding IsReviewSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
                     <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionQuick}" IsVisible="{Binding IsQuickSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
                     <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionFocused}" IsVisible="{Binding IsFocusedSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
                     <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionCram}" IsVisible="{Binding IsCramSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
                     <TextBlock Text="{markup:T Ns=Flashcards, Key=SessionTest}" IsVisible="{Binding IsTestSession}" FontFamily="{DynamicResource Font.SemiBold}"/>
-                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
-                                      Color="{DynamicResource TextTertiaryBrush}"
-                                      Width="12"
-                                      Height="12"
-                                      VerticalAlignment="Center"
-                                      IsVisible="{Binding IsReviewSession}" />
-                    <TextBlock Text="{Binding SchedulingEngineLabel}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               FontSize="{DynamicResource FontSize.Body.Small}"
-                               FontFamily="{DynamicResource Font.SemiBold}"
-                               IsVisible="{Binding IsReviewSession}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <ProgressBar Width="200" Height="6" Maximum="100" Value="{Binding ProgressPercent}"/>

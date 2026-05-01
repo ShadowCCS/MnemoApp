@@ -25,7 +25,10 @@ public class StudyGoalsWidget : IWidget
             category: WidgetCategory.Activity,
             icon: WidgetIconAvares.Uri("StudyGoals"),
             defaultSize: new WidgetSize(colSpan: 2, rowSpan: 2),
-            translationNamespace: "StudyGoals");
+            translationNamespace: "StudyGoals",
+            galleryFilter: WidgetGalleryFilterCategory.Productivity,
+            galleryTagKeys: ["TagGoals", "TagProgress"],
+            isFeatured: true);
     }
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)

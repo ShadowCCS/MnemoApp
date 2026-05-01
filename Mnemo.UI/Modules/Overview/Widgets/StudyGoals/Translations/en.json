@@ -1,6 +1,9 @@
 {
   "StudyGoals": {
     "Title": "Study Goals",
-    "Description": "Track your daily study goals and progress"
+    "Description": "Track your daily study goals and progress",
+    "GalleryDescription": "Daily progress for cards, sessions, and study minutes.",
+    "TagGoals": "#goals",
+    "TagProgress": "#progress"
   }
 }

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Mnemo.Core.Models.Widgets;
 
 /// <summary>
@@ -44,10 +46,41 @@ public class WidgetMetadata
     public string? TranslationNamespace { get; }
 
     /// <summary>
+    /// Gets the localization key under the AddWidget namespace for the product name in gallery metadata (e.g. "ProductMnemo").
+    /// </summary>
+    public string ProductLocalizationKey { get; }
+
+    /// <summary>
+    /// Gets the semantic version string shown in the gallery (e.g. "v1.0").
+    /// </summary>
+    public string Version { get; }
+
+    /// <summary>
+    /// Gets the gallery filter/category chip this widget belongs to.
+    /// </summary>
+    public WidgetGalleryFilterCategory GalleryFilter { get; }
+
+    /// <summary>
+    /// Gets localization keys for gallery tags, resolved in <see cref="TranslationNamespace"/> when set;
+    /// otherwise each entry is shown as literal text.
+    /// </summary>
+    public IReadOnlyList<string> GalleryTagKeys { get; }
+
+    /// <summary>
+    /// When true, the gallery highlights this widget (e.g. recommended) with a badge and primary action styling.
+    /// </summary>
+    public bool IsFeatured { get; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="WidgetMetadata"/> class.
     /// </summary>
     /// <param name="icon"><c>avares://</c> URI to the widget's co-located <c>icon.svg</c> (Mnemo.UI).</param>
     /// <param name="translationNamespace">Optional. When set, Title and Description are used as localization keys in this namespace.</param>
+    /// <param name="productLocalizationKey">Key in AddWidget namespace for the product segment of gallery metadata.</param>
+    /// <param name="version">Version shown in gallery metadata.</param>
+    /// <param name="galleryFilter">Filter chip / metadata category for the gallery.</param>
+    /// <param name="galleryTagKeys">Optional tag keys (or literals when no translation namespace).</param>
+    /// <param name="isFeatured">Whether this widget is highlighted as recommended in the gallery.</param>
     public WidgetMetadata(
         string id,
         string title,
@@ -55,7 +88,12 @@ public class WidgetMetadata
         WidgetCategory category,
         string icon,
         WidgetSize defaultSize,
-        string? translationNamespace = null)
+        string? translationNamespace = null,
+        string productLocalizationKey = "ProductMnemo",
+        string version = "v1.0",
+        WidgetGalleryFilterCategory galleryFilter = WidgetGalleryFilterCategory.Study,
+        IReadOnlyList<string>? galleryTagKeys = null,
+        bool isFeatured = false)
     {
         Id = id;
         Title = title;
@@ -64,5 +102,10 @@ public class WidgetMetadata
         Icon = icon;
         DefaultSize = defaultSize;
         TranslationNamespace = translationNamespace;
+        ProductLocalizationKey = productLocalizationKey;
+        Version = version;
+        GalleryFilter = galleryFilter;
+        GalleryTagKeys = galleryTagKeys ?? [];
+        IsFeatured = isFeatured;
     }
 }

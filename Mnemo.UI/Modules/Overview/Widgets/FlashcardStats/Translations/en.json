@@ -1,6 +1,9 @@
 {
   "FlashcardStats": {
     "Title": "Flashcard Stats",
-    "Description": "View your flashcard practice statistics and study streak"
+    "Description": "View your flashcard practice statistics and study streak",
+    "GalleryDescription": "Practice totals, streaks, and recent review momentum.",
+    "TagStats": "#stats",
+    "TagStreak": "#streak"
   }
 }

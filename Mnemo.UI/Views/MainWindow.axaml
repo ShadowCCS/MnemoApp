@@ -37,7 +37,7 @@
                 <ContentControl Content="{Binding Navigation.CurrentViewModel}"/>
                 <Border HorizontalAlignment="Right"
                         Width="12"
-                        IsVisible="{Binding !RightSidebarViewModel.IsCollapsed}"
+                        IsVisible="{Binding RightSidebarViewModel.ShowResizeHandle}"
                         Background="Transparent"
                         Cursor="SizeWestEast"
                         PointerPressed="SidebarResizeHandle_PointerPressed"
@@ -70,7 +70,7 @@
                 Background="{DynamicResource TopbarButtonBackgroundBrush}"
                 Foreground="{DynamicResource TopbarButtonForegroundBrush}"
                 Command="{Binding ToggleRightSidebarCommand}"
-                IsVisible="{Binding RightSidebarViewModel.IsCollapsed}"
+                IsVisible="{Binding RightSidebarViewModel.ShowFloatingOpenButton}"
                 ToolTip.Tip="{markup:T Ns=App, Key=ToggleAssistant}">
             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-sidebar.svg"
                               Color="{DynamicResource TopbarIconsBrush}"

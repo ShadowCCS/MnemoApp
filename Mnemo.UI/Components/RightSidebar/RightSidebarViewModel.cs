@@ -16,6 +16,8 @@ namespace Mnemo.UI.Components.RightSidebar;
 
 public partial class RightSidebarViewModel : ViewModelBase
 {
+    public const string AiAssistantEnabledKey = "AI.EnableAssistant";
+
     public const double MinWidth = 300;
     public const double MaxWidth = 480;
     public const double DefaultWidth = 320;
@@ -42,7 +44,18 @@ public partial class RightSidebarViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveWidth))]
     [NotifyPropertyChangedFor(nameof(LayoutWidth))]
+    [NotifyPropertyChangedFor(nameof(ShowFloatingOpenButton))]
+    [NotifyPropertyChangedFor(nameof(ShowResizeHandle))]
     private bool _isCollapsed = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowFloatingOpenButton))]
+    [NotifyPropertyChangedFor(nameof(ShowResizeHandle))]
+    private bool _isAiAssistantEnabled = true;
+
+    public bool ShowFloatingOpenButton => IsAiAssistantEnabled && IsCollapsed;
+
+    public bool ShowResizeHandle => IsAiAssistantEnabled && !IsCollapsed;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
@@ -92,13 +105,30 @@ public partial class RightSidebarViewModel : ViewModelBase
         _routingToolHintStore = routingToolHintStore;
         _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText, () => SelectedModelRoutingMode);
 
-        ToggleCommand = new RelayCommand(() => IsCollapsed = !IsCollapsed);
+        ToggleCommand = new RelayCommand(() =>
+        {
+            if (!IsAiAssistantEnabled)
+                return;
+            IsCollapsed = !IsCollapsed;
+        });
         SendCommand = new AsyncRelayCommand(SendAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
         NewChatCommand = new RelayCommand(NewChat);
         SuggestionSelectedCommand = new RelayCommand<string>(ApplySuggestion);
 
+        IsAiAssistantEnabled = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        _settingsService.SettingChanged += OnSettingsChanged;
+
         Messages.Add(CreateWelcomeMessage());
+    }
+
+    private void OnSettingsChanged(object? sender, string key)
+    {
+        if (key != AiAssistantEnabledKey)
+            return;
+        IsAiAssistantEnabled = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        if (!IsAiAssistantEnabled)
+            IsCollapsed = true;
     }
 
     private ChatMessage CreateWelcomeMessage()

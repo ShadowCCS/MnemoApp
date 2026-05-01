@@ -30,7 +30,10 @@ public class RecentDecksWidget : IWidget
             category: WidgetCategory.Activity,
             icon: WidgetIconAvares.Uri("RecentDecks"),
             defaultSize: new WidgetSize(colSpan: 3, rowSpan: 2),
-            translationNamespace: "RecentDecks");
+            translationNamespace: "RecentDecks",
+            galleryFilter: WidgetGalleryFilterCategory.Flashcards,
+            galleryTagKeys: ["TagDecks", "TagRecent"],
+            isFeatured: true);
     }
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)
