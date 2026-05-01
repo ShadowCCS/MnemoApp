@@ -7,6 +7,7 @@ using Mnemo.Core.Formatting;
 using Mnemo.Core.Models.Flashcards;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services.Notes.Markdown;
+using Mnemo.Infrastructure.Services.Statistics;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Modules.Flashcards.ViewModels;
@@ -38,6 +39,8 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     private readonly INavigationService _navigation;
     private readonly IOverlayService _overlay;
     private readonly ILocalizationService _localization;
+    private readonly IStatisticsManager _statistics;
+    private readonly ILoggerService _logger;
 
     private readonly List<Flashcard> _queue = new();
     private readonly List<FlashcardSessionCardResult> _sessionResults = new();
@@ -45,6 +48,7 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     private FlashcardSchedulingAlgorithm _activeSchedulingAlgorithm = FlashcardSchedulingAlgorithm.Fsrs;
     private string _deckId = string.Empty;
     private DateTimeOffset _sessionStartedAt;
+    private bool _sessionOutcomeRecorded;
 
     [ObservableProperty]
     private string _deckName = string.Empty;
@@ -228,18 +232,22 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         IFlashcardSchedulerResolver schedulerResolver,
         INavigationService navigation,
         IOverlayService overlay,
-        ILocalizationService localization)
+        ILocalizationService localization,
+        IStatisticsManager statistics,
+        ILoggerService logger)
     {
         _deckService = deckService;
         _schedulerResolver = schedulerResolver;
         _navigation = navigation;
         _overlay = overlay;
         _localization = localization;
+        _statistics = statistics;
+        _logger = logger;
 
         FlipCommand = new RelayCommand(Flip, CanFlip);
         RevealTestCommand = new RelayCommand(RevealTest, CanRevealTest);
         ExitToDeckCommand = new RelayCommand(() => _ = ExitToDeckAsync());
-        ExitToLibraryCommand = new RelayCommand(() => _navigation.NavigateTo("flashcards"));
+        ExitToLibraryCommand = new RelayCommand(() => _ = ExitToLibraryAsync());
         RestartSessionCommand = new RelayCommand(Restart);
         GradeAgainCommand = new RelayCommand(() => AdvanceAfterGrade(FlashcardReviewGrade.Again));
         GradeHardCommand = new RelayCommand(() => AdvanceAfterGrade(FlashcardReviewGrade.Hard));
@@ -301,6 +309,7 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
             CorrectCount = 0;
             IncorrectCount = 0;
             _sessionStartedAt = DateTimeOffset.UtcNow;
+            _sessionOutcomeRecorded = false;
             _sessionResults.Clear();
             AgainCount = 0;
             HardCount = 0;
@@ -380,7 +389,53 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
                 return;
         }
 
-        _navigation.NavigateTo("flashcard-deck", new FlashcardDeckNavigationParameter(_deckId));
+        await CommitSessionOutcomeAsync(DateTimeOffset.UtcNow, endedEarly: true).ConfigureAwait(false);
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            _navigation.NavigateTo("flashcard-deck", new FlashcardDeckNavigationParameter(_deckId)));
+    }
+
+    private async Task ExitToLibraryAsync()
+    {
+        if (!IsSessionComplete && CardsReviewed > 0)
+        {
+            var leaveLabel = _localization.T("ExitPractice", "Flashcards");
+            var cancelLabel = _localization.T("Cancel", "Common");
+            var result = await _overlay.CreateDialogAsync(
+                _localization.T("ExitSessionTitle", "Flashcards"),
+                _localization.T("ExitSessionConfirm", "Flashcards"),
+                leaveLabel,
+                cancelLabel).ConfigureAwait(false);
+            if (!string.Equals(result, leaveLabel, StringComparison.Ordinal))
+                return;
+        }
+
+        await CommitSessionOutcomeAsync(DateTimeOffset.UtcNow, endedEarly: true).ConfigureAwait(false);
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => _navigation.NavigateTo("flashcards"));
+    }
+
+    private async Task CommitSessionOutcomeAsync(DateTimeOffset completedAt, bool endedEarly)
+    {
+        if (_sessionOutcomeRecorded || CardsReviewed == 0)
+            return;
+
+        _sessionOutcomeRecorded = true;
+        var result = new FlashcardSessionResult(
+            _sessionConfig.DeckId,
+            _sessionConfig,
+            _sessionStartedAt,
+            completedAt,
+            _sessionResults.ToArray());
+
+        try
+        {
+            await _deckService.RecordSessionOutcomeAsync(result, default).ConfigureAwait(false);
+            await StatisticsRecorder.RecordFlashcardSessionAsync(_statistics, _logger, result, DeckName, endedEarly)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Flashcards", "Failed to record practice session outcome.", ex);
+        }
     }
 
     private void Restart()
@@ -449,13 +504,7 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
 
         IsSessionComplete = true;
         var completedAt = DateTimeOffset.UtcNow;
-        var result = new FlashcardSessionResult(
-            _sessionConfig.DeckId,
-            _sessionConfig,
-            _sessionStartedAt,
-            completedAt,
-            _sessionResults.ToArray());
-        _ = _deckService.RecordSessionOutcomeAsync(result, default);
+        _ = CommitSessionOutcomeAsync(completedAt, endedEarly: false);
         BuildSummary(completedAt);
         NotifyCardUi();
         RefreshCommandStates();

@@ -5,7 +5,9 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
+using Mnemo.Core.Models.Statistics;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.Statistics;
 using Mnemo.UI.ViewModels;
 using Mnemo.UI.Modules.Path.Tasks;
 
@@ -19,6 +21,7 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
     private readonly IKnowledgeService _knowledge;
     private readonly ISettingsService _settings;
     private readonly ILoggerService _logger;
+    private readonly IStatisticsManager _statistics;
 
     [ObservableProperty]
     private LearningPath? _path;
@@ -52,7 +55,8 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
         IAIOrchestrator orchestrator,
         IKnowledgeService knowledge,
         ISettingsService settings,
-        ILoggerService logger)
+        ILoggerService logger,
+        IStatisticsManager statistics)
     {
         _pathService = pathService;
         _taskManager = taskManager;
@@ -60,6 +64,7 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
         _knowledge = knowledge;
         _settings = settings;
         _logger = logger;
+        _statistics = statistics;
 
         _pathService.PathUpdated += OnPathUpdated;
     }
@@ -70,6 +75,9 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
 
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
+            int unitsGeneratedDelta = 0;
+            int unitsCompletedDelta = 0;
+
             // Sync properties of the path itself if needed
             Path.Title = updatedPath.Title;
             
@@ -80,11 +88,15 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
                 var existingUnit = Units.FirstOrDefault(u => u.UnitId == updatedUnit.UnitId);
                 if (existingUnit != null)
                 {
-                    // Update properties - this will trigger INotifyPropertyChanged
+                    var hadContent = !string.IsNullOrEmpty(existingUnit.Content);
+                    var nowHasContent = !string.IsNullOrEmpty(updatedUnit.Content);
+
                     if (existingUnit.Content != updatedUnit.Content)
                     {
                         existingUnit.Content = updatedUnit.Content;
                         changed = true;
+                        if (!hadContent && nowHasContent)
+                            unitsGeneratedDelta++;
                     }
                     if (existingUnit.Status != updatedUnit.Status)
                     {
@@ -93,17 +105,36 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
                     }
                     if (existingUnit.IsCompleted != updatedUnit.IsCompleted)
                     {
+                        if (!existingUnit.IsCompleted && updatedUnit.IsCompleted)
+                            unitsCompletedDelta++;
                         existingUnit.IsCompleted = updatedUnit.IsCompleted;
                         changed = true;
                     }
                 }
                 else
                 {
-                    // New unit added (e.g. during initial generation)
                     Units.Add(updatedUnit);
                     Path?.Units.Add(updatedUnit);
                     changed = true;
                 }
+            }
+
+            if (unitsGeneratedDelta > 0)
+                _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
+                    StatisticsNamespaces.Path, PathStatKinds.DailySummary, "units_generated", unitsGeneratedDelta);
+            if (unitsCompletedDelta > 0)
+            {
+                _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
+                    StatisticsNamespaces.Path, PathStatKinds.DailySummary, "units_completed", unitsCompletedDelta);
+                _ = StatisticsRecorder.IncrementLifetimeAsync(_statistics, _logger,
+                    StatisticsNamespaces.Path, PathStatKinds.LifetimeTotals, "total_units_completed", unitsCompletedDelta);
+            }
+            if ((unitsGeneratedDelta > 0 || unitsCompletedDelta > 0) && Path != null)
+            {
+                var totalUnits = updatedPath.Units?.Count ?? 0;
+                var completed = updatedPath.Units?.Count(u => u.IsCompleted) ?? 0;
+                _ = StatisticsRecorder.RecordPathSummaryAsync(_statistics, _logger,
+                    Path.PathId, Path.Title, totalUnits, completed);
             }
 
             if (changed)
@@ -112,7 +143,8 @@ public partial class PathDetailViewModel : ViewModelBase, INavigationAware, IDis
             }
 
             // Remove units that no longer exist
-            var toRemove = Units.Where(u => !updatedPath.Units.Any(uu => uu.UnitId == u.UnitId)).ToList();
+            IEnumerable<LearningUnit> remoteUnits = updatedPath.Units ?? Enumerable.Empty<LearningUnit>();
+            var toRemove = Units.Where(u => !remoteUnits.Any(uu => uu.UnitId == u.UnitId)).ToList();
             foreach (var u in toRemove)
             {
                 Units.Remove(u);

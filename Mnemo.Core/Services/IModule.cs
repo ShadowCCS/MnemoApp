@@ -19,6 +19,11 @@ public interface IModule
     /// (e.g. INoteService) needed to implement tool handlers.
     /// </summary>
     void RegisterTools(IFunctionRegistry registry, IServiceProvider services);
-    void RegisterWidgets(IWidgetRegistry registry);
+
+    /// <summary>
+    /// Registers dashboard widgets. <paramref name="services"/> provides access to resolved services
+    /// (e.g. <see cref="IStatisticsManager"/>) so widget factories can wire data dependencies.
+    /// </summary>
+    void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services);
 }
 

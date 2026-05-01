@@ -12,6 +12,9 @@ public interface INavigationService : INavigationRegistry
     void NavigateTo(string route, object? parameter);
     bool CanGoBack { get; }
     event Action? CanGoBackChanged;
+
+    /// <summary>Fires after <see cref="NavigateTo"/> resolves the new view model and updates history.</summary>
+    event EventHandler<NavigationChangedEventArgs>? Navigated;
     ObservableCollection<BreadcrumbItem> Breadcrumbs { get; }
     void NavigateToBreadcrumb(BreadcrumbItem item);
 }

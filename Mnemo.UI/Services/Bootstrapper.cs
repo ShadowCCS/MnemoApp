@@ -19,6 +19,7 @@ using Mnemo.Infrastructure.Services.Knowledge;
 using Mnemo.Infrastructure.Services.Notes;
 using Mnemo.Infrastructure.Services.Flashcards;
 using Mnemo.Infrastructure.Services.Speech;
+using Mnemo.Infrastructure.Services.Statistics;
 using Mnemo.Infrastructure.Services.TextShortcuts;
 using Mnemo.Infrastructure.Services.Tools;
 using Mnemo.Infrastructure.Services.Packaging;
@@ -162,6 +163,11 @@ public static class Bootstrapper
         services.AddSingleton<IFunctionRegistry, FunctionRegistry>();
         services.AddSingleton<IWidgetRegistry, WidgetRegistry>();
 
+        // Statistics manager is shared by built-in modules, widgets, and extension tools.
+        services.AddSingleton<IStatisticsManager, StatisticsManager>();
+        services.AddSingleton<StatisticsToolService>();
+        services.AddSingleton<NavigationStatisticsTracker>();
+
         // 3. Discover modules and register translation sources (before building provider)
         var modules = DiscoverModules();
         var translationRegistry = new TranslationSourceRegistry();
@@ -274,10 +280,22 @@ public static class Bootstrapper
             module.RegisterRoutes(navRegistry);
             module.RegisterSidebarItems(sidebarService);
             module.RegisterTools(funcRegistry, serviceProvider);
-            module.RegisterWidgets(widgetRegistry);
+            module.RegisterWidgets(widgetRegistry, serviceProvider);
         }
 
         ToolManifestValidator.ValidateAndLog(skillRegistry, funcRegistry, logger);
+
+        _ = serviceProvider.GetRequiredService<NavigationStatisticsTracker>();
+        try
+        {
+            StatisticsRecorder.RecordAppLaunchAsync(
+                serviceProvider.GetRequiredService<IStatisticsManager>(),
+                logger).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            logger.Warning("Bootstrapper", $"App launch statistics recording failed: {ex.Message}");
+        }
 
         return serviceProvider;
     }

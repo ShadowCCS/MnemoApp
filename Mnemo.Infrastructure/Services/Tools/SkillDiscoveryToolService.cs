@@ -29,6 +29,7 @@ public sealed class SkillDiscoveryToolService
     {
         await _skillRegistry.LoadAsync(CancellationToken.None).ConfigureAwait(false);
         var skills = _skillRegistry.GetEnabledSkills()
+            .Where(s => s.ExposeInGetSkills != false)
             .Select(s => new
             {
                 id = s.Id,
@@ -40,6 +41,26 @@ public sealed class SkillDiscoveryToolService
             .ToList();
 
         return ToolInvocationResult.Success("Enabled skills.", new { skills });
+    }
+
+    public async Task<ToolInvocationResult> GetAnalyticsSkillsAsync(EmptyToolParameters _)
+    {
+        await _skillRegistry.LoadAsync(CancellationToken.None).ConfigureAwait(false);
+        var skills = _skillRegistry.GetEnabledSkills()
+            .Where(s => s.ExposeInGetSkills == false)
+            .Select(s => new
+            {
+                id = s.Id,
+                version = s.Version,
+                description = s.Description,
+                detection_hint = s.DetectionHint,
+                include_tools = s.Injection.IncludeTools
+            })
+            .ToList();
+
+        return ToolInvocationResult.Success(
+            "Skills omitted from get_skills (heavy tooling). Call inject_skill with a skill id from this list to enable those tools for this conversation.",
+            new { skills });
     }
 
     public async Task<ToolInvocationResult> FetchSkillAsync(FetchSkillParameters p)

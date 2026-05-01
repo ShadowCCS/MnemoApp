@@ -475,8 +475,8 @@
   },
   "Topbar": {
     "SearchPlaceholder": "Search for a lesson, mindmap, etc.",
-    "XpSample": "4,850 XP",
-    "StreakDaysSample": "4 Days"
+    "GamificationXpFormat": "{0:N0} XP",
+    "GamificationStreakFormat": "{0} Days"
   },
   "InputBuilder": {
     "WhatToLearn": "What do you want to learn?",

@@ -5,7 +5,9 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
+using Mnemo.Core.Models.Statistics;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.Statistics;
 using Mnemo.UI.ViewModels;
 using Mnemo.UI.Modules.Path.ViewModels;
 using Mnemo.UI.Modules.Path.Tasks;
@@ -23,6 +25,7 @@ public class PathViewModel : ViewModelBase, IDisposable
     private readonly INavigationService _navigation;
     private readonly IOverlayService _overlay;
     private readonly ILoggerService _logger;
+    private readonly IStatisticsManager _statistics;
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -54,7 +57,8 @@ public class PathViewModel : ViewModelBase, IDisposable
         ISettingsService settings,
         INavigationService navigation,
         IOverlayService overlay,
-        ILoggerService logger)
+        ILoggerService logger,
+        IStatisticsManager statistics)
     {
         _taskManager = taskManager;
         _orchestrator = orchestrator;
@@ -64,6 +68,7 @@ public class PathViewModel : ViewModelBase, IDisposable
         _navigation = navigation;
         _overlay = overlay;
         _logger = logger;
+        _statistics = statistics;
 
         _pathService.PathUpdated += OnPathUpdated;
 
@@ -220,6 +225,16 @@ public class PathViewModel : ViewModelBase, IDisposable
 
         if (task.GeneratedPath != null)
         {
+            _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
+                StatisticsNamespaces.Path, PathStatKinds.DailySummary, "paths_created");
+            _ = StatisticsRecorder.IncrementLifetimeAsync(_statistics, _logger,
+                StatisticsNamespaces.Path, PathStatKinds.LifetimeTotals, "total_paths_created");
+            _ = StatisticsRecorder.RecordPathSummaryAsync(_statistics, _logger,
+                task.GeneratedPath.PathId,
+                task.GeneratedPath.Title,
+                task.GeneratedPath.Units?.Count ?? 0,
+                0);
+
             _navigation.NavigateTo("path-detail", task.GeneratedPath.PathId);
             _ = LoadPathsAsync();
         }

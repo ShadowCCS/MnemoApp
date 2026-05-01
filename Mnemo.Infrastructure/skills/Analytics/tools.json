@@ -1,0 +1,163 @@
+{
+  "tools": [
+    {
+      "name": "stats_create_record",
+      "description": "Create a new statistics record at (namespace, kind, key) with typed fields and optional JSON metadata. Fails if it already exists.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key": { "type": "string" },
+          "source_module": { "type": "string" },
+          "fields": { "type": "object", "additionalProperties": true },
+          "metadata_json": { "type": "string" },
+          "merge_mode": { "type": "string", "description": "\"merge\" or \"replace\"" },
+          "expected_version": { "type": "integer" }
+        },
+        "required": ["namespace", "kind", "key"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_update_record",
+      "description": "Update an existing statistics record. merge_mode \"merge\" (default) keeps existing fields; \"replace\" overwrites fields. Optional expected_version for optimistic concurrency.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key": { "type": "string" },
+          "source_module": { "type": "string" },
+          "fields": { "type": "object", "additionalProperties": true },
+          "metadata_json": { "type": "string" },
+          "merge_mode": { "type": "string" },
+          "expected_version": { "type": "integer" }
+        },
+        "required": ["namespace", "kind", "key"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_upsert_record",
+      "description": "Create or update a statistics record when existence does not matter.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key": { "type": "string" },
+          "source_module": { "type": "string" },
+          "fields": { "type": "object", "additionalProperties": true },
+          "metadata_json": { "type": "string" },
+          "merge_mode": { "type": "string" },
+          "expected_version": { "type": "integer" }
+        },
+        "required": ["namespace", "kind", "key"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_record_exists",
+      "description": "Returns whether a statistics record exists at (namespace, kind, key).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key": { "type": "string" }
+        },
+        "required": ["namespace", "kind", "key"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_get_record",
+      "description": "Returns the full statistics record (envelope, fields, metadata).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key": { "type": "string" }
+        },
+        "required": ["namespace", "kind", "key"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_read_fields",
+      "description": "Returns only the requested fields from a statistics record.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key": { "type": "string" },
+          "fields": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["namespace", "kind", "key"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_increment_field",
+      "description": "Atomically increments an Integer field on a record (creates the record if missing).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key": { "type": "string" },
+          "field": { "type": "string" },
+          "delta": { "type": "integer", "description": "Defaults to 1" },
+          "source_module": { "type": "string" }
+        },
+        "required": ["namespace", "kind", "key", "field"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_delete_record",
+      "description": "Deletes a statistics record. Idempotent.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key": { "type": "string" }
+        },
+        "required": ["namespace", "kind", "key"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_query",
+      "description": "Query records by namespace (required), optional kind, key prefix, limit, and updated_after / updated_before ISO timestamps.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "kind": { "type": "string" },
+          "key_prefix": { "type": "string" },
+          "limit": { "type": "integer" },
+          "updated_after": { "type": "string" },
+          "updated_before": { "type": "string" }
+        },
+        "required": ["namespace"]
+      },
+      "enabled": true
+    },
+    {
+      "name": "stats_list_schemas",
+      "description": "Lists registered statistics schemas, optionally filtered by namespace.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" }
+        }
+      },
+      "enabled": true
+    }
+  ]
+}

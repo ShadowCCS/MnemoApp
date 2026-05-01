@@ -30,7 +30,7 @@ public class ChatModule : IModule
         // No tools for chat yet
     }
 
-    public void RegisterWidgets(IWidgetRegistry registry)
+    public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
         // No widgets for chat
     }

@@ -1,14 +1,23 @@
+using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Models.Flashcards;
+using Mnemo.Core.Models.Statistics;
+using Mnemo.Core.Services;
 using Mnemo.UI.Modules.Overview.ViewModels;
 
 namespace Mnemo.UI.Modules.Overview.Widgets.RecentDecks;
 
 /// <summary>
-/// Represents a recently practiced deck.
+/// Represents a recently practiced deck, joined from per-deck stats summary and live deck metadata.
 /// </summary>
 public partial class RecentDeckItem : ObservableObject
 {
+    [ObservableProperty]
+    private string _deckId = string.Empty;
+
     [ObservableProperty]
     private string _name = string.Empty;
 
@@ -21,51 +30,99 @@ public partial class RecentDeckItem : ObservableObject
     [ObservableProperty]
     private DateTime _lastPracticed;
 
-    public string LastPracticedText => LastPracticed.ToString("MMM dd, yyyy");
+    public string LastPracticedText => LastPracticed == default ? "—" : LastPracticed.ToLocalTime().ToString("MMM dd, yyyy");
 }
 
 /// <summary>
 /// ViewModel for the Recent Decks widget.
-/// Displays the user's recently practiced flashcard decks.
 /// </summary>
 public partial class RecentDecksWidgetViewModel : WidgetViewModelBase
 {
+    private const int MaxItems = 6;
+
+    private readonly IStatisticsManager _statistics;
+    private readonly IFlashcardDeckService _decks;
+    private readonly INavigationService _navigation;
+    private readonly ILoggerService _logger;
+
+    public RecentDecksWidgetViewModel(
+        IStatisticsManager statistics,
+        IFlashcardDeckService decks,
+        INavigationService navigation,
+        ILoggerService logger)
+    {
+        _statistics = statistics;
+        _decks = decks;
+        _navigation = navigation;
+        _logger = logger;
+    }
+
+    [RelayCommand]
+    private void OpenDeck(string? deckId)
+    {
+        if (string.IsNullOrWhiteSpace(deckId))
+            return;
+        _navigation.NavigateTo("flashcard-deck", new FlashcardDeckNavigationParameter(deckId.Trim()));
+    }
+
     public ObservableCollection<RecentDeckItem> RecentDecks { get; } = new();
 
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-
-        // TODO: Load actual data from services
-        // For now, use placeholder data
         RecentDecks.Clear();
-        RecentDecks.Add(new RecentDeckItem
+
+        try
         {
-            Name = "Spanish Vocabulary",
-            Subject = "Language",
-            CardCount = 150,
-            LastPracticed = DateTime.Now.AddHours(-2)
-        });
-        RecentDecks.Add(new RecentDeckItem
+            var summaries = await _statistics.QueryAsync(new StatisticsQuery
+            {
+                Namespace = StatisticsNamespaces.Flashcards,
+                Kind = FlashcardStatKinds.DeckSummary,
+                Limit = 32,
+                OrderByUpdatedDescending = true
+            }).ConfigureAwait(false);
+
+            if (!summaries.IsSuccess || summaries.Value == null || summaries.Value.Count == 0)
+                return;
+
+            var allDecks = (await _decks.ListDecksAsync().ConfigureAwait(false))
+                .ToDictionary(d => d.Id, StringComparer.Ordinal);
+
+            var added = 0;
+            foreach (var record in summaries.Value)
+            {
+                if (added >= MaxItems) break;
+
+                var deckId = record.Key.StartsWith("deck:", StringComparison.Ordinal)
+                    ? record.Key["deck:".Length..]
+                    : record.Key;
+
+                if (!allDecks.TryGetValue(deckId, out var deck))
+                    continue;
+
+                var lastPracticed = ReadDateTime(record, "last_practiced") ?? deck.LastStudied?.UtcDateTime ?? default;
+
+                RecentDecks.Add(new RecentDeckItem
+                {
+                    DeckId = deckId,
+                    Name = deck.Name,
+                    Subject = deck.Tags?.Count > 0 ? deck.Tags[0] : string.Empty,
+                    CardCount = deck.Cards?.Count ?? 0,
+                    LastPracticed = lastPracticed
+                });
+                added++;
+            }
+        }
+        catch (Exception ex)
         {
-            Name = "Biology: Cell Structure",
-            Subject = "Science",
-            CardCount = 85,
-            LastPracticed = DateTime.Now.AddDays(-1)
-        });
-        RecentDecks.Add(new RecentDeckItem
-        {
-            Name = "World History",
-            Subject = "History",
-            CardCount = 200,
-            LastPracticed = DateTime.Now.AddDays(-2)
-        });
-        RecentDecks.Add(new RecentDeckItem
-        {
-            Name = "Math Formulas",
-            Subject = "Mathematics",
-            CardCount = 64,
-            LastPracticed = DateTime.Now.AddDays(-3)
-        });
+            _logger?.Error("Overview", "Loading recent decks widget failed.", ex);
+        }
+    }
+
+    private static DateTime? ReadDateTime(StatisticsRecord record, string field)
+    {
+        if (!record.Fields.TryGetValue(field, out var v)) return null;
+        if (v.Type != StatValueType.DateTime) return null;
+        return v.AsDateTime().UtcDateTime;
     }
 }

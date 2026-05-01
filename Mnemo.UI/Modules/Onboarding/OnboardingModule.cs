@@ -31,7 +31,7 @@ public class OnboardingModule : IModule
         // No tools
     }
 
-    public void RegisterWidgets(IWidgetRegistry registry)
+    public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
         // No widgets
     }

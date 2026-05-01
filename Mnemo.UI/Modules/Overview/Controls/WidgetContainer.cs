@@ -31,9 +31,6 @@ public class WidgetContainer : ContentControl
     public static readonly StyledProperty<DashboardWidgetViewModel?> WidgetProperty =
         AvaloniaProperty.Register<WidgetContainer, DashboardWidgetViewModel?>(nameof(Widget));
 
-    public static readonly StyledProperty<string> WidgetHeaderIconPathMarkupProperty =
-        AvaloniaProperty.Register<WidgetContainer, string>(nameof(WidgetHeaderIconPathMarkup), string.Empty);
-
     public static readonly StyledProperty<string> WidgetHeaderTitleProperty =
         AvaloniaProperty.Register<WidgetContainer, string>(nameof(WidgetHeaderTitle), string.Empty);
 
@@ -158,12 +155,6 @@ public class WidgetContainer : ContentControl
         set => SetValue(WidgetProperty, value);
     }
 
-    public string WidgetHeaderIconPathMarkup
-    {
-        get => GetValue(WidgetHeaderIconPathMarkupProperty);
-        set => SetValue(WidgetHeaderIconPathMarkupProperty, value);
-    }
-
     public string WidgetHeaderTitle
     {
         get => GetValue(WidgetHeaderTitleProperty);
@@ -215,10 +206,6 @@ public class WidgetContainer : ContentControl
     private void SyncHeaderFromWidget()
     {
         var metadata = Widget?.Metadata;
-        var icon = metadata?.Icon;
-        SetValue(
-            WidgetHeaderIconPathMarkupProperty,
-            string.IsNullOrEmpty(icon) ? string.Empty : icon);
         SetValue(WidgetHeaderTitleProperty, metadata?.Title ?? string.Empty);
         SetValue(WidgetHeaderTranslationNamespaceProperty, metadata?.TranslationNamespace ?? string.Empty);
     }

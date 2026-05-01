@@ -37,7 +37,7 @@ public class MindmapModule : IModule
         MindmapToolRegistrar.Register(registry, svc);
     }
 
-    public void RegisterWidgets(IWidgetRegistry registry)
+    public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
     }
 }

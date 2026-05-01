@@ -26,6 +26,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Mnemo.Infrastructure.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Languages\*.json" />
     <EmbeddedResource Include="Seed\WelcomeNote.json" />
     <EmbeddedResource Include="Seed\welcome-mitochondrion.png" />

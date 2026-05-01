@@ -60,9 +60,17 @@ namespace Mnemo.UI.Controls
     public static readonly StyledProperty<string?> SvgPathProperty =
         AvaloniaProperty.Register<SvgIcon, string?>(nameof(SvgPath));
 
+    /// <summary>
+    /// When true and <see cref="Color"/> is unset, the SVG is drawn without a color filter (native fills/strokes).
+    /// Use for multi-color assets; inherited <see cref="TextElement.Foreground"/> is otherwise applied as a tint.
+    /// </summary>
+    public static readonly StyledProperty<bool> PreserveSvgColorsProperty =
+        AvaloniaProperty.Register<SvgIcon, bool>(nameof(PreserveSvgColors), defaultValue: false);
+
     /// <summary>Gets or sets the tint. Accepts <see cref="Color"/> or <see cref="IBrush"/> (e.g. SolidColorBrush) from theme resources.</summary>
     public IBrush? Color { get => GetValue(ColorProperty) as IBrush; set => SetValue(ColorProperty, value); }
     public string? SvgPath { get => GetValue(SvgPathProperty); set => SetValue(SvgPathProperty, value); }
+    public bool PreserveSvgColors { get => GetValue(PreserveSvgColorsProperty); set => SetValue(PreserveSvgColorsProperty, value); }
 
         private RefCountedPicture? _svgPicture;
         private string? _loadedPath;
@@ -70,6 +78,7 @@ namespace Mnemo.UI.Controls
         static SvgIcon()
         {
             ColorProperty.Changed.AddClassHandler<SvgIcon>((x, _) => x.InvalidateVisual());
+            PreserveSvgColorsProperty.Changed.AddClassHandler<SvgIcon>((x, _) => x.InvalidateVisual());
             TextElement.ForegroundProperty.Changed.AddClassHandler<SvgIcon>((x, _) => x.InvalidateVisual());
             SvgPathProperty.Changed.AddClassHandler<SvgIcon>((x, e) =>
             {
@@ -149,9 +158,11 @@ namespace Mnemo.UI.Controls
             LoadSvg(SvgPath);
             if (_svgPicture == null) return;
 
-            // Color: explicit tint. Else inherited text foreground (MenuItem / ContentPresenter TemplateBinding).
-            var inheritedFg = TextElement.GetForeground(this);
-            SKColor? color = TryGetSkTint(Color) ?? TryGetSkTint(inheritedFg);
+            // Explicit tint from Color; otherwise inherited foreground tints single-color glyphs unless disabled.
+            SKColor? explicitTint = TryGetSkTint(Color);
+            SKColor? color = explicitTint;
+            if (explicitTint == null && !PreserveSvgColors)
+                color = TryGetSkTint(TextElement.GetForeground(this));
 
             _svgPicture.Increment();
             context.Custom(new SvgIconDrawOperation(_svgPicture, Bounds, color));

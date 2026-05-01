@@ -33,7 +33,7 @@ public class NotesModule : IModule
         NotesToolRegistrar.Register(registry, notesToolService);
     }
 
-    public void RegisterWidgets(IWidgetRegistry registry)
+    public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
     }
 }

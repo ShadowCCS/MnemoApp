@@ -33,7 +33,7 @@ public class SettingsModule : IModule
         SettingsToolRegistrar.Register(registry, svc);
     }
 
-    public void RegisterWidgets(IWidgetRegistry registry)
+    public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
     }
 }

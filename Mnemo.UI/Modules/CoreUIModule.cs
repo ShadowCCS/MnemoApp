@@ -40,7 +40,7 @@ public class CoreUIModule : IModule
         SkillDiscoveryToolRegistrar.Register(registry, services.GetRequiredService<SkillDiscoveryToolService>());
     }
 
-    public void RegisterWidgets(IWidgetRegistry registry)
+    public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
     }
 }

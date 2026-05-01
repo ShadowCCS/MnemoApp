@@ -40,7 +40,8 @@ internal static class RoutingAndSkillPromptBuilder
             "- NONE: General study or subject Q&A when the user is not asking about the Mnemo app or a specific module. " +
             "If they ask about Mnemo overall, navigation, themes, or app-wide \"where do I…\", choose Application—not NONE. " +
             "If they ask to change a specific setting (language, editor toggles, AI toggles, profile name) using tool workflows, choose Settings—not NONE. " +
-            "If they clearly mean Notes, Mindmap, or Learning Path content/workflow, choose that skill—not NONE.");
+            "If they clearly mean Notes, Mindmap, or Learning Path content/workflow, choose that skill—not NONE. " +
+            "If they ask for in-app statistics/aggregates/telemetry (counts, streaks, totals stored by Mnemo), choose Analytics—not NONE.");
         sb.AppendLine(
             "Output JSON field \"skills\": a non-empty array of skill ids. One module → one element (e.g. [\"Notes\"]). " +
             "Several modules in one request → distinct ids in order of work (e.g. [\"Notes\",\"Mindmap\"]). General chat → [\"NONE\"].");

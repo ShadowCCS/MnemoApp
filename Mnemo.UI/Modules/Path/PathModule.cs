@@ -32,7 +32,7 @@ public class PathModule : IModule
         // No tools for path yet
     }
 
-    public void RegisterWidgets(IWidgetRegistry registry)
+    public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
         // No widgets for path
     }

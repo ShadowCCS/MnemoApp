@@ -8,7 +8,9 @@ using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
+using Mnemo.Core.Models.Statistics;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.Statistics;
 using Mnemo.UI.Input;
 using Mnemo.UI.ViewModels;
 
@@ -29,6 +31,8 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     private readonly INoteFolderService _folderService;
     private readonly ISettingsService _settingsService;
     private readonly ILocalizationService _localizationService;
+    private readonly IStatisticsManager _statistics;
+    private readonly ILoggerService _logger;
 
     [ObservableProperty]
     private Note? _selectedNote;
@@ -105,12 +109,14 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
     private bool _suppressExpandFolderPersistence;
 
-    public NotesViewModel(INoteService noteService, INoteFolderService folderService, ISettingsService settingsService, ILocalizationService localizationService)
+    public NotesViewModel(INoteService noteService, INoteFolderService folderService, ISettingsService settingsService, ILocalizationService localizationService, IStatisticsManager statistics, ILoggerService logger)
     {
         _noteService = noteService;
         _folderService = folderService;
         _settingsService = settingsService;
         _localizationService = localizationService;
+        _statistics = statistics;
+        _logger = logger;
 
         _settingsService.SettingChanged += OnSettingChanged;
     }
@@ -466,6 +472,13 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         }
 
         await _noteService.SaveNoteAsync(note);
+        if (blocks != null || title != null)
+        {
+            _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
+                StatisticsNamespaces.Notes, NoteStatKinds.DailySummary, "notes_edited");
+            _ = StatisticsRecorder.IncrementLifetimeAsync(_statistics, _logger,
+                StatisticsNamespaces.Notes, NoteStatKinds.LifetimeTotals, "total_notes_edited");
+        }
         if (SelectedNote == note)
             ModifiedText = FormatRelative(note.ModifiedAt, "LastModified", "Notes");
     }
@@ -544,6 +557,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         SelectedNote = note;
 
         _ = await _noteService.SaveNoteAsync(note);
+
+        _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
+            StatisticsNamespaces.Notes, NoteStatKinds.DailySummary, "notes_created");
+        _ = StatisticsRecorder.IncrementLifetimeAsync(_statistics, _logger,
+            StatisticsNamespaces.Notes, NoteStatKinds.LifetimeTotals, "total_notes_created");
     }
 
     [RelayCommand]
@@ -578,6 +596,12 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
         Notes.Add(clone);
         await _noteService.SaveNoteAsync(clone);
+
+        _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
+            StatisticsNamespaces.Notes, NoteStatKinds.DailySummary, "notes_created");
+        _ = StatisticsRecorder.IncrementLifetimeAsync(_statistics, _logger,
+            StatisticsNamespaces.Notes, NoteStatKinds.LifetimeTotals, "total_notes_created");
+
         foreach (var n in bumped)
             await _noteService.SaveNoteAsync(n);
 
@@ -653,6 +677,11 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         RemoveNoteTreeItem(FavouriteNotes, item);
         RemoveNoteTreeItemFromRoot(RootTreeItems, item);
         RefreshFlattenedTreeItems();
+
+        _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
+            StatisticsNamespaces.Notes, NoteStatKinds.DailySummary, "notes_deleted");
+        _ = StatisticsRecorder.IncrementLifetimeAsync(_statistics, _logger,
+            StatisticsNamespaces.Notes, NoteStatKinds.LifetimeTotals, "total_notes_deleted");
     }
 
     [RelayCommand]

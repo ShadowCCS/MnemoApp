@@ -26,7 +26,8 @@ public class WidgetMetadata
     public WidgetCategory Category { get; }
 
     /// <summary>
-    /// Gets the icon resource key or URI for this widget.
+    /// Gets the widget icon as an <c>avares://</c> URI to SVG (each widget ships <c>icon.svg</c>
+    /// beside its implementation under <c>Modules/Overview/Widgets/&lt;WidgetFolder&gt;/</c>).
     /// </summary>
     public string Icon { get; }
 
@@ -45,6 +46,7 @@ public class WidgetMetadata
     /// <summary>
     /// Initializes a new instance of the <see cref="WidgetMetadata"/> class.
     /// </summary>
+    /// <param name="icon"><c>avares://</c> URI to the widget's co-located <c>icon.svg</c> (Mnemo.UI).</param>
     /// <param name="translationNamespace">Optional. When set, Title and Description are used as localization keys in this namespace.</param>
     public WidgetMetadata(
         string id,

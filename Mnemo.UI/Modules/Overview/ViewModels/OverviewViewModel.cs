@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,7 +15,7 @@ namespace Mnemo.UI.Modules.Overview.ViewModels;
 /// ViewModel for the Overview dashboard.
 /// Manages the grid layout, widget positions, and drag-and-drop behavior.
 /// </summary>
-public partial class OverviewViewModel : ViewModelBase
+public partial class OverviewViewModel : ViewModelBase, INavigationAware
 {
     private const string LayoutStorageKey = "overview_dashboard_layout";
     private const string UserDisplayNameKey = "User.DisplayName";
@@ -147,6 +148,33 @@ public partial class OverviewViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Reloads widget data when the user returns to Overview so statistics and lists stay current.
+    /// </summary>
+    public void OnNavigatedTo(object? parameter)
+    {
+        RunAndLogAsync(RefreshWidgetsAsync(), "refresh dashboard widgets");
+    }
+
+    private async Task RefreshWidgetsAsync()
+    {
+        var snapshot = Widgets.ToList();
+        await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            foreach (var widget in snapshot)
+            {
+                try
+                {
+                    await widget.Content.InitializeAsync().ConfigureAwait(true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("Overview", $"Failed to refresh widget '{widget.WidgetId}'.", ex);
+                }
+            }
+        });
+    }
+
+    /// <summary>
     /// Runs an async operation without blocking; logs any exception at the boundary.
     /// </summary>
     private async void RunAndLogAsync(Task task, string context)
@@ -206,7 +234,19 @@ public partial class OverviewViewModel : ViewModelBase
             {
                 foreach (var e in entries)
                 {
-                    await AddWidgetAsync(e.WidgetId, new WidgetPosition(e.Column, e.Row), new WidgetSize(e.ColSpan, e.RowSpan)).ConfigureAwait(false);
+                    var widget = _widgetRegistry.GetWidgetById(e.WidgetId);
+                    if (widget == null)
+                        continue;
+
+                    var size = new WidgetSize(e.ColSpan, e.RowSpan);
+                    // Saved layouts may still use older defaults (e.g. recent-notes was colSpan 2).
+                    if (string.Equals(e.WidgetId, "recent-notes", StringComparison.Ordinal)
+                        && size.ColSpan < widget.Metadata.DefaultSize.ColSpan)
+                    {
+                        size = new WidgetSize(widget.Metadata.DefaultSize.ColSpan, size.RowSpan);
+                    }
+
+                    await AddWidgetAsync(e.WidgetId, new WidgetPosition(e.Column, e.Row), size).ConfigureAwait(false);
                 }
             }
             else
@@ -224,6 +264,8 @@ public partial class OverviewViewModel : ViewModelBase
     {
         await AddWidgetAsync("flashcard-stats", new WidgetPosition(0, 0)).ConfigureAwait(false);
         await AddWidgetAsync("recent-decks", new WidgetPosition(2, 0)).ConfigureAwait(false);
+        await AddWidgetAsync("usage-summary", new WidgetPosition(4, 0)).ConfigureAwait(false);
+        await AddWidgetAsync("recent-notes", new WidgetPosition(6, 0)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -448,7 +490,8 @@ public partial class OverviewViewModel : ViewModelBase
              ShowBackdrop = true,
              CloseOnOutsideClick = true,
              HorizontalAlignment = "Center",
-             VerticalAlignment = "Center"
+             VerticalAlignment = "Center",
+             Margin = new Thickness(24)
         };
         
         var id = _overlayService.CreateOverlay(view, options);

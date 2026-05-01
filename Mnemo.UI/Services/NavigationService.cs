@@ -47,6 +47,8 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
 
     public event Action? CanGoBackChanged;
 
+    public event EventHandler<NavigationChangedEventArgs>? Navigated;
+
     public ObservableCollection<BreadcrumbItem> Breadcrumbs { get; }
 
     public void RegisterRoute(string route, Type viewModelType)
@@ -69,8 +71,11 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
     {
         if (_routes.TryGetValue(route, out var vmType))
         {
+            var previousRoute = _history.Count > 0 ? _history.Peek() : null;
+            var previousVm = CurrentViewModel;
+
             var vm = _serviceProvider.GetRequiredService(vmType);
-            
+
             if (vm is INavigationAware aware)
             {
                 aware.OnNavigatedTo(parameter);
@@ -79,6 +84,14 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
             _history.Push(route);
             CurrentViewModel = vm;
             CanGoBackChanged?.Invoke();
+
+            Navigated?.Invoke(this, new NavigationChangedEventArgs
+            {
+                PreviousRoute = previousRoute,
+                Route = route,
+                PreviousViewModel = previousVm,
+                ViewModel = vm
+            });
         }
     }
 

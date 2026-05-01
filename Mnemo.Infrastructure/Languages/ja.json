@@ -475,8 +475,8 @@
   },
   "Topbar": {
     "SearchPlaceholder": "レッスンやマインドマップなどを検索...",
-    "XpSample": "4,850 XP",
-    "StreakDaysSample": "4日連続"
+    "GamificationXpFormat": "{0:N0} XP",
+    "GamificationStreakFormat": "{0}日連続"
   },
   "InputBuilder": {
     "WhatToLearn": "何を学びたいですか？",

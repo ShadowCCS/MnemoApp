@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:vm="using:Mnemo.UI.Modules.Overview.Widgets.RecentNotes"
+             xmlns:controls="using:Mnemo.UI.Controls"
+             mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="240"
+             x:Class="Mnemo.UI.Modules.Overview.Widgets.RecentNotes.RecentNotesWidgetView"
+             x:Name="Root"
+             x:DataType="vm:RecentNotesWidgetViewModel"
+             HorizontalAlignment="Stretch">
+
+    <Grid RowDefinitions="*" HorizontalAlignment="Stretch" MinWidth="0">
+        <ScrollViewer Grid.Row="0"
+                      HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Stretch"
+                      VerticalContentAlignment="Top"
+                      VerticalScrollBarVisibility="Hidden"
+                      HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Items}"
+                          HorizontalAlignment="Stretch"
+                          Classes="overview-recent-list">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch" Spacing="0"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.Styles>
+                    <Style Selector="ItemsControl.overview-recent-list /template/ ItemsPresenter > StackPanel > ContentPresenter">
+                        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                    </Style>
+                </ItemsControl.Styles>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:RecentNoteRow">
+                        <Button Background="Transparent"
+                                BorderThickness="0"
+                                Padding="12,10"
+                                Margin="0,0,0,8"
+                                CornerRadius="12"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                MinWidth="0"
+                                Cursor="Hand"
+                                Command="{Binding #Root.DataContext.OpenNoteCommand}"
+                                CommandParameter="{Binding NoteId}">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                            <Grid ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Stretch" MinWidth="0">
+                                <Border Grid.Column="0"
+                                        Background="{DynamicResource CardAccentBrush}"
+                                        Width="36"
+                                        Height="36"
+                                        CornerRadius="10"
+                                        Margin="0,0,12,0">
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg"
+                                                      Width="18" Height="18"
+                                                      Color="{DynamicResource TextPrimaryBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Stretch"
+                                            MinWidth="0"
+                                            Spacing="0">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="13"
+                                               FontFamily="{DynamicResource Font.SemiBold}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding FolderLine}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding ModifiedColumnText}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="12,0,0,0"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

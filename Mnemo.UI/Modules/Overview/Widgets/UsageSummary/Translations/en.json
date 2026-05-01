@@ -1,0 +1,12 @@
+{
+  "UsageSummary": {
+    "Title": "Usage",
+    "Description": "Launches, notes created, and time on screen today",
+    "Launches": "App launches (lifetime)",
+    "NotesCreated": "Notes created (lifetime)",
+    "PracticeToday": "Study timer today",
+    "NotesToday": "Notes screen today",
+    "FlashcardsToday": "Flashcards screen today",
+    "None": "—"
+  }
+}

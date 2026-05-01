@@ -7,30 +7,53 @@
              xmlns:markup="using:Mnemo.UI.Markup"
              mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="240"
              x:Class="Mnemo.UI.Modules.Overview.Widgets.RecentDecks.RecentDecksWidgetView"
-             x:DataType="vm:RecentDecksWidgetViewModel">
+             x:Name="Root"
+             x:DataType="vm:RecentDecksWidgetViewModel"
+             HorizontalAlignment="Stretch">
 
-    <Grid RowDefinitions="*">
+    <Grid RowDefinitions="*" HorizontalAlignment="Stretch" MinWidth="0">
         <!-- Header removed to avoid duplication with WidgetContainer header -->
         
         <!-- Recent Decks List -->
-        <ScrollViewer Grid.Row="0" 
+        <ScrollViewer Grid.Row="0"
+                      HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Stretch"
+                      VerticalContentAlignment="Top"
                       VerticalScrollBarVisibility="Hidden"
                       HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding RecentDecks}">
+            <ItemsControl ItemsSource="{Binding RecentDecks}"
+                          HorizontalAlignment="Stretch"
+                          Classes="overview-recent-list">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch" Spacing="0"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.Styles>
+                    <Style Selector="ItemsControl.overview-recent-list /template/ ItemsPresenter > StackPanel > ContentPresenter">
+                        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                    </Style>
+                </ItemsControl.Styles>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:RecentDeckItem">
-                        <Border Background="Transparent"
+                        <Button Background="Transparent"
+                                BorderThickness="0"
                                 Padding="12,10"
                                 Margin="0,0,0,8"
                                 CornerRadius="12"
-                                Cursor="Hand">
-                            <Border.Styles>
-                                <Style Selector="Border:pointerover">
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                MinWidth="0"
+                                Cursor="Hand"
+                                Command="{Binding #Root.DataContext.OpenDeckCommand}"
+                                CommandParameter="{Binding DeckId}">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
                                     <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
                                 </Style>
-                            </Border.Styles>
+                            </Button.Styles>
 
-                            <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Grid ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Stretch" MinWidth="0">
                                 <!-- Icon -->
                                 <Border Grid.Column="0"
                                         Background="{DynamicResource CardAccentBrush}"
@@ -46,14 +69,20 @@
                                 </Border>
 
                                 <!-- Deck Info -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Stretch"
+                                            MinWidth="0"
+                                            Spacing="0">
                                     <TextBlock Text="{Binding Name}"
                                                FontSize="13"
                                                FontFamily="{DynamicResource Font.SemiBold}"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"/>
                                     <TextBlock FontSize="11"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
-                                               Margin="0,2,0,0">
+                                               Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis">
                                         <Run Text="{Binding Subject}"/>
                                         <Run Text="•"/>
                                         <Run Text="{Binding CardCount}"/>
@@ -67,9 +96,10 @@
                                            FontSize="11"
                                            Foreground="{DynamicResource TextTertiaryBrush}"
                                            VerticalAlignment="Center"
-                                           Margin="12,0,0,0"/>
+                                           Margin="12,0,0,0"
+                                           TextTrimming="CharacterEllipsis"/>
                             </Grid>
-                        </Border>
+                        </Button>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

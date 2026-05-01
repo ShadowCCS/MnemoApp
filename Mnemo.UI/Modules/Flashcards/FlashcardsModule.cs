@@ -44,7 +44,7 @@ public class FlashcardsModule : IModule
     {
     }
 
-    public void RegisterWidgets(IWidgetRegistry registry)
+    public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
     }
 }
