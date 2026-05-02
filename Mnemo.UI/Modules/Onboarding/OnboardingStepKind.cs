@@ -5,5 +5,4 @@ public enum OnboardingStepKind
     Welcome,
     Language,
     Personalization,
-    AISetup,
 }

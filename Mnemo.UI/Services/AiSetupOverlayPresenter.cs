@@ -28,7 +28,6 @@ public sealed class AiSetupOverlayPresenter : IAiSetupOverlayPresenter
         var vm = _services.GetRequiredService<AiModelSetupViewModel>();
         return _dispatcher.InvokeAsync(async () =>
         {
-            await vm.InitializeAsync().ConfigureAwait(false);
             var view = new AiModelsSetupOverlay { DataContext = vm };
             var id = _overlays.CreateOverlay(view, new OverlayOptions
             {
@@ -36,9 +35,12 @@ public sealed class AiSetupOverlayPresenter : IAiSetupOverlayPresenter
                 VerticalAlignment = VerticalAlignment.Center,
                 ShowBackdrop = true,
                 CloseOnOutsideClick = true,
-                CloseOnEscape = true
+                CloseOnEscape = true,
+                BackdropOpacity = 0.5,
             }, "AISetup");
             view.OverlayId = id;
+            // Show chrome + dimmed backdrop immediately; load status/download sizes after (was blocking open).
+            await vm.InitializeAsync().ConfigureAwait(true);
         });
     }
 }

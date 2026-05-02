@@ -8,7 +8,7 @@
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Status](https://img.shields.io/badge/status-In_Development-blue.svg)](https://github.com/ShadowCCS/mnemoapp)
+[![Status](https://img.shields.io/badge/status-In_Development-blue.svg)](https://github.com/onemnemo/mnemo)
 ![Framework](https://img.shields.io/badge/framework-.NET%2010.0-purple.svg)
 ![UI](https://img.shields.io/badge/UI-Avalonia%2011-orange.svg)
 
@@ -18,7 +18,7 @@
 
 ## What is Mnemo?
 
-Mnemo is a **fully modular**, cross-platform learning platform powered by **Avalonia 11** and **.NET 9**.  
+Mnemo is a **fully modular**, cross-platform learning platform powered by **Avalonia 11** and **.NET 10**.  
 It combines flashcards, notes, mindmaps, learning paths, games, and more, all in one place.  
 
 > No subscriptions. No ads. No tracking. Ever.

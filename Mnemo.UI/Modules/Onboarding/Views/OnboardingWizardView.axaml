@@ -1,10 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Mnemo.UI.Modules.Onboarding.ViewModels"
-             xmlns:onboardingViews="using:Mnemo.UI.Modules.Onboarding.Views"
              xmlns:settings="using:Mnemo.UI.Modules.Settings.ViewModels"
              xmlns:model="using:Mnemo.Core.Models"
-             xmlns:components="using:Mnemo.UI.Components"
              xmlns:controls="using:Mnemo.UI.Controls"
              xmlns:converters="using:Mnemo.UI.Converters"
              xmlns:markup="using:Mnemo.UI.Markup"
@@ -15,7 +13,7 @@
     <converters:PathToImageConverter x:Key="PathToImageConverter"/>
   </UserControl.Resources>
 
-  <Border Background="{DynamicResource CardBackgroundBrush}"
+  <Border Background="{DynamicResource OverlayBackgroundBrush}"
           BorderBrush="{DynamicResource SidebarBorderBrush}"
           BorderThickness="1"
           CornerRadius="12"
@@ -72,12 +70,6 @@
                      IsVisible="{Binding !IsPersonalizationStep}"/>
             <Ellipse Width="8" Height="8" Fill="{DynamicResource CardAccentBrush}"
                      IsVisible="{Binding IsPersonalizationStep}"/>
-            
-            <!-- Step 4 -->
-            <Ellipse Width="8" Height="8" Fill="{DynamicResource TextTertiaryBrush}"
-                     IsVisible="{Binding !IsAISetupStep}"/>
-            <Ellipse Width="8" Height="8" Fill="{DynamicResource CardAccentBrush}"
-                     IsVisible="{Binding IsAISetupStep}"/>
           </StackPanel>
         </Grid>
       </Border>
@@ -242,11 +234,6 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-              </StackPanel>
-
-              <!-- AI setup -->
-              <StackPanel IsVisible="{Binding IsAISetupStep}">
-                <onboardingViews:AiModelSetupPanel DataContext="{Binding AiSetup}"/>
               </StackPanel>
             </StackPanel>
           </ScrollViewer>

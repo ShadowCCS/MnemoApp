@@ -17,8 +17,8 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
     public InMemoryFlashcardDeckService(IFlashcardSchedulerResolver schedulerResolver)
     {
         _schedulerResolver = schedulerResolver;
-        var now = DateTimeOffset.UtcNow;
-        (_folders, _decks) = CreateSeedData(now);
+        _folders = new List<FlashcardFolder>();
+        _decks = new List<FlashcardDeck>();
     }
 
     /// <inheritdoc />
@@ -189,66 +189,6 @@ public sealed class InMemoryFlashcardDeckService : IFlashcardDeckService
             _folders.RemoveAt(index);
             return Task.FromResult(true);
         }
-    }
-
-    private static (List<FlashcardFolder> Folders, List<FlashcardDeck> Decks) CreateSeedData(DateTimeOffset now)
-    {
-        var folders = new List<FlashcardFolder>
-        {
-            new("f1", "Languages", null, 0),
-            new("f2", "Computer Science", null, 1),
-            new("f3", "Medical", null, 2)
-        };
-
-        var day = TimeSpan.FromDays(1);
-        var decks = new List<FlashcardDeck>
-        {
-            new FlashcardDeck(
-                "d1",
-                "Spanish Vocabulary",
-                "f1",
-                null,
-                new[] { "spanish", "vocab" },
-                now - day,
-                85,
-                new Flashcard[]
-                {
-                    new("c1", "d1", "El gato", "The cat", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
-                    new("c2", "d1", "El perro", "The dog", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
-                    new("c3", "d1", "La casa", "The house", FlashcardType.Classic, Array.Empty<string>(), now + day, null, null, null)
-                },
-                FlashcardSchedulingAlgorithm.Fsrs),
-            new FlashcardDeck(
-                "d2",
-                "Data Structures",
-                "f2",
-                null,
-                new[] { "cs", "algorithms" },
-                now - TimeSpan.FromDays(2),
-                62,
-                new Flashcard[]
-                {
-                    new("c4", "d2", "What is a Hash Table?", "A data structure that implements an associative array abstract data type, a structure that can map keys to values.", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
-                    new("c5", "d2", "Time complexity of Binary Search", "O(log n)", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null),
-                    new("c6", "d2", "{{c1::Quick Sort}} has an average time complexity of O(n log n).", "Quick Sort", FlashcardType.Cloze, Array.Empty<string>(), now, null, null, null)
-                },
-                FlashcardSchedulingAlgorithm.Sm2),
-            new FlashcardDeck(
-                "d3",
-                "Anatomy: Bones",
-                "f3",
-                null,
-                new[] { "anatomy", "biology" },
-                null,
-                0,
-                new Flashcard[]
-                {
-                    new("c7", "d3", "Longest bone in the human body", "Femur", FlashcardType.Classic, Array.Empty<string>(), now, null, null, null)
-                },
-                FlashcardSchedulingAlgorithm.Leitner)
-        };
-
-        return (folders, decks);
     }
 
     private static FlashcardDeck CloneDeck(FlashcardDeck deck)

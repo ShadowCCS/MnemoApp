@@ -16,18 +16,30 @@
 
   <!-- Host overlays on top of the window content -->
   <Grid Name="OverlayPopupHostRoot" IsHitTestVisible="True" Focusable="True">
-    <ItemsControl ItemsSource="{Binding Overlays}">
+    <ItemsControl ItemsSource="{Binding Overlays}"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
           <Grid />
         </ItemsPanelTemplate>
       </ItemsControl.ItemsPanel>
+      <ItemsControl.Styles>
+        <Style Selector="ContentPresenter">
+          <Setter Property="HorizontalAlignment" Value="Stretch"/>
+          <Setter Property="VerticalAlignment" Value="Stretch"/>
+        </Style>
+      </ItemsControl.Styles>
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="services:OverlayInstance">
           <Grid IsHitTestVisible="True"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
                 ZIndex="{Binding ZIndex}">
             <!-- Backdrop: always block hit-test when visible so background cannot be clicked; close only if CloseOnOutsideClick -->
             <Border IsVisible="{Binding Options.ShowBackdrop}"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
                     IsHitTestVisible="{Binding Options.ShowBackdrop}"
                     PointerPressed="BackdropPressed">
               <Border.Background>
@@ -39,7 +51,7 @@
               </Border.Background>
             </Border>
 
-            <!-- Content container with alignment options -->
+            <!-- Content container with alignment options (sized to dialog — do not stretch full window or backdrop clicks break) -->
             <Border x:Name="ContentBorder"
                     Background="Transparent"
                     LayoutUpdated="OnOverlayLayoutUpdated"

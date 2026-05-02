@@ -35,6 +35,7 @@ public partial class AiModelSetupViewModel : ViewModelBase
     [ObservableProperty] private bool _isDownloadComplete;
     [ObservableProperty] private string? _downloadError;
     [ObservableProperty] private bool _showDownloadButton = true;
+    [ObservableProperty] private bool _isSetupLoading;
 
     public bool ShowDownloadError => !string.IsNullOrEmpty(DownloadError);
 
@@ -52,11 +53,12 @@ public partial class AiModelSetupViewModel : ViewModelBase
 
     public async Task InitializeAsync()
     {
+        IsSetupLoading = true;
         AttachCoordinatorEvents();
         try
         {
-            var status = await _aiModelsSetupService.GetSetupStatusAsync().ConfigureAwait(false);
-            _sizes = await _aiModelsSetupService.GetComponentDownloadSizesAsync().ConfigureAwait(false);
+            var status = await _aiModelsSetupService.GetSetupStatusAsync().ConfigureAwait(true);
+            _sizes = await _aiModelsSetupService.GetComponentDownloadSizesAsync().ConfigureAwait(true);
 
             HardwareTierDescription = FormatTier(status.HardwareTier);
             InstalledSummary = string.Join(", ", status.Installed.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
@@ -87,6 +89,10 @@ public partial class AiModelSetupViewModel : ViewModelBase
         {
             DownloadError = ex.Message;
             OnPropertyChanged(nameof(ShowDownloadError));
+        }
+        finally
+        {
+            IsSetupLoading = false;
         }
     }
 
@@ -164,7 +170,7 @@ public partial class AiModelSetupViewModel : ViewModelBase
         {
             try
             {
-                var status = await _aiModelsSetupService.GetSetupStatusAsync().ConfigureAwait(false);
+                var status = await _aiModelsSetupService.GetSetupStatusAsync().ConfigureAwait(true);
                 RecomputeEstimate(status);
                 UpdateDownloadCompleteState(status);
                 RecomputeShowDownloadButton(status);
@@ -195,28 +201,39 @@ public partial class AiModelSetupViewModel : ViewModelBase
         try
         {
             var result = await _installCoordinator.StartDownloadAsync(optional).ConfigureAwait(false);
-            if (result.IsSuccess)
+            await _mainThreadDispatcher.InvokeAsync(async () =>
             {
-                DownloadError = null;
-                DownloadStatusMessage = result.Value!.Installed.Count > 0
-                    ? T("Ready")
-                    : T("AllModelsInstalled");
-                await InitializeAsync().ConfigureAwait(false);
-            }
-            else
-            {
-                DownloadError = result.ErrorMessage ?? T("DownloadFailed");
-                OnPropertyChanged(nameof(ShowDownloadError));
-            }
+                try
+                {
+                    if (result.IsSuccess)
+                    {
+                        DownloadError = null;
+                        DownloadStatusMessage = result.Value!.Installed.Count > 0
+                            ? T("Ready")
+                            : T("AllModelsInstalled");
+                        await InitializeAsync().ConfigureAwait(true);
+                    }
+                    else
+                    {
+                        DownloadError = result.ErrorMessage ?? T("DownloadFailed");
+                        OnPropertyChanged(nameof(ShowDownloadError));
+                    }
+                }
+                finally
+                {
+                    IsDownloading = false;
+                }
+            });
         }
         catch (Exception ex)
         {
-            DownloadError = ex.Message;
-            OnPropertyChanged(nameof(ShowDownloadError));
-        }
-        finally
-        {
-            IsDownloading = false;
+            await _mainThreadDispatcher.InvokeAsync(() =>
+            {
+                DownloadError = ex.Message;
+                OnPropertyChanged(nameof(ShowDownloadError));
+                IsDownloading = false;
+                return Task.CompletedTask;
+            });
         }
     }
 

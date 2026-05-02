@@ -571,6 +571,16 @@
                                                                        IsExpanded="{Binding IsExpanded}"
                                                                        IsVisible="{Binding IsCollapsible}">
                                             <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Vertical" Spacing="0"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.Styles>
+                                                    <Style Selector="ContentPresenter">
+                                                        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                                    </Style>
+                                                </ItemsControl.Styles>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <ContentControl Content="{Binding}">
@@ -604,6 +614,16 @@
                                                        LetterSpacing="0.5"
                                                        Margin="0,0,0,8"/>
                                             <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Vertical" Spacing="0"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.Styles>
+                                                    <Style Selector="ContentPresenter">
+                                                        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                                    </Style>
+                                                </ItemsControl.Styles>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <ContentControl Content="{Binding}">

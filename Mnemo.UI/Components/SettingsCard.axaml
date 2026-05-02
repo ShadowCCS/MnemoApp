@@ -14,7 +14,8 @@
                 Background="{DynamicResource CardBackgroundSecondaryBrush}"
                 CornerRadius="10"
                 Padding="20"
-                Width="600"
+                HorizontalAlignment="Stretch"
+                MaxWidth="800"
                 BorderThickness="1"
                 BorderBrush="Transparent">
           <Border.Transitions>

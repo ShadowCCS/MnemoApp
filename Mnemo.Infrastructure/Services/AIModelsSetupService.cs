@@ -14,7 +14,7 @@ namespace Mnemo.Infrastructure.Services;
 
 public class AIModelsSetupService : IAIModelsSetupService
 {
-    private const string ReleaseBaseUrl = "https://github.com/ShadowCCS/MnemoApp/releases/download/Models/";
+    private const string ReleaseBaseUrl = "https://github.com/onemnemo/mnemo/releases/download/Models/";
     private const int DownloadRetryCount = 2;
     /// <summary>Max concurrent HTTP downloads (batch) to avoid saturating the link or the host.</summary>
     private const int MaxConcurrentDownloads = 6;

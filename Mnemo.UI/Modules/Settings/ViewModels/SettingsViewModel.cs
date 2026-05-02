@@ -242,25 +242,27 @@ public partial class SettingsViewModel : ViewModelBase
         editor.Groups.Add(editorGroup);
         editor.Groups.Add(markdownGroup);
 
-        var aiTools = new SettingsCategoryViewModel(T("AITools"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg", "AITools");
+        var aiTools = new SettingsCategoryViewModel(T("AITools"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg", "AITools")
+        {
+            Subtitle = T("AIToolsExperimentalSubtitle")
+        };
 
         var aiInstalled = _aiRuntimeInstalled;
 
-        var aiGroup = new SettingsGroupViewModel(T("Intelligence"), isCollapsible: true);
-        if (!aiInstalled)
-        {
-            aiGroup.Items.Add(new AsyncActionSettingViewModel(
-                T("InstallLocalAI"),
-                T("InstallLocalAIDescription"),
-                T("InstallNow"),
-                async vm =>
-                {
-                    await _aiSetupOverlay.ShowAsync().ConfigureAwait(false);
-                    vm.StatusText = string.Empty;
-                },
-                isInteractionEnabled: true));
-        }
+        var manageAiGroup = new SettingsGroupViewModel(T("ManageAILocalModels"), isCollapsible: true);
+        manageAiGroup.Items.Add(new SettingsNoticeViewModel(T("ExperimentalLocalAINoticeTitle"), T("ExperimentalLocalAINoticeDescription")));
+        manageAiGroup.Items.Add(new AsyncActionSettingViewModel(
+            T("OpenAIManager"),
+            T("OpenAIManagerDescription"),
+            T("OpenManager"),
+            async vm =>
+            {
+                await _aiSetupOverlay.ShowAsync().ConfigureAwait(false);
+                vm.StatusText = string.Empty;
+            },
+            isInteractionEnabled: true));
 
+        var aiGroup = new SettingsGroupViewModel(T("Intelligence"), isCollapsible: true);
         aiGroup.Items.Add(new EnableAiAssistantToggleSettingViewModel(
             _settingsService,
             _overlayService,
@@ -318,6 +320,7 @@ public partial class SettingsViewModel : ViewModelBase
         ragGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "AI.EnableRAG", T("EnableRAG"), T("EnableRAGDescription"), true, aiInstalled));
         ragGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "AI.EmbeddingModel", T("EmbeddingModel"), T("EmbeddingModelDescription"), new[] { T("BgeSmallFast") }, null, null, null, aiInstalled));
 
+        aiTools.Groups.Add(manageAiGroup);
         aiTools.Groups.Add(aiGroup);
         aiTools.Groups.Add(ragGroup);
 

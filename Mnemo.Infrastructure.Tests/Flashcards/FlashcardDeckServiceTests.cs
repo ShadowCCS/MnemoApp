@@ -13,7 +13,7 @@ public sealed class FlashcardDeckServiceTests
     public async Task InMemory_RecordSessionOutcome_UpdatesDueDateForReview()
     {
         var service = new InMemoryFlashcardDeckService(CreateSchedulerResolver());
-        var deck = (await service.ListDecksAsync())[0];
+        var deck = await SeedSingleCardDeckAsync(service);
         var card = deck.Cards[0];
         var initialDue = card.DueDate;
         var now = DateTimeOffset.UtcNow;
@@ -37,7 +37,7 @@ public sealed class FlashcardDeckServiceTests
     public async Task InMemory_RecordSessionOutcome_DoesNotMutateScheduleForQuickPractice()
     {
         var service = new InMemoryFlashcardDeckService(CreateSchedulerResolver());
-        var deck = (await service.ListDecksAsync())[0];
+        var deck = await SeedSingleCardDeckAsync(service);
         var card = deck.Cards[0];
         var initialDue = card.DueDate;
         var now = DateTimeOffset.UtcNow;
@@ -61,7 +61,7 @@ public sealed class FlashcardDeckServiceTests
     public async Task InMemory_RecordSessionOutcome_DoesNotMutateScheduleForCram()
     {
         var service = new InMemoryFlashcardDeckService(CreateSchedulerResolver());
-        var deck = (await service.ListDecksAsync())[0];
+        var deck = await SeedSingleCardDeckAsync(service);
         var card = deck.Cards[0];
         var initialDue = card.DueDate;
         var now = DateTimeOffset.UtcNow;
@@ -88,7 +88,7 @@ public sealed class FlashcardDeckServiceTests
 
         var schedulerResolver = CreateSchedulerResolver();
         var serviceA = new PersistentFlashcardDeckService(storage, logger, schedulerResolver);
-        var deck = (await serviceA.ListDecksAsync())[0];
+        var deck = await SeedSingleCardDeckAsync(serviceA);
         var now = DateTimeOffset.UtcNow;
         var result = new FlashcardSessionResult(
             deck.Id,
@@ -136,6 +136,38 @@ public sealed class FlashcardDeckServiceTests
     private sealed class NullLoggerService : ILoggerService
     {
         public void Log(LogLevel level, string category, string message, Exception? exception = null) { }
+    }
+
+    private static async Task<FlashcardDeck> SeedSingleCardDeckAsync(IFlashcardDeckService service)
+    {
+        var now = DateTimeOffset.UtcNow;
+        const string deckId = "test-deck";
+        const string cardId = "test-card";
+        var deck = new FlashcardDeck(
+            deckId,
+            "Test",
+            null,
+            null,
+            Array.Empty<string>(),
+            null,
+            0,
+            new[]
+            {
+                new Flashcard(
+                    cardId,
+                    deckId,
+                    "Q",
+                    "A",
+                    FlashcardType.Classic,
+                    Array.Empty<string>(),
+                    now,
+                    null,
+                    null,
+                    null)
+            },
+            FlashcardSchedulingAlgorithm.Fsrs);
+        await service.SaveDeckAsync(deck);
+        return deck;
     }
 
     private static IFlashcardSchedulerResolver CreateSchedulerResolver()

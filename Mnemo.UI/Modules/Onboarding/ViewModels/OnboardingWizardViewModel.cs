@@ -25,7 +25,6 @@ public partial class OnboardingWizardViewModel : ViewModelBase
         OnboardingStepKind.Welcome,
         OnboardingStepKind.Language,
         OnboardingStepKind.Personalization,
-        OnboardingStepKind.AISetup,
     };
 
     [ObservableProperty]
@@ -40,7 +39,6 @@ public partial class OnboardingWizardViewModel : ViewModelBase
     public ThemeSettingViewModel ThemeSettingViewModel { get; }
     public AppIconSettingViewModel AppIconSettingViewModel { get; }
     public ProfilePictureSettingViewModel ProfilePictureSettingViewModel { get; }
-    public AiModelSetupViewModel AiSetup { get; }
 
     public int StepCount => Steps.Count;
     public OnboardingStepKind CurrentStep => Steps[CurrentStepIndex];
@@ -51,14 +49,12 @@ public partial class OnboardingWizardViewModel : ViewModelBase
     public bool IsWelcomeStep => CurrentStep == OnboardingStepKind.Welcome;
     public bool IsLanguageStep => CurrentStep == OnboardingStepKind.Language;
     public bool IsPersonalizationStep => CurrentStep == OnboardingStepKind.Personalization;
-    public bool IsAISetupStep => CurrentStep == OnboardingStepKind.AISetup;
 
     public string StepTitle => CurrentStep switch
     {
         OnboardingStepKind.Welcome => _localizationService.T("WelcomeTitle", "Onboarding"),
         OnboardingStepKind.Language => _localizationService.T("LanguageTitle", "Onboarding"),
         OnboardingStepKind.Personalization => _localizationService.T("PersonalizeTitle", "Onboarding"),
-        OnboardingStepKind.AISetup => _localizationService.T("AISetupTitle", "Onboarding"),
         _ => string.Empty,
     };
 
@@ -67,7 +63,6 @@ public partial class OnboardingWizardViewModel : ViewModelBase
         OnboardingStepKind.Welcome => _localizationService.T("WelcomeDescription", "Onboarding"),
         OnboardingStepKind.Language => _localizationService.T("LanguageDescription", "Onboarding"),
         OnboardingStepKind.Personalization => _localizationService.T("PersonalizeDescription", "Onboarding"),
-        OnboardingStepKind.AISetup => _localizationService.T("AISetupDescription", "Onboarding"),
         _ => string.Empty,
     };
 
@@ -78,14 +73,12 @@ public partial class OnboardingWizardViewModel : ViewModelBase
         ILocalizationService localizationService,
         IThemeService themeService,
         IOverlayService overlayService,
-        INavigationService navigationService,
-        AiModelSetupViewModel aiSetup)
+        INavigationService navigationService)
     {
         _settingsService = settingsService;
         _localizationService = localizationService;
         _overlayService = overlayService;
         _navigationService = navigationService;
-        AiSetup = aiSetup;
 
         string T(string key) => _localizationService.T(key, "Onboarding");
         LanguageSettingViewModel = new LanguageSettingViewModel(localizationService, settingsService);
@@ -128,9 +121,6 @@ public partial class OnboardingWizardViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsWelcomeStep));
         OnPropertyChanged(nameof(IsLanguageStep));
         OnPropertyChanged(nameof(IsPersonalizationStep));
-        OnPropertyChanged(nameof(IsAISetupStep));
-        if (CurrentStep == OnboardingStepKind.AISetup)
-            _ = AiSetup.InitializeAsync();
     }
 
     [RelayCommand]
