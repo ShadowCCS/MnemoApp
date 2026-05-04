@@ -7,6 +7,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -41,25 +42,17 @@ public partial class App : Application
 
     public IServiceProvider? Services { get; private set; }
 
-    /// <summary>
-    /// Direct reference so we can dispose the server manager on ProcessExit (fallback when Exit doesn't fire).
-    /// </summary>
-    private static IDisposable? _serverManagerForShutdown;
-
     public override void OnFrameworkInitializationCompleted()
     {
+        // Avalonia expects startup (including base.OnFrameworkInitializationCompleted) to finish synchronously
+        // in this callback; deferring DI/MainWindow via Task.Run breaks desktop lifetime/window creation.
         Services = Bootstrapper.Build();
         var navService = Services.GetRequiredService<INavigationService>();
         var themeService = Services.GetRequiredService<IThemeService>();
 
-        // Hold reference for shutdown so llama-server processes are always killed (even if Exit doesn't fire)
-        _serverManagerForShutdown = Services.GetService(typeof(IAIServerManager)) as IDisposable;
-
-        // Fallback: ensure server processes are stopped when the process exits (e.g. task manager, crash)
         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
-        // Apply saved theme on startup
         _ = themeService.GetCurrentThemeAsync().ContinueWith(t =>
         {
             if (t.IsCompletedSuccessfully)
@@ -70,22 +63,26 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
-            // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
-            desktop.MainWindow = new MainWindow
+            var mainWindow = new MainWindow
             {
                 DataContext = Services.GetRequiredService<MainWindowViewModel>(),
             };
-            
-            // Cleanup on application exit: dispose AI/servers in order, then the container
+
+            void OnMainWindowLoadedOnce(object? _, RoutedEventArgs __)
+            {
+                mainWindow.Loaded -= OnMainWindowLoadedOnce;
+                _ = RunPostLaunchFlowsAsync();
+            }
+
+            mainWindow.Loaded += OnMainWindowLoadedOnce;
+            desktop.MainWindow = mainWindow;
+
             desktop.Exit += (_, _) =>
             {
                 try
                 {
-                    // Stop server processes and release resources in dependency order
-                    _serverManagerForShutdown?.Dispose();
-                    _serverManagerForShutdown = null;
+                    DisposeServerManagerIfCreated();
                     (Services?.GetService(typeof(ITextGenerationService)) as IDisposable)?.Dispose();
                     (Services?.GetService(typeof(IResourceGovernor)) as IDisposable)?.Dispose();
                     (Services?.GetService(typeof(IEmbeddingService)) as IDisposable)?.Dispose();
@@ -107,10 +104,35 @@ public partial class App : Application
 
         navService.NavigateTo("overview");
 
-        _ = ShowOnboardingIfNeededAsync();
-        _ = RunHardwareInstallMismatchCheckAsync();
-
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private async Task RunPostLaunchFlowsAsync()
+    {
+        try
+        {
+            await ShowOnboardingIfNeededAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Services?.GetService<ILoggerService>()?.Error("Onboarding", "ShowOnboardingIfNeededAsync threw.", ex);
+        }
+
+        try
+        {
+            await RunHardwareInstallMismatchCheckAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Services?.GetService<ILoggerService>()?.Error("Hardware", "RunHardwareInstallMismatchCheckAsync threw.", ex);
+        }
+    }
+
+    private void DisposeServerManagerIfCreated()
+    {
+        if (Services == null)
+            return;
+        (Services.GetService(typeof(IAIServerManager)) as IDisposable)?.Dispose();
     }
 
     private async Task RunHardwareInstallMismatchCheckAsync()
@@ -173,29 +195,57 @@ public partial class App : Application
     private async Task ShowOnboardingIfNeededAsync()
     {
         if (Services == null) return;
+        var logger = Services.GetService<ILoggerService>();
         var settingsService = Services.GetRequiredService<ISettingsService>();
         var completed = await settingsService.GetAsync("Onboarding.Completed", false).ConfigureAwait(false);
+        logger?.Info("Onboarding", $"Onboarding.Completed read as {completed}.");
         if (completed) return;
 
-        var vm = Services.GetRequiredService<Mnemo.UI.Modules.Onboarding.ViewModels.OnboardingWizardViewModel>();
-        await vm.LoadUserNameAsync().ConfigureAwait(false);
+        Mnemo.UI.Modules.Onboarding.ViewModels.OnboardingWizardViewModel vm;
+        try
+        {
+            vm = Services.GetRequiredService<Mnemo.UI.Modules.Onboarding.ViewModels.OnboardingWizardViewModel>();
+        }
+        catch (Exception ex)
+        {
+            logger?.Error("Onboarding", "Failed to resolve OnboardingWizardViewModel from DI.", ex);
+            throw;
+        }
+
+        try
+        {
+            await vm.LoadUserNameAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger?.Warning("Onboarding", $"LoadUserNameAsync failed: {ex.Message}");
+        }
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             if (Services == null) return;
-            var overlayService = Services.GetRequiredService<IOverlayService>();
-            var view = new OnboardingWizardView { DataContext = vm };
-            var options = new OverlayOptions
+            try
             {
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                ShowBackdrop = true,
-                CloseOnOutsideClick = false,
-                CloseOnEscape = false
-            };
-            var id = overlayService.CreateOverlay(view, options, "OnboardingWizard");
-            vm.SetOverlayId(id);
-        });
+                var overlayService = Services.GetRequiredService<IOverlayService>();
+                var view = new OnboardingWizardView { DataContext = vm };
+                var options = new OverlayOptions
+                {
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    ShowBackdrop = true,
+                    CloseOnOutsideClick = false,
+                    CloseOnEscape = false
+                };
+                var id = overlayService.CreateOverlay(view, options, "OnboardingWizard");
+                vm.SetOverlayId(id);
+                logger?.Info("Onboarding", $"Onboarding overlay created with id {id}.");
+            }
+            catch (Exception ex)
+            {
+                logger?.Error("Onboarding", "Failed to construct/show OnboardingWizardView.", ex);
+                throw;
+            }
+        }, DispatcherPriority.Normal);
     }
 
     private static void OnProcessExit(object? sender, EventArgs e)
@@ -219,8 +269,8 @@ public partial class App : Application
     {
         try
         {
-            _serverManagerForShutdown?.Dispose();
-            _serverManagerForShutdown = null;
+            if (Current is App app)
+                app.DisposeServerManagerIfCreated();
         }
         catch
         {

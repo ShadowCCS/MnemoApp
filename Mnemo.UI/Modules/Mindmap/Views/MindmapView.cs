@@ -24,6 +24,19 @@ namespace Mnemo.UI.Modules.Mindmap.Views;
 
 public partial class MindmapView : UserControl
 {
+    public static readonly DirectProperty<MindmapView, bool> ShowCollapsedNodesOnMinimapBindingProperty =
+        AvaloniaProperty.RegisterDirect<MindmapView, bool>(
+            nameof(ShowCollapsedNodesOnMinimapBinding),
+            o => o.ShowCollapsedNodesOnMinimapBinding,
+            (o, v) => o.ShowCollapsedNodesOnMinimapBinding = v);
+
+    private bool _showCollapsedNodesOnMinimapBinding;
+    public bool ShowCollapsedNodesOnMinimapBinding
+    {
+        get => _showCollapsedNodesOnMinimapBinding;
+        private set => SetAndRaise(ShowCollapsedNodesOnMinimapBindingProperty, ref _showCollapsedNodesOnMinimapBinding, value);
+    }
+
     private const string MindmapGridColorKey = "MindmapGridColor";
     private double _gridSpacing = 40.0;
     private double _gridDotSize = 1.5;
@@ -71,6 +84,11 @@ public partial class MindmapView : UserControl
 
     private DispatcherTimer? _easeTimer;
     private long _lastEdgeHoverUpdateTicks = 0;
+
+    /// <summary>Avalonia <see cref="PointerPressedEventArgs.ClickCount"/> is not always 2 on the second press; we also detect a quick second tap on the same edge.</summary>
+    private string? _edgeDoubleTapPendingId;
+    private long _edgeDoubleTapPendingTicks;
+    private const long EdgeDoubleTapMaxDeltaMs = 650;
 
     public MindmapView()
     {
@@ -185,6 +203,11 @@ public partial class MindmapView : UserControl
             vm.Nodes.CollectionChanged += OnNodesCollectionChanged;
             vm.PropertyChanged += OnMindmapViewModelPropertyChanged;
             vm.ZoomLevel = GetScaleFromMatrix(_transformMatrix);
+            ShowCollapsedNodesOnMinimapBinding = vm.ShowCollapsedNodesOnMinimap;
+        }
+        else
+        {
+            ShowCollapsedNodesOnMinimapBinding = false;
         }
     }
 
@@ -197,6 +220,11 @@ public partial class MindmapView : UserControl
         else if (e.PropertyName == nameof(MindmapViewModel.MinimapVisibilityMode))
         {
             UpdateMinimapVisibility();
+        }
+        else if (e.PropertyName == nameof(MindmapViewModel.ShowCollapsedNodesOnMinimap)
+                 && sender is MindmapViewModel changedVm)
+        {
+            ShowCollapsedNodesOnMinimapBinding = changedVm.ShowCollapsedNodesOnMinimap;
         }
     }
 
@@ -506,6 +534,9 @@ public partial class MindmapView : UserControl
     {
         var properties = e.GetCurrentPoint(this).Properties;
         if (!properties.IsLeftButtonPressed) return;
+        var mainCanvas = this.FindControl<Panel>("MainCanvas");
+        if (mainCanvas != null && TryHandleEdgePressFromCanvas(e, mainCanvas))
+            return;
 
         bool isShiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         // When ModifierBehaviour is "Selecting": Shift + drag = select, no modifier = pan. When "Panning": opposite.
@@ -517,8 +548,6 @@ public partial class MindmapView : UserControl
             doPan = true;
             doSelect = false;
         }
-
-        var mainCanvas = this.FindControl<Panel>("MainCanvas");
 
         // Only when click was on empty space (node handler sets e.Handled when clicking a node)
         if (!e.Handled)
@@ -554,6 +583,51 @@ public partial class MindmapView : UserControl
         }
 
         _lastPointerPosition = e.GetPosition(this);
+    }
+
+    private bool TryHandleEdgePressFromCanvas(PointerPressedEventArgs e, Panel mainCanvas)
+    {
+        if (DataContext is not MindmapViewModel vm || !vm.IsEditingEnabled) return false;
+
+        var pos = e.GetPosition(mainCanvas);
+        var contentPoint = pos * _transformMatrix.Invert();
+        const double labelHalfW = 30;
+        const double labelHalfH = 11;
+
+        EdgeViewModel? hitEdge = null;
+        double bestDist = double.MaxValue;
+        foreach (var edge in vm.Edges)
+        {
+            if (edge.Label != null)
+            {
+                var cx = edge.CenterPoint.X;
+                var cy = edge.CenterPoint.Y;
+                if (contentPoint.X >= cx - labelHalfW && contentPoint.X <= cx + labelHalfW
+                    && contentPoint.Y >= cy - labelHalfH && contentPoint.Y <= cy + labelHalfH)
+                {
+                    hitEdge = edge;
+                    break;
+                }
+            }
+
+            var d = edge.GetDistanceToCurve(contentPoint);
+            if (d < EdgeHitThreshold && d < bestDist)
+            {
+                bestDist = d;
+                hitEdge = edge;
+            }
+        }
+
+        if (hitEdge == null) return false;
+
+        e.Handled = true;
+        bool activateEdit = e.ClickCount >= 2 || TryConsumeEdgeDoubleActivate(hitEdge);
+        if (activateEdit)
+            ActivateEdgeLabelEdit(hitEdge);
+        else
+            vm.SelectedEdge = hitEdge;
+
+        return true;
     }
 
     private void UpdateSelectionBox(Point start, Point end)
@@ -825,6 +899,35 @@ public partial class MindmapView : UserControl
         }
     }
 
+    private bool TryConsumeEdgeDoubleActivate(EdgeViewModel edge)
+    {
+        long now = Environment.TickCount64;
+        var id = edge.Id;
+        if (_edgeDoubleTapPendingId != id)
+        {
+            _edgeDoubleTapPendingId = id;
+            _edgeDoubleTapPendingTicks = now;
+            return false;
+        }
+
+        long dt = now - _edgeDoubleTapPendingTicks;
+        if (dt >= 0 && dt < EdgeDoubleTapMaxDeltaMs)
+        {
+            _edgeDoubleTapPendingId = null;
+            return true;
+        }
+
+        _edgeDoubleTapPendingTicks = now;
+        return false;
+    }
+
+    private void ActivateEdgeLabelEdit(EdgeViewModel edge)
+    {
+        if (DataContext is not MindmapViewModel vm || !vm.IsEditingEnabled) return;
+        vm.EdgeClicked(edge);
+        FocusEdgeLabelBox(edge);
+    }
+
     private async void OnNodeTextBoxLostFocus(object? sender, RoutedEventArgs e)
     {
         try
@@ -839,18 +942,6 @@ public partial class MindmapView : UserControl
             var logger = (Application.Current as App)?.Services?.GetService(typeof(ILoggerService)) as ILoggerService;
             logger?.Error(nameof(MindmapView), "Failed to save node text", ex);
         }
-    }
-
-    private void OnEdgePointerEnter(object? sender, PointerEventArgs e)
-    {
-        if (sender is Control c && c.DataContext is EdgeViewModel edge && DataContext is MindmapViewModel vm)
-            vm.SetHoveredEdge(edge.Id);
-    }
-
-    private void OnEdgePointerLeave(object? sender, PointerEventArgs e)
-    {
-        if (DataContext is MindmapViewModel vm)
-            vm.SetHoveredEdge(null);
     }
 
     private void OnCanvasPointerExited(object? sender, PointerEventArgs e)
@@ -956,44 +1047,6 @@ public partial class MindmapView : UserControl
     {
         if (sender is Control c && c.DataContext is NodeViewModel node && DataContext is MindmapViewModel vm)
             vm.SetHoveredNode(node.Id, false);
-    }
-
-    private void OnEdgeHitPathPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Control c || c.DataContext is not EdgeViewModel edge || DataContext is not MindmapViewModel vm)
-            return;
-        if (!vm.IsEditingEnabled) return;
-        e.Handled = true; // Consume so canvas doesn't start pan; single-click selects, double-click edits
-        if (e.ClickCount == 2)
-        {
-            vm.EdgeClicked(edge);
-            FocusEdgeLabelBox(edge);
-        }
-        else if (e.ClickCount == 1)
-            vm.SelectedEdge = edge;
-    }
-
-    private void OnEdgeLabelPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Control control || control.DataContext is not EdgeViewModel edge ||
-            DataContext is not MindmapViewModel vm)
-            return;
-        if (!vm.IsEditingEnabled) return;
-        e.Handled = true; // Prevents pan starting on label; single-click selects, double-click enters edit
-        if (e.ClickCount == 2)
-        {
-            vm.EdgeClicked(edge);
-            if (sender is TextBox box)
-                Dispatcher.UIThread.Post(() =>
-                {
-                    box.Focus();
-                    box.CaretIndex = box.Text?.Length ?? 0;
-                }, DispatcherPriority.Loaded);
-            else
-                FocusEdgeLabelBox(edge);
-        }
-        else if (e.ClickCount == 1)
-            vm.SelectedEdge = edge;
     }
 
     private void OnEdgeLabelLostFocus(object? sender, RoutedEventArgs e)

@@ -40,7 +40,7 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
     {
         if (key != AiAssistantEnabledKey)
             return;
-        var enabled = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        var enabled = _settingsService.GetAsync(AiAssistantEnabledKey, false).GetAwaiter().GetResult();
         if (enabled)
             return;
         var route = CurrentRoute;
@@ -49,7 +49,7 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
     }
 
     private bool IsAiAssistantEnabled() =>
-        _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        _settingsService.GetAsync(AiAssistantEnabledKey, false).GetAwaiter().GetResult();
 
     private void ResetStackAndNavigateTo(string route, object? parameter)
     {

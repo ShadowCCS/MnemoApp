@@ -506,11 +506,15 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         try
         {
             if (_currentMindmap == null) return;
+            // Selection must be synchronous so the Style toolbar and label focus run before any await.
+            SelectedEdge = edge;
+
             if (edge.Label == null)
             {
                 var modelEdge = _currentMindmap.Edges.FirstOrDefault(e => e.Id == edge.Id);
                 if (modelEdge != null)
                 {
+                    ShowEdgeLabels = true;
                     var before = MindmapSnapshotHelper.Clone(_currentMindmap);
                     modelEdge.Label = "";
                     edge.Label = "";
@@ -519,7 +523,6 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
                     await _mindmapService.UpdateEdgeLabelAsync(_currentMindmap.Id, edge.Id, "").ConfigureAwait(false);
                 }
             }
-            SelectedEdge = edge;
         }
         catch (Exception ex)
         {

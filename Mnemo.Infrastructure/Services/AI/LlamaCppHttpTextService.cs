@@ -31,12 +31,12 @@ public class LlamaCppHttpTextService : ITextGenerationService
 
     private readonly HttpClient _httpClient;
     private readonly ILoggerService _logger;
-    private readonly LlamaCppServerManager _serverManager;
+    private readonly Lazy<LlamaCppServerManager> _serverManagerLazy;
 
-    public LlamaCppHttpTextService(ILoggerService logger, LlamaCppServerManager serverManager)
+    public LlamaCppHttpTextService(ILoggerService logger, Lazy<LlamaCppServerManager> serverManagerLazy)
     {
         _logger = logger;
-        _serverManager = serverManager;
+        _serverManagerLazy = serverManagerLazy;
         _httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromMinutes(5)
@@ -52,8 +52,8 @@ public class LlamaCppHttpTextService : ITextGenerationService
                 return Result<string>.Failure($"Model {manifest.DisplayName} has no endpoint configured.");
             }
 
-            await _serverManager.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
-            using (_serverManager.BeginRequest(manifest.Id))
+            await _serverManagerLazy.Value.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
+            using (_serverManagerLazy.Value.BeginRequest(manifest.Id))
             {
                 var endpoint = $"{manifest.Endpoint.TrimEnd('/')}/v1/chat/completions";
                 var (temperature, maxTokens) = GetGenerationParams(manifest);
@@ -105,7 +105,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
 
         try
         {
-            await _serverManager.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
+            await _serverManagerLazy.Value.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -113,7 +113,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
             yield break;
         }
 
-        using (_serverManager.BeginRequest(manifest.Id))
+        using (_serverManagerLazy.Value.BeginRequest(manifest.Id))
         {
             await foreach (var chunk in GetStreamingChunksAsync(manifest, prompt, imageBase64Contents, ct))
             {
@@ -249,7 +249,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
 
         try
         {
-            await _serverManager.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
+            await _serverManagerLazy.Value.EnsureRunningAsync(manifest, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -257,7 +257,7 @@ public class LlamaCppHttpTextService : ITextGenerationService
             yield break;
         }
 
-        using (_serverManager.BeginRequest(manifest.Id))
+        using (_serverManagerLazy.Value.BeginRequest(manifest.Id))
         {
             await foreach (var chunk in GetStreamingChunksWithToolsAsync(manifest, messages, tools, ct))
             {

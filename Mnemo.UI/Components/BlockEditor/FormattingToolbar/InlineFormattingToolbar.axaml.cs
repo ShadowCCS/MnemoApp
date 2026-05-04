@@ -16,6 +16,7 @@ public partial class InlineFormattingToolbar : UserControl
 {
     private Ellipse? _colorSwatch;
     private string? _colorOverlayId;
+    private string? _hostingToolbarOverlayId;
     private IOverlayService? _overlayService;
     private ColorSwatchPopup? _currentColorPopup;
     private DateTime _lastInteractionUtc = DateTime.MinValue;
@@ -103,6 +104,12 @@ public partial class InlineFormattingToolbar : UserControl
         return false;
     }
 
+    /// <summary>Overlay instance id for this toolbar from <see cref="IOverlayService"/>; required so hosted popups close when the toolbar overlay closes.</summary>
+    public void SetHostingToolbarOverlayId(string overlayId)
+    {
+        _hostingToolbarOverlayId = overlayId;
+    }
+
     public InlineFormattingToolbar()
     {
         InitializeComponent();
@@ -154,13 +161,16 @@ public partial class InlineFormattingToolbar : UserControl
         var colorButton = this.FindControl<Button>("ColorButton");
         var options = new OverlayOptions
         {
-            ShowBackdrop = false,
+            // Full-window backdrop so outside taps dismiss this popup (BackdropPressed); opacity 0 keeps UI undimmed.
+            ShowBackdrop = true,
             CloseOnOutsideClick = true,
+            BackdropOpacity = 0,
             AnchorControl = colorButton ?? (object)this,
             AnchorPosition = AnchorPosition.BottomLeft,
             AnchorOffset = new Thickness(0, 4, 0, 0),
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+            ParentOverlayId = _hostingToolbarOverlayId
         };
 
         _colorOverlayId = _overlayService.CreateOverlay(popup, options, "ColorSwatchPopup");
@@ -194,13 +204,17 @@ public partial class InlineFormattingToolbar : UserControl
 
     private void CloseColorPopup()
     {
+        if (_currentColorPopup != null)
+        {
+            _currentColorPopup.ColorSelected -= OnSwatchColorSelected;
+            _currentColorPopup = null;
+        }
+
         if (!string.IsNullOrEmpty(_colorOverlayId) && _overlayService != null)
         {
             _overlayService.CloseOverlay(_colorOverlayId);
             _colorOverlayId = null;
         }
-
-        _currentColorPopup = null;
     }
 
     private void OnBoldClick(object? sender, RoutedEventArgs e) => FormatRequested?.Invoke(InlineFormatKind.Bold);

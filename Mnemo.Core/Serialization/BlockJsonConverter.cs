@@ -11,37 +11,73 @@ namespace Mnemo.Core.Serialization;
 /// <summary>Reads legacy <c>inlineRuns</c> / <c>content</c> and writes canonical <c>spans</c> + <c>payload</c>.</summary>
 public sealed class BlockJsonConverter : JsonConverter<Block>
 {
+    private static bool TryGetPropertyCaseInsensitive(JsonElement element, string propertyName, out JsonElement value)
+    {
+        if (element.TryGetProperty(propertyName, out value))
+            return true;
+
+        foreach (var candidate in element.EnumerateObject())
+        {
+            if (string.Equals(candidate.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = candidate.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static bool TryReadBlockType(JsonElement typeEl, out BlockType blockType)
+    {
+        if (typeEl.ValueKind == JsonValueKind.String
+            && Enum.TryParse(typeEl.GetString(), ignoreCase: true, out blockType))
+            return true;
+
+        if (typeEl.ValueKind == JsonValueKind.Number
+            && typeEl.TryGetInt32(out var numeric)
+            && Enum.IsDefined(typeof(BlockType), numeric))
+        {
+            blockType = (BlockType)numeric;
+            return true;
+        }
+
+        blockType = default;
+        return false;
+    }
+
     public override Block? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var block = new Block();
 
-        if (root.TryGetProperty("id", out var idEl))
+        if (TryGetPropertyCaseInsensitive(root, "id", out var idEl))
             block.Id = idEl.GetString() ?? block.Id;
-        if (root.TryGetProperty("type", out var typeEl) && Enum.TryParse(typeEl.GetString(), true, out BlockType bt))
+        if (TryGetPropertyCaseInsensitive(root, "type", out var typeEl) && TryReadBlockType(typeEl, out BlockType bt))
             block.Type = bt;
-        if (root.TryGetProperty("order", out var orderEl))
+        if (TryGetPropertyCaseInsensitive(root, "order", out var orderEl))
             block.Order = orderEl.GetInt32();
 
-        if (root.TryGetProperty("meta", out var metaEl) && metaEl.ValueKind == JsonValueKind.Object)
+        if (TryGetPropertyCaseInsensitive(root, "meta", out var metaEl) && metaEl.ValueKind == JsonValueKind.Object)
             block.Meta = JsonSerializer.Deserialize<Dictionary<string, object>>(metaEl.GetRawText(), options) ?? new();
 
-        if (root.TryGetProperty("children", out var chEl) && chEl.ValueKind == JsonValueKind.Array)
+        if (TryGetPropertyCaseInsensitive(root, "children", out var chEl) && chEl.ValueKind == JsonValueKind.Array)
             block.Children = JsonSerializer.Deserialize<List<Block>>(chEl.GetRawText(), options);
 
-        string? legacyContent = root.TryGetProperty("content", out var contentProp) && contentProp.ValueKind == JsonValueKind.String
+        string? legacyContent = TryGetPropertyCaseInsensitive(root, "content", out var contentProp) && contentProp.ValueKind == JsonValueKind.String
             ? contentProp.GetString()
             : null;
 
-        if (root.TryGetProperty("payload", out var payloadEl))
+        if (TryGetPropertyCaseInsensitive(root, "payload", out var payloadEl))
             block.Payload = ReadPayload(payloadEl);
         else
             block.Payload = PayloadFromLegacyMeta(block.Type, block.Meta, legacyContent);
 
-        if (root.TryGetProperty("spans", out var spansEl) && spansEl.ValueKind == JsonValueKind.Array)
+        if (TryGetPropertyCaseInsensitive(root, "spans", out var spansEl) && spansEl.ValueKind == JsonValueKind.Array)
             block.Spans = ReadSpans(spansEl);
-        else if (root.TryGetProperty("inlineRuns", out var runsEl) && runsEl.ValueKind == JsonValueKind.Array)
+        else if (TryGetPropertyCaseInsensitive(root, "inlineRuns", out var runsEl) && runsEl.ValueKind == JsonValueKind.Array)
             block.Spans = LegacyRunsToSpans(runsEl);
         else if (legacyContent != null)
             block.Spans = new List<InlineSpan> { InlineSpan.Plain(legacyContent) };
@@ -63,22 +99,23 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
     {
         if (el.ValueKind != JsonValueKind.Object)
             return new EmptyPayload();
-        var kind = el.TryGetProperty("kind", out var k) ? k.GetString() : null;
+        var kind = TryGetPropertyCaseInsensitive(el, "kind", out var k) ? k.GetString() : null;
+        kind = kind?.ToLowerInvariant();
         return kind switch
         {
-            "equation" => new EquationPayload(el.TryGetProperty("latex", out var lx) ? lx.GetString() ?? string.Empty : string.Empty),
+            "equation" => new EquationPayload(TryGetPropertyCaseInsensitive(el, "latex", out var lx) ? lx.GetString() ?? string.Empty : string.Empty),
             "image" => new ImagePayload(
-                el.TryGetProperty("path", out var p) ? p.GetString() ?? string.Empty : string.Empty,
-                el.TryGetProperty("alt", out var a) ? a.GetString() ?? string.Empty : string.Empty,
-                el.TryGetProperty("width", out var w) && w.TryGetDouble(out var wd) ? wd : 0,
-                el.TryGetProperty("align", out var al) ? al.GetString() ?? "left" : "left"),
+                TryGetPropertyCaseInsensitive(el, "path", out var p) ? p.GetString() ?? string.Empty : string.Empty,
+                TryGetPropertyCaseInsensitive(el, "alt", out var a) ? a.GetString() ?? string.Empty : string.Empty,
+                TryGetPropertyCaseInsensitive(el, "width", out var w) && w.TryGetDouble(out var wd) ? wd : 0,
+                TryGetPropertyCaseInsensitive(el, "align", out var al) ? al.GetString() ?? "left" : "left"),
             "code" => new CodePayload(
-                el.TryGetProperty("language", out var lang) ? lang.GetString() ?? "csharp" : "csharp",
-                el.TryGetProperty("source", out var src) ? src.GetString() ?? string.Empty : string.Empty),
+                TryGetPropertyCaseInsensitive(el, "language", out var lang) ? lang.GetString() ?? "csharp" : "csharp",
+                TryGetPropertyCaseInsensitive(el, "source", out var src) ? src.GetString() ?? string.Empty : string.Empty),
             "checklist" => new ChecklistPayload(
-                el.TryGetProperty("checked", out var ch) && ch.ValueKind == JsonValueKind.True),
-            "twoColumn" => new TwoColumnPayload(
-                el.TryGetProperty("splitRatio", out var sr) && sr.TryGetDouble(out var s) ? s : 0.5),
+                TryGetPropertyCaseInsensitive(el, "checked", out var ch) && ch.ValueKind == JsonValueKind.True),
+            "twocolumn" => new TwoColumnPayload(
+                TryGetPropertyCaseInsensitive(el, "splitRatio", out var sr) && sr.TryGetDouble(out var s) ? s : 0.5),
             "empty" => new EmptyPayload(),
             null or "" => new EmptyPayload(),
             _ => throw new JsonException($"Unknown block payload kind '{kind}'.")
@@ -92,24 +129,25 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
         {
             if (el.ValueKind != JsonValueKind.Object)
                 continue;
-            var kind = el.TryGetProperty("kind", out var k) ? k.GetString() : null;
+            var kind = TryGetPropertyCaseInsensitive(el, "kind", out var kEl) ? kEl.GetString() : null;
+            kind = kind?.ToLowerInvariant();
             if (kind == "fraction")
             {
-                var num = el.TryGetProperty("numerator", out var n) && n.TryGetInt32(out var nv) ? nv : 0;
-                var den = el.TryGetProperty("denominator", out var d) && d.TryGetInt32(out var dv) ? dv : 1;
+                var num = TryGetPropertyCaseInsensitive(el, "numerator", out var n) && n.TryGetInt32(out var nv) ? nv : 0;
+                var den = TryGetPropertyCaseInsensitive(el, "denominator", out var d) && d.TryGetInt32(out var dv) ? dv : 1;
                 list.Add(new FractionSpan(num, den <= 0 ? 1 : den, ReadTextStyle(el)));
                 continue;
             }
             var isEquation = kind == "equation"
-                || (kind != "text" && el.TryGetProperty("latex", out _) && !el.TryGetProperty("text", out _));
+                || (kind != "text" && TryGetPropertyCaseInsensitive(el, "latex", out _) && !TryGetPropertyCaseInsensitive(el, "text", out _));
             if (isEquation)
             {
-                var latex = el.TryGetProperty("latex", out var lx) ? lx.GetString() ?? string.Empty : string.Empty;
+                var latex = TryGetPropertyCaseInsensitive(el, "latex", out var lx) ? lx.GetString() ?? string.Empty : string.Empty;
                 list.Add(new EquationSpan(latex, ReadTextStyle(el)));
             }
             else
             {
-                var text = el.TryGetProperty("text", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+                var text = TryGetPropertyCaseInsensitive(el, "text", out var t) ? t.GetString() ?? string.Empty : string.Empty;
                 list.Add(new TextSpan(text, ReadTextStyle(el)));
             }
         }
@@ -119,7 +157,7 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
 
     private static TextStyle ReadTextStyle(JsonElement spanEl)
     {
-        if (!spanEl.TryGetProperty("style", out var st) || st.ValueKind != JsonValueKind.Object)
+        if (!TryGetPropertyCaseInsensitive(spanEl, "style", out var st) || st.ValueKind != JsonValueKind.Object)
             return TextStyle.Default;
         return LegacyStyleFromJson(st, out _);
     }
@@ -286,10 +324,10 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
         {
             if (el.ValueKind != JsonValueKind.Object)
                 continue;
-            var text = el.TryGetProperty("text", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+            var text = TryGetPropertyCaseInsensitive(el, "text", out var t) ? t.GetString() ?? string.Empty : string.Empty;
             TextStyle style = default;
             string? eq = null;
-            if (el.TryGetProperty("style", out var st) && st.ValueKind == JsonValueKind.Object)
+            if (TryGetPropertyCaseInsensitive(el, "style", out var st) && st.ValueKind == JsonValueKind.Object)
             {
                 style = LegacyStyleFromJson(st, out eq);
             }
@@ -306,7 +344,7 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
     private static TextStyle LegacyStyleFromJson(JsonElement st, out string? equationLatex)
     {
         equationLatex = null;
-        if (st.TryGetProperty("equationLatex", out var eqEl))
+        if (TryGetPropertyCaseInsensitive(st, "equationLatex", out var eqEl))
         {
             if (eqEl.ValueKind == JsonValueKind.String)
                 equationLatex = eqEl.GetString();
@@ -314,7 +352,7 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
 
         bool B(string n)
         {
-            if (!st.TryGetProperty(n, out var x)) return false;
+            if (!TryGetPropertyCaseInsensitive(st, n, out var x)) return false;
             return x.ValueKind switch
             {
                 JsonValueKind.True => true,
@@ -323,7 +361,7 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
             };
         }
         string? S(string n) =>
-            st.TryGetProperty(n, out var x) && x.ValueKind == JsonValueKind.String ? x.GetString() : null;
+            TryGetPropertyCaseInsensitive(st, n, out var x) && x.ValueKind == JsonValueKind.String ? x.GetString() : null;
 
         var highlight = B("highlight");
         var backgroundColor = S("backgroundColor");

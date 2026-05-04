@@ -264,8 +264,7 @@ public partial class OverviewViewModel : ViewModelBase, INavigationAware
     {
         await AddWidgetAsync("flashcard-stats", new WidgetPosition(0, 0)).ConfigureAwait(false);
         await AddWidgetAsync("recent-decks", new WidgetPosition(2, 0)).ConfigureAwait(false);
-        await AddWidgetAsync("usage-summary", new WidgetPosition(4, 0)).ConfigureAwait(false);
-        await AddWidgetAsync("recent-notes", new WidgetPosition(6, 0)).ConfigureAwait(false);
+        await AddWidgetAsync("recent-notes", new WidgetPosition(4, 0)).ConfigureAwait(false);
     }
 
     /// <summary>

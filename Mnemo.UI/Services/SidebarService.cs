@@ -59,7 +59,7 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
 
     private void ApplyAssistantVisibility()
     {
-        var aiOn = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        var aiOn = _settingsService.GetAsync(AiAssistantEnabledKey, false).GetAwaiter().GetResult();
         foreach (var (item, requirement) in _visibilityItems)
         {
             if (requirement == SidebarItemVisibilityRequirement.AiAssistantEnabled)
@@ -106,7 +106,7 @@ public class SidebarService : ISidebarService, INotifyPropertyChanged
         {
             _visibilityItems.Add((item, visibilityRequirement));
             if (visibilityRequirement == SidebarItemVisibilityRequirement.AiAssistantEnabled)
-                item.IsVisible = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+                item.IsVisible = _settingsService.GetAsync(AiAssistantEnabledKey, false).GetAwaiter().GetResult();
         }
 
         var itemInsertIndex = category.Items.Count;

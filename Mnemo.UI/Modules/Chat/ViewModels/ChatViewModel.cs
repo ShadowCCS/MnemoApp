@@ -83,12 +83,9 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         get => _inputText;
         set
         {
-            var wasEmpty = string.IsNullOrWhiteSpace(_inputText);
             if (SetProperty(ref _inputText, value))
             {
                 ((AsyncRelayCommand)SendMessageCommand).NotifyCanExecuteChanged();
-                if (wasEmpty && !string.IsNullOrWhiteSpace(value))
-                    WarmUpSafe();
                 _typingPrefetch.NotifyInputChanged(IsBusy, IsRecording);
             }
         }
@@ -337,7 +334,7 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
         _memorySummarizer = memorySummarizer;
         _memoryInjector = memoryInjector;
         _longTermMemoryEmbedder = longTermMemoryEmbedder;
-        _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText, () => SelectedModelRoutingMode);
+        _typingPrefetch = new ChatTypingPrefetchHelper(pauseToSendEstimator);
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(InputText) && !IsBusy && !IsRecording && _isHistoryReady);
         StopCommand = new RelayCommand(StopGeneration, () => IsBusy);
@@ -492,23 +489,6 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             OnPropertyChanged(nameof(RecordingDurationText));
             InputText = _inputTextBeforeRecording;
         });
-    }
-
-    private void WarmUpSafe()
-    {
-        _ = WarmUpAsync();
-    }
-
-    private async Task WarmUpAsync()
-    {
-        try
-        {
-            await _orchestrator.WarmUpLowTierModelAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("Chat", $"WarmUp failed: {ex}");
-        }
     }
 
     /// <summary>Called by the view when scroll position changes; updates <see cref="ShowScrollToBottomButton"/> and auto-scroll attachment.</summary>

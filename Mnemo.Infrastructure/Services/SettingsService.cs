@@ -25,14 +25,13 @@ public class SettingsService : ISettingsService
         }
 
         var result = await _storage.LoadAsync<T>(key).ConfigureAwait(false);
-        
-        if (result.IsSuccess && result.Value != null)
-        {
-            _cache[key] = result.Value;
-            return result.Value;
-        }
 
-        return defaultValue;
+        // Do not treat success+false / success+0 as "missing": only JSON null / absent key uses default.
+        if (!result.IsSuccess || result.Value is null)
+            return defaultValue;
+
+        _cache[key] = result.Value;
+        return result.Value;
     }
 
     public async Task SetAsync<T>(string key, T value)

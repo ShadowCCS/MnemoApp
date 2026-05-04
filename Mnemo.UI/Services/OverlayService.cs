@@ -45,6 +45,9 @@ public class OverlayService : IOverlayService
 
     public void CloseOverlay(string id, object? result)
     {
+        foreach (var childId in Overlays.Where(o => o.Options.ParentOverlayId == id).Select(o => o.Id).ToList())
+            CloseOverlay(childId, null);
+
         var overlay = Overlays.FirstOrDefault(o => o.Id == id);
         if (overlay != null)
         {

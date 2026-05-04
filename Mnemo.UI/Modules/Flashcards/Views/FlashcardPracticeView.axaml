@@ -16,6 +16,7 @@
 
     <UserControl.Resources>
         <conv:LocalPathToBitmapConverter x:Key="LocalPathToBitmapConverter" />
+        <conv:FlashcardImageAlignToHorizontalAlignmentConverter x:Key="FlashcardImageAlignConverter" />
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -269,38 +270,106 @@
                             IsVisible="{Binding ShowActivePractice}">
                     <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" CornerRadius="22"
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="0"
-                            MinWidth="620" Width="760" MinHeight="320" MaxHeight="420"
+                            MinWidth="620" Width="760" MinHeight="320" MaxHeight="620"
                             BoxShadow="0 16 40 -24 #45000000">
                         <Grid RowDefinitions="*,Auto">
                         <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="32">
                         <StackPanel Spacing="0">
-                            <!-- Front side: always visible while the card is active. Markdown view + image carousel
-                                 live in the same stack so spacing is consistent whether the card has text, images,
-                                 or both. -->
+                            <!-- Front: SplitView when text + images; otherwise full-width text or image-only panel. -->
                             <StackPanel Spacing="16" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                                 <TextBlock Classes="practiceFieldLabel"
                                            Text="{markup:T Ns=Flashcards, Key=FieldFront}"
                                            Foreground="{DynamicResource DestructiveButtonColorBrush}" />
-                                <blockEditor:RichTextEditor IsReadOnly="True"
-                                                            IsHitTestVisible="False"
-                                                            Cursor="Arrow"
-                                                            Spans="{Binding CurrentFrontSpans}"
-                                                            HorizontalAlignment="Stretch" />
-                                <ItemsControl ItemsSource="{Binding CurrentFrontImages}"
-                                              IsVisible="{Binding HasFrontImages}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Spacing="12" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="vm:FlashcardPracticeImage">
-                                            <Image MaxHeight="180" MaxWidth="660" Stretch="Uniform"
-                                                   HorizontalAlignment="Center"
-                                                   Source="{Binding Path, Converter={StaticResource LocalPathToBitmapConverter}}" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+
+                                <SplitView DisplayMode="Inline"
+                                           PanePlacement="Right"
+                                           IsPaneOpen="True"
+                                           OpenPaneLength="304"
+                                           CompactPaneLength="0"
+                                           Background="Transparent"
+                                           PaneBackground="Transparent"
+                                           MinHeight="280"
+                                           IsVisible="{Binding UseFrontTextImageSplit}">
+                                    <SplitView.Content>
+                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                                      VerticalScrollBarVisibility="Auto"
+                                                      Padding="0,0,12,0">
+                                            <blockEditor:RichTextEditor IsReadOnly="True"
+                                                                        IsHitTestVisible="False"
+                                                                        Cursor="Arrow"
+                                                                        Spans="{Binding CurrentFrontSpans}"
+                                                                        HorizontalAlignment="Stretch" />
+                                        </ScrollViewer>
+                                    </SplitView.Content>
+                                    <SplitView.Pane>
+                                        <Border BorderBrush="{DynamicResource BorderBrush}"
+                                                BorderThickness="1,0,0,0"
+                                                Padding="12,0,0,0">
+                                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                                          VerticalScrollBarVisibility="Auto">
+                                                <StackPanel Spacing="10">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding HasMultipleFrontImages}">
+                                                        <Button Grid.Column="0" Classes="ghost" Padding="4,2"
+                                                                Command="{Binding FrontImagePreviousCommand}">
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                                                              Width="13" Height="13"
+                                                                              Color="{DynamicResource TextSecondaryBrush}" />
+                                                        </Button>
+                                                        <TextBlock Grid.Column="1" Text="{Binding FrontImageCarouselLabel}"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                        <Button Grid.Column="2" Classes="ghost" Padding="4,2"
+                                                                Command="{Binding FrontImageNextCommand}">
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                                              Width="13" Height="13"
+                                                                              Color="{DynamicResource TextSecondaryBrush}" />
+                                                        </Button>
+                                                    </Grid>
+                                                    <Border ClipToBounds="True" HorizontalAlignment="Stretch" CornerRadius="8">
+                                                        <Image MaxHeight="320" Stretch="Uniform"
+                                                               HorizontalAlignment="{Binding CurrentFrontPracticeImage.Align, Converter={StaticResource FlashcardImageAlignConverter}}"
+                                                               Source="{Binding CurrentFrontPracticeImage.Path, Converter={StaticResource LocalPathToBitmapConverter}}" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </SplitView.Pane>
+                                </SplitView>
+
+                                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto"
+                                              IsVisible="{Binding ShowFrontTextOnly}">
+                                    <blockEditor:RichTextEditor IsReadOnly="True"
+                                                                IsHitTestVisible="False"
+                                                                Cursor="Arrow"
+                                                                Spans="{Binding CurrentFrontSpans}"
+                                                                HorizontalAlignment="Stretch" />
+                                </ScrollViewer>
+
+                                <StackPanel Spacing="10" IsVisible="{Binding ShowFrontImageOnly}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding HasMultipleFrontImages}">
+                                        <Button Grid.Column="0" Classes="ghost" Padding="4,2"
+                                                Command="{Binding FrontImagePreviousCommand}">
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                                              Width="13" Height="13"
+                                                              Color="{DynamicResource TextSecondaryBrush}" />
+                                        </Button>
+                                        <TextBlock Grid.Column="1" Text="{Binding FrontImageCarouselLabel}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <Button Grid.Column="2" Classes="ghost" Padding="4,2"
+                                                Command="{Binding FrontImageNextCommand}">
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                              Width="13" Height="13"
+                                                              Color="{DynamicResource TextSecondaryBrush}" />
+                                        </Button>
+                                    </Grid>
+                                    <Border ClipToBounds="True" HorizontalAlignment="Stretch" MaxWidth="696" CornerRadius="8">
+                                        <Image MaxHeight="280" Stretch="Uniform"
+                                               HorizontalAlignment="{Binding CurrentFrontPracticeImage.Align, Converter={StaticResource FlashcardImageAlignConverter}}"
+                                               Source="{Binding CurrentFrontPracticeImage.Path, Converter={StaticResource LocalPathToBitmapConverter}}" />
+                                    </Border>
+                                </StackPanel>
                             </StackPanel>
 
                             <!-- Reveal divider + back side. Wrapping both in an outer container bound to IsFlipped
@@ -313,26 +382,96 @@
                                     <TextBlock Classes="practiceFieldLabel"
                                                Text="{markup:T Ns=Flashcards, Key=FieldBack}"
                                                Foreground="{DynamicResource SystemSuccessBackgroundBrush}" />
-                                    <blockEditor:RichTextEditor IsReadOnly="True"
-                                                                IsHitTestVisible="False"
-                                                                Cursor="Arrow"
-                                                                Spans="{Binding CurrentBackSpans}"
-                                                                HorizontalAlignment="Stretch" />
-                                    <ItemsControl ItemsSource="{Binding CurrentBackImages}"
-                                                  IsVisible="{Binding HasBackImages}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Spacing="12" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate DataType="vm:FlashcardPracticeImage">
-                                                <Image MaxHeight="180" MaxWidth="660" Stretch="Uniform"
-                                                       HorizontalAlignment="Center"
-                                                       Source="{Binding Path, Converter={StaticResource LocalPathToBitmapConverter}}" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+
+                                    <SplitView DisplayMode="Inline"
+                                               PanePlacement="Right"
+                                               IsPaneOpen="True"
+                                               OpenPaneLength="304"
+                                               CompactPaneLength="0"
+                                               Background="Transparent"
+                                               PaneBackground="Transparent"
+                                               MinHeight="280"
+                                               IsVisible="{Binding UseBackTextImageSplit}">
+                                        <SplitView.Content>
+                                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                                          VerticalScrollBarVisibility="Auto"
+                                                          Padding="0,0,12,0">
+                                                <blockEditor:RichTextEditor IsReadOnly="True"
+                                                                            IsHitTestVisible="False"
+                                                                            Cursor="Arrow"
+                                                                            Spans="{Binding CurrentBackSpans}"
+                                                                            HorizontalAlignment="Stretch" />
+                                            </ScrollViewer>
+                                        </SplitView.Content>
+                                        <SplitView.Pane>
+                                            <Border BorderBrush="{DynamicResource BorderBrush}"
+                                                    BorderThickness="1,0,0,0"
+                                                    Padding="12,0,0,0">
+                                                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                                              VerticalScrollBarVisibility="Auto">
+                                                    <StackPanel Spacing="10">
+                                                        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding HasMultipleBackImages}">
+                                                            <Button Grid.Column="0" Classes="ghost" Padding="4,2"
+                                                                    Command="{Binding BackImagePreviousCommand}">
+                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                                                                  Width="13" Height="13"
+                                                                                  Color="{DynamicResource TextSecondaryBrush}" />
+                                                            </Button>
+                                                            <TextBlock Grid.Column="1" Text="{Binding BackImageCarouselLabel}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                            <Button Grid.Column="2" Classes="ghost" Padding="4,2"
+                                                                    Command="{Binding BackImageNextCommand}">
+                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                                                  Width="13" Height="13"
+                                                                                  Color="{DynamicResource TextSecondaryBrush}" />
+                                                            </Button>
+                                                        </Grid>
+                                                        <Border ClipToBounds="True" HorizontalAlignment="Stretch" CornerRadius="8">
+                                                            <Image MaxHeight="320" Stretch="Uniform"
+                                                                   HorizontalAlignment="{Binding CurrentBackPracticeImage.Align, Converter={StaticResource FlashcardImageAlignConverter}}"
+                                                                   Source="{Binding CurrentBackPracticeImage.Path, Converter={StaticResource LocalPathToBitmapConverter}}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </ScrollViewer>
+                                            </Border>
+                                        </SplitView.Pane>
+                                    </SplitView>
+
+                                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  IsVisible="{Binding ShowBackTextOnly}">
+                                        <blockEditor:RichTextEditor IsReadOnly="True"
+                                                                    IsHitTestVisible="False"
+                                                                    Cursor="Arrow"
+                                                                    Spans="{Binding CurrentBackSpans}"
+                                                                    HorizontalAlignment="Stretch" />
+                                    </ScrollViewer>
+
+                                    <StackPanel Spacing="10" IsVisible="{Binding ShowBackImageOnly}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding HasMultipleBackImages}">
+                                            <Button Grid.Column="0" Classes="ghost" Padding="4,2"
+                                                    Command="{Binding BackImagePreviousCommand}">
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                                                  Width="13" Height="13"
+                                                                  Color="{DynamicResource TextSecondaryBrush}" />
+                                            </Button>
+                                            <TextBlock Grid.Column="1" Text="{Binding BackImageCarouselLabel}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                            <Button Grid.Column="2" Classes="ghost" Padding="4,2"
+                                                    Command="{Binding BackImageNextCommand}">
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                                  Width="13" Height="13"
+                                                                  Color="{DynamicResource TextSecondaryBrush}" />
+                                            </Button>
+                                        </Grid>
+                                        <Border ClipToBounds="True" HorizontalAlignment="Stretch" MaxWidth="696" CornerRadius="8">
+                                            <Image MaxHeight="280" Stretch="Uniform"
+                                                   HorizontalAlignment="{Binding CurrentBackPracticeImage.Align, Converter={StaticResource FlashcardImageAlignConverter}}"
+                                                   Source="{Binding CurrentBackPracticeImage.Path, Converter={StaticResource LocalPathToBitmapConverter}}" />
+                                        </Border>
+                                    </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>

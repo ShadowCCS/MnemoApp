@@ -1517,6 +1517,7 @@ public partial class EditableBlock : UserControl
         }
 
         _formattingToolbarOverlayId = _overlayService.CreateOverlay(toolbar, options, "InlineFormattingToolbar");
+        toolbar.SetHostingToolbarOverlayId(_formattingToolbarOverlayId);
         AttachToolbarOutsideClickHandler(textBox);
         Dispatcher.UIThread.Post(UpdateFormattingToolbarState, DispatcherPriority.Loaded);
     }

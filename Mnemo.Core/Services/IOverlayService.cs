@@ -35,6 +35,8 @@ public class OverlayOptions
     public object? BackdropBrush { get; set; }
     public string? BackdropColor { get; set; }
     public double BackdropOpacity { get; set; } = 0.5;
+    /// <summary>When set, closing the overlay with this id also closes this overlay (nested popup).</summary>
+    public string? ParentOverlayId { get; set; }
 }
 
 public class OverlayInstance : INotifyPropertyChanged

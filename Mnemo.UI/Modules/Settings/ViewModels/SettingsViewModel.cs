@@ -270,7 +270,7 @@ public partial class SettingsViewModel : ViewModelBase
             "AI.EnableAssistant",
             T("EnableAIAssistant"),
             T("EnableAIAssistantDescription"),
-            true,
+            false,
             aiInstalled));
         aiGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Chat.WipeInputForDictation", T("WipeInputForDictation"), T("WipeInputForDictationDescription"), false, aiInstalled));
         aiGroup.Items.Add(new DropdownSettingViewModel(

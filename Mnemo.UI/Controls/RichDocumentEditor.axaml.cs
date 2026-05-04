@@ -691,7 +691,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
 
         var imageTokenText = new StringBuilder();
         foreach (var (path, align) in _imageEntries)
-            imageTokenText.Append($"![image]({path}){{align={align}}}");
+            imageTokenText.Append($"![]({path}){{align={align}}}");
 
         var combined = new List<InlineSpan>(textOnlySpans) { InlineSpan.Plain(imageTokenText.ToString()) };
         return InlineSpanFormatApplier.Normalize(combined);
@@ -1004,6 +1004,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
         SetSelectedClass(PreviewModeButton, IsPreviewMode);
         Editor.IsVisible = !IsPreviewMode;
         Editor.IsHitTestVisible = !IsPreviewMode;
+        Editor.IsSpellcheckDecorationsEnabled = !IsPreviewMode;
         PreviewHost.IsVisible = IsPreviewMode;
         PreviewHost.IsHitTestVisible = IsPreviewMode;
     }

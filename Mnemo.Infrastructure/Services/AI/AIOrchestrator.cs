@@ -15,7 +15,6 @@ public class AIOrchestrator : IAIOrchestrator
 {
     private static readonly TimeSpan ModelListCacheTtl = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PrefetchRoutingCacheTtl = TimeSpan.FromSeconds(45);
-    private static readonly TimeSpan MinHeavyChatWarmSwitchInterval = TimeSpan.FromSeconds(2.5);
 
     /// <summary>Attempts for <see cref="IOrchestrationLayer.RouteAndClassifySkillAsync"/> before falling back to the low-tier model.</summary>
     private const int MaxRoutingAttempts = 3;
@@ -30,7 +29,6 @@ public class AIOrchestrator : IAIOrchestrator
     private readonly ILoggerService _logger;
     private readonly IResourceGovernor _governor;
     private readonly ITextGenerationService _textService;
-    private readonly IAIServerManager _serverManager;
     private readonly IOrchestrationLayer _orchestrationLayer;
     private readonly ISkillRegistry _skillRegistry;
     private readonly ISkillSystemPromptComposer _skillSystemPromptComposer;
@@ -53,10 +51,6 @@ public class AIOrchestrator : IAIOrchestrator
     private RoutingAndSkillDecision? _prefetchRoutingDecision;
     private DateTime _prefetchUtc = DateTime.MinValue;
 
-    private readonly object _prefetchWarmupThrottleLock = new();
-    private DateTime _lastHeavyChatWarmUtc = DateTime.MinValue;
-    private string? _lastHeavyChatWarmModelId;
-
     private HardwarePerformanceTier? _cachedRoutingTier;
 
     public AIOrchestrator(
@@ -66,7 +60,6 @@ public class AIOrchestrator : IAIOrchestrator
         ILoggerService logger,
         IResourceGovernor governor,
         ITextGenerationService textService,
-        IAIServerManager serverManager,
         IOrchestrationLayer orchestrationLayer,
         ISkillRegistry skillRegistry,
         ISkillSystemPromptComposer skillSystemPromptComposer,
@@ -86,7 +79,6 @@ public class AIOrchestrator : IAIOrchestrator
         _logger = logger;
         _governor = governor;
         _textService = textService;
-        _serverManager = serverManager;
         _orchestrationLayer = orchestrationLayer;
         _skillRegistry = skillRegistry;
         _skillSystemPromptComposer = skillSystemPromptComposer;
@@ -1078,92 +1070,13 @@ public class AIOrchestrator : IAIOrchestrator
         return (reasoning, decision);
     }
 
-    public async Task PrefetchRoutingAndWarmupAsync(string routingUserMessage, string? modelRoutingMode = null, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(routingUserMessage))
-            return;
-
-        var (resolution, routingDecision) = await ResolveRoutingTargetModelAsync(
-            routingUserMessage,
-            ct,
-            pipelineStatus: null,
-            precomputedDecision: null,
-            routingToolHint: null,
-            conversationRoutingKey: null,
-            modelRoutingModeOverride: modelRoutingMode).ConfigureAwait(false);
-        if (resolution.Model == null)
-            return;
-
-        if (TeacherSyntheticManifest.IsTeacher(resolution.Model))
-        {
-            SetPrefetchRoutingCache(routingUserMessage, resolution, routingDecision);
-            return;
-        }
-
-        if (resolution.RoutingComplexity == RoutingComplexity.Reasoning
-            && string.Equals(resolution.ManagerConfidence, "low", StringComparison.OrdinalIgnoreCase)
-            && IsHeavyChatModel(resolution.Model))
-        {
-            _logger.Debug("AIOrchestrator", "Skipping prefetch routing cache and warm-up (manager confidence low for reasoning; would load mid/high tier).");
-            return;
-        }
-
-        SetPrefetchRoutingCache(routingUserMessage, resolution, routingDecision);
-
-        if (ShouldThrottleHeavyPrefetchWarm(resolution.Model))
-        {
-            _logger.Debug("AIOrchestrator", "Deferring heavy chat model prefetch warm-up (rapid switch throttle).");
-            return;
-        }
-
-        try
-        {
-            await _serverManager.EnsureRunningAsync(resolution.Model, ct).ConfigureAwait(false);
-            RecordHeavyPrefetchWarm(resolution.Model);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning("AIOrchestrator", $"Prefetch warm-up failed: {ex.Message}");
-        }
-    }
-
-    private static bool IsHeavyChatModel(AIModelManifest model)
-    {
-        var role = model.Role;
-        return role == AIModelRoles.Mid || role == AIModelRoles.High;
-    }
-
-    private bool ShouldThrottleHeavyPrefetchWarm(AIModelManifest model)
-    {
-        if (!IsHeavyChatModel(model))
-            return false;
-
-        lock (_prefetchWarmupThrottleLock)
-        {
-            var now = DateTime.UtcNow;
-            if (_lastHeavyChatWarmUtc != DateTime.MinValue
-                && now - _lastHeavyChatWarmUtc < MinHeavyChatWarmSwitchInterval
-                && _lastHeavyChatWarmModelId != null
-                && _lastHeavyChatWarmModelId != model.Id)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private void RecordHeavyPrefetchWarm(AIModelManifest model)
-    {
-        if (!IsHeavyChatModel(model))
-            return;
-
-        lock (_prefetchWarmupThrottleLock)
-        {
-            _lastHeavyChatWarmUtc = DateTime.UtcNow;
-            _lastHeavyChatWarmModelId = model.Id;
-        }
-    }
+    /// <inheritdoc />
+    /// <remarks>
+    /// Routing prefetch that touched local llama was removed so servers start on first Send/generation.
+    /// Routing cache fields remain for any future opt-in or external callers.
+    /// </remarks>
+    public Task PrefetchRoutingAndWarmupAsync(string routingUserMessage, string? modelRoutingMode = null, CancellationToken ct = default)
+        => Task.CompletedTask;
 
     private RoutingResolution WithSkillInjectionOverride(RoutingResolution r, string? conversationKey)
     {
@@ -1177,12 +1090,12 @@ public class AIOrchestrator : IAIOrchestrator
         var sid = skillOverride.Trim();
         if (string.IsNullOrWhiteSpace(sid) || string.Equals(sid, "NONE", StringComparison.OrdinalIgnoreCase))
         {
-        return r with
-        {
-            SkillId = "NONE",
-            ResolvedSkillIds = new[] { "NONE" },
-            InjectionContext = _skillRegistry.GetInjection("NONE")
-        };
+            return r with
+            {
+                SkillId = "NONE",
+                ResolvedSkillIds = new[] { "NONE" },
+                InjectionContext = _skillRegistry.GetInjection("NONE")
+            };
         }
 
         return r with
@@ -1373,43 +1286,10 @@ public class AIOrchestrator : IAIOrchestrator
         return string.IsNullOrEmpty(first) ? "NONE" : first;
     }
 
-    public async Task WarmUpLowTierModelAsync(CancellationToken ct = default)
+    public Task WarmUpLowTierModelAsync(CancellationToken ct = default)
     {
-        var teacherMain = await _settings.GetAsync(TeacherModelSettings.UseTeacherMainChatKey, false).ConfigureAwait(false)
-            && await _teacherClient.IsConfiguredAsync(ct).ConfigureAwait(false);
-        var teacherRouting = await _settings.GetAsync(TeacherModelSettings.UseTeacherRoutingKey, false).ConfigureAwait(false)
-            && await _teacherClient.IsConfiguredAsync(ct).ConfigureAwait(false);
-
-        var models = (await _modelRegistry.GetAvailableModelsAsync().ConfigureAwait(false)).ToList();
-        var manager = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == AIModelRoles.Manager);
-        var lowModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == AIModelRoles.Low);
-
-        if (manager != null && !teacherRouting)
-        {
-            try
-            {
-                await _serverManager.EnsureRunningAsync(manager, ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger.Warning("AIOrchestrator", $"Orchestration model warm-up failed: {ex.Message}");
-            }
-        }
-
-        if (teacherMain)
-            return;
-
-        if (lowModel == null)
-            return;
-
-        try
-        {
-            await _serverManager.EnsureRunningAsync(lowModel, ct).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning("AIOrchestrator", $"Low-tier model warm-up failed: {ex.Message}");
-        }
+        // Local llama-server processes start on first chat Send / generation path (LlamaCppHttpTextService.EnsureRunningAsync).
+        return Task.CompletedTask;
     }
 
     private async Task<Result<string>> ExecutePromptAsync(string systemPrompt, string userPrompt, CancellationToken ct, object? responseJsonSchema = null)

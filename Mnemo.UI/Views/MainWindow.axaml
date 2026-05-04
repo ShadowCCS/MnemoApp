@@ -78,8 +78,9 @@
                               Height="22"/>
         </Button>
 
-        <!-- Global Overlay Layer -->
-        <components:OverlayPopupHost HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+        <!-- Global Overlay Layer (ZIndex above extended client area / siblings) -->
+        <components:OverlayPopupHost ZIndex="10000"
+                                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                      DataContext="{Binding OverlayService}"/>
     </Grid>
 </Border>

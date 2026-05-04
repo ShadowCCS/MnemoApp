@@ -4,9 +4,11 @@
              xmlns:conv="using:Mnemo.UI.Converters"
              x:Class="Mnemo.UI.Components.OverlayPopupHost"
              x:DataType="services:IOverlayService"
+             x:CompileBindings="False"
+             ZIndex="9999"
              KeyDown="OnKeyDown">
   <UserControl.Styles>
-    <Style Selector="UserControl#OverlayPopupHostRoot">
+    <Style Selector="Grid#OverlayPopupHostRoot">
       <Setter Property="ZIndex" Value="9999"/>
     </Style>
   </UserControl.Styles>

@@ -242,16 +242,6 @@
             <Setter Property="Background" Value="{DynamicResource AccentPrimaryBrush}" />
             <Setter Property="Opacity" Value="1" />
         </Style>
-        <Style Selector="TextBlock.retention-trend-point-value">
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-            <Setter Property="FontSize" Value="10" />
-            <Setter Property="FontFamily" Value="{DynamicResource Font.SemiBold}" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Top" />
-        </Style>
-        <Style Selector="TextBlock.retention-trend-point-value.latest">
-            <Setter Property="Foreground" Value="{DynamicResource AccentPrimaryBrush}" />
-        </Style>
         <Style Selector="TextBlock.retention-trend-empty-text">
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
             <Setter Property="FontSize" Value="{DynamicResource FontSize.Body.Small}" />
@@ -400,12 +390,6 @@
                                                         Classes.latest="{Binding IsLatest}"
                                                         IsVisible="{Binding HasReviews}"
                                                         VerticalAlignment="Bottom" />
-                                                <TextBlock Classes="retention-trend-point-value"
-                                                           Classes.latest="{Binding IsLatest}"
-                                                           IsVisible="{Binding IsLatest}"
-                                                           Text="{Binding Percent, StringFormat='{}{0}%'}"
-                                                           VerticalAlignment="Bottom"
-                                                           Margin="0,0,0,16" />
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

@@ -51,7 +51,7 @@ public partial class RightSidebarViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowFloatingOpenButton))]
     [NotifyPropertyChangedFor(nameof(ShowResizeHandle))]
-    private bool _isAiAssistantEnabled = true;
+    private bool _isAiAssistantEnabled;
 
     public bool ShowFloatingOpenButton => IsAiAssistantEnabled && IsCollapsed;
 
@@ -103,7 +103,7 @@ public partial class RightSidebarViewModel : ViewModelBase
         _skillSystemPromptComposer = skillSystemPromptComposer;
         _chatDatasetLogger = chatDatasetLogger;
         _routingToolHintStore = routingToolHintStore;
-        _typingPrefetch = new ChatTypingPrefetchHelper(orchestrator, pauseToSendEstimator, logger, () => InputText, () => SelectedModelRoutingMode);
+        _typingPrefetch = new ChatTypingPrefetchHelper(pauseToSendEstimator);
 
         ToggleCommand = new RelayCommand(() =>
         {
@@ -116,7 +116,7 @@ public partial class RightSidebarViewModel : ViewModelBase
         NewChatCommand = new RelayCommand(NewChat);
         SuggestionSelectedCommand = new RelayCommand<string>(ApplySuggestion);
 
-        IsAiAssistantEnabled = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        IsAiAssistantEnabled = _settingsService.GetAsync(AiAssistantEnabledKey, false).GetAwaiter().GetResult();
         _settingsService.SettingChanged += OnSettingsChanged;
 
         Messages.Add(CreateWelcomeMessage());
@@ -126,7 +126,7 @@ public partial class RightSidebarViewModel : ViewModelBase
     {
         if (key != AiAssistantEnabledKey)
             return;
-        IsAiAssistantEnabled = _settingsService.GetAsync(AiAssistantEnabledKey, true).GetAwaiter().GetResult();
+        IsAiAssistantEnabled = _settingsService.GetAsync(AiAssistantEnabledKey, false).GetAwaiter().GetResult();
         if (!IsAiAssistantEnabled)
             IsCollapsed = true;
     }
@@ -148,26 +148,7 @@ public partial class RightSidebarViewModel : ViewModelBase
 
     partial void OnInputTextChanged(string value)
     {
-        if (!string.IsNullOrWhiteSpace(value))
-            WarmUpSafe();
         _typingPrefetch.NotifyInputChanged(IsBusy, isRecording: false);
-    }
-
-    private void WarmUpSafe()
-    {
-        _ = WarmUpAsync();
-    }
-
-    private async Task WarmUpAsync()
-    {
-        try
-        {
-            await _orchestrator.WarmUpLowTierModelAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("RightSidebar", $"WarmUp failed: {ex}");
-        }
     }
 
     private void StopGeneration()

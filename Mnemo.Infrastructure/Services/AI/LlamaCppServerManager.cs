@@ -47,6 +47,9 @@ public class LlamaCppServerManager : IAIServerManager
 
     private int _disposed;
 
+    /// <summary>Runs <see cref="KillLeftoversFromPreviousSession"/> once before any server is started (was ctor work moved here for faster UI).</summary>
+    private int _previousSessionCleanupDone;
+
     public LlamaCppServerManager(
         ILoggerService logger,
         ISettingsService settings,
@@ -63,8 +66,6 @@ public class LlamaCppServerManager : IAIServerManager
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "mnemo",
             "llama-servers.json");
-
-        KillLeftoversOnStartup();
 
         _cleanupTimer = new Timer(CleanupIdleServers, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
 
@@ -109,6 +110,8 @@ public class LlamaCppServerManager : IAIServerManager
         {
             throw new InvalidOperationException($"Model {manifest.DisplayName} has no endpoint configured.");
         }
+
+        EnsurePreviousSessionCleanupDoneOnce();
 
         var modelFile = ResolveModelPath(manifest);
         var mmprojFile = ResolveMmprojPath(manifest);
@@ -278,7 +281,14 @@ public class LlamaCppServerManager : IAIServerManager
         return useGpu;
     }
 
-    private void KillLeftoversOnStartup()
+    private void EnsurePreviousSessionCleanupDoneOnce()
+    {
+        if (Interlocked.CompareExchange(ref _previousSessionCleanupDone, 1, 0) != 0)
+            return;
+        KillLeftoversFromPreviousSession();
+    }
+
+    private void KillLeftoversFromPreviousSession()
     {
         List<LlamaServerRegistryEntry> entries;
         try

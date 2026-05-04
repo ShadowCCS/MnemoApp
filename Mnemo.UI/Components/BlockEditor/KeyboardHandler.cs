@@ -99,13 +99,15 @@ public class KeyboardHandler
 
         if (viewModel.Type == BlockType.Quote)
         {
+            // Empty line in quote: structural exit to a new text block (HandleEnterPressed + QuoteEnterBehavior).
+            // Non-empty line: soft newline inside the same quote (same as Ctrl/Cmd+Enter elsewhere).
             if (selectionLength == 0 && QuoteEnterBehavior.IsCaretOnWhitespaceOnlyLine(text, caretIndex))
             {
                 EnterPressed?.Invoke();
                 return;
             }
 
-            EnterPressed?.Invoke();
+            editor.InsertTextAtCaret("\n");
             return;
         }
 

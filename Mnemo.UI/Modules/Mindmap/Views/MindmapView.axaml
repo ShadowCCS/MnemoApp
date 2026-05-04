@@ -187,7 +187,7 @@
                              IsHitTestVisible="{Binding IsSelected}">
                         <TextBox.IsReadOnly>
                             <MultiBinding Converter="{StaticResource PreviewOrUnselectedConverter}">
-                                <Binding ElementName="MindmapViewControl" Path="DataContext.IsPreviewMode"/>
+                                <Binding ElementName="MindmapViewControl" Path="DataContext.IsPreviewMode" FallbackValue="False"/>
                                 <Binding Path="IsSelected"/>
                             </MultiBinding>
                         </TextBox.IsReadOnly>
@@ -300,9 +300,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:EdgeViewModel">
                                 <Canvas IsVisible="{Binding IsHidden, Converter={StaticResource BoolNegationConverter}}">
-                                    <Path Stroke="Transparent" StrokeThickness="12" IsHitTestVisible="True"
-                                          Cursor="Hand" PointerEntered="OnEdgePointerEnter" PointerExited="OnEdgePointerLeave"
-                                          PointerPressed="OnEdgeHitPathPointerPressed">
+                                    <Path Stroke="Transparent" StrokeThickness="12" IsHitTestVisible="True">
                                         <Path.Data>
                                             <PathGeometry>
                                                 <PathFigure StartPoint="{Binding StartPoint}" IsClosed="False">
@@ -320,14 +318,11 @@
                                             Background="{DynamicResource CardBackgroundSecondaryBrush}"
                                             BorderBrush="{DynamicResource BorderBrush}"
                                             BorderThickness="1" CornerRadius="4"
-                                            MinWidth="60" MinHeight="22" Padding="6,2"
-                                            PointerEntered="OnEdgePointerEnter" PointerExited="OnEdgePointerLeave"
-                                            PointerPressed="OnEdgeLabelPointerPressed"
-                                            Cursor="Hand">
+                                            MinWidth="60" MinHeight="22" Padding="6,2">
                                         <Border.IsVisible>
                                             <MultiBinding Converter="{StaticResource BoolAndConverter}">
                                                 <Binding Path="Label" Converter="{StaticResource NotNullToBoolConverter}"/>
-                                                <Binding ElementName="MindmapViewControl" Path="DataContext.ShowEdgeLabels"/>
+                                                <Binding ElementName="MindmapViewControl" Path="DataContext.ShowEdgeLabels" FallbackValue="True"/>
                                             </MultiBinding>
                                         </Border.IsVisible>
                                         <Border.RenderTransform>
@@ -343,7 +338,6 @@
                                                  Background="Transparent" BorderThickness="0"
                                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                                  FontSize="11" MinWidth="48" MinHeight="18"
-                                                 PointerPressed="OnEdgeLabelPointerPressed"
                                                  LostFocus="OnEdgeLabelLostFocus"/>
                                     </Border>
                                 </Canvas>
@@ -775,7 +769,7 @@
                                         <Path.IsVisible>
                                             <MultiBinding Converter="{StaticResource MinimapHiddenVisibilityConverter}">
                                                 <Binding Path="IsHidden"/>
-                                                <Binding ElementName="MindmapViewControl" Path="DataContext.ShowCollapsedNodesOnMinimap"/>
+                                                <Binding ElementName="MindmapViewControl" Path="ShowCollapsedNodesOnMinimapBinding"/>
                                             </MultiBinding>
                                         </Path.IsVisible>
                                         <Path.Data>
@@ -816,7 +810,7 @@
                                         <Border.IsVisible>
                                             <MultiBinding Converter="{StaticResource MinimapHiddenVisibilityConverter}">
                                                 <Binding Path="IsHidden"/>
-                                                <Binding ElementName="MindmapViewControl" Path="DataContext.ShowCollapsedNodesOnMinimap"/>
+                                                <Binding ElementName="MindmapViewControl" Path="ShowCollapsedNodesOnMinimapBinding"/>
                                             </MultiBinding>
                                         </Border.IsVisible>
                                     </Border>

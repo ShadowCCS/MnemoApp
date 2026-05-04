@@ -64,16 +64,10 @@ public interface IAIOrchestrator
     /// <param name="responseJsonSchema">Optional. When set, server is asked to return JSON matching this schema (Llama forced output; same mechanism as the manager model).</param>
     Task<Result<string>> PromptWithContextAsync(string systemPrompt, string prompt, IEnumerable<KnowledgeChunk> context, CancellationToken ct = default, object? responseJsonSchema = null);
 
-    /// <summary>Starts the low-tier chat model server if not already running, to reduce first-request latency when the user starts typing in chat.</summary>
+    /// <summary>Reserved; local llama-server processes start on first chat Send / generation.</summary>
     Task WarmUpLowTierModelAsync(CancellationToken ct = default);
 
-    /// <summary>
-    /// Runs the same routing as send-time selection for <paramref name="routingUserMessage"/>, caches the result for a short window
-    /// when appropriate, and may start the chosen model server. Skips mid/high warm-up when manager confidence is low for reasoning
-    /// (low-tier hardware still prefetches the low model),
-    /// and throttles rapid switches between heavy models. Send-time selection accepts the cache when the draft is still close (edit distance).
-    /// </summary>
-    /// <param name="modelRoutingMode">When Simple or Reasoning, matches send-time override for prefetch cache and warm-up.</param>
+    /// <summary>Reserved; routing prefetch that started local models was removed.</summary>
     Task PrefetchRoutingAndWarmupAsync(string routingUserMessage, string? modelRoutingMode = null, CancellationToken ct = default);
 }
 

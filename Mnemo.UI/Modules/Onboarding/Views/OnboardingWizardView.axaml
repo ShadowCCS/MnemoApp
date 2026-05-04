@@ -77,9 +77,9 @@
       <!-- RIGHT PANE: Interactive Content & Buttons -->
       <Border Grid.Column="1" Background="{DynamicResource OverlayBackgroundBrush}">
         <Grid RowDefinitions="*,Auto" Margin="32,32,32,32">
-          <!-- Welcome: full-area centered showcase image -->
+          <!-- Welcome -->
           <Grid Grid.Row="0" IsVisible="{Binding IsWelcomeStep}">
-            <Image Source="avares://Mnemo.UI/Modules/Onboarding/Assets/showcase.png"
+            <Image Source="avares://Mnemo.UI/Assets/Branding/showcase.png"
                    Stretch="Uniform"
                    MaxWidth="480"
                    MaxHeight="320"

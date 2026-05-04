@@ -108,6 +108,16 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     [ObservableProperty]
     private int _easyCount;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentFrontPracticeImage))]
+    [NotifyPropertyChangedFor(nameof(FrontImageCarouselLabel))]
+    private int _frontPracticeImageIndex;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentBackPracticeImage))]
+    [NotifyPropertyChangedFor(nameof(BackImageCarouselLabel))]
+    private int _backPracticeImageIndex;
+
     public Flashcard? CurrentCard =>
         _queue.Count > 0 && CurrentIndex >= 0 && CurrentIndex < _queue.Count
             ? _queue[CurrentIndex]
@@ -169,6 +179,43 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
     public bool HasFrontImages => CurrentFrontImages.Count > 0;
 
     public bool HasBackImages => CurrentBackImages.Count > 0;
+
+    public FlashcardPracticeImage? CurrentFrontPracticeImage =>
+        CurrentFrontImages.Count == 0
+            ? null
+            : CurrentFrontImages[Math.Clamp(FrontPracticeImageIndex, 0, CurrentFrontImages.Count - 1)];
+
+    public FlashcardPracticeImage? CurrentBackPracticeImage =>
+        CurrentBackImages.Count == 0
+            ? null
+            : CurrentBackImages[Math.Clamp(BackPracticeImageIndex, 0, CurrentBackImages.Count - 1)];
+
+    public bool HasMultipleFrontImages => CurrentFrontImages.Count > 1;
+
+    public bool HasMultipleBackImages => CurrentBackImages.Count > 1;
+
+    public string FrontImageCarouselLabel =>
+        CurrentFrontImages.Count <= 1 ? string.Empty : $"{FrontPracticeImageIndex + 1} / {CurrentFrontImages.Count}";
+
+    public string BackImageCarouselLabel =>
+        CurrentBackImages.Count <= 1 ? string.Empty : $"{BackPracticeImageIndex + 1} / {CurrentBackImages.Count}";
+
+    /// <summary>Whether the front has visible text besides embedded images (drives stacked vs split layout).</summary>
+    public bool HasFrontPracticeBodyText => HasNonWhitespacePracticeText(CurrentFrontSpans);
+
+    public bool HasBackPracticeBodyText => HasNonWhitespacePracticeText(CurrentBackSpans);
+
+    public bool UseFrontTextImageSplit => HasFrontImages && HasFrontPracticeBodyText;
+
+    public bool ShowFrontTextOnly => !HasFrontImages;
+
+    public bool ShowFrontImageOnly => HasFrontImages && !HasFrontPracticeBodyText;
+
+    public bool UseBackTextImageSplit => HasBackImages && HasBackPracticeBodyText;
+
+    public bool ShowBackTextOnly => !HasBackImages;
+
+    public bool ShowBackImageOnly => HasBackImages && !HasBackPracticeBodyText;
 
     public int CardsReviewed => UsesFullGradeCounts
         ? AgainCount + HardCount + GoodCount + EasyCount
@@ -247,6 +294,14 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
 
     public IRelayCommand QuickGradeGotItHotkeyCommand { get; }
 
+    public IRelayCommand FrontImagePreviousCommand { get; }
+
+    public IRelayCommand FrontImageNextCommand { get; }
+
+    public IRelayCommand BackImagePreviousCommand { get; }
+
+    public IRelayCommand BackImageNextCommand { get; }
+
     public FlashcardPracticeViewModel(
         IFlashcardDeckService deckService,
         IFlashcardSchedulerResolver schedulerResolver,
@@ -279,6 +334,10 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         TestCorrectCommand = new RelayCommand(() => AdvanceAfterGrade(FlashcardReviewGrade.Good));
         QuickGradeLearningHotkeyCommand = new RelayCommand(() => AdvanceAfterGrade(FlashcardReviewGrade.Again));
         QuickGradeGotItHotkeyCommand = new RelayCommand(() => AdvanceAfterGrade(FlashcardReviewGrade.Good));
+        FrontImagePreviousCommand = new RelayCommand(CycleFrontImagePrevious);
+        FrontImageNextCommand = new RelayCommand(CycleFrontImageNext);
+        BackImagePreviousCommand = new RelayCommand(CycleBackImagePrevious);
+        BackImageNextCommand = new RelayCommand(CycleBackImageNext);
     }
 
     public void OnNavigatedTo(object? parameter)
@@ -323,6 +382,8 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
             _queue.Clear();
             _queue.AddRange(built);
             CurrentIndex = 0;
+            FrontPracticeImageIndex = 0;
+            BackPracticeImageIndex = 0;
             IsFlipped = false;
             IsSessionComplete = _queue.Count == 0;
             TestAnswer = string.Empty;
@@ -602,6 +663,20 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         OnPropertyChanged(nameof(CurrentBackImages));
         OnPropertyChanged(nameof(HasFrontImages));
         OnPropertyChanged(nameof(HasBackImages));
+        OnPropertyChanged(nameof(CurrentFrontPracticeImage));
+        OnPropertyChanged(nameof(CurrentBackPracticeImage));
+        OnPropertyChanged(nameof(HasMultipleFrontImages));
+        OnPropertyChanged(nameof(HasMultipleBackImages));
+        OnPropertyChanged(nameof(FrontImageCarouselLabel));
+        OnPropertyChanged(nameof(BackImageCarouselLabel));
+        OnPropertyChanged(nameof(HasFrontPracticeBodyText));
+        OnPropertyChanged(nameof(HasBackPracticeBodyText));
+        OnPropertyChanged(nameof(UseFrontTextImageSplit));
+        OnPropertyChanged(nameof(ShowFrontTextOnly));
+        OnPropertyChanged(nameof(ShowFrontImageOnly));
+        OnPropertyChanged(nameof(UseBackTextImageSplit));
+        OnPropertyChanged(nameof(ShowBackTextOnly));
+        OnPropertyChanged(nameof(ShowBackImageOnly));
         OnPropertyChanged(nameof(ShowEmptyQueue));
         OnPropertyChanged(nameof(ShowSummary));
         OnPropertyChanged(nameof(ShowCorrectIncorrectSummary));
@@ -634,7 +709,47 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         RefreshCommandStates();
     }
 
-    partial void OnCurrentIndexChanged(int value) => NotifyCardUi();
+    partial void OnCurrentIndexChanged(int value)
+    {
+        FrontPracticeImageIndex = 0;
+        BackPracticeImageIndex = 0;
+        NotifyCardUi();
+    }
+
+    private void CycleFrontImagePrevious()
+    {
+        var list = CurrentFrontImages;
+        if (list.Count <= 1)
+            return;
+        FrontPracticeImageIndex = (FrontPracticeImageIndex - 1 + list.Count) % list.Count;
+    }
+
+    private void CycleFrontImageNext()
+    {
+        var list = CurrentFrontImages;
+        if (list.Count <= 1)
+            return;
+        FrontPracticeImageIndex = (FrontPracticeImageIndex + 1) % list.Count;
+    }
+
+    private void CycleBackImagePrevious()
+    {
+        var list = CurrentBackImages;
+        if (list.Count <= 1)
+            return;
+        BackPracticeImageIndex = (BackPracticeImageIndex - 1 + list.Count) % list.Count;
+    }
+
+    private void CycleBackImageNext()
+    {
+        var list = CurrentBackImages;
+        if (list.Count <= 1)
+            return;
+        BackPracticeImageIndex = (BackPracticeImageIndex + 1) % list.Count;
+    }
+
+    private static bool HasNonWhitespacePracticeText(IReadOnlyList<InlineSpan> spans) =>
+        !string.IsNullOrWhiteSpace(InlineSpanFormatApplier.Flatten(spans ?? Array.Empty<InlineSpan>()));
 
     private static string BuildFrontMarkdown(Flashcard? card)
     {
@@ -696,13 +811,16 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
 
     private static IReadOnlyList<InlineSpan> BuildEditorSpans(IReadOnlyList<Block>? blocks, string fallbackText)
     {
+        // Strip embedded image tokens before Markdig: otherwise `![](path){align=…}` becomes visible alt text.
+        var textForMarkdown = StripImages(fallbackText ?? string.Empty);
+
         if (blocks is null || blocks.Count == 0)
-            return InlineMarkdownParser.ToSpans(fallbackText);
+            return InlineMarkdownParser.ToSpans(textForMarkdown);
 
         // Legacy cards can have a single plain text block whose span text still contains markdown
         // (including `$...$` LaTeX). Re-parse that shape so practice mode renders equations.
         if (LooksLikeLegacyPlainTextBlocks(blocks))
-            return InlineMarkdownParser.ToSpans(fallbackText);
+            return InlineMarkdownParser.ToSpans(textForMarkdown);
 
         var merged = new List<InlineSpan>();
         for (var i = 0; i < blocks.Count; i++)
@@ -769,13 +887,18 @@ public partial class FlashcardPracticeViewModel : ViewModelBase, INavigationAwar
         if (matches.Count == 0)
             return Array.Empty<FlashcardPracticeImage>();
 
+        var strippedAsideFromImages = StripImages(text);
+        var hasCompanionText = !string.IsNullOrWhiteSpace(strippedAsideFromImages);
+
         var list = new List<FlashcardPracticeImage>(matches.Count);
         foreach (Match m in matches)
         {
             var path = m.Groups["path"].Value.Trim();
             if (string.IsNullOrEmpty(path))
                 continue;
-            var align = m.Groups["align"].Success ? m.Groups["align"].Value : "center";
+            var align = m.Groups["align"].Success
+                ? m.Groups["align"].Value.ToLowerInvariant()
+                : (hasCompanionText ? "right" : "center");
             list.Add(new FlashcardPracticeImage(path, align));
         }
         return list;

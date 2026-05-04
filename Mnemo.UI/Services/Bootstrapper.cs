@@ -67,7 +67,10 @@ public static class Bootstrapper
         services.AddSingleton<IResourceGovernor, ResourceGovernor>();
         services.AddSingleton<LlamaCppServerManager>();
         services.AddSingleton<IAIServerManager>(sp => sp.GetRequiredService<LlamaCppServerManager>());
-        services.AddSingleton<LlamaCppHttpTextService>();
+        services.AddSingleton<LlamaCppHttpTextService>(sp =>
+            new LlamaCppHttpTextService(
+                sp.GetRequiredService<ILoggerService>(),
+                new Lazy<LlamaCppServerManager>(() => sp.GetRequiredService<LlamaCppServerManager>())));
         services.AddSingleton<ITeacherModelClient, VertexGeminiTeacherClient>();
         services.AddSingleton<ITextGenerationService>(sp => new DelegatingTextGenerationService(
             sp.GetRequiredService<LlamaCppHttpTextService>(),
@@ -190,19 +193,26 @@ public static class Bootstrapper
 
         var serviceProvider = services.BuildServiceProvider();
 
-        try
-        {
-            WelcomeNoteFirstRunSeed.TrySeedIfNeededAsync(
-                serviceProvider.GetRequiredService<INoteService>(),
-                serviceProvider.GetRequiredService<IStorageProvider>(),
-                serviceProvider.GetRequiredService<ILoggerService>()).GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            serviceProvider.GetRequiredService<ILoggerService>().Error("Bootstrapper", "Welcome note seed failed.", ex);
-        }
+        var logger = serviceProvider.GetRequiredService<ILoggerService>();
 
-        serviceProvider.GetRequiredService<HardwareDetector>().Initialize();
+        // Welcome-note seed: runs once on fresh install, fire-and-forget so DB I/O doesn't block startup.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await WelcomeNoteFirstRunSeed.TrySeedIfNeededAsync(
+                    serviceProvider.GetRequiredService<INoteService>(),
+                    serviceProvider.GetRequiredService<IStorageProvider>(),
+                    logger).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.Error("Bootstrapper", "Welcome note seed failed.", ex);
+            }
+        });
+
+        // GPU detection can call DXGI/WMI; cache it in the background so first AI request reuses it.
+        _ = Task.Run(() => serviceProvider.GetRequiredService<HardwareDetector>().Initialize());
 
         // 5. Load saved or default language
         _ = LoadSavedLanguageAsync(serviceProvider);
@@ -211,7 +221,6 @@ public static class Bootstrapper
         var settingsService = serviceProvider.GetRequiredService<ISettingsService>();
         _ = Task.Run(async () =>
         {
-            // Set default llama.cpp server path if not configured
             var serverPath = await settingsService.GetAsync<string>("AI.LlamaCpp.ServerPath");
             if (string.IsNullOrEmpty(serverPath))
             {
@@ -221,55 +230,25 @@ public static class Bootstrapper
                     "models",
                     "llamaServer",
                     "llama-server.exe");
-                
+
                 await settingsService.SetAsync("AI.LlamaCpp.ServerPath", defaultPath);
             }
         });
 
-        var logger = serviceProvider.GetRequiredService<ILoggerService>();
         var modelRegistry = serviceProvider.GetRequiredService<IAIModelRegistry>();
         _ = modelRegistry.RefreshAsync();
+
+        // Skill loading reads from disk; fire-and-forget so the window isn't delayed.
         var skillRegistry = serviceProvider.GetRequiredService<ISkillRegistry>();
-        try
+        _ = skillRegistry.LoadAsync().ContinueWith(t =>
         {
-            skillRegistry.LoadAsync().GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            logger.Warning("Bootstrapper", $"Failed to load skill registry: {ex.Message}");
-        }
+            if (t.IsFaulted)
+                logger.Warning("Bootstrapper", $"Failed to load skill registry: {t.Exception?.GetBaseException().Message}");
+        }, TaskScheduler.Default);
 
-        // 7. Auto-start manager (mini orchestration) model server
-        var serverManager = serviceProvider.GetRequiredService<LlamaCppServerManager>();
-        
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                // Wait a moment for model registry to complete
-                await Task.Delay(500);
-                
-                var models = await modelRegistry.GetAvailableModelsAsync();
-                var managerModel = models.FirstOrDefault(m => m.Type == AIModelType.Text && m.Role == AIModelRoles.Manager);
-                
-                if (managerModel != null)
-                {
-                    logger.Info("Bootstrapper", "Auto-starting manager (orchestration) model server...");
-                    await serverManager.EnsureRunningAsync(managerModel, CancellationToken.None);
-                    logger.Info("Bootstrapper", "Manager model server started successfully.");
-                }
-                else
-                {
-                    logger.Warning("Bootstrapper", "No manager model found. Orchestration auto-start skipped.");
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Error("Bootstrapper", "Failed to auto-start manager model", ex);
-            }
-        });
+        // Local llama-server processes start on first generation route (LlamaCppHttpTextService / orchestration).
 
-        // 8. Register Routes, Sidebar Items, Tools and Widgets
+        // 7. Register Routes, Sidebar Items, Tools and Widgets
         var navRegistry = serviceProvider.GetRequiredService<INavigationRegistry>();
         var funcRegistry = serviceProvider.GetRequiredService<IFunctionRegistry>();
         var sidebarService = serviceProvider.GetRequiredService<ISidebarService>();
@@ -286,16 +265,10 @@ public static class Bootstrapper
         ToolManifestValidator.ValidateAndLog(skillRegistry, funcRegistry, logger);
 
         _ = serviceProvider.GetRequiredService<NavigationStatisticsTracker>();
-        try
-        {
-            StatisticsRecorder.RecordAppLaunchAsync(
-                serviceProvider.GetRequiredService<IStatisticsManager>(),
-                logger).GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            logger.Warning("Bootstrapper", $"App launch statistics recording failed: {ex.Message}");
-        }
+
+        // Launch stats: write to SQLite in background, not on the hot startup path.
+        _ = StatisticsRecorder.RecordAppLaunchAsync(
+            serviceProvider.GetRequiredService<IStatisticsManager>(), logger);
 
         return serviceProvider;
     }

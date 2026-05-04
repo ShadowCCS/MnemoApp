@@ -76,6 +76,14 @@ public class RichTextEditor : Control, ICustomHitTest
         AvaloniaProperty.Register<RichTextEditor, bool>(nameof(IsReadOnly), defaultValue: false);
 
     /// <summary>
+    /// When false, spell-check highlighting and background checks are disabled (preview/read-only surfaces).
+    /// User preference <see cref="_spellcheckEnabled"/> still applies when this is true and <see cref="IsReadOnly"/> is false.
+    /// </summary>
+    public static readonly StyledProperty<bool> IsSpellcheckDecorationsEnabledProperty =
+        AvaloniaProperty.Register<RichTextEditor, bool>(
+            nameof(IsSpellcheckDecorationsEnabled), defaultValue: true);
+
+    /// <summary>
     /// When true, inline equations show their raw LaTeX source while hovered.
     /// </summary>
     public static readonly StyledProperty<bool> ShowInlineEquationSourceOnHoverProperty =
@@ -296,6 +304,12 @@ public class RichTextEditor : Control, ICustomHitTest
         set => SetValue(IsReadOnlyProperty, value);
     }
 
+    public bool IsSpellcheckDecorationsEnabled
+    {
+        get => GetValue(IsSpellcheckDecorationsEnabledProperty);
+        set => SetValue(IsSpellcheckDecorationsEnabledProperty, value);
+    }
+
     public bool ShowInlineEquationSourceOnHover
     {
         get => GetValue(ShowInlineEquationSourceOnHoverProperty);
@@ -350,6 +364,8 @@ public class RichTextEditor : Control, ICustomHitTest
         });
         SearchHighlightRangesProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateVisual());
         ActiveSearchHighlightRangeProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.InvalidateVisual());
+        IsReadOnlyProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.OnSpellcheckDecorationGateChanged());
+        IsSpellcheckDecorationsEnabledProperty.Changed.AddClassHandler<RichTextEditor>((o, _) => o.OnSpellcheckDecorationGateChanged());
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -1704,6 +1720,14 @@ public class RichTextEditor : Control, ICustomHitTest
     {
         if (VisualRoot == null)
             return;
+        if (!SpellcheckDecorationsActive)
+        {
+            _spellcheckCts?.Cancel();
+            _spellcheckDebounceTimer?.Stop();
+            ClearSpellcheckIssues();
+            return;
+        }
+
         if (force)
             _lastSpellcheckText = string.Empty;
 
@@ -1720,10 +1744,25 @@ public class RichTextEditor : Control, ICustomHitTest
         await RunSpellcheckAsync().ConfigureAwait(false);
     }
 
+    private bool SpellcheckDecorationsActive =>
+        _spellcheckEnabled && IsSpellcheckDecorationsEnabled && !IsReadOnly;
+
+    private void OnSpellcheckDecorationGateChanged()
+    {
+        if (!SpellcheckDecorationsActive)
+        {
+            _spellcheckCts?.Cancel();
+            _spellcheckDebounceTimer?.Stop();
+            ClearSpellcheckIssues();
+        }
+        else
+            ScheduleSpellcheck(force: true);
+    }
+
     private async Task RunSpellcheckAsync()
     {
         var service = ResolveSpellcheckService();
-        if (service == null || !_spellcheckEnabled)
+        if (service == null || !SpellcheckDecorationsActive)
         {
             ClearSpellcheckIssues();
             return;
@@ -1743,6 +1782,12 @@ public class RichTextEditor : Control, ICustomHitTest
             var issues = await service.CheckAsync(spans, languages, _spellcheckCts.Token).ConfigureAwait(false);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (!SpellcheckDecorationsActive)
+                {
+                    ClearSpellcheckIssues();
+                    return;
+                }
+
                 lock (_spellcheckSync)
                 {
                     _spellcheckIssues.Clear();
@@ -1770,7 +1815,7 @@ public class RichTextEditor : Control, ICustomHitTest
 
     private void RenderSpellcheckUnderlines(DrawingContext context)
     {
-        if (_textLayout == null || !_spellcheckEnabled)
+        if (_textLayout == null || !SpellcheckDecorationsActive)
             return;
 
         var pen = new Pen(GetSpellcheckUnderlineBrush(), 1.2);
@@ -1813,7 +1858,7 @@ public class RichTextEditor : Control, ICustomHitTest
 
     private bool TryOpenSpellcheckContextMenu(Point point)
     {
-        if (!_spellcheckEnabled || IsReadOnly)
+        if (!SpellcheckDecorationsActive)
             return false;
 
         var idx = HitTestPoint(point);
