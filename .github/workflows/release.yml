@@ -1,0 +1,88 @@
+# Builds Velopack installers per RID and attaches them to the GitHub release for the pushed tag.
+# Prereq: create the release (or draft) for the tag on GitHub before/with the tag push, or extend this workflow to create it.
+# Portable Windows zip is included for non-Setup users.
+name: Release packages
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            mainexe: Mnemo.UI.exe
+          - rid: linux-x64
+            os: ubuntu-latest
+            mainexe: Mnemo.UI
+          - rid: osx-x64
+            os: macos-13
+            mainexe: Mnemo.UI
+          - rid: osx-arm64
+            os: macos-14
+            mainexe: Mnemo.UI
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore vpk tool
+        run: dotnet tool restore
+
+      - name: Publish
+        run: >
+          dotnet publish Mnemo.UI/Mnemo.UI.csproj -c Release -r ${{ matrix.rid }} --self-contained true
+          -p:Version=${{ github.ref_name }}
+          -p:AssemblyInformationalVersion=${{ github.ref_name }}
+          -o publish
+
+      - name: Pack (Velopack)
+        run: >
+          dotnet vpk pack
+          --packId Mnemo.Desktop
+          --packTitle Mnemo
+          --packAuthors Mnemo
+          --packVersion ${{ github.ref_name }}
+          --packDir publish
+          --mainExe ${{ matrix.mainexe }}
+          -o vpk-out
+          --channel stable
+
+      - name: Portable zip (Windows)
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: Compress-Archive -Path "publish/*" -DestinationPath "vpk-out/Mnemo-Portable-${{ matrix.rid }}.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vpk-${{ matrix.rid }}
+          path: vpk-out/**
+
+  upload-to-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: vpk-*
+          merge-multiple: true
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

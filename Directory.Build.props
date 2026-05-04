@@ -1,0 +1,7 @@
+<Project>
+  <!-- Smaller Release outputs: no loose .pdb next to shipped exes (portable zip / vpk pack). -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+</Project>

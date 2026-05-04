@@ -16,6 +16,7 @@ using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services.AI;
 using Mnemo.UI.Modules.Onboarding.Views;
+using Mnemo.UI.Modules.Updates.Services;
 using Mnemo.UI.ViewModels;
 using Mnemo.UI.Views;
 
@@ -125,6 +126,15 @@ public partial class App : Application
         catch (Exception ex)
         {
             Services?.GetService<ILoggerService>()?.Error("Hardware", "RunHardwareInstallMismatchCheckAsync threw.", ex);
+        }
+
+        try
+        {
+            Services?.GetService<UpdateOrchestrator>()?.Start();
+        }
+        catch (Exception ex)
+        {
+            Services?.GetService<ILoggerService>()?.Error("Updates", "UpdateOrchestrator.Start threw.", ex);
         }
     }
 

@@ -24,6 +24,8 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+[Ss]cripts/
+_pack/
 
 ## Visual Studio
 .vs/

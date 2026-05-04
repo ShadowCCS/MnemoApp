@@ -7,6 +7,8 @@ using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services.AI;
+using Mnemo.Infrastructure.Services.Updates;
+using Mnemo.UI.Modules.Updates.Services;
 using Mnemo.UI.Services;
 using Mnemo.UI.ViewModels;
 
@@ -27,6 +29,8 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IAIModelInstallCoordinator _aiInstallCoordinator;
     private readonly IAiSetupOverlayPresenter _aiSetupOverlay;
     private readonly IMainThreadDispatcher _mainThreadDispatcher;
+    private readonly IUpdateService _updateService;
+    private readonly UpdateOrchestrator _updateOrchestrator;
 
     private bool _aiRuntimeInstalled;
     private bool _developerGateUnlocked;
@@ -92,7 +96,9 @@ public partial class SettingsViewModel : ViewModelBase
         IAIModelsSetupService aiModelsSetupService,
         IAIModelInstallCoordinator aiInstallCoordinator,
         IAiSetupOverlayPresenter aiSetupOverlay,
-        IMainThreadDispatcher mainThreadDispatcher)
+        IMainThreadDispatcher mainThreadDispatcher,
+        IUpdateService updateService,
+        UpdateOrchestrator updateOrchestrator)
     {
         _settingsService = settingsService;
         _themeService = themeService;
@@ -104,6 +110,8 @@ public partial class SettingsViewModel : ViewModelBase
         _aiInstallCoordinator = aiInstallCoordinator;
         _aiSetupOverlay = aiSetupOverlay;
         _mainThreadDispatcher = mainThreadDispatcher;
+        _updateService = updateService;
+        _updateOrchestrator = updateOrchestrator;
 
         _aiInstallCoordinator.Completed += OnAiInstallCompleted;
 
@@ -332,6 +340,21 @@ public partial class SettingsViewModel : ViewModelBase
 
         appearance.Groups.Add(themeGroup);
 
+        var updatesCategory = new SettingsCategoryViewModel(T("UpdatesCategoryTitle"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/refresh.svg", "Updates");
+        var updatesGroup = new SettingsGroupViewModel(T("UpdatesGroupTitle"), isCollapsible: true);
+        updatesGroup.Items.Add(new ToggleSettingViewModel(_settingsService, UpdateSettingsKeys.AutoCheck, T("AutoCheckUpdates"), T("AutoCheckUpdatesDescription"), true));
+        var versionLine = string.Format(T("CurrentVersionLabelFormat"), _updateService.CurrentDisplayVersion);
+        updatesGroup.Items.Add(new AsyncActionSettingViewModel(
+            T("CheckForUpdatesNow"),
+            versionLine,
+            T("CheckNow"),
+            async vm =>
+            {
+                await _updateOrchestrator.RequestManualCheckAsync().ConfigureAwait(false);
+                vm.StatusText = _updateOrchestrator.LastManualCheckMessage ?? string.Empty;
+            }));
+        updatesCategory.Groups.Add(updatesGroup);
+
         var mindmap = new SettingsCategoryViewModel(T("Mindmap"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Mindmap");
 
         var gridGroup = new SettingsGroupViewModel(T("GridBackground"), isCollapsible: true);
@@ -360,6 +383,7 @@ public partial class SettingsViewModel : ViewModelBase
         Categories.Add(aiTools);
         Categories.Add(mindmap);
         Categories.Add(appearance);
+        Categories.Add(updatesCategory);
         Categories.Add(hotkeys);
 
         if (_developerMode)

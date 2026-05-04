@@ -22,6 +22,10 @@ public partial class SidebarItem : ObservableObject
     [ObservableProperty]
     private bool _isVisible = true;
 
+    /// <summary>Small indicator on the sidebar row (e.g. update available after prompt cap).</summary>
+    [ObservableProperty]
+    private bool _showUpdateBadge;
+
     public SidebarItem(string label, string route, string icon, int order = int.MaxValue)
     {
         _label = label;

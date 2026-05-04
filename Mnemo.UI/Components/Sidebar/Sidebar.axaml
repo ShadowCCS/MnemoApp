@@ -70,20 +70,27 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Panel IsVisible="{Binding IsVisible}">
-                                            <controls:NavigationButton IsSelected="{Binding IsSelected}"
-                                                                       BorderThickness="0" 
-                                                                       HorizontalAlignment="Stretch"
-                                                                       HorizontalContentAlignment="Left"
-                                                                       ToolTip.Tip="{Binding Label}"
-                                                                       Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
-                                                                       CommandParameter="{Binding}">
-                                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                                    <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg'}" 
-                                                                      Width="20" Height="20"/>
-                                                    <TextBlock Text="{Binding Label}" 
-                                                               VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </controls:NavigationButton>
+                                            <Grid>
+                                                <controls:NavigationButton IsSelected="{Binding IsSelected}"
+                                                                           BorderThickness="0" 
+                                                                           HorizontalAlignment="Stretch"
+                                                                           HorizontalContentAlignment="Left"
+                                                                           ToolTip.Tip="{Binding Label}"
+                                                                           Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
+                                                                           CommandParameter="{Binding}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                                        <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg'}" 
+                                                                          Width="20" Height="20"/>
+                                                        <TextBlock Text="{Binding Label}" 
+                                                                   VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </controls:NavigationButton>
+                                                <Border Width="8" Height="8" CornerRadius="4"
+                                                        Background="{DynamicResource AccentBrush}"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Margin="0,6,10,0"
+                                                        IsVisible="{Binding ShowUpdateBadge}"/>
+                                            </Grid>
                                             </Panel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -178,16 +185,22 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Panel IsVisible="{Binding IsVisible}">
-                                                <controls:NavigationButton IsSelected="{Binding IsSelected}"
-                                                                            IsCollapsed="True"
-                                                                            BorderThickness="0" 
-                                                                            ToolTip.Tip="{Binding Label}"
-                                                                            Margin="0,0,0,8"
-                                                                            Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
-                                                                            CommandParameter="{Binding}">
-                                                    <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg'}" 
-                                                                      Width="20" Height="20"/>
-                                                </controls:NavigationButton>
+                                                <Grid Margin="0,0,0,8">
+                                                    <controls:NavigationButton IsSelected="{Binding IsSelected}"
+                                                                                IsCollapsed="True"
+                                                                                BorderThickness="0" 
+                                                                                ToolTip.Tip="{Binding Label}"
+                                                                                Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
+                                                                                CommandParameter="{Binding}">
+                                                        <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg'}" 
+                                                                          Width="20" Height="20"/>
+                                                    </controls:NavigationButton>
+                                                    <Border Width="8" Height="8" CornerRadius="4"
+                                                            Background="{DynamicResource AccentBrush}"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                            Margin="0,0,2,0"
+                                                            IsVisible="{Binding ShowUpdateBadge}"/>
+                                                </Grid>
                                                 </Panel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

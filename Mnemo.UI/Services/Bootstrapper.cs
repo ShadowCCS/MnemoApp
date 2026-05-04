@@ -10,6 +10,7 @@ using Mnemo.Core.Models;
 using Mnemo.Core.Models.Flashcards;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services;
+using Mnemo.Infrastructure.Services.Updates;
 
 using Mnemo.Core.History;
 using Mnemo.Infrastructure.History;
@@ -43,6 +44,7 @@ public static class Bootstrapper
         services.AddSingleton<IChatModuleHistoryService, ChatModuleHistoryService>();
         services.AddSingleton<IChatHistoryClearService, ChatHistoryClearService>();
         services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IUpdateService, VelopackUpdateService>();
         services.AddSingleton<IChatDatasetLogger, ChatDatasetLogger>();
         services.AddSingleton<DatasetExporter>();
         services.AddSingleton<ILaTeXEngine, LaTeXEngine>();
