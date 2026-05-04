@@ -15,7 +15,10 @@ internal static class NoteDocumentHelper
         {
             foreach (var b in note.Blocks)
                 b.EnsureSpans();
-            return string.Join("\n\n", note.Blocks.OrderBy(b => b.Order).Select(b => b.Content));
+            return string.Join("\n\n", note.Blocks.OrderBy(b => b.Order).Select(b =>
+                b.Type == BlockType.Page && b.Payload is PagePayload pp
+                    ? "[[" + "page:" + pp.ReferenceNoteId + "]]"
+                    : b.Content));
         }
 
         return note.Content ?? string.Empty;

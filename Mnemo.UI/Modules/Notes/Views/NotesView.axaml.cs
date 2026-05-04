@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -23,6 +24,7 @@ namespace Mnemo.UI.Modules.Notes.Views;
 
 public partial class NotesView : UserControl
 {
+    private bool _editorOpenNoteWired;
     private bool _blocksChangedSubscribed;
     private DispatcherTimer? _saveDebounceTimer;
     /// <summary>Note we have pending unsaved block changes for. When flushing on note switch, SelectedNote is already the new note; we must save this one with editor content.</summary>
@@ -91,6 +93,21 @@ public partial class NotesView : UserControl
             editor.NoteClipboardService ??= sp.GetService<INoteClipboardPlatformService>();
             editor.ImageAssetService ??= sp.GetService<IImageAssetService>();
         }
+
+        editor.HostNoteId = vm.SelectedNote?.NoteId;
+        editor.NoteTitleResolver = id => vm.ResolveNoteTitleForPageBlock(id);
+        editor.ChildPageCountResolver = id => vm.CountDirectChildPagesForNote(id);
+        editor.CreateChildPageUnderNoteAsync = vm.CreateChildPageNoteUnderParentAsync;
+        var loc = sp?.GetService<ILocalizationService>();
+        editor.PageBlockMissingTitle = loc?.T("PageMissingTitle", "NotesEditor") ?? "Missing note";
+
+        if (!_editorOpenNoteWired)
+        {
+            editor.OpenReferencedNote += OnBlockEditorOpenReferencedNote;
+            _editorOpenNoteWired = true;
+        }
+
+        editor.FlushPendingNoteSaveAsync = FlushEditorToSelectedNoteAsync;
 
         editor.LoadBlocks(vm.GetBlocksForCurrentNote());
 
@@ -282,13 +299,37 @@ public partial class NotesView : UserControl
             vm.PropertyChanged -= OnViewModelPropertyChanged;
 
         var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
-        if (editor != null && _blocksChangedSubscribed)
+        if (editor != null)
         {
-            editor.BlocksChanged -= OnBlockEditorBlocksChanged;
-            _blocksChangedSubscribed = false;
+            if (_editorOpenNoteWired)
+            {
+                editor.OpenReferencedNote -= OnBlockEditorOpenReferencedNote;
+                _editorOpenNoteWired = false;
+            }
+            if (_blocksChangedSubscribed)
+            {
+                editor.BlocksChanged -= OnBlockEditorBlocksChanged;
+                _blocksChangedSubscribed = false;
+            }
         }
 
         base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnBlockEditorOpenReferencedNote(string noteId)
+    {
+        if (DataContext is NotesViewModel vm)
+            vm.NavigateToNoteById(noteId);
+    }
+
+    private async Task FlushEditorToSelectedNoteAsync()
+    {
+        if (DataContext is not NotesViewModel vm || vm.SelectedNote == null)
+            return;
+        var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
+        if (editor == null)
+            return;
+        await vm.SaveNoteWithContentAsync(vm.SelectedNote, editor.GetBlocks(), null).ConfigureAwait(true);
     }
 
     private async void OnTitleBoxLostFocus(object? sender, RoutedEventArgs e)

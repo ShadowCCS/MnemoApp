@@ -52,6 +52,7 @@ public static class BlockMarkdownSerializer
             BlockType.Divider => "---",
             BlockType.Image => SerializeImageMarkdown(block),
             BlockType.Equation => "$$\n" + block.EquationLatex + "\n$$",
+            BlockType.Page => "[[" + "page:" + block.ReferenceNoteId + "]]",
             _ => body
         };
     }
@@ -103,6 +104,16 @@ public static class BlockMarkdownSerializer
             if (trimmed == "---" || line.Trim() == "---")
             {
                 result.Add(BlockFactory.CreateBlock(BlockType.Divider, order++));
+                i++;
+                continue;
+            }
+
+            var pageMd = Regex.Match(trimmed, @"^\[\[page:([^\]]*)\]\]\s*$");
+            if (pageMd.Success)
+            {
+                var vm = BlockFactory.CreateBlock(BlockType.Page, order++);
+                vm.ReferenceNoteId = pageMd.Groups[1].Value.Trim();
+                result.Add(vm);
                 i++;
                 continue;
             }

@@ -55,6 +55,12 @@ public class BlockViewModel : INotifyPropertyChanged
 
     /// <summary>Image horizontal alignment: left, center, right. Canonical with <see cref="ImagePayload.Align"/>.</summary>
     private string _imageAlign = "left";
+
+    /// <summary>Target note id for <see cref="BlockType.Page"/>; title always comes from <see cref="ReferencedNoteTitle"/> / resolver.</summary>
+    private string _referenceNoteId = string.Empty;
+
+    private string _referencedNoteTitle = string.Empty;
+    private string _pageBlockSubtitle = string.Empty;
     private bool _isFocused;
     private bool _isSelected;
 
@@ -118,6 +124,21 @@ public class BlockViewModel : INotifyPropertyChanged
                         SetSpans(new List<InlineSpan> { InlineSpan.Plain(legacyAlt) });
                 }
 
+                if (prevType == BlockType.Page && value != BlockType.Page)
+                {
+                    _referenceNoteId = string.Empty;
+                    _referencedNoteTitle = string.Empty;
+                    _pageBlockSubtitle = string.Empty;
+                    OnPropertyChanged(nameof(ReferenceNoteId));
+                    OnPropertyChanged(nameof(ReferencedNoteTitle));
+                    OnPropertyChanged(nameof(PageBlockSubtitle));
+                }
+
+                if (value == BlockType.Page && prevType != BlockType.Page)
+                {
+                    SetSpans(new List<InlineSpan> { InlineSpan.Plain(string.Empty) });
+                }
+
                 EnsureMetaKeys();
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Watermark));
@@ -132,6 +153,12 @@ public class BlockViewModel : INotifyPropertyChanged
                     OnPropertyChanged(nameof(ImagePath));
                     OnPropertyChanged(nameof(ImageWidth));
                     OnPropertyChanged(nameof(ImageAlign));
+                }
+                if (value == BlockType.Page || prevType == BlockType.Page)
+                {
+                    OnPropertyChanged(nameof(ReferenceNoteId));
+                    OnPropertyChanged(nameof(ReferencedNoteTitle));
+                    OnPropertyChanged(nameof(PageBlockSubtitle));
                 }
             }
         }
@@ -188,6 +215,74 @@ public class BlockViewModel : INotifyPropertyChanged
             "right" => "right",
             _ => "left",
         };
+
+    /// <summary>Referenced sub-note id for <see cref="BlockType.Page"/> blocks.</summary>
+    public string ReferenceNoteId
+    {
+        get => _referenceNoteId;
+        set
+        {
+            var v = value ?? string.Empty;
+            if (_referenceNoteId == v) return;
+            _referenceNoteId = v;
+            OnPropertyChanged();
+            if (_type == BlockType.Page)
+                ContentChanged?.Invoke(this);
+        }
+    }
+
+    /// <summary>Resolved title for the page button; refresh via <see cref="RefreshPageButtonTitle"/>.</summary>
+    public string ReferencedNoteTitle
+    {
+        get => _referencedNoteTitle;
+        private set
+        {
+            var v = value ?? string.Empty;
+            if (_referencedNoteTitle == v) return;
+            _referencedNoteTitle = v;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Second line under the title (e.g. “Open page” and optional nested count). Set by <see cref="RefreshPageButtonTitle"/>.</summary>
+    public string PageBlockSubtitle
+    {
+        get => _pageBlockSubtitle;
+        private set
+        {
+            var v = value ?? string.Empty;
+            if (_pageBlockSubtitle == v) return;
+            _pageBlockSubtitle = v;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Updates <see cref="ReferencedNoteTitle"/> from <paramref name="lookup"/>; uses <paramref name="missingTitle"/> when the note is missing or empty.</summary>
+    public void RefreshPageButtonTitle(Func<string, string?>? lookup, string missingTitle, Func<string, int>? childPageCountLookup = null)
+    {
+        if (_type != BlockType.Page) return;
+        var t = lookup?.Invoke(_referenceNoteId);
+        ReferencedNoteTitle = string.IsNullOrWhiteSpace(t) ? missingTitle : t;
+
+        var loc = (Application.Current as App)?.Services?.GetService(typeof(ILocalizationService)) as ILocalizationService;
+        string T(string key, string fallback, string ns = "NotesEditor")
+        {
+            var s = loc?.T(key, ns);
+            return string.IsNullOrEmpty(s) ? fallback : s;
+        }
+
+        var openLine = T("PageBlockOpenPage", "Open page");
+        var nested = childPageCountLookup?.Invoke(_referenceNoteId) ?? 0;
+        if (nested > 0)
+        {
+            var suffixFmt = nested == 1
+                ? T("PageBlockNestedPageCountOne", "• {0} nested page")
+                : T("PageBlockNestedPageCountMany", "• {0} nested pages");
+            PageBlockSubtitle = $"{openLine}  {string.Format(suffixFmt, nested)}";
+        }
+        else
+            PageBlockSubtitle = openLine;
+    }
 
     /// <summary>Programming language id for fenced code blocks (e.g. csharp, python). Ignored when <see cref="Type"/> is not <see cref="BlockType.Code"/>.</summary>
     public string CodeLanguage
@@ -561,6 +656,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 BlockType.NumberedList => T("ListItem"),
                 BlockType.Checklist => T("ChecklistItem"),
                 BlockType.Image => string.Empty,
+                BlockType.Page => string.Empty,
                 _ => string.Empty
             };
         }
@@ -660,6 +756,9 @@ public class BlockViewModel : INotifyPropertyChanged
 
         if (_type == BlockType.Checklist)
             InitChecklistFromBlock(block);
+
+        if (_type == BlockType.Page)
+            InitPageFromBlock(block);
     }
 
     private static string ReadMetaString(Dictionary<string, object> meta, string key)
@@ -685,6 +784,8 @@ public class BlockViewModel : INotifyPropertyChanged
             case ChecklistPayload:
                 break;
             case TwoColumnPayload:
+                break;
+            case PagePayload:
                 break;
             default:
                 throw new UnreachableException($"Unexpected block payload type: {payload.GetType().Name}");
@@ -743,6 +844,18 @@ public class BlockViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(Meta));
     }
 
+    private void InitPageFromBlock(Block block)
+    {
+        if (block.Payload is PagePayload pp)
+            _referenceNoteId = pp.ReferenceNoteId ?? string.Empty;
+        else
+            _referenceNoteId = ReadMetaString(_meta, "reference_note_id");
+        if (_meta.Remove("reference_note_id"))
+            OnPropertyChanged(nameof(Meta));
+        SetSpans(new List<InlineSpan> { InlineSpan.Plain(string.Empty) });
+        OnPropertyChanged(nameof(ReferenceNoteId));
+    }
+
     private void InitImageFromBlock(Block block)
     {
         if (block.Type != BlockType.Image)
@@ -799,6 +912,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 InlineSpanText.FlattenDisplay(_spans),
                 _imageWidth,
                 _imageAlign),
+            BlockType.Page => new PagePayload(_referenceNoteId),
             _ => new EmptyPayload()
         };
     }
@@ -823,6 +937,9 @@ public class BlockViewModel : INotifyPropertyChanged
             metaChanged = true;
 
         if (_type != BlockType.Checklist && _meta.Remove("checked"))
+            metaChanged = true;
+
+        if (_type != BlockType.Page && _meta.Remove("reference_note_id"))
             metaChanged = true;
 
         if (OwnerTwoColumn != null)
@@ -867,6 +984,9 @@ public class BlockViewModel : INotifyPropertyChanged
             foreach (var k in new[] { "imagePath", "imageAlt", "imageWidth", "imageAlign" })
                 block.Meta.Remove(k);
         }
+
+        if (Type == BlockType.Page)
+            block.Meta.Remove("reference_note_id");
 
         return block;
     }

@@ -139,6 +139,45 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     /// <summary>Optional: image import when pasting paths / duplicating / hydrating clipboard blocks.</summary>
     public IImageAssetService? ImageAssetService { get; set; }
+
+    /// <summary>Note id whose blocks are being edited; used when inserting a <see cref="BlockType.Page"/> block from the slash menu.</summary>
+    public string? HostNoteId { get; set; }
+
+    /// <summary>Resolve a note title by id for <see cref="BlockType.Page"/> button labels.</summary>
+    public Func<string, string?>? NoteTitleResolver { get; set; }
+
+    /// <summary>Count direct child notes (<see cref="Note.ParentNoteId"/>) for page block subtitle.</summary>
+    public Func<string, int>? ChildPageCountResolver { get; set; }
+
+    /// <summary>Creates a child note under <paramref name="parentNoteId"/>; returns the new note id.</summary>
+    public Func<string, Task<string?>>? CreateChildPageUnderNoteAsync { get; set; }
+
+    /// <summary>Optional: persist the current note from the editor immediately (e.g. after inserting a page block).</summary>
+    public Func<Task>? FlushPendingNoteSaveAsync { get; set; }
+
+    /// <summary>Fallback label when the referenced note is missing or empty.</summary>
+    public string PageBlockMissingTitle { get; set; } = "Missing note";
+
+    /// <summary>Raised when the user activates a page block; host should open <paramref name="noteId"/>.</summary>
+    public event Action<string>? OpenReferencedNote;
+
+    public void RequestOpenReferencedNote(string noteId)
+    {
+        if (string.IsNullOrWhiteSpace(noteId)) return;
+        OpenReferencedNote?.Invoke(noteId.Trim());
+    }
+
+    /// <summary>Refreshes <see cref="BlockType.Page"/> button titles from <see cref="NoteTitleResolver"/>.</summary>
+    public void RefreshPageBlockTitles()
+    {
+        var missing = PageBlockMissingTitle;
+        foreach (var b in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+        {
+            if (b.Type == BlockType.Page)
+                b.RefreshPageButtonTitle(NoteTitleResolver, missing, ChildPageCountResolver);
+        }
+    }
+
     private static readonly TimeSpan OrphanImageDeleteDelay = TimeSpan.FromSeconds(2);
     private static readonly object PendingOrphanImageDeletesGate = new();
     private static readonly Dictionary<string, CancellationTokenSource> PendingOrphanImageDeletes = new(StringComparer.OrdinalIgnoreCase);
@@ -856,7 +895,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         
         // Update list numbers after loading
         UpdateListNumbers();
-        
+
+        RefreshPageBlockTitles();
+
         // Focus the first block after UI updates to make it immediately editable
         if (newBlocks.Count > 0)
         {
@@ -1790,6 +1831,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (_findPanelVisible)
             RefreshFindMatchesAndHighlights();
+        RefreshPageBlockTitles();
         BlocksChanged?.Invoke();
     }
 
@@ -2533,7 +2575,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     /// <summary>Image/Divider/Equation blocks have no inline runs — merging them into a Text block drops the payload.</summary>
     private static bool PasteFirstBlockRequiresBlockInsert(BlockViewModel[] pasted) =>
-        pasted.Length > 0 && pasted[0].Type is BlockType.Image or BlockType.Divider or BlockType.Equation;
+        pasted.Length > 0 && pasted[0].Type is BlockType.Image or BlockType.Divider or BlockType.Equation or BlockType.Page;
 
     /// <summary>
     /// Applies pasted block type and body runs, then list/checklist metadata. Runs are committed first so
@@ -2547,6 +2589,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             target.ListNumberIndex = pastedFirst.ListNumberIndex;
         if (pastedFirst.Type == BlockType.Checklist)
             target.IsChecked = pastedFirst.IsChecked;
+        if (pastedFirst.Type == BlockType.Page)
+            target.ReferenceNoteId = pastedFirst.ReferenceNoteId;
     }
 
     /// <summary>
@@ -3315,7 +3359,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     }
 
     private bool IsFindSearchableBlock(BlockViewModel block) =>
-        block.Type is not BlockType.Divider and not BlockType.Image and not BlockType.Equation and not BlockType.Code;
+        block.Type is not BlockType.Divider and not BlockType.Image and not BlockType.Equation and not BlockType.Code
+        and not BlockType.Page;
 
     private bool IsFindCaseSensitive() =>
         _findPanel != null

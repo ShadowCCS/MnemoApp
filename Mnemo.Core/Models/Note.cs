@@ -24,6 +24,11 @@ public class Note
     public string? FolderId { get; set; }
 
     /// <summary>
+    /// When set, this note was created as a child page of another note (e.g. from a page block). Does not replace folder hierarchy.
+    /// </summary>
+    public string? ParentNoteId { get; set; }
+
+    /// <summary>
     /// Display order among siblings in the same folder (lower = first). Used for drag-reorder.
     /// </summary>
     public int Order { get; set; }

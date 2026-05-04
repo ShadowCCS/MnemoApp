@@ -22,6 +22,7 @@ public static class BlockFactory
             BlockType.Image => CreateImageBlock(order),
             BlockType.TwoColumn => CreateTwoColumnBlock(order),
             BlockType.Equation => CreateEquationBlock(order),
+            BlockType.Page => CreatePageBlock(order),
             _ => new BlockViewModel(BlockType.Text, "", order)
         };
     }
@@ -60,6 +61,13 @@ public static class BlockFactory
     {
         var block = new BlockViewModel(BlockType.Equation, "", order);
         block.EquationLatex = string.Empty;
+        return block;
+    }
+
+    private static BlockViewModel CreatePageBlock(int order)
+    {
+        var block = new BlockViewModel(BlockType.Page, "", order);
+        block.ReferenceNoteId = string.Empty;
         return block;
     }
 }

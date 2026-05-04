@@ -47,6 +47,19 @@ internal static class NoteToolBlockFactory
             return b;
         }
 
+        if (bt == BlockType.Page)
+        {
+            var refId = string.Empty;
+            if (b.Meta.TryGetValue("reference_note_id", out var rv) && rv != null)
+                refId = rv is string s ? s : rv.ToString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(refId))
+                refId = (p.Content ?? string.Empty).Trim();
+            b.Payload = new PagePayload(refId);
+            b.Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
+            b.Meta.Remove("reference_note_id");
+            return b;
+        }
+
         b.Spans = InlineMarkdownParser.ToSpans(p.Content ?? string.Empty);
         if (bt is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
             EnsureHeadingBold(b);

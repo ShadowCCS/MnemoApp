@@ -40,4 +40,7 @@ public sealed class NoteClipboardBlockDto
 
     /// <summary>LaTeX source for <see cref="BlockType.Equation"/> blocks.</summary>
     public string? EquationLatex { get; set; }
+
+    /// <summary>Referenced note id for <see cref="BlockType.Page"/> blocks.</summary>
+    public string? ReferenceNoteId { get; set; }
 }

@@ -80,6 +80,9 @@ public static class NoteClipboardMapper
         if (vm.Type == BlockType.Equation)
             dto.EquationLatex = vm.EquationLatex;
 
+        if (vm.Type == BlockType.Page)
+            dto.ReferenceNoteId = vm.ReferenceNoteId;
+
         if (vm.Type == BlockType.Image)
         {
             dto.ImagePath = vm.ImagePath;
@@ -219,6 +222,14 @@ public static class NoteClipboardMapper
             vm.ImageAlign = string.IsNullOrEmpty(dto.ImageAlign) ? "left" : dto.ImageAlign;
             var alt = dto.ImageAlt ?? string.Empty;
             vm.SetSpans(new List<InlineSpan> { InlineSpan.Plain(alt) });
+            ApplyColumnClipboardMeta(vm, dto);
+            return vm;
+        }
+
+        if (dto.Type == BlockType.Page)
+        {
+            vm.ReferenceNoteId = dto.ReferenceNoteId ?? string.Empty;
+            vm.SetSpans(new List<InlineSpan> { InlineSpan.Plain(string.Empty) });
             ApplyColumnClipboardMeta(vm, dto);
             return vm;
         }

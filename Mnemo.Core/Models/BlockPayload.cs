@@ -18,3 +18,6 @@ public sealed record ChecklistPayload(bool Checked) : BlockPayload;
 
 /// <summary>Layout for <see cref="BlockType.TwoColumn"/> — split ratio is owned by the container, not column cells.</summary>
 public sealed record TwoColumnPayload(double SplitRatio = 0.5) : BlockPayload;
+
+/// <summary>Embedded sub-note for <see cref="BlockType.Page"/>; title is always read from the referenced note.</summary>
+public sealed record PagePayload(string ReferenceNoteId) : BlockPayload;

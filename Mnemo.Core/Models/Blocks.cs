@@ -21,7 +21,8 @@ public enum BlockType
     Image,
     ColumnGroup,
     TwoColumn,
-    Equation
+    Equation,
+    Page
 }
 
 [JsonConverter(typeof(BlockJsonConverter))]

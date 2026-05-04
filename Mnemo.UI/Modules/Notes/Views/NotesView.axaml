@@ -220,13 +220,10 @@
                                           Width="20" Height="20"
                                           Color="{DynamicResource TextSecondaryBrush}"/>
                     </Button>
-                    
-                    <TextBlock Grid.Column="1" Text="{Binding BreadcrumbText}"
-                               FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
-                               Foreground="{DynamicResource TextTertiaryBrush}"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center"
-                               IsVisible="{Binding BreadcrumbText, Converter={StaticResource NullToBoolConverter}}"/>
+
+                    <views:NoteBreadcrumb Grid.Column="1"
+                                          DataContext="{Binding NoteBreadcrumb}"
+                                          VerticalAlignment="Center"/>
                 </Grid>
 
                 <!-- Title, metadata, separator and content (visible when a note is selected) -->

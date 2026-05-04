@@ -594,14 +594,14 @@ public partial class EditableBlock : UserControl
     /// </summary>
     private void UpdateEditableBlockAlignment()
     {
-        var isDivider = _viewModel?.Type == BlockType.Divider;
+        var stretchRow = _viewModel?.Type is BlockType.Divider or BlockType.Page;
         if (BlockContentChrome != null)
-            BlockContentChrome.HorizontalAlignment = isDivider ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+            BlockContentChrome.HorizontalAlignment = stretchRow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
         if (BlockContentControl != null)
         {
-            BlockContentControl.HorizontalAlignment = isDivider ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+            BlockContentControl.HorizontalAlignment = stretchRow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
             BlockContentControl.HorizontalContentAlignment =
-                isDivider ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+                stretchRow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
         }
 
         if (_viewModel?.Type == BlockType.Image)
@@ -1289,7 +1289,8 @@ public partial class EditableBlock : UserControl
         return true;
     }
 
-    private static bool IsEditableBlockType(BlockType type) => type is not BlockType.Divider and not BlockType.Image and not BlockType.Equation;
+    private static bool IsEditableBlockType(BlockType type) =>
+        type is not BlockType.Divider and not BlockType.Image and not BlockType.Equation and not BlockType.Page;
 
     #endregion
 
@@ -1406,6 +1407,22 @@ public partial class EditableBlock : UserControl
             }
         }
 
+        if (blockType == BlockType.Page)
+        {
+            var editor = FindParentBlockEditor();
+            if (editor == null
+                || string.IsNullOrEmpty(editor.HostNoteId)
+                || editor.CreateChildPageUnderNoteAsync == null)
+            {
+                _stateManager.SetNormal();
+                _focusManager?.ClearCache();
+                return;
+            }
+
+            _ = CompleteSlashPageBlockAsync(editor);
+            return;
+        }
+
         _viewModel.NotifyStructuralChangeStarting();
         _viewModel.Type = blockType;
         _viewModel.Content = string.Empty;
@@ -1420,6 +1437,39 @@ public partial class EditableBlock : UserControl
         {
             _viewModel.IsFocused = true;
             Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
+        }
+    }
+
+    private async Task CompleteSlashPageBlockAsync(BlockEditor editor)
+    {
+        if (_viewModel == null || _stateManager == null) return;
+        try
+        {
+            var newId = await editor.CreateChildPageUnderNoteAsync!(editor.HostNoteId!).ConfigureAwait(true);
+            if (string.IsNullOrEmpty(newId))
+                return;
+
+            _viewModel.NotifyStructuralChangeStarting();
+            _viewModel.Type = BlockType.Page;
+            _viewModel.ReferenceNoteId = newId;
+            _viewModel.RefreshPageButtonTitle(editor.NoteTitleResolver, editor.PageBlockMissingTitle, editor.ChildPageCountResolver);
+
+            var added = EnsureEditableBlockBelowIfNeeded();
+            if (!added)
+            {
+                _viewModel.IsFocused = true;
+                Dispatcher.UIThread.Post(() => _focusManager?.FocusTextBox(), DispatcherPriority.Loaded);
+            }
+
+            if (editor.FlushPendingNoteSaveAsync != null)
+                await editor.FlushPendingNoteSaveAsync().ConfigureAwait(true);
+
+            editor.NotifyBlocksChanged();
+        }
+        finally
+        {
+            _stateManager.SetNormal();
+            _focusManager?.ClearCache();
         }
     }
 

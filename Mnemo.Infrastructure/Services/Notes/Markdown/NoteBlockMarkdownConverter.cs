@@ -40,6 +40,9 @@ public static class NoteBlockMarkdownConverter
         var isChecked = GetChecklistChecked(block);
         return block.Type switch
         {
+            BlockType.Page => block.Payload is PagePayload pp
+                ? "[[" + "page:" + pp.ReferenceNoteId + "]]"
+                : "[[page:]]",
             BlockType.Text => body,
             BlockType.Heading1 => $"# {body}",
             BlockType.Heading2 => $"## {body}",
@@ -153,6 +156,23 @@ public static class NoteBlockMarkdownConverter
                     Meta = new Dictionary<string, object>()
                 };
                 result.Add(codeBlock);
+                continue;
+            }
+
+            var pageRef = Regex.Match(trimmed, @"^\[\[page:([^\]]*)\]\]\s*$");
+            if (pageRef.Success)
+            {
+                var refId = pageRef.Groups[1].Value.Trim();
+                var pageBlock = new Block
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Type = BlockType.Page,
+                    Order = order++,
+                    Payload = new PagePayload(refId),
+                    Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) }
+                };
+                result.Add(pageBlock);
+                i++;
                 continue;
             }
 

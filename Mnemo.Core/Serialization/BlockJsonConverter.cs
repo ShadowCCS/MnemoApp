@@ -91,8 +91,20 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
         if (block.Type == BlockType.Equation)
             block.Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
 
+        if (block.Type == BlockType.Page)
+            block.Spans = new List<InlineSpan> { InlineSpan.Plain(string.Empty) };
+
         block.Spans = InlineSpanFormatApplier.Normalize(block.Spans);
         return block;
+    }
+
+    private static string ReadPageReferenceNoteId(JsonElement el)
+    {
+        if (TryGetPropertyCaseInsensitive(el, "referenceNoteId", out var rn) && rn.ValueKind == JsonValueKind.String)
+            return rn.GetString() ?? string.Empty;
+        if (TryGetPropertyCaseInsensitive(el, "reference_note_id", out var rn2) && rn2.ValueKind == JsonValueKind.String)
+            return rn2.GetString() ?? string.Empty;
+        return string.Empty;
     }
 
     private static BlockPayload ReadPayload(JsonElement el)
@@ -116,6 +128,7 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
                 TryGetPropertyCaseInsensitive(el, "checked", out var ch) && ch.ValueKind == JsonValueKind.True),
             "twocolumn" => new TwoColumnPayload(
                 TryGetPropertyCaseInsensitive(el, "splitRatio", out var sr) && sr.TryGetDouble(out var s) ? s : 0.5),
+            "page" => new PagePayload(ReadPageReferenceNoteId(el)),
             "empty" => new EmptyPayload(),
             null or "" => new EmptyPayload(),
             _ => throw new JsonException($"Unknown block payload kind '{kind}'.")
@@ -252,6 +265,10 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
                 writer.WriteString("kind", "twoColumn");
                 writer.WriteNumber("splitRatio", tc.SplitRatio);
                 break;
+            case PagePayload pg:
+                writer.WriteString("kind", "page");
+                writer.WriteString("referenceNoteId", pg.ReferenceNoteId ?? string.Empty);
+                break;
             default:
                 throw new UnreachableException($"Unknown block payload type: {payload.GetType().Name}");
         }
@@ -279,6 +296,8 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
                 return new ChecklistPayload(ReadMetaBool(meta, "checked"));
             case BlockType.TwoColumn:
                 return new TwoColumnPayload(NormalizeSplitRatio(ReadMetaDouble(meta, "columnSplitRatio")));
+            case BlockType.Page:
+                return new PagePayload(ReadMetaString(meta, "reference_note_id"));
             default:
                 return new EmptyPayload();
         }
@@ -403,6 +422,8 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
         var payloadToWrite = value.Payload;
         if (value.Type == BlockType.TwoColumn && payloadToWrite is EmptyPayload)
             payloadToWrite = new TwoColumnPayload(NormalizeSplitRatio(ReadMetaDouble(value.Meta ?? new Dictionary<string, object>(), "columnSplitRatio")));
+        if (value.Type == BlockType.Page && payloadToWrite is EmptyPayload)
+            payloadToWrite = new PagePayload(ReadMetaString(value.Meta ?? new Dictionary<string, object>(), "reference_note_id"));
         WritePayload(writer, payloadToWrite);
 
         writer.WritePropertyName("meta");
@@ -410,6 +431,12 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
         {
             var m = new Dictionary<string, object>(value.Meta ?? new Dictionary<string, object>());
             m.Remove("columnSplitRatio");
+            JsonSerializer.Serialize(writer, m, options);
+        }
+        else if (value.Type == BlockType.Page)
+        {
+            var m = new Dictionary<string, object>(value.Meta ?? new Dictionary<string, object>());
+            m.Remove("reference_note_id");
             JsonSerializer.Serialize(writer, m, options);
         }
         else if (value.Type == BlockType.Image)

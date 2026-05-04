@@ -50,14 +50,22 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     /// </summary>
     private bool _isRefreshingCollections;
 
+    /// <summary>When true, clearing <see cref="SelectedTreeItem"/> must not clear <see cref="SelectedNote"/> (e.g. opening a nested page from a page block not listed in the sidebar).</summary>
+    private bool _suppressSelectedNoteClearOnTreeItemNull;
+
+    /// <summary>Notes shown in the folder tree / flat sidebar lists. Child pages from page blocks are editor-only.</summary>
+    private static bool IsSidebarListedNote(Note n) => string.IsNullOrEmpty(n.ParentNoteId);
+
     [ObservableProperty]
     private NoteTreeItemViewModel? _selectedTreeItem;
 
     [ObservableProperty]
     private bool _isLoading = true;
 
-    [ObservableProperty]
-    private string _breadcrumbText = string.Empty;
+    /// <summary>
+    /// Breadcrumb view model for the note hierarchy navigation (supports nested page breadcrumbs with overflow).
+    /// </summary>
+    public NoteBreadcrumbViewModel NoteBreadcrumb { get; }
 
     [ObservableProperty]
     private string _createdText = string.Empty;
@@ -118,6 +126,8 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         _statistics = statistics;
         _logger = logger;
 
+        NoteBreadcrumb = new NoteBreadcrumbViewModel(() => Notes, folderService, NavigateToNoteById);
+
         _settingsService.SettingChanged += OnSettingChanged;
     }
 
@@ -170,6 +180,8 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
                     matchingItem = AllNotesTreeItems.FirstOrDefault(i => i.Note?.NoteId == noteIdToSelect);
                 if (matchingItem != null)
                     SelectedTreeItem = matchingItem;
+                else
+                    NavigateToNoteById(noteIdToSelect);
             }
 
             var sidebarOpen = await _settingsService.GetAsync(NotesSidebarOpenKey, true);
@@ -187,7 +199,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     {
         var list = notes ?? Notes.ToList();
         AllNotesTreeItems.Clear();
-        foreach (var note in list.OrderByDescending(n => n.ModifiedAt))
+        foreach (var note in list.Where(IsSidebarListedNote).OrderByDescending(n => n.ModifiedAt))
             AllNotesTreeItems.Add(new NoteTreeItemViewModel(note));
     }
 
@@ -211,7 +223,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         try
         {
             FavouriteNotes.Clear();
-            foreach (var note in Notes.Where(n => n.IsFavorite).OrderByDescending(n => n.ModifiedAt))
+            foreach (var note in Notes.Where(n => n.IsFavorite && IsSidebarListedNote(n)).OrderByDescending(n => n.ModifiedAt))
                 FavouriteNotes.Add(new NoteTreeItemViewModel(note));
         }
         finally
@@ -235,12 +247,12 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             .OrderBy(f => f.Order).ThenBy(f => f.Name)
             .ToList();
         var rootNotes = notes
-            .Where(n => string.IsNullOrEmpty(n.FolderId))
+            .Where(n => string.IsNullOrEmpty(n.FolderId) && IsSidebarListedNote(n))
             .OrderBy(n => n.Order)
             .ThenByDescending(n => n.ModifiedAt)
             .ToList();
         var orphanNotes = notes
-            .Where(n => !string.IsNullOrEmpty(n.FolderId) && !folderIds.Contains(n.FolderId))
+            .Where(n => !string.IsNullOrEmpty(n.FolderId) && !folderIds.Contains(n.FolderId) && IsSidebarListedNote(n))
             .OrderByDescending(n => n.ModifiedAt)
             .ToList();
 
@@ -320,7 +332,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     private void AddChildren(NoteTreeItemViewModel node, string parentFolderId, List<NoteFolder> folders, List<Note> notes)
     {
         var childFolders = folders.Where(f => f.ParentId == parentFolderId).OrderBy(f => f.Order).ThenBy(f => f.Name).ToList();
-        var childNotes = notes.Where(n => n.FolderId == parentFolderId).OrderBy(n => n.Order).ThenByDescending(n => n.ModifiedAt).ToList();
+        var childNotes = notes.Where(n => n.FolderId == parentFolderId && IsSidebarListedNote(n)).OrderBy(n => n.Order).ThenByDescending(n => n.ModifiedAt).ToList();
 
         foreach (var f in childFolders)
         {
@@ -354,6 +366,9 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
         if (value == null && _isRefreshingCollections)
             return;
 
+        if (value == null && _suppressSelectedNoteClearOnTreeItemNull)
+            return;
+
         if (value == null)
         {
             _lastSelectedNoteTreeItem = null;
@@ -374,7 +389,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     {
         if (value == null)
         {
-            BreadcrumbText = string.Empty;
+            NoteBreadcrumb.BuildForNote(null, _foldersById);
             CreatedText = string.Empty;
             ModifiedText = string.Empty;
             IsFavorite = false;
@@ -390,19 +405,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
 
         IsFavorite = value.IsFavorite;
 
-        if (!string.IsNullOrEmpty(value.FolderPath))
-        {
-            BreadcrumbText = value.FolderPath.TrimEnd('/').TrimEnd().Replace("/", " / ") + " / " + title;
-        }
-        else if (value.FolderId != null && _foldersById.TryGetValue(value.FolderId, out var folder))
-        {
-            var path = GetFolderPath(folder);
-            BreadcrumbText = path.Count > 0 ? string.Join(" / ", path) + " / " + title : title;
-        }
-        else
-        {
-            BreadcrumbText = title;
-        }
+        NoteBreadcrumb.BuildForNote(value, _foldersById);
 
         CreatedText = FormatRelative(value.CreatedAt, "Created", "Notes");
         ModifiedText = FormatRelative(value.ModifiedAt, "LastModified", "Notes");
@@ -411,18 +414,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     private void RefreshBreadcrumbText()
     {
         if (SelectedNote == null) return;
-        var value = SelectedNote;
-        var noteTitle = value.Title ?? string.Empty;
-        if (!string.IsNullOrEmpty(value.FolderPath))
-            BreadcrumbText = value.FolderPath.TrimEnd('/').TrimEnd().Replace("/", " / ") + " / " + noteTitle;
-        else if (value.FolderId != null && _foldersById.TryGetValue(value.FolderId, out var folder))
-        {
-            var path = GetFolderPath(folder);
-            BreadcrumbText = path.Count > 0 ? string.Join(" / ", path) + " / " + noteTitle : noteTitle;
-        }
-        else
-            BreadcrumbText = noteTitle;
-        OnPropertyChanged(nameof(BreadcrumbText));
+        NoteBreadcrumb.BuildForNote(SelectedNote, _foldersById);
     }
 
     private List<string> GetFolderPath(NoteFolder folder)
@@ -564,6 +556,74 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             StatisticsNamespaces.Notes, NoteStatKinds.LifetimeTotals, "total_notes_created");
     }
 
+    public string? ResolveNoteTitleForPageBlock(string noteId)
+    {
+        if (string.IsNullOrEmpty(noteId)) return null;
+        return Notes.FirstOrDefault(n => n.NoteId == noteId)?.Title;
+    }
+
+    /// <summary>Direct child pages of <paramref name="noteId"/> (notes with <see cref="Note.ParentNoteId"/> set).</summary>
+    public int CountDirectChildPagesForNote(string noteId)
+    {
+        if (string.IsNullOrEmpty(noteId)) return 0;
+        return Notes.Count(n => string.Equals(n.ParentNoteId, noteId, StringComparison.Ordinal));
+    }
+
+    public async Task<string?> CreateChildPageNoteUnderParentAsync(string parentNoteId)
+    {
+        var parent = Notes.FirstOrDefault(n => n.NoteId == parentNoteId);
+        if (parent == null) return null;
+
+        var maxOrder = Notes.Where(n => n.FolderId == parent.FolderId).Select(n => n.Order).DefaultIfEmpty(0).Max();
+        var child = new Note
+        {
+            Title = "Untitled",
+            FolderId = parent.FolderId,
+            FolderPath = parent.FolderPath,
+            ParentNoteId = parentNoteId,
+            Order = maxOrder + 1
+        };
+
+        Notes.Add(child);
+        await _noteService.SaveNoteAsync(child);
+
+        _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
+            StatisticsNamespaces.Notes, NoteStatKinds.DailySummary, "notes_created");
+        _ = StatisticsRecorder.IncrementLifetimeAsync(_statistics, _logger,
+            StatisticsNamespaces.Notes, NoteStatKinds.LifetimeTotals, "total_notes_created");
+
+        return child.NoteId;
+    }
+
+    public void NavigateToNoteById(string? noteId)
+    {
+        if (string.IsNullOrWhiteSpace(noteId)) return;
+        var id = noteId.Trim();
+        var note = Notes.FirstOrDefault(n => n.NoteId == id);
+        if (note == null) return;
+
+        var item = AllNotesTreeItems.FirstOrDefault(i => i.Note?.NoteId == id)
+            ?? FindTreeItemByNoteId(RootTreeItems, id);
+        if (item != null)
+        {
+            SelectedTreeItem = item;
+            return;
+        }
+
+        _suppressSelectedNoteClearOnTreeItemNull = true;
+        try
+        {
+            SelectedNote = note;
+            SelectedTreeItem = null;
+        }
+        finally
+        {
+            _suppressSelectedNoteClearOnTreeItemNull = false;
+        }
+
+        _lastSelectedNoteTreeItem = null;
+    }
+
     [RelayCommand]
     private async Task DuplicateNoteAsync(NoteTreeItemViewModel? item)
     {
@@ -586,6 +646,7 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
             Title = FormatDuplicateNoteTitle(source.Title),
             FolderId = source.FolderId,
             FolderPath = source.FolderPath,
+            ParentNoteId = null,
             Content = source.Content ?? string.Empty,
             Blocks = CloneNoteBlocksForDuplicate(source.Blocks),
             Order = source.Order + 1,
