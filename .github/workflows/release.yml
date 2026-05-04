@@ -40,10 +40,18 @@ jobs:
       - name: Restore vpk tool
         run: dotnet tool restore
 
+      # Tags are v1.2.3; NuGet / MSBuild Version must be semver without the leading v.
+      - name: Resolve semver from tag
+        id: version
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: echo "semver=${TAG#v}" >> "$GITHUB_OUTPUT"
+
       - name: Publish
         run: >
           dotnet publish Mnemo.UI/Mnemo.UI.csproj -c Release -r ${{ matrix.rid }} --self-contained true
-          -p:Version=${{ github.ref_name }}
+          -p:Version=${{ steps.version.outputs.semver }}
           -p:AssemblyInformationalVersion=${{ github.ref_name }}
           -o publish
 
@@ -53,7 +61,7 @@ jobs:
           --packId Mnemo.Desktop
           --packTitle Mnemo
           --packAuthors Mnemo
-          --packVersion ${{ github.ref_name }}
+          --packVersion ${{ steps.version.outputs.semver }}
           --packDir publish
           --mainExe ${{ matrix.mainexe }}
           -o vpk-out
