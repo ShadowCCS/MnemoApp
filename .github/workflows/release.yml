@@ -24,7 +24,8 @@ jobs:
             os: ubuntu-latest
             mainexe: Mnemo.UI
           - rid: osx-x64
-            os: macos-13
+            # macos-13 is largely retired on GHA; cross-publish osx-x64 from a current image.
+            os: macos-14
             mainexe: Mnemo.UI
           - rid: osx-arm64
             os: macos-14
