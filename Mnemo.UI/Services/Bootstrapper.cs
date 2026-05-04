@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -172,7 +172,9 @@ public static class Bootstrapper
         services.AddSingleton<NavigationStatisticsTracker>();
 
         // 3. Discover modules and register translation sources (before building provider)
+        var discoverSw = Stopwatch.StartNew();
         var modules = DiscoverModules();
+        Console.WriteLine($"DiscoverModules: {discoverSw.ElapsedMilliseconds}ms");
         var translationRegistry = new TranslationSourceRegistry();
         translationRegistry.Add(new EmbeddedBuiltInTranslationSource());
         foreach (var module in modules)
@@ -191,7 +193,9 @@ public static class Bootstrapper
             module.ConfigureServices(registrar);
         }
 
+        var buildSpSw = Stopwatch.StartNew();
         var serviceProvider = services.BuildServiceProvider();
+        Console.WriteLine($"BuildServiceProvider: {buildSpSw.ElapsedMilliseconds}ms");
 
         var logger = serviceProvider.GetRequiredService<ILoggerService>();
 
@@ -256,10 +260,22 @@ public static class Bootstrapper
 
         foreach (var module in modules)
         {
+            var moduleName = module.GetType().Name;
+            var regSw = Stopwatch.StartNew();
             module.RegisterRoutes(navRegistry);
+            Console.WriteLine($"{moduleName}.RegisterRoutes: {regSw.ElapsedMilliseconds}ms");
+
+            regSw.Restart();
             module.RegisterSidebarItems(sidebarService);
+            Console.WriteLine($"{moduleName}.RegisterSidebarItems: {regSw.ElapsedMilliseconds}ms");
+
+            regSw.Restart();
             module.RegisterTools(funcRegistry, serviceProvider);
+            Console.WriteLine($"{moduleName}.RegisterTools: {regSw.ElapsedMilliseconds}ms");
+
+            regSw.Restart();
             module.RegisterWidgets(widgetRegistry, serviceProvider);
+            Console.WriteLine($"{moduleName}.RegisterWidgets: {regSw.ElapsedMilliseconds}ms");
         }
 
         ToolManifestValidator.ValidateAndLog(skillRegistry, funcRegistry, logger);
@@ -284,9 +300,9 @@ public static class Bootstrapper
 
     private static IEnumerable<IModule> DiscoverModules()
     {
-        // For now, scan all loaded assemblies. 
-        // In the future, we can add Assembly.LoadFrom for a Modules folder.
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Scan Mnemo.* assemblies only; plugin assemblies can be loaded into the AppDomain before discovery.
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => a.FullName?.StartsWith("Mnemo.", StringComparison.Ordinal) == true);
         var moduleType = typeof(IModule);
         
         var foundModules = new List<IModule>();

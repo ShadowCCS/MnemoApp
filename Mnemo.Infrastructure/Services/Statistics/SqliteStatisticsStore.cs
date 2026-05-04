@@ -23,6 +23,7 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
     private readonly string _connectionString;
     private readonly ILoggerService _logger;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private readonly Lazy<Task> _initTask;
 
     public SqliteStatisticsStore(ILoggerService logger)
     {
@@ -32,15 +33,23 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
         if (!string.IsNullOrWhiteSpace(dbDir))
             Directory.CreateDirectory(dbDir);
         _connectionString = $"Data Source={dbPath}";
-        InitializeDatabase();
+        _initTask = new Lazy<Task>(() => InitializeDatabaseAsync());
     }
 
-    private void InitializeDatabase()
+    private async Task EnsureInitializedAsync(CancellationToken cancellationToken)
     {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = $@"CREATE TABLE IF NOT EXISTS {TableName} (
+        cancellationToken.ThrowIfCancellationRequested();
+        await _initTask.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task InitializeDatabaseAsync()
+    {
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync().ConfigureAwait(false);
+            using var command = connection.CreateCommand();
+            command.CommandText = $@"CREATE TABLE IF NOT EXISTS {TableName} (
             Namespace   TEXT NOT NULL,
             Kind        TEXT NOT NULL,
             Key         TEXT NOT NULL,
@@ -52,12 +61,18 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
             MetadataJson TEXT,
             PRIMARY KEY (Namespace, Kind, Key)
         );";
-        command.ExecuteNonQuery();
+            await command.ExecuteNonQueryAsync().ConfigureAwait(false);
 
-        using var indexCmd = connection.CreateCommand();
-        indexCmd.CommandText =
-            $"CREATE INDEX IF NOT EXISTS IX_{TableName}_Updated ON {TableName} (Namespace, Kind, UpdatedAt DESC);";
-        indexCmd.ExecuteNonQuery();
+            using var indexCmd = connection.CreateCommand();
+            indexCmd.CommandText =
+                $"CREATE INDEX IF NOT EXISTS IX_{TableName}_Updated ON {TableName} (Namespace, Kind, UpdatedAt DESC);";
+            await indexCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Statistics", "Statistics database initialization failed.", ex);
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -66,6 +81,7 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             using var cmd = connection.CreateCommand();
@@ -92,6 +108,7 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             using var cmd = connection.CreateCommand();
@@ -115,6 +132,7 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
         if (record == null) throw new ArgumentNullException(nameof(record));
         cancellationToken.ThrowIfCancellationRequested();
 
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -140,6 +158,7 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
         if (record == null) throw new ArgumentNullException(nameof(record));
         cancellationToken.ThrowIfCancellationRequested();
 
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -177,6 +196,7 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -203,6 +223,7 @@ internal sealed class SqliteStatisticsStore : IStatisticsStore
 
         var limit = query.Limit > 0 ? Math.Min(query.Limit, 1000) : 100;
 
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         using var cmd = connection.CreateCommand();

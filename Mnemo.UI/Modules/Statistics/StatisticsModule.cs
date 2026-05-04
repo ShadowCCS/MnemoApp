@@ -33,6 +33,7 @@ public sealed class StatisticsModule : IModule
     public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
     {
         var stats = services.GetRequiredService<IStatisticsManager>();
+        // RegisterSchemaAsync is in-memory only; .GetAwaiter().GetResult() avoids async signature on IModule.
         RegisterBuiltInSchemas(stats);
 
         var tools = services.GetRequiredService<StatisticsToolService>();

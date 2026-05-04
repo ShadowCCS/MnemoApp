@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Mnemo.Infrastructure.Common;
@@ -13,6 +14,7 @@ public class SqliteStorageProvider : IStorageProvider
 {
     private readonly string _connectionString;
     private readonly ILoggerService _logger;
+    private readonly Lazy<Task> _initTask;
 
     public SqliteStorageProvider(ILoggerService logger)
     {
@@ -24,32 +26,43 @@ public class SqliteStorageProvider : IStorageProvider
             Directory.CreateDirectory(dbDir);
         }
         _connectionString = $"Data Source={dbPath}";
-        InitializeDatabase();
+        _initTask = new Lazy<Task>(() => InitializeDatabaseAsync());
     }
 
-    private void InitializeDatabase()
+    private async Task EnsureInitializedAsync()
     {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-        using var command = connection.CreateCommand();
-        
-        // Storage table
-        command.CommandText = "CREATE TABLE IF NOT EXISTS Storage (Key TEXT PRIMARY KEY, Value TEXT)";
-        command.ExecuteNonQuery();
+        await _initTask.Value.ConfigureAwait(false);
+    }
 
-        // Versioning table
-        command.CommandText = "CREATE TABLE IF NOT EXISTS DbVersion (Version INTEGER PRIMARY KEY, AppliedAt TEXT)";
-        command.ExecuteNonQuery();
-
-        // Check current version
-        command.CommandText = "SELECT COUNT(*) FROM DbVersion";
-        var count = Convert.ToInt32(command.ExecuteScalar());
-        if (count == 0)
+    private async Task InitializeDatabaseAsync()
+    {
+        try
         {
-            command.CommandText = "INSERT INTO DbVersion (Version, AppliedAt) VALUES (1, $date)";
-            command.Parameters.Clear();
-            command.Parameters.AddWithValue("$date", DateTime.UtcNow.ToString("O"));
-            command.ExecuteNonQuery();
+            using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(CancellationToken.None).ConfigureAwait(false);
+            using var command = connection.CreateCommand();
+
+            command.CommandText = "CREATE TABLE IF NOT EXISTS Storage (Key TEXT PRIMARY KEY, Value TEXT)";
+            await command.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
+
+            command.CommandText = "CREATE TABLE IF NOT EXISTS DbVersion (Version INTEGER PRIMARY KEY, AppliedAt TEXT)";
+            await command.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
+
+            command.CommandText = "SELECT COUNT(*) FROM DbVersion";
+            var countObj = await command.ExecuteScalarAsync(CancellationToken.None).ConfigureAwait(false);
+            var count = Convert.ToInt32(countObj);
+            if (count == 0)
+            {
+                command.CommandText = "INSERT INTO DbVersion (Version, AppliedAt) VALUES (1, $date)";
+                command.Parameters.Clear();
+                command.Parameters.AddWithValue("$date", DateTime.UtcNow.ToString("O"));
+                await command.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Storage", "Storage database initialization failed.", ex);
+            throw;
         }
     }
 
@@ -57,6 +70,7 @@ public class SqliteStorageProvider : IStorageProvider
     {
         try
         {
+            await EnsureInitializedAsync().ConfigureAwait(false);
             var json = JsonSerializer.Serialize(data);
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
@@ -78,6 +92,7 @@ public class SqliteStorageProvider : IStorageProvider
     {
         try
         {
+            await EnsureInitializedAsync().ConfigureAwait(false);
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
             var command = connection.CreateCommand();
@@ -102,6 +117,7 @@ public class SqliteStorageProvider : IStorageProvider
     {
         try
         {
+            await EnsureInitializedAsync().ConfigureAwait(false);
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
             var command = connection.CreateCommand();
