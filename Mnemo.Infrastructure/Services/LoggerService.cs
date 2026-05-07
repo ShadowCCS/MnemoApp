@@ -12,7 +12,13 @@ public class LoggerService : ILoggerService
 
     public LoggerService()
     {
-        var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(localAppData))
+        {
+            localAppData = AppContext.BaseDirectory;
+        }
+
+        var logDir = Path.Combine(localAppData, "Mnemo", "logs");
         if (!Directory.Exists(logDir))
         {
             Directory.CreateDirectory(logDir);
