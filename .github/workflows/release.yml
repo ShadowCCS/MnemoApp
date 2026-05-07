@@ -1,6 +1,6 @@
-# Builds Velopack installers per RID and attaches them to the GitHub release for the pushed tag.
-# Prereq: create the release (or draft) for the tag on GitHub before/with the tag push, or extend this workflow to create it.
-# Portable Windows zip is included for non-Setup users.
+# Builds Velopack installers per RID.
+# GitHub Release assets remain user-facing only (installer/portable binaries).
+# Update-feed files are published as a separate workflow artifact.
 name: Release packages
 
 on:
@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -92,6 +94,67 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: artifacts/**/*
+          files: |
+            artifacts/**/Mnemo-Portable-*.zip
+            artifacts/**/*.AppImage
+            artifacts/**/*Setup.exe
+            artifacts/**/*Setup.pkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-update-feed-artifact:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: vpk-*
+          merge-multiple: true
+
+      - name: Upload update feed files
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-feed-stable-${{ github.ref_name }}
+          path: |
+            artifacts/**/*.nupkg
+            artifacts/**/RELEASES-*
+            artifacts/**/releases.*.json
+            artifacts/**/assets.*.json
+          if-no-files-found: error
+
+  publish-update-feed-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: vpk-*
+          merge-multiple: true
+
+      - name: Build update feed site payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p feed/updates/stable
+          shopt -s globstar nullglob
+          for f in artifacts/**/*.nupkg artifacts/**/RELEASES-* artifacts/**/releases.*.json artifacts/**/assets.*.json; do
+            cp "$f" feed/updates/stable/
+          done
+          ls -la feed/updates/stable
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: feed
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
