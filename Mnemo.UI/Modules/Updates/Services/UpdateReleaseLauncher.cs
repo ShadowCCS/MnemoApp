@@ -7,7 +7,7 @@ namespace Mnemo.UI.Modules.Updates.Services;
 
 public static class UpdateReleaseLauncher
 {
-    public const string LatestReleaseUrl = "https://github.com/onemneo/mnemo/releases/latest";
+    public const string LatestReleaseUrl = "https://github.com/onemnemo/mnemo/releases/latest";
 
     public static async Task LaunchLatestAsync()
     {

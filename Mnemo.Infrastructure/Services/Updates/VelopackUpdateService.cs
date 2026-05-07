@@ -16,8 +16,9 @@ namespace Mnemo.Infrastructure.Services.Updates;
 
 public sealed class VelopackUpdateService : IUpdateService, IDisposable
 {
-    private const string GithubRepoUrl = "https://github.com/onemneo/mnemo";
-    private static readonly Uri ReleasesLatestApi = new("https://api.github.com/repos/onemneo/mnemo/releases/latest");
+    private const string GithubRepoUrl = "https://github.com/onemnemo/mnemo";
+    private const string StableFeedUrl = "https://onemnemo.github.io/mnemo/updates/stable/";
+    private static readonly Uri ReleasesLatestApi = new("https://api.github.com/repos/onemnemo/mnemo/releases/latest");
 
     private readonly ILoggerService _logger;
     private readonly HttpClient _httpClient;
@@ -39,7 +40,8 @@ public sealed class VelopackUpdateService : IUpdateService, IDisposable
         if (_updateManager != null)
             return _updateManager;
 
-        var source = new GithubSource(GithubRepoUrl, accessToken: null, prerelease: false);
+        // Feed payload (RELEASES + nupkg) is published to GitHub Pages by CI.
+        var source = new SimpleWebSource(StableFeedUrl);
         _updateManager = new UpdateManager(source, new UpdateOptions(), locator: null);
         return _updateManager;
     }
