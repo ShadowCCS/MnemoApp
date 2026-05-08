@@ -65,7 +65,7 @@
                         Classes="ghost"
                         Command="{Binding CloseStudyLauncherCommand}"
                         Padding="8">
-                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                                       Width="20"
                                       Height="20"
                                       Color="{DynamicResource TextSecondaryBrush}" />

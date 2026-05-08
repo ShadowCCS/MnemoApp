@@ -359,13 +359,14 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         if (coordinator == null || overlayService == null)
             return;
 
+        var localization = services.GetService<ILocalizationService>();
         var capabilities = coordinator.GetCapabilities("flashcards").Where(c => c.SupportsExport).ToArray();
-        var overlay = new TransferOverlay
-        {
-            Title = "Transfer Deck",
-            Description = "Choose format and settings.",
-            ConfirmText = "Export"
-        };
+        var overlay = new TransferOverlay();
+        overlay.SetLocalizedChrome(
+            "TransferDeckOverlayTitle", "Flashcards",
+            "TransferOverlayDescription", "Flashcards",
+            "Export", "Flashcards",
+            "Cancel", "Common");
         overlay.Initialize(capabilities, defaultImport: false);
 
         var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions

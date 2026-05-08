@@ -207,7 +207,7 @@
                             Cursor="Hand"
                             Command="{Binding ToggleChatHistorySidebarCommand}"
                             ToolTip.Tip="{markup:T Ns=Notes, Key=ToggleSidebar}">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-sidebar.svg"
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/layout-sidebar.svg"
                                           Width="20" Height="20"
                                           Color="{DynamicResource TextSecondaryBrush}"/>
                     </Button>
@@ -218,7 +218,7 @@
                             Cursor="Hand"
                             Command="{Binding NewChatCommand}"
                             ToolTip.Tip="{markup:T Ns=Chat, Key=NewChat}">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/plus.svg"
                                           Width="20" Height="20"
                                           Color="{DynamicResource TextPrimaryBrush}"/>
                     </Button>
@@ -241,7 +241,7 @@
                                 Cursor="Hand"
                                 Command="{Binding ToggleChatHistorySidebarCommand}"
                                 ToolTip.Tip="{markup:T Ns=Notes, Key=ToggleSidebar}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-sidebar.svg"
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/layout-sidebar.svg"
                                               Width="20" Height="20"
                                               Color="{DynamicResource TextSecondaryBrush}"/>
                         </Button>
@@ -252,7 +252,7 @@
                             HorizontalAlignment="Stretch"
                             Margin="0,0,0,12">
                         <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/plus.svg"
                                               Width="15" Height="15"
                                               Color="{DynamicResource TextPrimaryBrush}"
                                               VerticalAlignment="Center"/>
@@ -302,7 +302,7 @@
                                                     <Button.IsEnabled>
                                                         <Binding ElementName="ChatRoot" Path="HistoryNavigationEnabled"/>
                                                     </Button.IsEnabled>
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/dots-vertical-filled.svg"
                                                                       Width="16" Height="16"
                                                                       Color="{DynamicResource TextSecondaryBrush}"/>
                                                     <Button.Flyout>
@@ -348,7 +348,7 @@
                         Width="40" Height="40"
                         CornerRadius="12"
                         BoxShadow="0 1 4 0 #10000000">
-                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg"
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chart-bubble.svg"
                                       Width="20" Height="20"
                                       HorizontalAlignment="Center" VerticalAlignment="Center"
                                       Color="{DynamicResource AccentButtonIconBrush}"/>
@@ -380,7 +380,7 @@
                                 Background="{DynamicResource CardAccentBrush}"
                                 Margin="0,2,12,0" VerticalAlignment="Top"
                                 BoxShadow="0 1 4 0 #10000000">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg"
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chart-bubble.svg"
                                               Width="14" Height="14"
                                               HorizontalAlignment="Center" VerticalAlignment="Center"
                                               Color="{DynamicResource AccentButtonIconBrush}"/>
@@ -431,7 +431,7 @@
                                                 Background="{DynamicResource CardAccentBrush}"
                                                 Margin="0,2,12,0" VerticalAlignment="Top"
                                                 BoxShadow="0 1 4 0 #10000000">
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg"
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chart-bubble.svg"
                                                               Width="14" Height="14"
                                                               HorizontalAlignment="Center" VerticalAlignment="Center"
                                                               Color="{DynamicResource AccentButtonIconBrush}"/>
@@ -507,7 +507,7 @@
                                                                        FontFamily="{DynamicResource Font.Monospace}"
                                                                        VerticalAlignment="Center"/>
                                                             <controls:SvgIcon Classes="chevron"
-                                                                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-down.svg"
+                                                                              SvgPath="avares://Mnemo.UI/Icons/Common/chevron-down.svg"
                                                                               Width="14" Height="14"
                                                                               Color="{DynamicResource TextFadedBrush}"
                                                                               VerticalAlignment="Center"
@@ -581,7 +581,7 @@
                                                                                                       Margin="0,0,0,4">
                                                                                                 <Expander.Header>
                                                                                                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
-                                                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/external-link.svg"
+                                                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/external-link.svg"
                                                                                                                           Width="13" Height="13"
                                                                                                                           Color="{DynamicResource TextSecondaryBrush}"/>
                                                                                                         <TextBlock Text="{Binding Name}"
@@ -638,7 +638,7 @@
                                                                 Padding="8,4"
                                                                 Margin="0,0,6,6">
                                                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
+                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/file-text.svg"
                                                                                   Width="12" Height="12"
                                                                                   Color="{DynamicResource TextSecondaryBrush}"/>
                                                                 <TextBlock Text="{Binding}"
@@ -674,7 +674,7 @@
                                                         Command="{Binding #ChatRoot.DataContext, Converter={StaticResource ChatViewModelDataContextCommandConverter}, ConverterParameter=Regenerate}"
                                                         CommandParameter="{Binding}"
                                                         ToolTip.Tip="{markup:T Ns=Chat, Key=Regenerate}">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/refresh.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/refresh.svg"
                                                                       Width="18" Height="18"
                                                                       Color="{DynamicResource TextSecondaryBrush}"/>
                                                 </Button>
@@ -683,7 +683,7 @@
                                                         CommandParameter="{Binding}"
                                                         ToolTip.Tip="{markup:T Ns=Chat, Key=CopyMessage}"
                                                         IsEnabled="{Binding HasCopiableAssistantContent}">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/copy.svg"
                                                                       Width="18" Height="18"
                                                                       Color="{DynamicResource TextSecondaryBrush}"/>
                                                 </Button>
@@ -742,7 +742,7 @@
                                                                         <Border Background="{DynamicResource CardBackgroundSecondaryBrush}"
                                                                                 CornerRadius="6"
                                                                                 Padding="6">
-                                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
+                                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/file-text.svg"
                                                                                               Width="16" Height="16"
                                                                                               Color="{DynamicResource TextPrimaryBrush}"/>
                                                                         </Border>
@@ -770,7 +770,7 @@
                                                                                 Padding="4"
                                                                                 Cursor="Hand"
                                                                                 BorderThickness="0">
-                                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-play.svg"
+                                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/player-play.svg"
                                                                                               Width="14" Height="14"
                                                                                               Color="{DynamicResource AccentButtonIconBrush}"/>
                                                                         </Button>
@@ -866,7 +866,7 @@
                             Classes="PromptActionButton" 
                             ToolTip.Tip="{markup:T Ns=Common, Key=Cancel}" 
                             Margin="0,0,8,0">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" 
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg" 
                                           Width="20" Height="20" 
                                           Color="{DynamicResource TextSecondaryBrush}"/>
                     </Button>
@@ -879,7 +879,7 @@
                             Padding="8" 
                             BorderThickness="0"
                             ToolTip.Tip="{markup:T Ns=Chat, Key=Stop}">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-pause.svg" 
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/player-pause.svg" 
                                           Width="16" Height="16" 
                                           Color="{DynamicResource AccentButtonIconBrush}"/>
                     </Button>
@@ -939,7 +939,7 @@
                                                            Source="{Binding Path, Converter={StaticResource LocalPathToBitmapConverter}}"
                                                            Stretch="UniformToFill"
                                                            IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=Image}"/>
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/file-text.svg"
                                                                       Width="16" Height="16"
                                                                       HorizontalAlignment="Center"
                                                                       VerticalAlignment="Center"
@@ -947,7 +947,7 @@
                                                                       IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=File}"/>
                                                     <Border Background="{DynamicResource CardAccentBrush}"
                                                             IsVisible="{Binding Kind, Converter={StaticResource ChatAttachmentKindToBoolConverter}, ConverterParameter=Voice}">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-play.svg"
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/player-play.svg"
                                                                           Width="14" Height="14"
                                                                           HorizontalAlignment="Center"
                                                                           VerticalAlignment="Center"
@@ -966,7 +966,7 @@
                                                     Classes="PromptActionButton"
                                                     Padding="2"
                                                     VerticalAlignment="Center">
-                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                                                                   Width="12" Height="12"
                                                                   Color="{DynamicResource TextSecondaryBrush}"/>
                                             </Button>
@@ -997,19 +997,19 @@
                               Margin="8,0,8,10">
                             <Button Grid.Column="0" Classes="PromptActionButton" Margin="0,0,2,0"
                                     ToolTip.Tip="{markup:T Ns=Chat, Key=AddAttachment}" Click="AddAttachment_Click">
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/upload.svg"
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/upload.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextFadedBrush}"/>
                             </Button>
                             <Button Grid.Column="1" Classes="PromptActionButton" Margin="0,0,2,0"
                                     ToolTip.Tip="{markup:T Ns=Chat, Key=AddImage}" Click="AddImage_Click">
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/polaroid.svg"
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/FormattingToolbar/polaroid.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextFadedBrush}"/>
                             </Button>
                             <Button Grid.Column="2" Classes="PromptActionButton" Margin="0,0,4,0"
                                     ToolTip.Tip="{markup:T Ns=Chat, Key=AddScreenshot}" Click="AddScreenshot_Click">
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/screenshot.svg"
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/screenshot.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextFadedBrush}"/>
                             </Button>
@@ -1073,7 +1073,7 @@
                             <Button Grid.Column="7" Classes="PromptActionButton" Margin="0,0,6,0"
                                     ToolTip.Tip="{markup:T Ns=Chat, Key=VoiceInput}"
                                     Command="{Binding StartRecordingCommand}">
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/microphone.svg"
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/microphone.svg"
                                                   Width="16" Height="16"
                                                   Color="{DynamicResource TextFadedBrush}"/>
                             </Button>
@@ -1087,7 +1087,7 @@
                                         BorderThickness="0"
                                         Width="32" Height="32"
                                         ToolTip.Tip="{markup:T Ns=Chat, Key=SendEnter}">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                                       Width="16" Height="16"
                                                       Color="{DynamicResource AccentButtonIconBrush}">
                                         <controls:SvgIcon.RenderTransform>
@@ -1104,7 +1104,7 @@
                                         BorderThickness="0"
                                         Width="32" Height="32"
                                         ToolTip.Tip="{markup:T Ns=Chat, Key=Stop}">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-pause.svg"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/player-pause.svg"
                                                       Width="16" Height="16"
                                                       Color="{DynamicResource StopButtonForegroundBrush}"/>
                                 </Button>

@@ -202,13 +202,13 @@ public partial class SettingsViewModel : ViewModelBase
 
     private void RebuildCategories(string? preserveCategoryId = null)
     {
-        var account = new SettingsCategoryViewModel(T("Account"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/user.svg", "Account");
+        var account = new SettingsCategoryViewModel(T("Account"), "avares://Mnemo.UI/Icons/Common/user.svg", "Account");
         var profileGroup = new SettingsGroupViewModel(T("Profile"), isCollapsible: true);
         profileGroup.Items.Add(new ProfilePictureSettingViewModel(_settingsService, T("ProfilePicture"), T("ProfilePictureDescription")));
         profileGroup.Items.Add(new NameSettingViewModel(_settingsService, T("DisplayName"), T("DisplayNameDescription")));
         account.Groups.Add(profileGroup);
 
-        var general = new SettingsCategoryViewModel(T("General"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/settings.svg", "General") { IsSelected = true };
+        var general = new SettingsCategoryViewModel(T("General"), "avares://Mnemo.UI/Icons/Sidebar/settings.svg", "General") { IsSelected = true };
 
         var appGroup = new SettingsGroupViewModel(T("Application"), isCollapsible: true);
         appGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.LaunchAtStartup", T("LaunchAtStartup"), T("LaunchAtStartupDescription")));
@@ -223,7 +223,7 @@ public partial class SettingsViewModel : ViewModelBase
         general.Groups.Add(appGroup);
         general.Groups.Add(expGroup);
 
-        var editor = new SettingsCategoryViewModel(T("Editor"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg", "Editor");
+        var editor = new SettingsCategoryViewModel(T("Editor"), "avares://Mnemo.UI/Icons/Common/file-description-filled.svg", "Editor");
 
         var editorGroup = new SettingsGroupViewModel(T("WritingExperience"), isCollapsible: true);
         editorGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "Editor.AutoSave", T("AutoSave"), T("AutoSaveDescription"), true));
@@ -250,7 +250,7 @@ public partial class SettingsViewModel : ViewModelBase
         editor.Groups.Add(editorGroup);
         editor.Groups.Add(markdownGroup);
 
-        var aiTools = new SettingsCategoryViewModel(T("AITools"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg", "AITools")
+        var aiTools = new SettingsCategoryViewModel(T("AITools"), "avares://Mnemo.UI/Icons/Common/chart-bubble.svg", "AITools")
         {
             Subtitle = T("AIToolsExperimentalSubtitle")
         };
@@ -332,7 +332,7 @@ public partial class SettingsViewModel : ViewModelBase
         aiTools.Groups.Add(aiGroup);
         aiTools.Groups.Add(ragGroup);
 
-        var appearance = new SettingsCategoryViewModel(T("Appearance"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/template.svg", "Appearance");
+        var appearance = new SettingsCategoryViewModel(T("Appearance"), "avares://Mnemo.UI/Icons/Common/template.svg", "Appearance");
 
         var themeGroup = new SettingsGroupViewModel(T("ThemeVisuals"), isCollapsible: true);
         themeGroup.Items.Add(new ThemeSettingViewModel(_themeService, T("AppTheme"), T("AppThemeDescription")));
@@ -340,7 +340,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         appearance.Groups.Add(themeGroup);
 
-        var updatesCategory = new SettingsCategoryViewModel(T("UpdatesCategoryTitle"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/refresh.svg", "Updates");
+        var updatesCategory = new SettingsCategoryViewModel(T("UpdatesCategoryTitle"), "avares://Mnemo.UI/Icons/Common/refresh-filled.svg", "Updates");
         var updatesGroup = new SettingsGroupViewModel(T("UpdatesGroupTitle"), isCollapsible: true);
         updatesGroup.Items.Add(new ToggleSettingViewModel(_settingsService, UpdateSettingsKeys.AutoCheck, T("AutoCheckUpdates"), T("AutoCheckUpdatesDescription"), true));
         var versionLine = string.Format(T("CurrentVersionLabelFormat"), _updateService.CurrentDisplayVersion);
@@ -355,7 +355,7 @@ public partial class SettingsViewModel : ViewModelBase
             }));
         updatesCategory.Groups.Add(updatesGroup);
 
-        var mindmap = new SettingsCategoryViewModel(T("Mindmap"), "avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg", "Mindmap");
+        var mindmap = new SettingsCategoryViewModel(T("Mindmap"), "avares://Mnemo.UI/Icons/Common/sitemap.svg", "Mindmap");
 
         var gridGroup = new SettingsGroupViewModel(T("GridBackground"), isCollapsible: true);
         gridGroup.Items.Add(new DropdownSettingViewModel(_settingsService, "Mindmap.GridType", T("GridType"), T("GridTypeDescription"), new[] { "None", "Dotted", "Lines" }, null, "Dotted"));
@@ -370,7 +370,7 @@ public partial class SettingsViewModel : ViewModelBase
         mindmap.Groups.Add(gridGroup);
         mindmap.Groups.Add(behaviourGroup);
 
-        var hotkeys = new SettingsCategoryViewModel(T("Hotkeys"), "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg", "Hotkeys");
+        var hotkeys = new SettingsCategoryViewModel(T("Hotkeys"), "avares://Mnemo.UI/Icons/Common/link.svg", "Hotkeys");
         var hotkeysGroup = new SettingsGroupViewModel(T("Shortcuts"), isCollapsible: true);
         hotkeysGroup.Items.Add(new ActionSettingViewModel(T("GlobalQuickActions"), T("GlobalQuickActionsDescription"), T("ChangeBind")));
         hotkeysGroup.Items.Add(new ActionSettingViewModel(T("NewNote"), T("NewNoteDescription"), T("ChangeBind")));
@@ -388,7 +388,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         if (_developerMode)
         {
-            var developer = new SettingsCategoryViewModel("Developer", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout.svg", "Developer")
+            var developer = new SettingsCategoryViewModel("Developer", "avares://Mnemo.UI/Icons/Common/layout.svg", "Developer")
             {
                 Subtitle = "Internal tools and experimental options for development builds."
             };

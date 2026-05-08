@@ -33,14 +33,16 @@ public partial class RecentNotesWidgetViewModel : WidgetViewModelBase
     private readonly INoteService _notes;
     private readonly INavigationService _navigation;
     private readonly ILoggerService _logger;
+    private readonly ILocalizationService _localization;
 
     public ObservableCollection<RecentNoteRow> Items { get; } = new();
 
-    public RecentNotesWidgetViewModel(INoteService notes, INavigationService navigation, ILoggerService logger)
+    public RecentNotesWidgetViewModel(INoteService notes, INavigationService navigation, ILoggerService logger, ILocalizationService localization)
     {
         _notes = notes;
         _navigation = navigation;
         _logger = logger;
+        _localization = localization;
     }
 
     public override async Task InitializeAsync()
@@ -60,7 +62,7 @@ public partial class RecentNotesWidgetViewModel : WidgetViewModelBase
                 Items.Add(new RecentNoteRow
                 {
                     NoteId = n.NoteId,
-                    Title = string.IsNullOrWhiteSpace(n.Title) ? "Untitled" : n.Title.Trim(),
+                    Title = string.IsNullOrWhiteSpace(n.Title) ? _localization.T("Untitled", "RecentNotes") : n.Title.Trim(),
                     FolderLine = string.IsNullOrWhiteSpace(n.FolderPath) ? "—" : n.FolderPath.Trim(),
                     ModifiedColumnText = n.ModifiedAt.ToLocalTime().ToString("MMM dd, yyyy", CultureInfo.CurrentCulture)
                 });

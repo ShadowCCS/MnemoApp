@@ -41,7 +41,7 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Color="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                    SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg" />
+                    SvgPath="avares://Mnemo.UI/Icons/Common/file-text.svg" />
             </Border>
             <StackPanel
                 Grid.Column="1"
@@ -70,7 +70,7 @@
                 Margin="10,0,0,0"
                 VerticalAlignment="Center"
                 Color="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-                SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg" />
+                SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg" />
         </Grid>
     </Button>
 </UserControl>

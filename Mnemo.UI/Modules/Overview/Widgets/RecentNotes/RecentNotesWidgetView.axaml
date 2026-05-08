@@ -55,7 +55,7 @@
                                         Height="36"
                                         CornerRadius="10"
                                         Margin="0,0,12,0">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/file-description.svg"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/file-description-filled.svg"
                                                       Width="18" Height="18"
                                                       Color="{DynamicResource TextPrimaryBrush}"
                                                       HorizontalAlignment="Center"

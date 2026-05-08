@@ -98,7 +98,7 @@
                         Width="18"
                         Height="18"
                         Color="{DynamicResource TextSecondaryBrush}"
-                        SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" />
+                        SvgPath="avares://Mnemo.UI/Icons/Common/x.svg" />
                 </Button>
             </Grid>
 
@@ -137,7 +137,7 @@
                             Width="16"
                             Height="16"
                             Color="{DynamicResource TextPrimaryBrush}"
-                            SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-down.svg" />
+                            SvgPath="avares://Mnemo.UI/Icons/Common/chevron-down.svg" />
                     </Button>
                     <Button
                         Classes="PillButton"

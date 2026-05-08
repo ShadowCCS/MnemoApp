@@ -25,16 +25,17 @@
                         Classes="ghost"
                         Padding="6"
                         Command="{Binding CancelCommand}">
-                    <icons:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                    <icons:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                                    Width="18"
                                    Height="18" />
                 </Button>
             </Grid>
 
             <icons:SegmentedToggle Grid.Row="1"
+                                   x:Name="ModeToggle"
                                    Margin="24,0,24,18"
-                                   LeftText="Import"
-                                   RightText="Export"
+                                   LeftText="{Binding ImportTabText}"
+                                   RightText="{Binding ExportTabText}"
                                    LeftIconPath="avares://Mnemo.UI/Icons/MindmapToolbar/download.svg"
                                    RightIconPath="avares://Mnemo.UI/Icons/Flyout/export.svg"
                                    IsLeftSelected="{Binding IsImportMode}"
@@ -50,10 +51,10 @@
                             Padding="16">
                         <StackPanel Spacing="12">
                             <StackPanel Spacing="4">
-                                <TextBlock Text="File format"
+                                <TextBlock Text="{Binding FileFormatTitle}"
                                            FontFamily="{DynamicResource Font.SemiBold}"
                                            FontSize="{DynamicResource FontSize.Body}" />
-                                <TextBlock Text="Choose which format you want to transfer."
+                                <TextBlock Text="{Binding FileFormatDescription}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            FontSize="{DynamicResource FontSize.Body.Small}" />
                             </StackPanel>
@@ -66,12 +67,12 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
                             <TextBlock IsVisible="{Binding IsImportMode}"
-                                       Text="Import reads cards from a file and merges them into your deck."
+                                       Text="{Binding ImportBodyHint}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="{DynamicResource FontSize.Body.Small}"
                                        TextWrapping="Wrap" />
                             <TextBlock IsVisible="{Binding IsExportMode}"
-                                       Text="Export writes your cards to a file that can be reused elsewhere."
+                                       Text="{Binding ExportBodyHint}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="{DynamicResource FontSize.Body.Small}"
                                        TextWrapping="Wrap" />
@@ -87,19 +88,19 @@
                             Padding="16">
                         <StackPanel Spacing="12">
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Import settings"
+                                <TextBlock Text="{Binding ImportSettingsTitle}"
                                            FontFamily="{DynamicResource Font.SemiBold}"
                                            FontSize="{DynamicResource FontSize.Body}" />
-                                <TextBlock Text="Control how existing cards and unknown fields are handled."
+                                <TextBlock Text="{Binding ImportSettingsDescription}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            FontSize="{DynamicResource FontSize.Body.Small}"
                                            TextWrapping="Wrap" />
                             </StackPanel>
 
                             <StackPanel Spacing="10">
-                                <CheckBox Content="Duplicate on conflict"
+                                <CheckBox Content="{Binding DuplicateOnConflictLabel}"
                                           IsChecked="{Binding DuplicateOnConflict, Mode=TwoWay}" />
-                                <CheckBox Content="Strict unknown payload handling"
+                                <CheckBox Content="{Binding StrictUnknownPayloadsLabel}"
                                           IsChecked="{Binding StrictUnknownPayloads, Mode=TwoWay}" />
                             </StackPanel>
                         </StackPanel>

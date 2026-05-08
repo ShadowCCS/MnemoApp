@@ -359,13 +359,12 @@ public partial class NotesView : UserControl
         var button = sender as Button;
         var startTransfer = string.Equals(button?.Tag?.ToString(), "transfer", StringComparison.OrdinalIgnoreCase);
         var capabilities = coordinator.GetCapabilities("notes");
-        var overlay = new TransferOverlay
-        {
-            Title = localization?.T("TransferOverlayTitle", "Notes") ?? "Notes Import / Export",
-            Description = localization?.T("TransferOverlayDescription", "Notes") ?? "Choose format and settings.",
-            ConfirmText = "Continue",
-            CancelText = "Cancel"
-        };
+        var overlay = new TransferOverlay();
+        overlay.SetLocalizedChrome(
+            "TransferOverlayTitle", "Notes",
+            "TransferOverlayDescription", "Notes",
+            "Continue", "Common",
+            "Cancel", "Common");
         overlay.Initialize(capabilities, startTransfer);
 
         var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions

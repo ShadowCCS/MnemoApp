@@ -253,7 +253,7 @@ public sealed class FlashcardsDragCoordinator : IDisposable
 
         row.Children.Add(new SvgIcon
         {
-            SvgPath = "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg",
+            SvgPath = "avares://Mnemo.UI/Icons/Common/folder.svg",
             Width = 18,
             Height = 18,
             VerticalAlignment = VerticalAlignment.Center,
@@ -282,7 +282,7 @@ public sealed class FlashcardsDragCoordinator : IDisposable
 
         row.Children.Add(new SvgIcon
         {
-            SvgPath = "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg",
+            SvgPath = "avares://Mnemo.UI/Icons/Common/file-text.svg",
             Width = 18,
             Height = 18,
             VerticalAlignment = VerticalAlignment.Center,

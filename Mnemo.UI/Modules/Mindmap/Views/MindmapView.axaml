@@ -413,10 +413,10 @@
                     BoxShadow="{DynamicResource MindmapToolbarBoxShadow}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <Button Command="{Binding UndoCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=UndoTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8" IsEnabled="{Binding CanUndo}">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-left.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
                     </Button>
                     <Button Command="{Binding RedoCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=RedoTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8" IsEnabled="{Binding CanRedo}">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
                     </Button>
                 </StackPanel>
             </Border>
@@ -495,16 +495,16 @@
                                 <TextBlock Text="{markup:T Ns=Mindmap, Key=Tools}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource MindmapToolbarLabelBrush}" LetterSpacing="0.5"/>
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <Button Command="{Binding AddNodeCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=AddNodeTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/circle-plus.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
                                     </Button>
                                     <Button Command="{Binding ConnectSelectedCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=ConnectSelectedTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/link.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
                                     </Button>
                                     <Button Command="{Binding DetachSelectedCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=DetachSelectedTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link-off.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/link-off.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
                                     </Button>
                                     <Button Command="{Binding DeleteSelectedCommand}" Classes="Danger" ToolTip.Tip="{markup:T Ns=Mindmap, Key=DeleteSelectedTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" Width="18" Height="18" Color="{DynamicResource DestructiveButtonColor}"/>
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg" Width="18" Height="18" Color="{DynamicResource DestructiveButtonColor}"/>
                                     </Button>
                                 </StackPanel>
                             </StackPanel>
@@ -547,16 +547,16 @@
                                 <TextBlock Text="{markup:T Ns=Mindmap, Key=Tools}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource MindmapToolbarLabelBrush}" LetterSpacing="0.5"/>
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <Button Command="{Binding AddNodeCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=AddNodeTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/circle-plus.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/circle-plus.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
                                     </Button>
                                     <Button Command="{Binding ConnectSelectedCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=ConnectSelectedTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/link.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
                                     </Button>
                                     <Button Command="{Binding DetachSelectedCommand}" Classes="toolbar-action" ToolTip.Tip="{markup:T Ns=Mindmap, Key=DetachSelectedTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link-off.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/link-off.svg" Width="18" Height="18" Color="{DynamicResource MindmapToolbarIcon}"/>
                                     </Button>
                                     <Button Command="{Binding DeleteSelectedCommand}" Classes="Danger" ToolTip.Tip="{markup:T Ns=Mindmap, Key=DeleteSelectedTooltip}" Width="36" Height="36" Padding="0" CornerRadius="8">
-                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" Width="18" Height="18" Color="{DynamicResource DestructiveButtonColor}"/>
+                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg" Width="18" Height="18" Color="{DynamicResource DestructiveButtonColor}"/>
                                     </Button>
                                 </StackPanel>
                             </StackPanel>

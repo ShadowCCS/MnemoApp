@@ -10,6 +10,7 @@ public partial class UsageSummaryWidgetViewModel : WidgetViewModelBase
 {
     private readonly IStatisticsManager _statistics;
     private readonly ILoggerService _logger;
+    private readonly ILocalizationService _localization;
 
     [ObservableProperty]
     private string _launchCountDisplay = "—";
@@ -26,10 +27,11 @@ public partial class UsageSummaryWidgetViewModel : WidgetViewModelBase
     [ObservableProperty]
     private string _flashcardsModuleTodayDisplay = "—";
 
-    public UsageSummaryWidgetViewModel(IStatisticsManager statistics, ILoggerService logger)
+    public UsageSummaryWidgetViewModel(IStatisticsManager statistics, ILoggerService logger, ILocalizationService localization)
     {
         _statistics = statistics;
         _logger = logger;
+        _localization = localization;
     }
 
     public override async Task InitializeAsync()
@@ -69,23 +71,23 @@ public partial class UsageSummaryWidgetViewModel : WidgetViewModelBase
     private static string FormatCount(long v)
         => v.ToString("N0", CultureInfo.CurrentCulture);
 
-    private static string FormatDuration(long seconds)
+    private string FormatDuration(long seconds)
     {
         if (seconds <= 0)
             return "0";
 
         if (seconds < 60)
-            return string.Format(CultureInfo.CurrentCulture, "{0}s", seconds);
+            return string.Format(CultureInfo.CurrentCulture, _localization.T("DurationSeconds", "UsageSummary"), seconds);
 
         var minutes = seconds / 60;
         if (seconds < 3600)
-            return string.Format(CultureInfo.CurrentCulture, "{0} min", minutes);
+            return string.Format(CultureInfo.CurrentCulture, _localization.T("DurationMinutes", "UsageSummary"), minutes);
 
         var hours = seconds / 3600;
         var remMin = (seconds % 3600) / 60;
         return remMin > 0
-            ? string.Format(CultureInfo.CurrentCulture, "{0}h {1}m", hours, remMin)
-            : string.Format(CultureInfo.CurrentCulture, "{0}h", hours);
+            ? string.Format(CultureInfo.CurrentCulture, _localization.T("DurationHoursMinutes", "UsageSummary"), hours, remMin)
+            : string.Format(CultureInfo.CurrentCulture, _localization.T("DurationHours", "UsageSummary"), hours);
     }
 
     private static long ReadInt(StatisticsRecord? record, string field)

@@ -1,9 +1,12 @@
 {
   "StudyGoals": {
     "Title": "Lernziele",
-    "Description": "Verfolge deine täglichen Lernziele und Fortschritte",
+    "Description": "Tägliche Lernziele und Fortschritt im Blick behalten",
     "GalleryDescription": "Tagesfortschritt für Karten, Sitzungen und Lernminuten.",
     "TagGoals": "#ziele",
-    "TagProgress": "#fortschritt"
+    "TagProgress": "#fortschritt",
+    "CardsReviewed": "Wiederholte Karten",
+    "SessionsCompleted": "Abgeschlossene Sitzungen",
+    "MinutesStudied": "Lernminuten"
   }
 }

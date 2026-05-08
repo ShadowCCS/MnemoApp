@@ -72,7 +72,7 @@
                 Command="{Binding ToggleRightSidebarCommand}"
                 IsVisible="{Binding RightSidebarViewModel.ShowFloatingOpenButton}"
                 ToolTip.Tip="{markup:T Ns=App, Key=ToggleAssistant}">
-            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-sidebar.svg"
+            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/layout-sidebar.svg"
                               Color="{DynamicResource TopbarIconsBrush}"
                               Width="22"
                               Height="22"/>

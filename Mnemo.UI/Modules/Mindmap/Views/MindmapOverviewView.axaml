@@ -141,7 +141,7 @@
                             BorderBrush="{DynamicResource CardAccentBrush}"
                             Padding="20,10" CornerRadius="12">
                         <StackPanel Orientation="Horizontal" Spacing="10">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg" 
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/file-plus.svg" 
                                               Width="18" Height="18" Color="{DynamicResource CardAccentBrush}"/>
                             <TextBlock Text="{markup:T Ns=Mindmap, Key=NewMindmap}" 
                                        FontFamily="{DynamicResource Font.SemiBold}" 
@@ -221,7 +221,7 @@
                                                     <Border HorizontalAlignment="Left" Padding="10,5" 
                                                             Background="{DynamicResource SearchBarBackgroundBrush}" CornerRadius="8">
                                                         <StackPanel Orientation="Horizontal" Spacing="6">
-                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg" 
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chart-bubble.svg" 
                                                                               Width="12" Height="12" Color="{DynamicResource TextSecondaryBrush}"/>
                                                             <TextBlock Text="{markup:T Ns=Mindmap, Key=MindmapLabel}" 
                                                                        FontSize="{DynamicResource FontSize.Caption}" 
@@ -234,7 +234,7 @@
                                                             BorderThickness="0"
                                                             Padding="6"
                                                             Cursor="Hand">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/dots-vertical.svg"
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/dots-vertical.svg"
                                                                           Width="16" Height="16"
                                                                           Color="{DynamicResource TextTertiaryBrush}"/>
                                                         <Button.Flyout>
@@ -257,7 +257,7 @@
                                                                 <Separator/>
                                                                 <MenuItem Header="{markup:T Ns=Mindmap, Key=Delete}" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick">
                                                                     <MenuItem.Icon>
-                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16"/>
+                                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg" Width="16" Height="16"/>
                                                                     </MenuItem.Icon>
                                                                 </MenuItem>
                                                             </MenuFlyout>
@@ -275,14 +275,14 @@
                                                 <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
                                                     <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                                                         <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding NodeStats}">
-                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg" 
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/sitemap.svg" 
                                                                               Width="14" Height="14" Color="{DynamicResource TextSecondaryBrush}"/>
                                                             <TextBlock Text="{Binding NodeCount}" 
                                                                        FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
                                                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                         </StackPanel>
                                                         <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding EdgeStats}">
-                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" 
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/link.svg" 
                                                                               Width="14" Height="14" Color="{DynamicResource TextSecondaryBrush}"/>
                                                             <TextBlock Text="{Binding EdgeCount}" 
                                                                        FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
@@ -320,7 +320,7 @@
                              VerticalContentAlignment="Center"
                              DockPanel.Dock="Left">
                         <TextBox.InnerLeftContent>
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg" 
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/search.svg" 
                                               Width="16" Height="16" 
                                               Margin="12,0,0,0"
                                               Color="{DynamicResource TextSecondaryBrush}"/>
@@ -331,10 +331,10 @@
                         <Border CornerRadius="12" Padding="4">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <RadioButton Classes="ToggleViewItem" IsChecked="{Binding IsGridView, Converter={StaticResource BoolNegationConverter}}">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/list-details.svg" Width="18" Height="18"/>
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/list-details.svg" Width="18" Height="18"/>
                                 </RadioButton>
                                 <RadioButton Classes="ToggleViewItem" IsChecked="{Binding IsGridView}">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-grid.svg" Width="18" Height="18"/>
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/layout-grid.svg" Width="18" Height="18"/>
                                 </RadioButton>
                             </StackPanel>
                         </Border>
@@ -362,7 +362,7 @@
                                             <Grid Grid.Row="0">
                                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                                     <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource SearchBarBackgroundBrush}">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg" 
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chart-bubble.svg" 
                                                                           Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
                                                     </Border>
                                                     <StackPanel VerticalAlignment="Center">
@@ -377,7 +377,7 @@
                                                         BorderThickness="0"
                                                         Padding="6"
                                                         Cursor="Hand">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/dots-vertical.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/dots-vertical.svg"
                                                                       Width="14" Height="14"
                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
                                                     <Button.Flyout>
@@ -400,7 +400,7 @@
                                                             <Separator/>
                                                             <MenuItem Header="{markup:T Ns=Mindmap, Key=Delete}" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick">
                                                                 <MenuItem.Icon>
-                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16"/>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg" Width="16" Height="16"/>
                                                                 </MenuItem.Icon>
                                                             </MenuItem>
                                                         </MenuFlyout>
@@ -416,14 +416,14 @@
                                             <StackPanel Grid.Row="2" Spacing="4">
                                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                                     <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding NodeStats}">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg" 
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/sitemap.svg" 
                                                                           Width="12" Height="12" Color="{DynamicResource TextSecondaryBrush}"/>
                                                         <TextBlock Text="{Binding NodeCount}" 
                                                                    FontSize="{DynamicResource FontSize.Caption}" 
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                     </StackPanel>
                                                     <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding EdgeStats}">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" 
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/link.svg" 
                                                                           Width="12" Height="12" Color="{DynamicResource TextSecondaryBrush}"/>
                                                         <TextBlock Text="{Binding EdgeCount}" 
                                                                    FontSize="{DynamicResource FontSize.Caption}" 
@@ -475,7 +475,7 @@
                                         <Border Background="{DynamicResource CardBackgroundPrimaryBrush}" CornerRadius="16" Margin="0,0,0,8" Padding="12" Classes="CardHover" ClipToBounds="True" Cursor="Hand">
                                             <Grid ColumnDefinitions="48,*,150,170,40">
                                                 <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{DynamicResource SearchBarBackgroundBrush}">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chart-bubble.svg"
                                                                       Width="20" Height="20" Color="{DynamicResource CardAccentBrush}"/>
                                                 </Border>
     
@@ -494,14 +494,14 @@
     
                                                 <StackPanel Grid.Column="3" VerticalAlignment="Center" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,0,10,0">
                                                     <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding NodeStats}">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/sitemap.svg" 
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/sitemap.svg" 
                                                                           Width="14" Height="14" Color="{DynamicResource TextSecondaryBrush}"/>
                                                         <TextBlock Text="{Binding NodeCount}" 
                                                                    FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                     </StackPanel>
                                                     <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding EdgeStats}">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg" 
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/link.svg" 
                                                                           Width="14" Height="14" Color="{DynamicResource TextSecondaryBrush}"/>
                                                         <TextBlock Text="{Binding EdgeCount}" 
                                                                    FontSize="{DynamicResource FontSize.Body.ExtraSmall}" 
@@ -516,7 +516,7 @@
                                                         BorderThickness="0"
                                                         Padding="6"
                                                         Cursor="Hand">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/dots-vertical.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/dots-vertical.svg"
                                                                       Width="16" Height="16"
                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
                                                     <Button.Flyout>
@@ -539,7 +539,7 @@
                                                             <Separator/>
                                                             <MenuItem Header="{markup:T Ns=Mindmap, Key=Delete}" Classes="danger" Tag="{Binding}" Click="OnMindmapDeleteClick">
                                                                 <MenuItem.Icon>
-                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16"/>
+                                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg" Width="16" Height="16"/>
                                                                 </MenuItem.Icon>
                                                             </MenuItem>
                                                         </MenuFlyout>

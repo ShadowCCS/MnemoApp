@@ -264,7 +264,7 @@
                                         </MenuItem>
                                         <MenuItem x:Name="PhFlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand">
                                             <MenuItem.Icon>
-                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16" />
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/copy.svg" Width="16" Height="16" />
                                             </MenuItem.Icon>
                                         </MenuItem>
                                         <Separator />
@@ -275,7 +275,7 @@
                                         </MenuItem>
                                         <MenuItem x:Name="PhFlyoutDeleteItem" Classes="danger" Click="FlyoutDelete_Click" Cursor="Hand">
                                             <MenuItem.Icon>
-                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16" />
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg" Width="16" Height="16" />
                                             </MenuItem.Icon>
                                         </MenuItem>
                                     </MenuFlyout>
@@ -413,7 +413,7 @@
                                             </MenuItem>
                                             <MenuItem x:Name="FlyoutCopyItem" Click="FlyoutCopy_Click" Cursor="Hand">
                                                 <MenuItem.Icon>
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/copy.svg" Width="16" Height="16" />
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/copy.svg" Width="16" Height="16" />
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <Separator />
@@ -424,7 +424,7 @@
                                             </MenuItem>
                                             <MenuItem x:Name="FlyoutDeleteItem" Classes="danger" Click="FlyoutDelete_Click" Cursor="Hand">
                                                 <MenuItem.Icon>
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16" />
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg" Width="16" Height="16" />
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                         </MenuFlyout>

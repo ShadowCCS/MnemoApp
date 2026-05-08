@@ -40,7 +40,7 @@
             Cursor="Hand">
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
             <controls:SvgIcon Grid.Column="0"
-                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
+                              SvgPath="avares://Mnemo.UI/Icons/Common/folder.svg"
                               Width="18" Height="18"
                               VerticalAlignment="Center"
                               Color="{DynamicResource TextSecondaryBrush}" />
@@ -67,7 +67,7 @@
                     x:Name="MoreButton"
                     Classes="folder-row-more"
                     ToolTip.Tip="{markup:T Ns=Flashcards, Key=FolderActions}">
-                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
+                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/dots-vertical-filled.svg"
                                   Width="16" Height="16"
                                   Color="{DynamicResource TextSecondaryBrush}" />
                 <Button.Flyout>
@@ -83,7 +83,7 @@
                                   Header="{markup:T Ns=Flashcards, Key=DeleteFolder}"
                                   Click="OnDeleteClick">
                             <MenuItem.Icon>
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16" />
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg" Width="16" Height="16" />
                             </MenuItem.Icon>
                         </MenuItem>
                     </MenuFlyout>

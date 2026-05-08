@@ -207,11 +207,12 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
         var button = sender as Button;
         var startTransfer = string.Equals(button?.Tag?.ToString(), "transfer", StringComparison.OrdinalIgnoreCase);
         var capabilities = coordinator.GetCapabilities("flashcards");
-        var overlay = new TransferOverlay
-        {
-            Title = localization?.T("TransferOverlayTitle", "Flashcards") ?? "Transfer Flashcards",
-            Description = localization?.T("TransferOverlayDescription", "Flashcards") ?? "Choose format and settings."
-        };
+        var overlay = new TransferOverlay();
+        overlay.SetLocalizedChrome(
+            "TransferOverlayTitle", "Flashcards",
+            "TransferOverlayDescription", "Flashcards",
+            "Continue", "Common",
+            "Cancel", "Common");
         overlay.Initialize(capabilities, startTransfer);
 
         var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
@@ -241,7 +242,7 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
                 AllowMultiple = false,
-                Title = "Import flashcards",
+                Title = localization?.T("ImportFlashcardsPickerTitle", "Flashcards") ?? "Import flashcards",
                 FileTypeFilter = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
             });
             var file = files.FirstOrDefault();
@@ -259,11 +260,11 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             var importedDecks = result.Value?.ProcessedCounts.TryGetValue("decks", out var deckCount) == true ? deckCount : 0;
             var importedCards = result.Value?.ProcessedCounts.TryGetValue("flashcards", out var cardCount) == true ? cardCount : 0;
             var importMessage = importSucceeded
-                ? $"Flashcards import finished. Imported {importedDecks} deck(s), {importedCards} card(s)."
-                : result.Value?.ErrorMessage ?? result.ErrorMessage ?? "Import failed.";
+                ? string.Format(localization?.T("ImportFlashcardsFinishedFormat", "Flashcards") ?? "Flashcards import finished. Imported {0} deck(s), {1} card(s).", importedDecks, importedCards)
+                : result.Value?.ErrorMessage ?? result.ErrorMessage ?? localization?.T("ImportFlashcardsGenericError", "Flashcards") ?? "Import failed.";
 
             await overlayService.CreateDialogAsync(
-                importSucceeded ? "Import complete" : "Import failed",
+                importSucceeded ? localization?.T("ImportCompleteTitle", "Common") ?? "Import complete" : localization?.T("ImportFailedTitle", "Common") ?? "Import failed",
                 importMessage).ConfigureAwait(true);
 
             if (importSucceeded)
@@ -276,7 +277,7 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
 
         var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export flashcards",
+            Title = localization?.T("ExportFlashcardsPickerTitle", "Flashcards") ?? "Export flashcards",
             SuggestedFileName = $"flashcards{selected.Format.Extensions.FirstOrDefault() ?? ".mnemo"}",
             DefaultExtension = selected.Format.Extensions.FirstOrDefault()?.TrimStart('.'),
             FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
@@ -292,7 +293,9 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             .ToArray();
         if (filteredDeckIds.Length == 0)
         {
-            await overlayService.CreateDialogAsync("Export failed", "No decks are currently visible to export.").ConfigureAwait(true);
+            await overlayService.CreateDialogAsync(
+                localization?.T("ExportFailedTitle", "Common") ?? "Export failed",
+                localization?.T("ExportFlashcardsNoDecksMessage", "Flashcards") ?? "No decks are currently visible to export.").ConfigureAwait(true);
             return;
         }
         if (filteredDeckIds.Length > 0)
@@ -308,9 +311,11 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
 
         var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
         var exportMessage = exportSucceeded
-            ? "Flashcards export finished."
-            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
-        await overlayService.CreateDialogAsync(exportSucceeded ? "Export complete" : "Export failed", exportMessage).ConfigureAwait(true);
+            ? localization?.T("ExportFlashcardsFinishedMessage", "Flashcards") ?? "Flashcards export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? localization?.T("ExportFlashcardsGenericError", "Flashcards") ?? "Export failed.";
+        await overlayService.CreateDialogAsync(
+            exportSucceeded ? localization?.T("ExportCompleteTitle", "Common") ?? "Export complete" : localization?.T("ExportFailedTitle", "Common") ?? "Export failed",
+            exportMessage).ConfigureAwait(true);
     }
 
     private async void OnDeckRenameClick(object? sender, RoutedEventArgs e)
@@ -389,6 +394,7 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
         var deckService = services.GetService<IFlashcardDeckService>();
         if (coordinator == null || overlayService == null || deckService == null)
             return;
+        var localization = services.GetService<ILocalizationService>();
         var deck = await deckService.GetDeckByIdAsync(row.Id).ConfigureAwait(true);
         if (deck == null)
             return;
@@ -401,7 +407,9 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             var preferred = capabilities.FirstOrDefault(c => string.Equals(c.FormatId, requestedFormatId, StringComparison.Ordinal));
             if (preferred == null)
             {
-                await overlayService.CreateDialogAsync("Export unavailable", "This export format is not available right now.").ConfigureAwait(true);
+                await overlayService.CreateDialogAsync(
+                    localization?.T("ExportFormatUnavailableTitle", "Flashcards") ?? "Export unavailable",
+                    localization?.T("ExportFormatUnavailableMessage", "Flashcards") ?? "This export format is not available right now.").ConfigureAwait(true);
                 return;
             }
 
@@ -413,7 +421,12 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
         }
         else
         {
-            var overlay = new TransferOverlay { Title = "Export Deck", Description = "Choose format and settings.", ConfirmText = "Export" };
+            var overlay = new TransferOverlay();
+            overlay.SetLocalizedChrome(
+                "ExportDeckOverlayTitle", "Flashcards",
+                "ExportDeckOverlayDescription", "Flashcards",
+                "Export", "Flashcards",
+                "Cancel", "Common");
             overlay.Initialize(capabilities, defaultImport: false);
             var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
             {
@@ -438,7 +451,7 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
             return;
         var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export deck",
+            Title = localization?.T("ExportDeckPickerTitle", "Flashcards") ?? "Export deck",
             SuggestedFileName = $"{SanitizeFileName(deck.Name)}{selected.Format.Extensions.FirstOrDefault() ?? ".mnemo"}",
             DefaultExtension = selected.Format.Extensions.FirstOrDefault()?.TrimStart('.'),
             FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
@@ -455,9 +468,11 @@ public partial class FlashcardsView : UserControl, INotifyPropertyChanged
         }).ConfigureAwait(true);
         var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
         var exportMessage = exportSucceeded
-            ? "Deck export finished."
-            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
-        await overlayService.CreateDialogAsync(exportSucceeded ? "Export complete" : "Export failed", exportMessage).ConfigureAwait(true);
+            ? localization?.T("DeckExportFinishedMessage", "Flashcards") ?? "Deck export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? localization?.T("ExportFlashcardsGenericError", "Flashcards") ?? "Export failed.";
+        await overlayService.CreateDialogAsync(
+            exportSucceeded ? localization?.T("ExportCompleteTitle", "Common") ?? "Export complete" : localization?.T("ExportFailedTitle", "Common") ?? "Export failed",
+            exportMessage).ConfigureAwait(true);
         await vm.RefreshCommand.ExecuteAsync(null);
     }
 

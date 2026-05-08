@@ -25,7 +25,7 @@ public class PathModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("LearningPath", "path", "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/route-square.svg", "MainHub", 0, 1, visibilityRequirement: SidebarItemVisibilityRequirement.AiAssistantEnabled);
+        sidebarService.RegisterItem("LearningPath", "path", "avares://Mnemo.UI/Icons/Sidebar/route-square.svg", "MainHub", 0, 1, visibilityRequirement: SidebarItemVisibilityRequirement.AiAssistantEnabled);
     }
 
     public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)

@@ -24,7 +24,7 @@ public class SettingsModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("Settings", "settings", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/settings.svg", "Ecosystem", 2, int.MaxValue);
+        sidebarService.RegisterItem("Settings", "settings", "avares://Mnemo.UI/Icons/Sidebar/settings.svg", "Ecosystem", 2, int.MaxValue);
     }
 
     public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)

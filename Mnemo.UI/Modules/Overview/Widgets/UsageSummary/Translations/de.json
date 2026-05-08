@@ -1,0 +1,19 @@
+{
+  "UsageSummary": {
+    "Title": "Nutzung",
+    "Description": "Starts, erstellte Notizen und heutige Bildschirmzeit",
+    "GalleryDescription": "Überblick: Sitzungen, Notizaktivität und heutige Nutzung.",
+    "TagUsage": "#nutzung",
+    "TagStats": "#statistik",
+    "Launches": "App-Starts (gesamt)",
+    "NotesCreated": "Erstellte Notizen (gesamt)",
+    "PracticeToday": "Lern-Timer heute",
+    "NotesToday": "Notizen-Ansicht heute",
+    "FlashcardsToday": "Karteikarten-Ansicht heute",
+    "None": "—",
+    "DurationSeconds": "{0}s",
+    "DurationMinutes": "{0} Min.",
+    "DurationHoursMinutes": "{0}h {1}m",
+    "DurationHours": "{0}h"
+  }
+}

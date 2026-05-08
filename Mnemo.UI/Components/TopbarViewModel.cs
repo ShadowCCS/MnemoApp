@@ -128,13 +128,13 @@ public partial class TopbarViewModel : ViewModelBase
     private async Task CloseAsync()
     {
         var result = await _overlayService.CreateDialogAsync(
-            "Confirm Exit",
-            "Are you sure you want to close Mnemo?",
-            "Exit",
-            "Cancel"
+            _localization.T("ConfirmExitTitle", "Topbar"),
+            _localization.T("ConfirmExitMessage", "Topbar"),
+            _localization.T("ConfirmExitButton", "Topbar"),
+            _localization.T("Cancel", "Common")
         );
 
-        if (result == "Exit")
+        if (result == _localization.T("ConfirmExitButton", "Topbar"))
         {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {

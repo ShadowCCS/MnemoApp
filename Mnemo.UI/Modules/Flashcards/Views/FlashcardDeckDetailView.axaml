@@ -257,7 +257,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                     <Button Grid.Column="0" Classes="ghost" Command="{Binding GoBackCommand}"
                             Padding="4" VerticalAlignment="Center" ToolTip.Tip="{markup:T Ns=Common, Key=Back}">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-left.svg"
                                           Width="20" Height="20" Color="{DynamicResource TextSecondaryBrush}" />
                     </Button>
                     <Border Grid.Column="1"
@@ -283,7 +283,7 @@
                                      Background="Transparent" BorderThickness="0"
                                      VerticalAlignment="Center" />
                             <controls:SvgIcon Grid.Column="1"
-                                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/pencil.svg"
+                                              SvgPath="avares://Mnemo.UI/Icons/Common/pencil.svg"
                                               Width="14"
                                               Height="14"
                                               Opacity="0.7"
@@ -296,7 +296,7 @@
                             <Button Classes="accent" Command="{Binding OpenStudyLauncherCommand}"
                                     BorderThickness="0" Padding="16,10" CornerRadius="12">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/player-play.svg"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/player-play.svg"
                                                       Width="16" Height="16"
                                                       Color="{DynamicResource AccentButtonForegroundBrush}" />
                                     <TextBlock Text="{markup:T Ns=Flashcards, Key=Practice}"
@@ -310,11 +310,11 @@
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                                 CornerRadius="12" Padding="10,8"
                                 ToolTip.Tip="{markup:T Ns=Flashcards, Key=DeckMenu}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/dots-vertical.svg"
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/dots-vertical.svg"
                                               Width="18" Height="18" Color="{DynamicResource TextSecondaryBrush}" />
                             <Button.Flyout>
                                 <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                    <MenuItem Header="Settings" Command="{Binding OpenDeckSettingsCommand}">
+                                    <MenuItem Header="{markup:T Ns=Flashcards, Key=DeckSettings}" Command="{Binding OpenDeckSettingsCommand}">
                                         <MenuItem.Icon>
                                             <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/settings.svg" Width="16" Height="16" />
                                         </MenuItem.Icon>
@@ -338,7 +338,7 @@
                                     <Separator />
                                     <MenuItem Classes="danger" Header="{markup:T Ns=Flashcards, Key=DeleteDeck}" Command="{Binding DeleteDeckCommand}">
                                         <MenuItem.Icon>
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16" />
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg" Width="16" Height="16" />
                                         </MenuItem.Icon>
                                     </MenuItem>
                                 </MenuFlyout>
@@ -484,7 +484,7 @@
                                        FontSize="{DynamicResource FontSize.Body.Small}"
                                        FontFamily="{DynamicResource Font.SemiBold}"
                                        Foreground="{DynamicResource AccentButtonForegroundBrush}" />
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/plus.svg"
                                               Width="18"
                                               Height="18"
                                               Color="{DynamicResource AccentButtonForegroundBrush}" />
@@ -499,7 +499,7 @@
                         Padding="12,8">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                         <controls:SvgIcon Grid.Column="0"
-                                          SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg"
+                                          SvgPath="avares://Mnemo.UI/Icons/Common/search.svg"
                                           Width="16"
                                           Height="16"
                                           Color="{DynamicResource TextSecondaryBrush}"
@@ -549,7 +549,7 @@
                                             </Button.Styles>
 
                                             <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="16,16,20,16" VerticalAlignment="Center">
-                                                <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                <controls:SvgIcon Grid.Column="0" SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                                                   Width="20" Height="20" Margin="4,0,16,0"
                                                                   Color="{DynamicResource TextSecondaryBrush}" />
 
@@ -667,7 +667,7 @@
                                                         <Button Grid.Column="0" Classes="ghost" Padding="8,6" HorizontalAlignment="Left"
                                                                 Command="{Binding DeleteCardCommandProxy, ElementName=root, FallbackValue={x:Null}, TargetNullValue={x:Null}}">
                                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/trashbin.svg"
+                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg"
                                                                                   Width="16" Height="16"
                                                                                   Color="{DynamicResource DestructiveButtonColorBrush}" />
                                                                 <TextBlock Text="{markup:T Ns=Flashcards, Key=DeleteCard}"
@@ -726,7 +726,7 @@
                             Command="{Binding AddCardCommand}">
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <controls:SvgIcon Grid.Column="0"
-                                              SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/plus.svg"
+                                              SvgPath="avares://Mnemo.UI/Icons/Common/plus.svg"
                                               Width="18" Height="18"
                                               Color="{DynamicResource AccentPrimaryBrush}"
                                               VerticalAlignment="Center" />
@@ -755,7 +755,7 @@
                 Click="OnBackToTopClick"
                 ToolTip.Tip="{markup:T Ns=Flashcards, Key=BackToTop}"
                 IsVisible="{Binding IsBackToTopVisibleProxy, ElementName=root}">
-            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-down.svg"
+            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-down.svg"
                               Width="18"
                               Height="18"
                               RenderTransform="rotate(180deg)"

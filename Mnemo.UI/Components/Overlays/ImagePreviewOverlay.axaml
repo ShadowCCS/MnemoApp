@@ -51,7 +51,7 @@
               <Setter Property="Background" Value="#A0000000"/>
             </Style>
           </Button.Styles>
-          <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+          <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                             Width="16" Height="16"
                             Color="White"
                             HorizontalAlignment="Center"

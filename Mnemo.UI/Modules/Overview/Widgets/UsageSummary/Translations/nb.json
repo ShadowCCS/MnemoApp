@@ -1,0 +1,19 @@
+{
+  "UsageSummary": {
+    "Title": "Bruk",
+    "Description": "Oppstarter, opprettede notater og tid på skjerm i dag",
+    "GalleryDescription": "Oversikt over bruk: økter, notataktivitet og skjermtid i dag.",
+    "TagUsage": "#bruk",
+    "TagStats": "#statistikk",
+    "Launches": "App-oppstarter (totalt)",
+    "NotesCreated": "Opprettede notater (totalt)",
+    "PracticeToday": "Studietimer i dag",
+    "NotesToday": "Notatskjerm i dag",
+    "FlashcardsToday": "Flashkort-skjerm i dag",
+    "None": "—",
+    "DurationSeconds": "{0}s",
+    "DurationMinutes": "{0} min",
+    "DurationHoursMinutes": "{0}t {1}m",
+    "DurationHours": "{0}t"
+  }
+}

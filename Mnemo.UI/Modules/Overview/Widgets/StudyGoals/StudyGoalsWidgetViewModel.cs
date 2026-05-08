@@ -37,11 +37,13 @@ public partial class StudyGoalsWidgetViewModel : WidgetViewModelBase
 
     private readonly IStatisticsManager _statistics;
     private readonly ILoggerService _logger;
+    private readonly ILocalizationService _localization;
 
-    public StudyGoalsWidgetViewModel(IStatisticsManager statistics, ILoggerService logger)
+    public StudyGoalsWidgetViewModel(IStatisticsManager statistics, ILoggerService logger, ILocalizationService localization)
     {
         _statistics = statistics;
         _logger = logger;
+        _localization = localization;
     }
 
     public ObservableCollection<StudyGoalItem> Goals { get; } = new();
@@ -65,19 +67,19 @@ public partial class StudyGoalsWidgetViewModel : WidgetViewModelBase
 
             Goals.Add(new StudyGoalItem
             {
-                Title = "Cards reviewed",
+                Title = _localization.T("CardsReviewed", "StudyGoals"),
                 Target = DefaultCardsTarget,
                 Completed = Math.Min(cardsReviewed, DefaultCardsTarget)
             });
             Goals.Add(new StudyGoalItem
             {
-                Title = "Sessions completed",
+                Title = _localization.T("SessionsCompleted", "StudyGoals"),
                 Target = DefaultSessionsTarget,
                 Completed = Math.Min(sessionsCompleted, DefaultSessionsTarget)
             });
             Goals.Add(new StudyGoalItem
             {
-                Title = "Minutes studied",
+                Title = _localization.T("MinutesStudied", "StudyGoals"),
                 Target = DefaultMinutesTarget,
                 Completed = Math.Min(minutesStudied, DefaultMinutesTarget)
             });
@@ -86,9 +88,9 @@ public partial class StudyGoalsWidgetViewModel : WidgetViewModelBase
         {
             _logger?.Error("Overview", "Loading study goals widget failed.", ex);
 
-            Goals.Add(new StudyGoalItem { Title = "Cards reviewed", Target = DefaultCardsTarget, Completed = 0 });
-            Goals.Add(new StudyGoalItem { Title = "Sessions completed", Target = DefaultSessionsTarget, Completed = 0 });
-            Goals.Add(new StudyGoalItem { Title = "Minutes studied", Target = DefaultMinutesTarget, Completed = 0 });
+            Goals.Add(new StudyGoalItem { Title = _localization.T("CardsReviewed", "StudyGoals"), Target = DefaultCardsTarget, Completed = 0 });
+            Goals.Add(new StudyGoalItem { Title = _localization.T("SessionsCompleted", "StudyGoals"), Target = DefaultSessionsTarget, Completed = 0 });
+            Goals.Add(new StudyGoalItem { Title = _localization.T("MinutesStudied", "StudyGoals"), Target = DefaultMinutesTarget, Completed = 0 });
         }
     }
 

@@ -42,7 +42,7 @@
                         Command="{Binding ToggleSidebarCommand}"
                         ToolTip.Tip="{markup:T Ns=Sidebar, Key=CollapseSidebar}"
                         VerticalAlignment="Center">
-                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg" 
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-left.svg" 
                                       Width="18" Height="18" 
                                       Color="{DynamicResource ChevronSidebarBrush}"
                                       />
@@ -79,7 +79,7 @@
                                                                            Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
                                                                            CommandParameter="{Binding}">
                                                     <StackPanel Orientation="Horizontal" Spacing="12">
-                                                        <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg'}" 
+                                                        <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Common/circle.svg'}" 
                                                                           Width="20" Height="20"/>
                                                         <TextBlock Text="{Binding Label}" 
                                                                    VerticalAlignment="Center"/>
@@ -114,7 +114,7 @@
                         Padding="12,8">
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="6" CornerRadius="6">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/pointer-x.svg" 
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/pointer-x.svg" 
                                           Width="20" Height="20" 
                                           Color="{DynamicResource CardIconColorBrush}"/>
                         </Border>
@@ -167,7 +167,7 @@
                             BorderThickness="0" 
                             Command="{Binding ToggleSidebarCommand}"
                             ToolTip.Tip="{markup:T Ns=Sidebar, Key=ExpandSidebar}">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg" 
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg" 
                                           Width="16" Height="16" 
                                           Color="{DynamicResource ChevronSidebarBrush}"/>
                     </Button>
@@ -192,7 +192,7 @@
                                                                                 ToolTip.Tip="{Binding Label}"
                                                                                 Command="{Binding $parent[UserControl].((vm:SidebarViewModel)DataContext).NavigateCommand}"
                                                                                 CommandParameter="{Binding}">
-                                                        <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Tabler/Used/Outlined/circle.svg'}" 
+                                                        <controls:SvgIcon SvgPath="{Binding Icon, FallbackValue='avares://Mnemo.UI/Icons/Common/circle.svg'}" 
                                                                           Width="20" Height="20"/>
                                                     </controls:NavigationButton>
                                                     <Border Width="8" Height="8" CornerRadius="4"

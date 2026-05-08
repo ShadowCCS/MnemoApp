@@ -1,0 +1,12 @@
+{
+  "StudyGoals": {
+    "Title": "Studiemål",
+    "Description": "Følg daglige studiemål og fremdrift",
+    "GalleryDescription": "Daglig fremgang for kort, økter og studieminutter.",
+    "TagGoals": "#mål",
+    "TagProgress": "#fremgang",
+    "CardsReviewed": "Kort gjennomgått",
+    "SessionsCompleted": "Fullførte økter",
+    "MinutesStudied": "Studieminutter"
+  }
+}

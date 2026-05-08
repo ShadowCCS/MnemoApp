@@ -320,6 +320,7 @@ public partial class NoteTreeRow : UserControl
 
         var coordinator = services.GetService<IImportExportCoordinator>();
         var overlayService = services.GetService<IOverlayService>();
+        var localization = services.GetService<ILocalizationService>();
         if (coordinator == null || overlayService == null)
             return;
 
@@ -331,7 +332,9 @@ public partial class NoteTreeRow : UserControl
             var preferred = capabilities.FirstOrDefault(x => string.Equals(x.FormatId, requestedFormatId, StringComparison.Ordinal));
             if (preferred == null)
             {
-                await overlayService.CreateDialogAsync("Export unavailable", "This export format is not available right now.").ConfigureAwait(true);
+                await overlayService.CreateDialogAsync(
+                    localization?.T("ExportFormatUnavailableTitle", "Notes") ?? "Export unavailable",
+                    localization?.T("ExportFormatUnavailableMessage", "Notes") ?? "This export format is not available right now.").ConfigureAwait(true);
                 return;
             }
 
@@ -343,12 +346,12 @@ public partial class NoteTreeRow : UserControl
         }
         else
         {
-            var overlay = new TransferOverlay
-            {
-                Title = "Export Note",
-                Description = "Choose export format.",
-                ConfirmText = "Export"
-            };
+            var overlay = new TransferOverlay();
+            overlay.SetLocalizedChrome(
+                "ExportNoteOverlayTitle", "Notes",
+                "ExportNoteOverlayDescription", "Notes",
+                "Export", "Notes",
+                "Cancel", "Common");
             overlay.Initialize(capabilities, defaultImport: false);
             var id = overlayService.CreateOverlay(overlay, new OverlayOptions
             {
@@ -375,7 +378,7 @@ public partial class NoteTreeRow : UserControl
         var ext = selected.Format.Extensions.FirstOrDefault() ?? ".mnemo";
         var save = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export note",
+            Title = localization?.T("ExportNotePickerTitle", "Notes") ?? "Export note",
             SuggestedFileName = $"{SanitizeFileName(item.Name)}{ext}",
             DefaultExtension = ext.TrimStart('.'),
             FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(e => $"*{e}").ToArray() }]

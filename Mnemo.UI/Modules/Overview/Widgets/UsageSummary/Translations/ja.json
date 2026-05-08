@@ -1,0 +1,19 @@
+{
+  "UsageSummary": {
+    "Title": "利用状況",
+    "Description": "起動回数、作成ノート数、本日の画面時間",
+    "GalleryDescription": "本日の利用の概要：セッション・ノート・画面時間。",
+    "TagUsage": "#利用",
+    "TagStats": "#統計",
+    "Launches": "アプリ起動（累計）",
+    "NotesCreated": "作成ノート（累計）",
+    "PracticeToday": "本日の学習タイマー",
+    "NotesToday": "本日のノート画面",
+    "FlashcardsToday": "本日のフラッシュカード画面",
+    "None": "—",
+    "DurationSeconds": "{0}秒",
+    "DurationMinutes": "{0}分",
+    "DurationHoursMinutes": "{0}時間{1}分",
+    "DurationHours": "{0}時間"
+  }
+}

@@ -41,7 +41,7 @@
                    VerticalAlignment="Center"
                    TextWrapping="Wrap"/>
         <Button Grid.Column="1" Classes="ghost" Command="{Binding CloseCommand}" Padding="4" Margin="0,-4,-4,0">
-          <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" Width="20" Height="20" />
+          <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg" Width="20" Height="20" />
         </Button>
       </Grid>
       <TextBox Grid.Row="1"

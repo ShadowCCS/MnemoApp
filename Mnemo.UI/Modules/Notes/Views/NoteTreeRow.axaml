@@ -40,15 +40,15 @@
            Cursor="Hand">
        <Grid ColumnDefinitions="Auto,*,Auto" MinWidth="0" Background="Transparent">
            <controls:SvgIcon Grid.Column="0" Margin="2,2,0,2" Classes="note-row-icon"
-                             SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/folder.svg"
+                             SvgPath="avares://Mnemo.UI/Icons/Common/folder.svg"
                              Width="18" Height="18"
                              IsVisible="{Binding IsFolderEmpty}" IsHitTestVisible="False"/>
            <controls:SvgIcon Grid.Column="0" Margin="2,2,0,2" VerticalAlignment="Center" Classes="note-row-icon"
-                             SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/folder.svg"
+                             SvgPath="avares://Mnemo.UI/Icons/Common/folder-filled.svg"
                              Width="18" Height="18"
                              IsVisible="{Binding IsFolderWithChildren}" IsHitTestVisible="False"/>
            <controls:SvgIcon Grid.Column="0" Margin="2,2,0,2" VerticalAlignment="Center" Classes="note-row-icon"
-                             SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-text.svg"
+                             SvgPath="avares://Mnemo.UI/Icons/Common/file-text.svg"
                              Width="18" Height="18"
                              IsVisible="{Binding IsFolder, Converter={StaticResource BoolNegationConverter}}" IsHitTestVisible="False"/>
            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" Classes="note-row-text"
@@ -69,7 +69,7 @@
                    VerticalAlignment="Center" Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=MoreActions}"
                    Tag="{Binding}"
                    Opacity="0">
-               <controls:SvgIcon Classes="note-row-icon" SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/dots-vertical.svg"
+               <controls:SvgIcon Classes="note-row-icon" SvgPath="avares://Mnemo.UI/Icons/Common/dots-vertical-filled.svg"
                                  Width="16" Height="16"/>
                <Button.Flyout>
                    <MenuFlyout>
@@ -96,15 +96,15 @@
                            <MenuItem.Icon>
                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg" Width="16" Height="16"/>
                            </MenuItem.Icon>
-                           <MenuItem Header="Mnemo (.mnemo)"
+                           <MenuItem Header="{markup:T Ns=Notes, Key=ExportFormatMnemo}"
                                      Tag="{Binding}"
                                      CommandParameter="notes.mnemo"
                                      Click="OnExportClick" />
-                           <MenuItem Header="Markdown"
+                           <MenuItem Header="{markup:T Ns=Notes, Key=ExportFormatMarkdown}"
                                      Tag="{Binding}"
                                      CommandParameter="notes.markdown"
                                      Click="OnExportClick" />
-                           <MenuItem Header="Choose format..."
+                           <MenuItem Header="{markup:T Ns=Notes, Key=ChooseExportFormat}"
                                      Tag="{Binding}"
                                      Click="OnExportClick" />
                        </MenuItem>
@@ -112,7 +112,7 @@
                        <MenuItem Classes="danger" Header="{markup:T Ns=Notes, Key=Delete}" Tag="{Binding}" Click="OnDeleteClick"
                                  controls:MenuItemGestureHint.GestureHint="⌫">
                            <MenuItem.Icon>
-                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/trash.svg" Width="16" Height="16"/>
+                               <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg" Width="16" Height="16"/>
                            </MenuItem.Icon>
                        </MenuItem>
                    </MenuFlyout>

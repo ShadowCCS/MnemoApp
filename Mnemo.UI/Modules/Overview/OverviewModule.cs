@@ -30,7 +30,7 @@ public class OverviewModule : IModule
 
     public void RegisterSidebarItems(ISidebarService sidebarService)
     {
-        sidebarService.RegisterItem("Overview", "overview", "avares://Mnemo.UI/Icons/Tabler/Used/Filled/home.svg", "MainHub", 0, 0);
+        sidebarService.RegisterItem("Overview", "overview", "avares://Mnemo.UI/Icons/Sidebar/home.svg", "MainHub", 0, 0);
     }
 
     public void RegisterTools(IFunctionRegistry registry, IServiceProvider services)
@@ -45,12 +45,13 @@ public class OverviewModule : IModule
         var notes = services.GetRequiredService<INoteService>();
         var navigation = services.GetRequiredService<INavigationService>();
         var logger = services.GetRequiredService<ILoggerService>();
+        var localization = services.GetRequiredService<ILocalizationService>();
 
         registry.RegisterWidget(new Widgets.FlashcardStats.FlashcardStatsWidget(stats, logger));
         registry.RegisterWidget(new Widgets.RecentDecks.RecentDecksWidget(stats, decks, navigation, logger));
-        registry.RegisterWidget(new Widgets.StudyGoals.StudyGoalsWidget(stats, logger));
-        registry.RegisterWidget(new Widgets.RecentNotes.RecentNotesWidget(notes, navigation, logger));
-        registry.RegisterWidget(new Widgets.UsageSummary.UsageSummaryWidget(stats, logger));
+        registry.RegisterWidget(new Widgets.StudyGoals.StudyGoalsWidget(stats, logger, localization));
+        registry.RegisterWidget(new Widgets.RecentNotes.RecentNotesWidget(notes, navigation, logger, localization));
+        registry.RegisterWidget(new Widgets.UsageSummary.UsageSummaryWidget(stats, logger, localization));
     }
 }
 

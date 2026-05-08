@@ -97,7 +97,7 @@
                 <Border Width="120" Height="120" CornerRadius="60"
                         Background="{DynamicResource CardBackgroundSecondaryBrush}"
                         HorizontalAlignment="Center">
-                  <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/chart-bubble.svg"
+                  <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chart-bubble.svg"
                                     Color="{DynamicResource CardAccentBrush}"
                                     Width="56" Height="56"
                                     HorizontalAlignment="Center"

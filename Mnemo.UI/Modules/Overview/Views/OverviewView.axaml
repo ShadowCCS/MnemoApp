@@ -187,7 +187,7 @@
                             Width="64" Height="64"
                             CornerRadius="16"
                             HorizontalAlignment="Center">
-                        <ui:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-grid.svg"
+                        <ui:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/layout-grid.svg"
                                     Width="32" Height="32"
                                     Color="{DynamicResource CardAccentBrush}"
                                     HorizontalAlignment="Center"

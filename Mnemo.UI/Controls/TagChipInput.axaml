@@ -58,7 +58,7 @@
                                         Click="OnRemoveTagClick"
                                         Tag="{Binding}"
                                         ToolTip.Tip="Remove tag">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                                                       Width="12" Height="12"
                                                       Color="{DynamicResource TextSecondaryBrush}" />
                                 </Button>

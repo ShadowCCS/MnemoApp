@@ -9,11 +9,13 @@ public sealed class UsageSummaryWidget : IWidget
     public WidgetMetadata Metadata { get; }
     private readonly IStatisticsManager _statistics;
     private readonly ILoggerService _logger;
+    private readonly ILocalizationService _localization;
 
-    public UsageSummaryWidget(IStatisticsManager statistics, ILoggerService logger)
+    public UsageSummaryWidget(IStatisticsManager statistics, ILoggerService logger, ILocalizationService localization)
     {
         _statistics = statistics;
         _logger = logger;
+        _localization = localization;
         Metadata = new WidgetMetadata(
             id: "usage-summary",
             title: "Usage",
@@ -27,5 +29,5 @@ public sealed class UsageSummaryWidget : IWidget
     }
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)
-        => new UsageSummaryWidgetViewModel(_statistics, _logger);
+        => new UsageSummaryWidgetViewModel(_statistics, _logger, _localization);
 }

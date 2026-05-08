@@ -10,6 +10,10 @@
     "PracticeToday": "Study timer today",
     "NotesToday": "Notes screen today",
     "FlashcardsToday": "Flashcards screen today",
-    "None": "—"
+    "None": "—",
+    "DurationSeconds": "{0}s",
+    "DurationMinutes": "{0} min",
+    "DurationHoursMinutes": "{0}h {1}m",
+    "DurationHours": "{0}h"
   }
 }

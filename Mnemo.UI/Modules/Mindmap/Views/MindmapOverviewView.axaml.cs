@@ -38,11 +38,12 @@ public partial class MindmapOverviewView : UserControl
         var button = sender as Button;
         var startTransfer = string.Equals(button?.Tag?.ToString(), "transfer", StringComparison.OrdinalIgnoreCase);
         var capabilities = coordinator.GetCapabilities("mindmaps");
-        var overlay = new TransferOverlay
-        {
-            Title = localization?.T("TransferOverlayTitle", "Mindmap") ?? "Mindmap Import / Export",
-            Description = localization?.T("TransferOverlayDescription", "Mindmap") ?? "Choose format and settings."
-        };
+        var overlay = new TransferOverlay();
+        overlay.SetLocalizedChrome(
+            "TransferOverlayTitle", "Mindmap",
+            "TransferOverlayDescription", "Mindmap",
+            "Continue", "Common",
+            "Cancel", "Common");
         overlay.Initialize(capabilities, startTransfer);
         var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
         {
@@ -71,7 +72,7 @@ public partial class MindmapOverviewView : UserControl
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
                 AllowMultiple = false,
-                Title = "Import mindmaps",
+                Title = localization?.T("ImportMindmapsPickerTitle", "Mindmap") ?? "Import mindmaps",
                 FileTypeFilter = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
             });
             var file = files.FirstOrDefault();
@@ -86,9 +87,9 @@ public partial class MindmapOverviewView : UserControl
             }).ConfigureAwait(true);
             var importSucceeded = result.IsSuccess && result.Value is { Success: true };
             var importMessage = importSucceeded
-                ? "Mindmap import finished."
-                : result.Value?.ErrorMessage ?? result.ErrorMessage ?? "Import failed.";
-            await overlayService.CreateDialogAsync(importSucceeded ? "Import complete" : "Import failed", importMessage).ConfigureAwait(true);
+                ? localization?.T("ImportMindmapFinishedMessage", "Mindmap") ?? "Mindmap import finished."
+                : result.Value?.ErrorMessage ?? result.ErrorMessage ?? localization?.T("ImportMindmapGenericError", "Mindmap") ?? "Import failed.";
+            await overlayService.CreateDialogAsync(importSucceeded ? localization?.T("ImportCompleteTitle", "Common") ?? "Import complete" : localization?.T("ImportFailedTitle", "Common") ?? "Import failed", importMessage).ConfigureAwait(true);
             if (importSucceeded)
                 await vm.RefreshAsync().ConfigureAwait(true);
             return;
@@ -96,7 +97,7 @@ public partial class MindmapOverviewView : UserControl
 
         var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export mindmaps",
+            Title = localization?.T("ExportMindmapsPickerTitle", "Mindmap") ?? "Export mindmaps",
             SuggestedFileName = $"mindmaps{selected.Format.Extensions.FirstOrDefault() ?? ".mnemo"}",
             DefaultExtension = selected.Format.Extensions.FirstOrDefault()?.TrimStart('.'),
             FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
@@ -112,9 +113,9 @@ public partial class MindmapOverviewView : UserControl
         }).ConfigureAwait(true);
         var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
         var exportMessage = exportSucceeded
-            ? "Mindmap export finished."
-            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
-        await overlayService.CreateDialogAsync(exportSucceeded ? "Export complete" : "Export failed", exportMessage).ConfigureAwait(true);
+            ? localization?.T("ExportMindmapFinishedMessage", "Mindmap") ?? "Mindmap export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? localization?.T("ExportMindmapGenericError", "Mindmap") ?? "Export failed.";
+        await overlayService.CreateDialogAsync(exportSucceeded ? localization?.T("ExportCompleteTitle", "Common") ?? "Export complete" : localization?.T("ExportFailedTitle", "Common") ?? "Export failed", exportMessage).ConfigureAwait(true);
     }
 
     private async void OnMindmapDeleteClick(object? sender, RoutedEventArgs e)
@@ -202,10 +203,16 @@ public partial class MindmapOverviewView : UserControl
             return;
         var coordinator = services.GetService<IImportExportCoordinator>();
         var overlayService = services.GetService<IOverlayService>();
+        var localization = services.GetService<ILocalizationService>();
         if (coordinator == null || overlayService == null)
             return;
         var capabilities = coordinator.GetCapabilities("mindmaps").Where(c => c.SupportsExport).ToArray();
-        var overlay = new TransferOverlay { Title = "Export Mindmap", Description = "Choose format and settings.", ConfirmText = "Export" };
+        var overlay = new TransferOverlay();
+        overlay.SetLocalizedChrome(
+            "ExportSingleMindmapTitle", "Mindmap",
+            "ExportSingleMindmapDescription", "Mindmap",
+            "Export", "Mindmap",
+            "Cancel", "Common");
         overlay.Initialize(capabilities, defaultImport: false);
         var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
         {
@@ -228,7 +235,7 @@ public partial class MindmapOverviewView : UserControl
             return;
         var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export mindmap",
+            Title = localization?.T("ExportSingleMindmapPickerTitle", "Mindmap") ?? "Export mindmap",
             SuggestedFileName = $"{SanitizeFileName(item.Name)}{selected.Format.Extensions.FirstOrDefault() ?? ".mnemo"}",
             DefaultExtension = selected.Format.Extensions.FirstOrDefault()?.TrimStart('.'),
             FileTypeChoices = [new FilePickerFileType(selected.Format.DisplayName) { Patterns = selected.Format.Extensions.Select(ext => $"*{ext}").ToArray() }]
@@ -244,9 +251,9 @@ public partial class MindmapOverviewView : UserControl
         }).ConfigureAwait(true);
         var exportSucceeded = export.IsSuccess && export.Value is { Success: true };
         var exportMessage = exportSucceeded
-            ? "Mindmap export finished."
-            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? "Export failed.";
-        await overlayService.CreateDialogAsync(exportSucceeded ? "Export complete" : "Export failed", exportMessage).ConfigureAwait(true);
+            ? localization?.T("ExportMindmapFinishedMessage", "Mindmap") ?? "Mindmap export finished."
+            : export.Value?.ErrorMessage ?? export.ErrorMessage ?? localization?.T("ExportMindmapGenericError", "Mindmap") ?? "Export failed.";
+        await overlayService.CreateDialogAsync(exportSucceeded ? localization?.T("ExportCompleteTitle", "Common") ?? "Export complete" : localization?.T("ExportFailedTitle", "Common") ?? "Export failed", exportMessage).ConfigureAwait(true);
     }
 
     private static Mnemo.Core.Models.Mindmap.Mindmap CloneMindmap(Mnemo.Core.Models.Mindmap.Mindmap source, string title)

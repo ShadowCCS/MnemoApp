@@ -28,7 +28,7 @@
                         BorderThickness="0"
                         Padding="6"
                         Command="{Binding CancelCommand}">
-                    <icons:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                    <icons:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                                    Width="16" Height="16" />
                 </Button>
             </Grid>

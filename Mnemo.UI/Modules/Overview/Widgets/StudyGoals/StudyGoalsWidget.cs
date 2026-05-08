@@ -13,11 +13,13 @@ public class StudyGoalsWidget : IWidget
     public WidgetMetadata Metadata { get; }
     private readonly IStatisticsManager _statistics;
     private readonly ILoggerService _logger;
+    private readonly ILocalizationService _localization;
 
-    public StudyGoalsWidget(IStatisticsManager statistics, ILoggerService logger)
+    public StudyGoalsWidget(IStatisticsManager statistics, ILoggerService logger, ILocalizationService localization)
     {
         _statistics = statistics;
         _logger = logger;
+        _localization = localization;
         Metadata = new WidgetMetadata(
             id: "study-goals",
             title: "Study Goals",
@@ -33,6 +35,6 @@ public class StudyGoalsWidget : IWidget
 
     public IWidgetViewModel CreateViewModel(IWidgetSettings? settings = null)
     {
-        return new StudyGoalsWidgetViewModel(_statistics, _logger);
+        return new StudyGoalsWidgetViewModel(_statistics, _logger, _localization);
     }
 }

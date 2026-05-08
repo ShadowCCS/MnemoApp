@@ -87,11 +87,11 @@
                     <DataTemplate>
                         <Border Classes="FileItem">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-description.svg" 
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/file-description-filled.svg" 
                                                   Width="14" Height="14" Color="{DynamicResource CardAccentBrush}"/>
                                 <TextBlock Text="{Binding}" FontSize="12" VerticalAlignment="Center"/>
                                 <Button Click="RemoveFile_Click" Padding="4" Background="Transparent" BorderThickness="0">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg" 
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg" 
                                                       Width="12" Height="12" Color="{DynamicResource TextTertiaryBrush}"/>
                                 </Button>
                             </StackPanel>
@@ -102,7 +102,7 @@
 
             <Button Name="AddFileButton" Classes="FileButton" Click="AddFile_Click">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg" 
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/file-plus.svg" 
                                       Width="16" Height="16" Color="{DynamicResource CardAccentBrush}"/>
                     <TextBlock Text="{markup:T Ns=InputBuilder, Key=UploadFiles}" FontWeight="Medium" Foreground="{DynamicResource CardAccentBrush}"/>
                 </StackPanel>

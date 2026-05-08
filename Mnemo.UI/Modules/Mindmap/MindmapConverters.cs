@@ -241,8 +241,8 @@ public class MinimapVisibilityToDisplayConverter : IValueConverter
 /// <summary>Converts node IsCollapsed bool to the appropriate chevron SVG path.</summary>
 public class CollapseChevronConverter : IValueConverter
 {
-    private const string ChevronRight = "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg";
-    private const string ChevronDown = "avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-down.svg";
+    private const string ChevronRight = "avares://Mnemo.UI/Icons/Common/chevron-right.svg";
+    private const string ChevronDown = "avares://Mnemo.UI/Icons/Common/chevron-down.svg";
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is true ? ChevronRight : ChevronDown;

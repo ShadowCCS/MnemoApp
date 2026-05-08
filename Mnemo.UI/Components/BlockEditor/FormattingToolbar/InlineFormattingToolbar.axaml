@@ -112,7 +112,7 @@
                 Click="OnUnlinkClick">
                 <controls:SvgIcon
                     Width="16" Height="16"
-                    SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg"
+                    SvgPath="avares://Mnemo.UI/Icons/Common/link.svg"
                     Color="{DynamicResource TextPrimaryBrush}" />
             </Button>
 

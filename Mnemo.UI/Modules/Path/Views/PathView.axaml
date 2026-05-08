@@ -134,7 +134,7 @@
                         BorderBrush="{DynamicResource CardAccentBrush}"
                         Padding="20,10" CornerRadius="12">
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/file-plus.svg" 
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/file-plus.svg" 
                                           Width="18" Height="18" Color="{DynamicResource CardAccentBrush}"/>
                         <TextBlock Text="{markup:T Ns=Path, Key=GenerateNew}" 
                                    FontFamily="{DynamicResource Font.SemiBold}" 
@@ -192,7 +192,7 @@
                                                             BorderThickness="0" 
                                                             Padding="6"
                                                             Cursor="Hand">
-                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                                                                           Width="16" Height="16"
                                                                           Color="{DynamicResource TextTertiaryBrush}"/>
                                                     </Button>
@@ -245,7 +245,7 @@
                              VerticalContentAlignment="Center"
                              DockPanel.Dock="Left">
                         <TextBox.InnerLeftContent>
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/search.svg" 
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/search.svg" 
                                               Width="16" Height="16" 
                                               Margin="12,0,0,0"
                                               Color="{DynamicResource TextSecondaryBrush}"/>
@@ -256,10 +256,10 @@
                         <Border CornerRadius="12" Padding="4">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <RadioButton Classes="ToggleViewItem" IsChecked="{Binding IsGridView, Converter={StaticResource BoolNegationConverter}}">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/list-details.svg" Width="18" Height="18"/>
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/list-details.svg" Width="18" Height="18"/>
                                 </RadioButton>
                                 <RadioButton Classes="ToggleViewItem" IsChecked="{Binding IsGridView}">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Filled/layout-grid.svg" Width="18" Height="18"/>
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/layout-grid.svg" Width="18" Height="18"/>
                                 </RadioButton>
                             </StackPanel>
                         </Border>
@@ -307,7 +307,7 @@
                                                         BorderThickness="0" 
                                                         Padding="6"
                                                         Cursor="Hand">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                                                                       Width="14" Height="14"
                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
                                                 </Button>
@@ -429,7 +429,7 @@
                                                         BorderThickness="0" 
                                                         Padding="6"
                                                         Cursor="Hand">
-                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/x.svg"
+                                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
                                                                       Width="16" Height="16"
                                                                       Color="{DynamicResource TextTertiaryBrush}"/>
                                                 </Button>

@@ -75,7 +75,7 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    FontFamily="{DynamicResource Font.SemiBold}" />
                     </Button>
-                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                       Color="{DynamicResource TextTertiaryBrush}"
                                       Width="12"
                                       Height="12"
@@ -95,7 +95,7 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    FontFamily="{DynamicResource Font.SemiBold}" />
                     </Button>
-                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                       Color="{DynamicResource TextTertiaryBrush}"
                                       Width="12"
                                       Height="12"
@@ -311,7 +311,7 @@
                                                     <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding HasMultipleFrontImages}">
                                                         <Button Grid.Column="0" Classes="ghost" Padding="4,2"
                                                                 Command="{Binding FrontImagePreviousCommand}">
-                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-left.svg"
                                                                               Width="13" Height="13"
                                                                               Color="{DynamicResource TextSecondaryBrush}" />
                                                         </Button>
@@ -320,7 +320,7 @@
                                                                    FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                                                         <Button Grid.Column="2" Classes="ghost" Padding="4,2"
                                                                 Command="{Binding FrontImageNextCommand}">
-                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                                                               Width="13" Height="13"
                                                                               Color="{DynamicResource TextSecondaryBrush}" />
                                                         </Button>
@@ -350,7 +350,7 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding HasMultipleFrontImages}">
                                         <Button Grid.Column="0" Classes="ghost" Padding="4,2"
                                                 Command="{Binding FrontImagePreviousCommand}">
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-left.svg"
                                                               Width="13" Height="13"
                                                               Color="{DynamicResource TextSecondaryBrush}" />
                                         </Button>
@@ -359,7 +359,7 @@
                                                    FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                                         <Button Grid.Column="2" Classes="ghost" Padding="4,2"
                                                 Command="{Binding FrontImageNextCommand}">
-                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                                               Width="13" Height="13"
                                                               Color="{DynamicResource TextSecondaryBrush}" />
                                         </Button>
@@ -413,7 +413,7 @@
                                                         <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding HasMultipleBackImages}">
                                                             <Button Grid.Column="0" Classes="ghost" Padding="4,2"
                                                                     Command="{Binding BackImagePreviousCommand}">
-                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-left.svg"
                                                                                   Width="13" Height="13"
                                                                                   Color="{DynamicResource TextSecondaryBrush}" />
                                                             </Button>
@@ -422,7 +422,7 @@
                                                                        FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                                                             <Button Grid.Column="2" Classes="ghost" Padding="4,2"
                                                                     Command="{Binding BackImageNextCommand}">
-                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                                                                   Width="13" Height="13"
                                                                                   Color="{DynamicResource TextSecondaryBrush}" />
                                                             </Button>
@@ -452,7 +452,7 @@
                                         <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding HasMultipleBackImages}">
                                             <Button Grid.Column="0" Classes="ghost" Padding="4,2"
                                                     Command="{Binding BackImagePreviousCommand}">
-                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-left.svg"
                                                                   Width="13" Height="13"
                                                                   Color="{DynamicResource TextSecondaryBrush}" />
                                             </Button>
@@ -461,7 +461,7 @@
                                                        FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                                             <Button Grid.Column="2" Classes="ghost" Padding="4,2"
                                                     Command="{Binding BackImageNextCommand}">
-                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                                                   Width="13" Height="13"
                                                                   Color="{DynamicResource TextSecondaryBrush}" />
                                             </Button>

@@ -109,6 +109,7 @@ public class LocalizationService : ILocalizationService
             new() { Code = "en", Name = "English", NativeName = "English" },
             new() { Code = "es", Name = "Spanish", NativeName = "Español" },
             new() { Code = "de", Name = "German", NativeName = "Deutsch" },
+            new() { Code = "nb", Name = "Norwegian", NativeName = "Norsk" },
             new() { Code = "ja", Name = "Japanese", NativeName = "日本語" }
         };
         return Task.FromResult<IEnumerable<LanguageManifest>>(list);

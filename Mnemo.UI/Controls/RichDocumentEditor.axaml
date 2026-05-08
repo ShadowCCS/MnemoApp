@@ -112,7 +112,7 @@
                                 Padding="8,6"
                                 Click="OnLinkClick"
                                 IsEnabled="{Binding IsToolbarEnabled, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/link.svg"
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/link.svg"
                                               Width="16" Height="16"
                                               Color="{DynamicResource TextPrimaryBrush}" />
                         </Button>
@@ -122,7 +122,7 @@
                                 Click="OnImageClick"
                                 IsVisible="{Binding ShowImageButton, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                 IsEnabled="{Binding CanInsertImage, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}">
-                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/polaroid.svg"
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/FormattingToolbar/polaroid.svg"
                                               Width="16" Height="16"
                                               Color="{DynamicResource TextPrimaryBrush}" />
                         </Button>
@@ -184,7 +184,7 @@
                                         Padding="4,2"
                                         IsEnabled="{Binding CanGoToPreviousImage, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                         Click="OnPreviousImageClick">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-left.svg"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-left.svg"
                                                       Width="13" Height="13"
                                                       Color="{DynamicResource TextSecondaryBrush}" />
                                 </Button>
@@ -197,7 +197,7 @@
                                         Padding="4,2"
                                         IsEnabled="{Binding CanGoToNextImage, RelativeSource={RelativeSource AncestorType=controls:RichDocumentEditor}}"
                                         Click="OnNextImageClick">
-                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/chevron-right.svg"
+                                    <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/chevron-right.svg"
                                                       Width="13" Height="13"
                                                       Color="{DynamicResource TextSecondaryBrush}" />
                                 </Button>
@@ -235,7 +235,7 @@
                                     Padding="4,2"
                                     VerticalAlignment="Center"
                                     Click="OnDeleteImageClick">
-                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Tabler/Used/Outlined/trashbin.svg"
+                                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/trash.svg"
                                                   Width="13" Height="13"
                                                   Color="{DynamicResource TextSecondaryBrush}" />
                             </Button>

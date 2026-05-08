@@ -1,0 +1,197 @@
+{
+  "Flashcards": {
+    "Title": "Flashcards",
+    "Subtitle": "Library and practice",
+    "AllDecks": "All decks",
+    "DueToday": "Due today",
+    "Folders": "Folders",
+    "ToggleSidebar": "Toggle sidebar",
+    "SearchPlaceholder": "Search decks…",
+    "NewDeck": "New deck",
+    "NewFolder": "New folder",
+    "RenameFolder": "Rename folder",
+    "FolderActions": "Folder actions",
+    "OpenDeck": "Open deck",
+    "Transfer": "Transfer",
+    "TransferOverlayTitle": "Overfør flashkort",
+    "TransferOverlayDescription": "Velg format og innstillinger.",
+    "TransferDeckOverlayTitle": "Overfør kortstokk",
+    "DeckSettings": "Deck settings",
+    "ImportFlashcardsPickerTitle": "Import flashcards",
+    "ExportFlashcardsPickerTitle": "Export flashcards",
+    "ImportFlashcardsFinishedFormat": "Flashcards import finished. Imported {0} deck(s), {1} card(s).",
+    "ExportFlashcardsFinishedMessage": "Flashcards export finished.",
+    "ExportFlashcardsNoDecksMessage": "No decks are currently visible to export.",
+    "ExportFormatUnavailableTitle": "Export unavailable",
+    "ExportFormatUnavailableMessage": "This export format is not available right now.",
+    "ExportDeckOverlayTitle": "Export deck",
+    "ExportDeckOverlayDescription": "Choose format and settings.",
+    "ExportDeckPickerTitle": "Export deck",
+    "DeckExportFinishedMessage": "Deck export finished.",
+    "ImportFlashcardsGenericError": "Import failed.",
+    "ExportFlashcardsGenericError": "Export failed.",
+    "Export": "Export",
+    "ExportFormatMnemo": "Mnemo (.mnemo)",
+    "ExportFormatAnki": "Anki (.apkg)",
+    "ExportFormatCsv": "CSV (.csv)",
+    "ChooseFormat": "Choose format...",
+    "NewFolderName": "New folder",
+    "RetentionFormat": "{0}% retention",
+    "DueCountFormat": "{0} due",
+    "DefaultDeckName": "New deck",
+    "Practice": "Practice",
+    "CardDue": "Due",
+    "MetricTotalCards": "TOTAL CARDS",
+    "MetricDueToday": "DUE TODAY",
+    "MetricRetention": "RETENTION",
+    "SaveDeck": "Save deck",
+    "DeckMenu": "Deck options",
+    "Study": "Study",
+    "Cards": "Cards",
+    "AddCard": "Add card",
+    "EditCard": "Edit",
+    "Front": "Front",
+    "Back": "Back",
+    "Save": "Save",
+    "Cancel": "Cancel",
+    "DeleteCard": "Delete card",
+    "DeleteCardConfirm": "Delete this card from the deck?",
+    "DeleteFolder": "Delete folder",
+    "DeleteFolderConfirm": "Delete \"{0}\"? Decks and subfolders will be moved to root.",
+    "DeleteDeck": "Delete deck",
+    "DeleteDeckConfirm": "Delete this deck? This cannot be undone.",
+    "RenameDeck": "Rename deck",
+    "DuplicateDeck": "Duplicate deck",
+    "DuplicateDeckTitleFormat": "{0} (copy)",
+    "SessionTitle": "Choose study mode",
+    "SessionModesHelp": "Review updates your schedule. Quick, Cram, and Test are practice-only.",
+    "SessionPrimaryBadge": "PRIMARY",
+    "SessionPracticeNoSchedule": "Does not affect schedule",
+    "SessionReview": "Review",
+    "PracticeReviewBreadcrumbFormat": "{0} ({1})",
+    "SchedulingBreadcrumbShortFsrs": "smart FSRS",
+    "SchedulingBreadcrumbShortSm2": "SM-2",
+    "SchedulingBreadcrumbShortLeitner": "Leitner",
+    "SchedulingBreadcrumbShortBaseline": "simple",
+    "SessionReviewDescFormat": "Study due cards with {0} scheduling and full grading.",
+    "SessionReviewStart": "Start review",
+    "SessionQuick": "Quick",
+    "SessionQuickDesc": "Fast due-card practice with simple feedback.",
+    "SessionQuickStart": "Start quick",
+    "SessionFocused": "Focused",
+    "SessionFocusedDesc": "Deep review with limits by cards or time.",
+    "SessionFocusedStart": "Start focused",
+    "SessionCram": "Cram",
+    "SessionCramDesc": "Practice all cards in one pass. Shuffle if you want.",
+    "SessionCramStart": "Start cram",
+    "SessionTest": "Test",
+    "SessionTestDesc": "Type your answer first, then reveal and self-check.",
+    "SessionTestStart": "Start test",
+    "SessionClose": "Close",
+    "FocusedCardCount": "Cards",
+    "FocusedByCards": "By cards",
+    "FocusedByTime": "By time",
+    "FocusedTimeLimit": "Minutes",
+    "PracticeProgress": "{0} / {1}",
+    "Flip": "Show answer",
+    "GradeAgain": "Again",
+    "GradeHard": "Hard",
+    "GradeGood": "Good",
+    "GradeEasy": "Easy",
+    "GradeLearning": "Still learning",
+    "GradeGotIt": "Got it",
+    "SubmitAnswer": "Check",
+    "PracticeEmptyTitle": "Nothing to study",
+    "PracticeEmptyDesc": "No cards match this session.",
+    "PracticeCompleteTitle": "Session complete",
+    "PracticeCompleteDesc": "Nice work.",
+    "BackToDeck": "Back to deck",
+    "BackToLibrary": "Library",
+    "ExitPractice": "End Session",
+    "Shuffle": "Shuffle",
+    "TestGradingExact": "Exact match",
+    "TestGradingAi": "AI graded",
+    "TestAnswerPlaceholder": "Type your answer…",
+    "TestReveal": "Reveal",
+    "TestYourAnswer": "Your answer",
+    "TestIncorrect": "Incorrect",
+    "TestCorrect": "Correct",
+    "StudyAgain": "Study again",
+    "CorrectLabel": "Correct",
+    "IncorrectLabel": "Incorrect",
+    "TypeClassic": "Classic",
+    "TypeCloze": "Cloze",
+    "Write": "Write",
+    "Preview": "Preview",
+    "InsertCloze": "Cloze",
+    "DoneCard": "Done",
+    "DoneCardTooltip": "Save changes and collapse this card (Esc also works)",
+    "RetentionTrendRangeLast14": "LAST 14 DAYS",
+    "MakeCloze": "Make cloze",
+    "MakeClozeTooltip": "Wrap the selected text as a cloze deletion (Ctrl+Shift+C)",
+    "ClozeBadge": "CLOZE",
+    "ClozeBadgeTooltip": "This card has cloze deletions",
+    "Revert": "Revert",
+    "RevertTooltip": "Discard changes made since the card was opened",
+    "NewCard": "New card",
+    "AddAnotherCard": "Add another card",
+    "EditTitle": "Edit deck title",
+    "Undo": "Undo",
+    "Redo": "Redo",
+    "Cut": "Cut",
+    "Copy": "Copy",
+    "Paste": "Paste",
+    "SelectAll": "Select all",
+    "InsertImage": "Insert image",
+    "InsertEquation": "Insert equation",
+    "TagAddPlaceholder": "Add a tag…",
+    "TagsLabel": "TAGS",
+    "TagPlaceholder": "Add a tag and press Enter…",
+    "SaveCard": "Save card",
+    "CloseCard": "Close",
+    "FieldFront": "FRONT",
+    "FieldBack": "BACK",
+    "SearchCardsPlaceholder": "Search cards…",
+    "BackToTop": "Back to top",
+    "DeckRetentionLabel": "Retention",
+    "DeckCardCountFormat": "{0} cards",
+    "DeckLastStudiedFormat": "Last studied {0}",
+    "DeckNeverStudied": "Never studied"
+    ,"RetentionTrend": "Retention trend"
+    ,"RetentionTrendSubtitle": "Daily retention across recent reviews"
+    ,"RetentionTrendSummaryAverage": "Avg on review days"
+    ,"RetentionTrendSummaryEmpty": "Awaiting review data"
+    ,"RetentionTrendDeltaUpFormat": "+{0}% vs previous period"
+    ,"RetentionTrendDeltaDownFormat": "-{0}% vs previous period"
+    ,"RetentionTrendDeltaFlat": "No change vs previous period"
+    ,"RetentionTrendDeltaInsufficient": "Need review activity in both periods to compare"
+    ,"RetentionTrendActivityNone": "No review days in the last {0}"
+    ,"RetentionTrendActivitySingle": "1 active day in the last {0}"
+    ,"RetentionTrendActivityPlural": "{0} active days in the last {1}"
+    ,"RetentionTrendEmptyState": "Complete a review session to start seeing a trend"
+    ,"RetentionTrend14DaysAgo": "14d ago"
+    ,"RetentionTrendToday": "Today"
+    ,"SchedulingSectionTitle": "Scheduling"
+    ,"SchedulingEngineLabel": "Scheduling engine"
+    ,"SchedulingEngineHint": "This engine is used in Review mode. Quick, Cram, and Test do not change the schedule."
+    ,"DescriptionLabel": "Description"
+    ,"GeneralSectionTitle": "General"
+    ,"FolderLabel": "Folder"
+    ,"SchedulingEngineSmart": "Smart (FSRS)"
+    ,"SchedulingEngineClassic": "Classic (SM-2)"
+    ,"SchedulingEngineBoxed": "Boxed (Leitner)"
+    ,"SchedulingEngineSimple": "Simple"
+    ,"CardTypeLabel": "TYPE"
+    ,"InstalledModesTitle": "Installed modes"
+    ,"InstalledModesPlaceholder": "No installed custom modes yet."
+    ,"ExitSessionTitle": "End session?"
+    ,"ExitSessionConfirm": "Progress from this session will be saved. Do you want to end now?"
+    ,"SummaryDurationLabel": "Duration"
+    ,"SummaryAccuracyLabel": "Accuracy"
+    ,"SummaryNextDueLabel": "Next due"
+    ,"PracticeKeyboardShortcutsLabel": "Keyboard shortcuts:"
+    ,"PracticeRevealPrefix": "Press"
+    ,"PracticeRevealSpacebar": "Spacebar"
+    ,"PracticeRevealSuffix": "to reveal"
+  }
+}
