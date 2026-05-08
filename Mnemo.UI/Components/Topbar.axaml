@@ -15,10 +15,82 @@
             BorderThickness="0, 0, 0, 1"
             Padding="10,8">
         <Grid ColumnDefinitions="Auto,*" Margin="10">
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/search.svg" Color="{DynamicResource TextSecondaryBrush}" Width="24" Height="24" />
-                <TextBlock Grid.Column="0" Text="{markup:T Ns=Topbar, Key=SearchPlaceholder}" FontSize="{DynamicResource FontSize.Body.Small}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-            </StackPanel>
+            <Button Background="Transparent"
+                    BorderThickness="0"
+                    Padding="0"
+                    Command="{Binding OpenGlobalSearchCommand}">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover Border#SearchButtonChrome">
+                        <Setter Property="Background" Value="{DynamicResource TopbarButtonBackgroundBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource IconsSeparationBarBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pressed Border#SearchButtonChrome">
+                        <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource IconsSeparationBarBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pointerover TextBlock#SearchPlaceholderText">
+                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pressed TextBlock#SearchPlaceholderText">
+                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pointerover TextBlock#SearchShortcutText">
+                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pressed TextBlock#SearchShortcutText">
+                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pointerover Border#SearchShortcutBadge">
+                        <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pressed Border#SearchShortcutBadge">
+                        <Setter Property="Background" Value="{DynamicResource CardBackgroundSecondaryBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pointerover controls|SvgIcon#SearchIcon">
+                        <Setter Property="Color" Value="{DynamicResource TextSecondaryBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pressed controls|SvgIcon#SearchIcon">
+                        <Setter Property="Color" Value="{DynamicResource TextSecondaryBrush}"/>
+                    </Style>
+                </Button.Styles>
+                <Border Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="1"
+                        x:Name="SearchButtonChrome"
+                        CornerRadius="12"
+                        Height="34"
+                        Padding="10,0">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" MinWidth="330">
+                        <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/search.svg"
+                                          x:Name="SearchIcon"
+                                          Color="{DynamicResource TextFadedBrush}"
+                                          Width="16"
+                                          Height="16"
+                                          VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   x:Name="SearchPlaceholderText"
+                                   Text="{markup:T Ns=Topbar, Key=SearchPlaceholder}"
+                                   FontSize="{DynamicResource FontSize.Body.Small}"
+                                   Foreground="{DynamicResource TextFadedBrush}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <Border Grid.Column="2"
+                                x:Name="SearchShortcutBadge"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource IconsSeparationBarBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="8,2"
+                                VerticalAlignment="Center">
+                            <TextBlock x:Name="SearchShortcutText"
+                                       Text="{markup:T Ns=Topbar, Key=SearchShortcut}"
+                                       FontSize="{DynamicResource FontSize.Caption}"
+                                       Foreground="{DynamicResource TextFadedBrush}"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                </Border>
+            </Button>
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         Spacing="8"

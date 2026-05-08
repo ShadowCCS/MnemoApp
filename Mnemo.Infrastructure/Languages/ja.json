@@ -541,8 +541,22 @@
     "Swatch5": "スウォッチ 5",
     "Swatch6": "スウォッチ 6"
   },
+  "GlobalSearch": {
+    "ShortcutHint": "Ctrl/Cmd + K",
+    "BestMatches": "最適な一致",
+    "LoadMore": "さらに表示",
+    "NoResults": "結果がありません",
+    "TypeDeck": "デッキ",
+    "TypeCard": "カード",
+    "TypeNote": "ノート",
+    "TypeMindmap": "マインドマップ",
+    "TypeSetting": "設定",
+    "TypePage": "ページ"
+  },
   "Topbar": {
     "SearchPlaceholder": "レッスンやマインドマップなどを検索...",
+    "SearchShortcut": "Cmd+K",
+    "GlobalSearchOverlayHint": "グローバル検索はここに表示されます。結果一覧とアクションは次の更新で追加します。",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0}日連続",
     "ConfirmExitTitle": "終了の確認",

@@ -1,13 +1,16 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.UI.Components.Overlays;
 using Mnemo.Core.Models;
 using Mnemo.Core.Models.Statistics;
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Search;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Components;
@@ -20,6 +23,7 @@ public partial class TopbarViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly INavigationService _navigation;
     private readonly ILocalizationService _localization;
+    private readonly IGlobalSearchService _globalSearchService;
 
     public ObservableCollection<TopbarButtonModel> Buttons { get; } = new();
 
@@ -43,7 +47,8 @@ public partial class TopbarViewModel : ViewModelBase
         IStatisticsManager statistics,
         ILoggerService logger,
         INavigationService navigation,
-        ILocalizationService localization)
+        ILocalizationService localization,
+        IGlobalSearchService globalSearchService)
     {
         _settingsService = settingsService;
         _overlayService = overlayService;
@@ -51,6 +56,7 @@ public partial class TopbarViewModel : ViewModelBase
         _logger = logger;
         _navigation = navigation;
         _localization = localization;
+        _globalSearchService = globalSearchService;
 
         // Initial load
         _isGamificationEnabled = _settingsService.GetAsync("App.EnableGamification", true).GetAwaiter().GetResult();
@@ -161,6 +167,39 @@ public partial class TopbarViewModel : ViewModelBase
                 ? Avalonia.Controls.WindowState.Normal
                 : Avalonia.Controls.WindowState.Maximized;
         }
+    }
+
+    [RelayCommand]
+    private void OpenGlobalSearch()
+    {
+        if (_overlayService.Overlays.Any(o => o.Name == "GlobalSearch"))
+        {
+            return;
+        }
+
+        var overlay = new GlobalSearchOverlay(
+            _globalSearchService,
+            _navigation,
+            _localization,
+            _localization.T("SearchPlaceholder", "Topbar"));
+        string? overlayId = null;
+        overlay.OnClose = () =>
+        {
+            if (!string.IsNullOrWhiteSpace(overlayId))
+            {
+                _overlayService.CloseOverlay(overlayId);
+            }
+        };
+
+        overlayId = _overlayService.CreateOverlay(overlay, new OverlayOptions
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+            Margin = new Thickness(0, 84, 0, 0),
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true,
+            CloseOnEscape = true
+        }, "GlobalSearch");
     }
 }
 

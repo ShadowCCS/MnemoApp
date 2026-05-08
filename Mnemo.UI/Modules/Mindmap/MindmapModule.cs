@@ -1,7 +1,9 @@
 using System;
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Search;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Infrastructure.Services;
+using Mnemo.Infrastructure.Services.Search;
 using Mnemo.Infrastructure.Services.Tools;
 using Mnemo.UI.Modules.Mindmap.ViewModels;
 
@@ -14,6 +16,7 @@ public class MindmapModule : IModule
         services.AddSingleton<IMindmapService, MindmapService>();
         services.AddTransient<MindmapViewModel>();
         services.AddTransient<MindmapOverviewViewModel>();
+        services.AddSingleton<ISearchProvider, MindmapsSearchProvider>();
     }
 
     public void RegisterTranslationSources(ITranslationSourceRegistry registry)

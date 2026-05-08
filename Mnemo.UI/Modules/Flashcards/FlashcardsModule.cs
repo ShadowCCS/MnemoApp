@@ -1,5 +1,7 @@
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Search;
 using Mnemo.Infrastructure.Services;
+using Mnemo.Infrastructure.Services.Search;
 using Mnemo.UI.Modules.Flashcards.ViewModels;
 
 namespace Mnemo.UI.Modules.Flashcards;
@@ -14,6 +16,8 @@ public class FlashcardsModule : IModule
         services.AddTransient<FlashcardsViewModel>();
         services.AddTransient<FlashcardDeckDetailViewModel>();
         services.AddTransient<FlashcardPracticeViewModel>();
+        services.AddSingleton<ISearchProvider, DecksSearchProvider>();
+        services.AddSingleton<ISearchProvider, FlashcardsSearchProvider>();
     }
 
     public void RegisterTranslationSources(ITranslationSourceRegistry registry)

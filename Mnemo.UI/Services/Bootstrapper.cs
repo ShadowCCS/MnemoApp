@@ -28,6 +28,8 @@ using Mnemo.Infrastructure.Services.Packaging.PayloadHandlers;
 using Mnemo.Infrastructure.Services.ImportExport;
 using Mnemo.Infrastructure.Services.ImportExport.Adapters;
 using Mnemo.Infrastructure.Services.Spellcheck;
+using Mnemo.Infrastructure.Services.Search;
+using Mnemo.Core.Services.Search;
 
 namespace Mnemo.UI.Services;
 
@@ -172,6 +174,8 @@ public static class Bootstrapper
         services.AddSingleton<IStatisticsManager, StatisticsManager>();
         services.AddSingleton<StatisticsToolService>();
         services.AddSingleton<NavigationStatisticsTracker>();
+        services.AddSingleton<IGlobalSearchService, GlobalSearchService>();
+        services.AddSingleton<ISearchProvider, NavigationSearchProvider>();
 
         // 3. Discover modules and register translation sources (before building provider)
         var discoverSw = Stopwatch.StartNew();

@@ -544,8 +544,22 @@
     "Swatch5": "Swatch 5",
     "Swatch6": "Swatch 6"
   },
+  "GlobalSearch": {
+    "ShortcutHint": "Ctrl/Cmd + K",
+    "BestMatches": "BEST MATCHES",
+    "LoadMore": "Load more",
+    "NoResults": "No results",
+    "TypeDeck": "Deck",
+    "TypeCard": "Card",
+    "TypeNote": "Note",
+    "TypeMindmap": "Mindmap",
+    "TypeSetting": "Setting",
+    "TypePage": "Page"
+  },
   "Topbar": {
     "SearchPlaceholder": "Search for a lesson, mindmap, etc.",
+    "SearchShortcut": "Ctrl+K",
+    "GlobalSearchOverlayHint": "Global search is opening here. Full results and actions are coming next.",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0} Days",
     "ConfirmExitTitle": "Confirm exit",

@@ -1,6 +1,8 @@
 using System;
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Search;
 using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Infrastructure.Services.Search;
 using Mnemo.Infrastructure.Services.Tools;
 using Mnemo.UI.Modules.Settings.ViewModels;
 
@@ -11,6 +13,7 @@ public class SettingsModule : IModule
     public void ConfigureServices(IServiceRegistrar services)
     {
         services.AddTransient<SettingsViewModel>();
+        services.AddSingleton<ISearchProvider, SettingsSearchProvider>();
     }
 
     public void RegisterTranslationSources(ITranslationSourceRegistry registry)

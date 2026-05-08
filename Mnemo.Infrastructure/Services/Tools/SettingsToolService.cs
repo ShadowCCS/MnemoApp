@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Mnemo.Core.Models.Tools;
@@ -54,6 +55,12 @@ public sealed class SettingsToolService
         Func<object?, object> Coerce,
         IReadOnlyList<string>? AllowedValues = null);
 
+    public sealed record SettingCatalogEntry(
+        string Key,
+        string Category,
+        bool Writable,
+        IReadOnlyList<string>? AllowedValues);
+
     private static bool TryGetDescriptor(string trimmedKey, out string catalogKey, out SettingDescriptor descriptor)
     {
         if (Catalog.TryGetValue(trimmedKey, out var d))
@@ -79,6 +86,17 @@ public sealed class SettingsToolService
     {
         _settings = settings;
         _themeService = themeService;
+    }
+
+    public IReadOnlyList<SettingCatalogEntry> GetCatalogEntries()
+    {
+        return Catalog
+            .Select(kv => new SettingCatalogEntry(
+                kv.Key,
+                kv.Value.Category,
+                kv.Value.Writable,
+                kv.Value.AllowedValues))
+            .ToList();
     }
 
     public async Task<ToolInvocationResult> GetSettingAsync(GetSettingParameters p)

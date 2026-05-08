@@ -544,8 +544,22 @@
     "Swatch5": "Fargeprøve 5",
     "Swatch6": "Fargeprøve 6"
   },
+  "GlobalSearch": {
+    "ShortcutHint": "Ctrl/Cmd + K",
+    "BestMatches": "BESTE TREFF",
+    "LoadMore": "Last inn flere",
+    "NoResults": "Ingen resultater",
+    "TypeDeck": "Kortstokk",
+    "TypeCard": "Kort",
+    "TypeNote": "Notat",
+    "TypeMindmap": "Tankekart",
+    "TypeSetting": "Innstilling",
+    "TypePage": "Side"
+  },
   "Topbar": {
     "SearchPlaceholder": "Søk etter en leksjon, et tankekart, osv.",
+    "SearchShortcut": "Ctrl+K",
+    "GlobalSearchOverlayHint": "Globalt sok aapnes her. Fullstendige resultater og handlinger kommer snart.",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0} dager",
     "ConfirmExitTitle": "Bekreft avslutt",

@@ -1,151 +1,145 @@
-# MnemoApp Coding Standards
+# Mnemo Coding Standard
 
-## Naming Conventions
+This file is the source of truth for project conventions.  
 
-### DO
-- Use PascalCase for classes, interfaces, methods, properties, and public members
-- Prefix interfaces with `I` (e.g., `IAIService`, `INavigationService`)
-- Suffix async methods with `Async` (e.g., `InitializeAsync`, `LoadDataAsync`)
-- Use descriptive, self-documenting names
-- Use singular nouns for classes (e.g., `TaskScheduler`, not `TaskSchedulers`)
+## Priority Rules
 
-### DON'T
-- Use abbreviations unless widely understood (e.g., `ctx` is acceptable, `mgr` is not)
-- Use Hungarian notation (e.g., `strName`, `intCount`)
-- Use underscores in public identifiers (private fields may use `_` prefix)
+1. Architecture boundary is strict: `Core` (interfaces/models only, zero implementation deps), `Infrastructure` (implementations), `UI` (presentation).
+2. UI uses MVVM: logic in ViewModels/services, not in views/code-behind.
+3. Service dependencies use DI and interfaces.
+4. Async I/O must be truly async (`Task`/`Task<T>`, cancellation support, no `.Result`/`.Wait()`).
+5. Do not swallow exceptions.
+6. For Avalonia layout controls: `StackPanel` and `Grid` do not get `Padding` or `CornerRadius`; use `Margin` or wrap in `Border`.
 
-## Architecture Principles
+## Naming
 
-### DO
-- Prefer lightweight, modular, and future-proof architecture
-- Separate concerns: Core (interfaces), Infrastructure (implementations), UI (presentation)
-- Use Dependency Injection for all service dependencies
-- Design for extensibility: modules should auto-discover and register themselves
-- Keep Core layer dependency-free (interfaces and models only)
-- Use interfaces for all services to enable testing and swapping implementations
+### Required
+- PascalCase for classes, interfaces, methods, properties, and public members.
+- Prefix interfaces with `I` (example: `IAIService`).
+- Suffix async methods with `Async` (example: `LoadDataAsync`).
+- Use singular class names (example: `TaskScheduler`).
+- Use descriptive names.
 
-### DON'T
-- Create "God Objects" that do everything (e.g., avoid monolithic `IMnemoAPI`)
-- Hard-code module registration in startup code
-- Mix business logic with UI code
-- Create circular dependencies between layers
+### Avoid
+- Non-standard abbreviations (acceptable: common ones like `ctx`; avoid `mgr`).
+- Hungarian notation (`strName`, `intCount`).
+- Underscores in public identifiers (private fields may use `_fieldName`).
+
+## Architecture and Layering
+
+### Required
+- Keep `Mnemo.Core` dependency-light and implementation-free.
+- Put implementation code in `Mnemo.Infrastructure`.
+- Keep presentation concerns in `Mnemo.UI`.
+- Keep modules extensible via `IModule` auto-discovery.
+- Register extension tools through `IFunctionRegistry`.
+
+### Avoid
+- God objects.
+- Circular dependencies between layers.
+- Hard-coded module registration.
+- Leaking implementation details across boundaries.
 
 ## Code Organization
 
-### DO
-- Group related functionality into namespaces:
-  - `Mnemo.Core.Services` for service interfaces
-  - `Mnemo.Core.Models` for data models
-  - `Mnemo.Infrastructure` for implementations
-  - `Mnemo.UI.Components` for reusable UI components
-- Keep files focused: one class/interface per file
-- Use `partial` classes only when necessary (e.g., code-behind files)
+### Required
+- One class/interface per file unless there is a strong reason.
+- Use focused namespaces (typical patterns):
+  - `Mnemo.Core.Services`
+  - `Mnemo.Core.Models`
+  - `Mnemo.Infrastructure.*`
+  - `Mnemo.UI.Components.*`
+- Keep namespace depth reasonable (typically <= 4 levels).
+- Use `partial` only where it naturally belongs (for example, code-behind patterns).
 
-### DON'T
-- Put implementations in the Core layer
-- Mix UI components with business logic
-- Create deep namespace hierarchies (max 3-4 levels)
+## Async, Concurrency, and Task Execution
 
-## Async/Await
+### Required
+- Use `async`/`await` for all I/O and long-running async workflows.
+- Accept `CancellationToken` for cancellable/long operations.
+- Use `ConfigureAwait(false)` in non-UI/library code when appropriate.
+- Use `TaskExecutionMode.Exclusive` for resource-heavy tasks (for example local AI inference).
+- Use `TaskExecutionMode.Parallel` for lightweight independent I/O tasks.
+- Support progress reporting when useful (`IProgress<T>`).
 
-### DO
-- Use `async`/`await` for all I/O operations
-- Return `Task` or `Task<T>` from async methods
-- Use `CancellationToken` parameters in long-running operations
-- Use `ConfigureAwait(false)` in library code when appropriate
-
-### DON'T
-- Block async code with `.Result` or `.Wait()`
-- Mix async and sync code without careful consideration
-- Ignore cancellation tokens
+### Avoid
+- Blocking waits on async (`.Result`, `.Wait()`).
+- Ignoring cancellation once token is passed in.
 
 ## Error Handling
 
-### DO
-- Use exceptions for exceptional circumstances
-- Return `Result<T>` or `bool` for expected failure cases
-- Log errors with context (use structured logging when possible)
-- Handle exceptions at appropriate boundaries (UI, service boundaries)
+### Required
+- Throw exceptions for exceptional failures.
+- Use `Result<T>` or `bool` for expected non-exception flow.
+- Log with context (prefer structured logging).
+- Handle exceptions at clear boundaries (UI, service/API boundary).
 
-### DON'T
-- Swallow exceptions silently
-- Use exceptions for control flow
-- Catch `Exception` without re-throwing or logging
+### Avoid
+- Silent catches.
+- Exceptions as control flow.
+- Catching broad `Exception` without handling and logging context.
 
-## UI Guidelines
+## UI and Avalonia
 
-### DO
-- Use MVVM pattern: ViewModels contain logic, Views are declarative
-- Bind to ViewModels, not directly to services
-- Use Avalonia's built-in controls when possible
-- Create custom controls only when adding new functionality (not just styling)
-- Use styles/themes for visual customization, not subclassing controls
+### Required
+- Prefer built-in Avalonia controls.
+- Bind to dynamic theme values (brushes).
+- Keep views declarative and bind to ViewModels.
+- Localize UI strings (no hard-coded user-facing text).
+- Keep UI thread responsive.
 
-### DON'T
-- Put business logic in code-behind files
-- Create custom controls just to change colors/borders (use styles instead)
-- Hard-code strings in UI (use localization)
-- Block the UI thread with long-running operations
+### Avoid
+- Business logic in code-behind.
+- Creating custom controls when styles/templates are enough.
+- Applying unsupported layout styling:
+  - Do not set `Padding` on `StackPanel` or `Grid`.
+  - Do not set `CornerRadius` on `StackPanel` or `Grid`.
+  - Instead: set `Margin` and/or wrap with `Border`.
 
-## Storage & Data
+## Storage and Data
 
-### DO
-- Use SQLite for runtime data
-- Use `.mnemo` ZIP format for portable exports
-- Separate runtime storage from packaged storage
-- Version your data schemas
+### Required
+- SQLite for runtime data.
+- `.mnemo` ZIP for portable exports.
+- Separate runtime storage from packaged/export storage.
+- Version schemas and keep migration paths.
 
-### DON'T
-- Store large binary data in SQLite (use file system with references)
-- Mix runtime and packaged data without clear boundaries
-- Create storage without migration paths
+### Avoid
+- Large binary payloads in SQLite (store files and reference paths/ids).
+- Mixing runtime and packaged concerns.
 
-## Extensibility
+## Performance and Lifecycle
 
-### DO
-- Implement `IModule` interface for auto-discovery
-- Register services, routes, and tools in module initialization
-- Use `IFunctionRegistry` for AI tool registration
-- Design APIs that extensions can consume
+### Required
+- Profile before optimizing.
+- Lazy-load heavy resources.
+- Cache expensive computations where justified.
+- Use correct concurrent data structures (`ConcurrentDictionary`, etc.).
+- Prevent leaks (unsubscribe events, dispose resources).
 
-### DON'T
-- Require manual registration of modules
-- Create tight coupling between modules
-- Expose internal implementation details to extensions
-
-## Performance
-
-### DO
-- Profile before optimizing
-- Use lazy loading for heavy resources
-- Cache expensive computations
-- Use appropriate data structures (e.g., `ConcurrentDictionary` for thread-safe lookups)
-
-### DON'T
-- Prematurely optimize
-- Load all data at startup
-- Create memory leaks (unsubscribe from events, dispose resources)
+### Avoid
+- Premature optimization.
+- Loading all data at startup by default.
 
 ## Testing
 
-### DO
-- Write unit tests for business logic
-- Mock dependencies using interfaces
-- Test edge cases and error conditions
+### Required
+- Unit test business logic.
+- Mock dependencies through interfaces.
+- Cover edge cases and failure paths.
 
-### DON'T
-- Test implementation details
-- Create tests that depend on external resources without mocking
-- Skip testing error paths
+### Avoid
+- Tests coupled to implementation details.
+- Tests requiring external services without test doubles.
 
 ## Documentation
 
-### DO
-- Add XML documentation comments for public APIs
-- Document complex algorithms and business rules
-- Keep README files updated
+### Required
+- XML docs for public APIs where useful.
+- Explain complex business rules and non-obvious algorithms.
+- Keep module-level docs current.
 
-### DON'T
-- Document obvious code (e.g., `// Sets the name`)
-- Leave TODO comments without tracking issues
-- Write documentation that duplicates the code
+### Avoid
+- Comments that restate obvious code.
+- Untracked TODOs.
+- Docs that duplicate code without adding intent.

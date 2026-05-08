@@ -20,6 +20,10 @@
         CanMinimize="True"
         CanResize="True"
         Background="{DynamicResource WorkspaceBackgroundBrush}">
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+K" Command="{Binding TopbarViewModel.OpenGlobalSearchCommand}" />
+        <KeyBinding Gesture="Meta+K" Command="{Binding TopbarViewModel.OpenGlobalSearchCommand}" />
+    </Window.KeyBindings>
 
 <Border CornerRadius="8" Background="{DynamicResource WorkspaceBackgroundBrush}" ClipToBounds="True">
     <Grid>

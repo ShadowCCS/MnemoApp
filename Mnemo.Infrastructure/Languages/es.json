@@ -541,8 +541,22 @@
     "Swatch5": "Muestra 5",
     "Swatch6": "Muestra 6"
   },
+  "GlobalSearch": {
+    "ShortcutHint": "Ctrl/Cmd + K",
+    "BestMatches": "MEJORES COINCIDENCIAS",
+    "LoadMore": "Cargar más",
+    "NoResults": "Sin resultados",
+    "TypeDeck": "Mazo",
+    "TypeCard": "Tarjeta",
+    "TypeNote": "Nota",
+    "TypeMindmap": "Mapa mental",
+    "TypeSetting": "Configuración",
+    "TypePage": "Página"
+  },
   "Topbar": {
     "SearchPlaceholder": "Buscar una lección, mapa mental, etc.",
+    "SearchShortcut": "Ctrl+K",
+    "GlobalSearchOverlayHint": "La búsqueda global se abrirá aquí. Los resultados completos y acciones llegarán enseguida.",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0} Días",
     "ConfirmExitTitle": "Confirmar salida",
