@@ -120,7 +120,7 @@ public class FocusManager
         if (_cachedEditor != null
             && _cachedEditor.IsVisible
             && _cachedEditor.IsEffectivelyVisible
-            && _cachedEditor.GetVisualRoot() != null)
+            && TopLevel.GetTopLevel(_cachedEditor) != null)
             return _cachedEditor;
 
         var editor = FindFocusableEditor();

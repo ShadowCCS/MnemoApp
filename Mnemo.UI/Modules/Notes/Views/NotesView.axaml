@@ -240,7 +240,7 @@
                                  Background="Transparent"
                                  BorderThickness="0"
                                  Padding="0"
-                                 Watermark="{markup:T Ns=Notes, Key=NoteTitlePlaceholder}"
+                                PlaceholderText="{markup:T Ns=Notes, Key=NoteTitlePlaceholder}"
                                  x:Name="NoteTitleBox"/>
                         <Button Grid.Column="1" Command="{Binding ToggleFavoriteCommand}"
                                 Background="Transparent" BorderThickness="0" Padding="8,4"

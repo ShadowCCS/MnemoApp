@@ -47,7 +47,7 @@
       <TextBox Grid.Row="1"
                x:Name="InputTextBox"
                Text="{Binding InputValue, Mode=TwoWay}"
-               Watermark="{Binding Placeholder}"
+               PlaceholderText="{Binding Placeholder}"
                FontFamily="{DynamicResource Font.Medium}"
                FontSize="{DynamicResource FontSize.Body.ExtraSmall}"/>
       <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">

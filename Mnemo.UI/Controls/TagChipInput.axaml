@@ -73,7 +73,7 @@
                      Padding="4,2"
                      MinHeight="28"
                      FontSize="{DynamicResource FontSize.Body.Small}"
-                     Watermark="{Binding Placeholder, ElementName=root}"
+                     PlaceholderText="{Binding Placeholder, ElementName=root}"
                      KeyDown="OnEntryKeyDown"
                      LostFocus="OnEntryLostFocus" />
         </StackPanel>

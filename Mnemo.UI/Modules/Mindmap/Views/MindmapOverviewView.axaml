@@ -312,7 +312,7 @@
 
                 <!-- Modern Toolbar -->
                 <DockPanel LastChildFill="False">
-                    <TextBox Watermark="{markup:T Ns=Mindmap, Key=SearchMindmaps}" 
+                    <TextBox PlaceholderText="{markup:T Ns=Mindmap, Key=SearchMindmaps}"
                              Classes="SettingsSearch"
                              Width="320" 
                              Height="38"

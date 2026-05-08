@@ -494,6 +494,7 @@ public class RichTextEditor : Control, ICustomHitTest
             TextAlignment.Left, TextWrapping.Wrap, TextTrimming.None,
             null, FlowDirection.LeftToRight, maxWidth,
             double.PositiveInfinity, double.NaN, 0, 0,
+            null,
             foregroundSpans.Count > 0 ? foregroundSpans : null);
 
         _backgroundLayout = new TextLayout(
@@ -501,6 +502,7 @@ public class RichTextEditor : Control, ICustomHitTest
             TextAlignment.Left, TextWrapping.Wrap, TextTrimming.None,
             null, FlowDirection.LeftToRight, maxWidth,
             double.PositiveInfinity, double.NaN, 0, 0,
+            null,
             backgroundSpans.Count > 0 ? backgroundSpans : null);
         _lastBuiltText = text;
     }
@@ -1291,7 +1293,7 @@ public class RichTextEditor : Control, ICustomHitTest
 
     // ── Focus ────────────────────────────────────────────────────────────────
 
-    protected override void OnGotFocus(GotFocusEventArgs e)
+    protected override void OnGotFocus(FocusChangedEventArgs e)
     {
         base.OnGotFocus(e);
         _caretVisible = true;
@@ -1299,7 +1301,7 @@ public class RichTextEditor : Control, ICustomHitTest
         InvalidateVisual();
     }
 
-    protected override void OnLostFocus(RoutedEventArgs e)
+    protected override void OnLostFocus(FocusChangedEventArgs e)
     {
         base.OnLostFocus(e);
         _caretVisible = false;
@@ -2893,7 +2895,7 @@ public class RichTextEditor : Control, ICustomHitTest
                 AcceptsReturn = false,
                 FontFamily = MonoFont,
                 FontSize = 14,
-                Watermark = TNotes("EquationFlyoutPlaceholder")
+                PlaceholderText = TNotes("EquationFlyoutPlaceholder")
             };
 
             _inlineEqTextBox.KeyDown += (_, e) =>
@@ -3028,7 +3030,7 @@ public class RichTextEditor : Control, ICustomHitTest
     {
         if (p.Target is not Visual v)
             return;
-        var top = v.GetVisualRoot() as TopLevel;
+        var top = TopLevel.GetTopLevel(v);
         if (top == null)
             return;
         var m = v.TransformToVisual(top);

@@ -980,7 +980,7 @@
                         <TextBox x:Name="InputBox"
                                  Grid.Row="1"
                                  Classes="TransparentBackground"
-                                 Watermark="{Binding WatermarkText}"
+                                PlaceholderText="{Binding WatermarkText}"
                                  AcceptsReturn="False"
                                  TextWrapping="Wrap"
                                  MinHeight="48"

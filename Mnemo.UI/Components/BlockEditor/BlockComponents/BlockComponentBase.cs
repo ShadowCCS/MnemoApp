@@ -132,7 +132,7 @@ public abstract class BlockComponentBase : UserControl
     public event EventHandler<KeyEventArgs>? TextBoxKeyDown;
     public event EventHandler<RoutedEventArgs>? TextBoxLostFocus;
 
-    private void OnEditorGotFocus(object? sender, GotFocusEventArgs e)
+    private void OnEditorGotFocus(object? sender, FocusChangedEventArgs e)
     {
         if (_editor == null) return;
         SyncFromViewModel();

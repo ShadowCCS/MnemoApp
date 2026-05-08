@@ -130,7 +130,7 @@
                            FontFamily="{DynamicResource Font.Medium}"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
                 <TextBox Text="{Binding UserName}"
-                         Watermark="{markup:T Ns=Onboarding, Key=EnterYourName}"
+                        PlaceholderText="{markup:T Ns=Onboarding, Key=EnterYourName}"
                          Padding="12,10"
                          FontSize="{DynamicResource FontSize.Input}"/>
 

@@ -20,7 +20,6 @@
                 <ResourceInclude Source="CalendarDatePicker.axaml" />
                 <ResourceInclude Source="CalendarDayButton.axaml" />
                 <ResourceInclude Source="CalendarItem.axaml" />
-                <ResourceInclude Source="CaptionButtons.axaml" />
                 <ResourceInclude Source="Carousel.axaml" />
                 <ResourceInclude Source="CheckBox.axaml" />
                 <ResourceInclude Source="FlyoutPresenter.axaml" />
@@ -52,7 +51,6 @@
                 <ResourceInclude Source="ToggleButton.axaml" />
                 <ResourceInclude Source="ToggleSwitch.axaml" />
                 <ResourceInclude Source="ToolTip.axaml" />
-                <ResourceInclude Source="TitleBar.axaml" />
                 <ResourceInclude Source="TransitioningContentControl.axaml" />
                 <ResourceInclude Source="WindowNotificationManager.axaml" />
                 <ResourceInclude Source="Window.axaml" />

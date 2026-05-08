@@ -277,7 +277,7 @@ public partial class EquationBlockComponent : BlockComponentBase
             MinWidth = 220,
             MaxWidth = 360,
             AcceptsReturn = false,
-            Watermark = T("EquationFlyoutPlaceholder"),
+            PlaceholderText = T("EquationFlyoutPlaceholder"),
             Text = GetLatexSource(),
             FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New, monospace"),
             FontSize = 14

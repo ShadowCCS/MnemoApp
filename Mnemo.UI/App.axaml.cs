@@ -5,8 +5,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
-using Avalonia.Data.Core;
-using Avalonia.Data.Core.Plugins;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
@@ -114,9 +112,9 @@ public partial class App : Application
         {
             await ShowOnboardingIfNeededAsync().ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch
         {
-            Services?.GetService<ILoggerService>()?.Error("Onboarding", "ShowOnboardingIfNeededAsync threw.", ex);
+            // Keep startup resilient if onboarding flow fails.
         }
 
         try
@@ -205,10 +203,8 @@ public partial class App : Application
     private async Task ShowOnboardingIfNeededAsync()
     {
         if (Services == null) return;
-        var logger = Services.GetService<ILoggerService>();
         var settingsService = Services.GetRequiredService<ISettingsService>();
         var completed = await settingsService.GetAsync("Onboarding.Completed", false).ConfigureAwait(false);
-        logger?.Info("Onboarding", $"Onboarding.Completed read as {completed}.");
         if (completed) return;
 
         Mnemo.UI.Modules.Onboarding.ViewModels.OnboardingWizardViewModel vm;
@@ -218,7 +214,6 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            logger?.Error("Onboarding", "Failed to resolve OnboardingWizardViewModel from DI.", ex);
             throw;
         }
 
@@ -226,9 +221,9 @@ public partial class App : Application
         {
             await vm.LoadUserNameAsync().ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch
         {
-            logger?.Warning("Onboarding", $"LoadUserNameAsync failed: {ex.Message}");
+            // Ignore and keep onboarding usable without prefilled name.
         }
 
         await Dispatcher.UIThread.InvokeAsync(() =>
@@ -248,11 +243,9 @@ public partial class App : Application
                 };
                 var id = overlayService.CreateOverlay(view, options, "OnboardingWizard");
                 vm.SetOverlayId(id);
-                logger?.Info("Onboarding", $"Onboarding overlay created with id {id}.");
             }
             catch (Exception ex)
             {
-                logger?.Error("Onboarding", "Failed to construct/show OnboardingWizardView.", ex);
                 throw;
             }
         }, DispatcherPriority.Normal);
@@ -290,14 +283,6 @@ public partial class App : Application
 
     private void DisableAvaloniaDataAnnotationValidation()
     {
-        // Get an array of plugins to remove
-        var dataValidationPluginsToRemove =
-            BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
-
-        // remove each entry found
-        foreach (var plugin in dataValidationPluginsToRemove)
-        {
-            BindingPlugins.DataValidators.Remove(plugin);
-        }
+        // Avalonia 12 removed public binding plugin access; no-op is intentional.
     }
 }

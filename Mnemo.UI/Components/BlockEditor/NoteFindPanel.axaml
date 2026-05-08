@@ -73,7 +73,7 @@
                     Grid.Column="0"
                     Height="36"
                     MinWidth="0"
-                    Watermark="Find text"
+                    PlaceholderText="Find text"
                     Background="{DynamicResource CardBackgroundSecondaryBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="1"
@@ -175,8 +175,7 @@
                         HorizontalContentAlignment="Center"
                         IsChecked="False"
                         IsThreeState="False"
-                        Checked="FindOptionCheckBox_OnChanged"
-                        Unchecked="FindOptionCheckBox_OnChanged" />
+                        IsCheckedChanged="FindOptionCheckBox_OnChanged" />
                     <ToggleButton
                         Classes="FindTogglePill"
                         x:Name="FindWholeWordCheckBoxCompact"
@@ -185,8 +184,7 @@
                         HorizontalContentAlignment="Center"
                         IsChecked="False"
                         IsThreeState="False"
-                        Checked="FindOptionCheckBox_OnChanged"
-                        Unchecked="FindOptionCheckBox_OnChanged" />
+                        IsCheckedChanged="FindOptionCheckBox_OnChanged" />
                 </StackPanel>
             </Border>
 
@@ -194,7 +192,7 @@
                 <TextBox
                     x:Name="ReplaceQueryTextBox"
                     Height="36"
-                    Watermark="Replace with"
+                    PlaceholderText="Replace with"
                     Background="{DynamicResource BasicButtonBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="1"
@@ -214,8 +212,7 @@
                         HorizontalContentAlignment="Center"
                         IsChecked="False"
                         IsThreeState="False"
-                        Checked="FindOptionCheckBox_OnChanged"
-                        Unchecked="FindOptionCheckBox_OnChanged" />
+                        IsCheckedChanged="FindOptionCheckBox_OnChanged" />
                     <ToggleButton
                         Classes="FindTogglePill"
                         x:Name="FindWholeWordCheckBoxReplace"
@@ -225,8 +222,7 @@
                         HorizontalContentAlignment="Center"
                         IsChecked="False"
                         IsThreeState="False"
-                        Checked="FindOptionCheckBox_OnChanged"
-                        Unchecked="FindOptionCheckBox_OnChanged" />
+                        IsCheckedChanged="FindOptionCheckBox_OnChanged" />
                     <Button
                         Classes="PillButton"
                         x:Name="ReplaceAllButton"

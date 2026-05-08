@@ -15,9 +15,8 @@
         Icon="{Binding AppIconPath, Converter={x:Static converters:PathToWindowIconConverter.Instance}}"
         Title="{markup:T Ns=App, Key=AppTitle}"
         WindowStartupLocation="CenterScreen"
-        SystemDecorations="Full"
+        WindowDecorations="Full"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
         CanMinimize="True"
         CanResize="True"
         Background="{DynamicResource WorkspaceBackgroundBrush}">

@@ -65,6 +65,7 @@ public partial class EditableBlock : UserControl
     private const double DragHandleReorderDragThresholdPixels = 6;
 
     private Point? _dragHandleReorderPressPoint;
+    private PointerPressedEventArgs? _dragHandleReorderPressArgs;
     private bool _dragHandleReorderDragLaunched;
 
     /// <summary>Matches gutter <see cref="Border"/> MinHeight in <c>EditableBlock.axaml</c>.</summary>
@@ -2205,6 +2206,7 @@ public partial class EditableBlock : UserControl
 
         _dragHandleReorderDragLaunched = false;
         _dragHandleReorderPressPoint = e.GetPosition(DragHandleBorder);
+        _dragHandleReorderPressArgs = e;
         e.Pointer.Capture(DragHandleBorder);
         e.Handled = true;
     }
@@ -2222,7 +2224,7 @@ public partial class EditableBlock : UserControl
         if (Math.Sqrt(dx * dx + dy * dy) >= DragHandleReorderDragThresholdPixels)
         {
             _dragHandleReorderDragLaunched = true;
-            _ = RunDragReorderFromHandleAsync(e);
+            _ = RunDragReorderFromHandleAsync();
         }
     }
 
@@ -2251,17 +2253,21 @@ public partial class EditableBlock : UserControl
     private void ClearDragHandleReorderGestureState()
     {
         _dragHandleReorderPressPoint = null;
+        _dragHandleReorderPressArgs = null;
         _dragHandleReorderDragLaunched = false;
     }
 
-    private async Task RunDragReorderFromHandleAsync(PointerEventArgs e)
+    private async Task RunDragReorderFromHandleAsync()
     {
         try
         {
-            if (DragHandleBorder != null && ReferenceEquals(e.Pointer.Captured, DragHandleBorder))
-                e.Pointer.Capture(null);
+            if (_dragHandleReorderPressArgs == null)
+                return;
 
-            await BeginBlockReorderDragCoreAsync(e).ConfigureAwait(true);
+            if (DragHandleBorder != null && ReferenceEquals(_dragHandleReorderPressArgs.Pointer.Captured, DragHandleBorder))
+                _dragHandleReorderPressArgs.Pointer.Capture(null);
+
+            await BeginBlockReorderDragCoreAsync(_dragHandleReorderPressArgs).ConfigureAwait(true);
         }
         finally
         {
@@ -2270,7 +2276,7 @@ public partial class EditableBlock : UserControl
     }
 
     /// <summary>Gutter handle or image chrome (after move threshold) — same payload and ghost as the drag handle.</summary>
-    internal async Task BeginBlockReorderDragCoreAsync(PointerEventArgs e)
+    internal async Task BeginBlockReorderDragCoreAsync(PointerPressedEventArgs e)
     {
         if (_viewModel == null) return;
 

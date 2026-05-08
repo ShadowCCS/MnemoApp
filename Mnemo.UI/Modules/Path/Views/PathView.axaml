@@ -237,7 +237,7 @@
 
                 <!-- Modern Toolbar -->
                 <DockPanel LastChildFill="False">
-                    <TextBox Watermark="{markup:T Ns=Path, Key=SearchLibrary}" 
+                    <TextBox PlaceholderText="{markup:T Ns=Path, Key=SearchLibrary}"
                              Classes="SettingsSearch"
                              Width="320" 
                              Height="38"

@@ -53,7 +53,7 @@
             <TextBox Grid.Row="2"
                      x:Name="UrlTextBox"
                      Text="{Binding Url, Mode=TwoWay}"
-                     Watermark="{Binding UrlPlaceholder}"
+                     PlaceholderText="{Binding UrlPlaceholder}"
                      FontFamily="{DynamicResource Font.Medium}"
                      FontSize="{DynamicResource FontSize.Body.ExtraSmall}"/>
 
@@ -65,7 +65,7 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                 <TextBox x:Name="DisplayTextBox"
                          Text="{Binding DisplayText, Mode=TwoWay}"
-                         Watermark="{Binding DisplayPlaceholder}"
+                        PlaceholderText="{Binding DisplayPlaceholder}"
                          Margin="0,8,0,0"
                          FontFamily="{DynamicResource Font.Medium}"
                          FontSize="{DynamicResource FontSize.Body.ExtraSmall}"/>

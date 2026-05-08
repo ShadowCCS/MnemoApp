@@ -506,7 +506,7 @@
                     <StackPanel Spacing="14" IsVisible="{Binding IsTestSession}" MaxWidth="620" HorizontalAlignment="Stretch">
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !IsFlipped}" Margin="0,10,0,0">
                             <TextBox Grid.Column="0" MinHeight="100" AcceptsReturn="True" TextWrapping="Wrap"
-                                     Watermark="{markup:T Ns=Flashcards, Key=TestAnswerPlaceholder}"
+                                    PlaceholderText="{markup:T Ns=Flashcards, Key=TestAnswerPlaceholder}"
                                      Text="{Binding TestAnswer}"
                                      CornerRadius="8"
                                      Margin="0,0,16,0"

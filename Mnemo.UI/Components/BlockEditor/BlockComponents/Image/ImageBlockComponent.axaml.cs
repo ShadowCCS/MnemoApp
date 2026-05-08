@@ -52,6 +52,7 @@ public partial class ImageBlockComponent : BlockComponentBase
     private bool _resizeMutationCompleted;
 
     private Point? _imageReorderPressPoint;
+    private PointerPressedEventArgs? _imageReorderPressArgs;
     private bool _imageReorderDragLaunched;
 
     /// <summary>Device-independent px before a press on the bitmap becomes a block reorder drag.</summary>
@@ -476,6 +477,7 @@ public partial class ImageBlockComponent : BlockComponentBase
 
         _imageReorderDragLaunched = false;
         _imageReorderPressPoint = e.GetPosition(ImageInnerBorder);
+        _imageReorderPressArgs = e;
         e.Pointer.Capture(ImageInnerBorder);
     }
 
@@ -512,6 +514,7 @@ public partial class ImageBlockComponent : BlockComponentBase
     private void ClearImageReorderGestureState()
     {
         _imageReorderPressPoint = null;
+        _imageReorderPressArgs = null;
         _imageReorderDragLaunched = false;
         if (ImageInnerBorder != null)
             ImageInnerBorder.Cursor = Cursor.Default;
@@ -521,13 +524,16 @@ public partial class ImageBlockComponent : BlockComponentBase
     {
         try
         {
+            if (_imageReorderPressArgs == null)
+                return;
+
             // DoDragDrop expects no prior capture (same as gutter drag handle).
-            if (ReferenceEquals(e.Pointer.Captured, ImageInnerBorder))
-                e.Pointer.Capture(null);
+            if (ReferenceEquals(_imageReorderPressArgs.Pointer.Captured, ImageInnerBorder))
+                _imageReorderPressArgs.Pointer.Capture(null);
 
             var eb = this.GetVisualAncestors().OfType<EditableBlock>().FirstOrDefault();
             if (eb != null)
-                await eb.BeginBlockReorderDragCoreAsync(e).ConfigureAwait(true);
+                await eb.BeginBlockReorderDragCoreAsync(_imageReorderPressArgs).ConfigureAwait(true);
         }
         finally
         {

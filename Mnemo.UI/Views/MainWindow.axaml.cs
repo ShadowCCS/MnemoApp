@@ -76,7 +76,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || DataContext is not MainWindowViewModel mainVm)
             return;
 
-        var root = this.GetVisualRoot() as Visual;
+        var root = this.VisualRoot as Visual;
         if (root == null)
             return;
 
@@ -92,7 +92,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (!_sidebarResizing || DataContext is not MainWindowViewModel mainVm)
             return;
 
-        var root = this.GetVisualRoot() as Visual;
+        var root = this.VisualRoot as Visual;
         if (root == null)
             return;
 

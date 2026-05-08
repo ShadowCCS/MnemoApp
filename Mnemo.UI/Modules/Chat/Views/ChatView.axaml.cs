@@ -218,15 +218,22 @@ public partial class ChatView : UserControl
             return;
         }
 
+        var top = TopLevel.GetTopLevel(rowHost);
+        if (top == null)
+        {
+            vm.IsRowHovered = false;
+            return;
+        }
+
         // PointerExited + Bounds.Contains is unreliable here (position can still read inside the row).
-        // After input processing, PointerOverElement reflects the actual hit target.
-        Dispatcher.UIThread.Post(() => ClearChatHistoryRowHoverIfPointerLeft(rowHost, vm), DispatcherPriority.Input);
+        // Post to Input so hit-testing sees final pointer target after routing completes.
+        var pointerPosInTop = e.GetPosition(top);
+        Dispatcher.UIThread.Post(() => ClearChatHistoryRowHoverIfPointerLeft(rowHost, vm, top, pointerPosInTop), DispatcherPriority.Input);
     }
 
-    private static void ClearChatHistoryRowHoverIfPointerLeft(Border rowHost, ChatConversationRowViewModel vm)
+    private static void ClearChatHistoryRowHoverIfPointerLeft(Border rowHost, ChatConversationRowViewModel vm, TopLevel top, Point pointerPosInTop)
     {
-        var top = TopLevel.GetTopLevel(rowHost);
-        if (top is not IInputRoot inputRoot || inputRoot.PointerOverElement is not Visual over)
+        if (top.InputHitTest(pointerPosInTop) is not Visual over)
         {
             vm.IsRowHovered = false;
             return;

@@ -17,7 +17,7 @@
             Padding="0"
             Text="{Binding Content, Mode=TwoWay}"
             TextWrapping="NoWrap"
-            Watermark="{Binding Watermark}" />
+            PlaceholderText="{Binding Watermark}" />
     </Border>
 </UserControl>
 

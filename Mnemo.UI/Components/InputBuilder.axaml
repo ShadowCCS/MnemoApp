@@ -70,7 +70,7 @@
 
         <TextBox Name="InputTextBox" 
                  Classes="InputArea"
-                 Watermark="{markup:T Ns=InputBuilder, Key=PastePlaceholder}"/>
+                 PlaceholderText="{markup:T Ns=InputBuilder, Key=PastePlaceholder}"/>
 
         <StackPanel Spacing="12">
             <TextBlock Text="{markup:T Ns=InputBuilder, Key=AddSourceMaterials}" 

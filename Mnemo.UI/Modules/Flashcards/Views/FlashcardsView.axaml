@@ -256,7 +256,7 @@
                                  Classes="deck-search"
                                  Text="{Binding SearchText}"
                                  HorizontalAlignment="Stretch"
-                                 Watermark="{markup:T Ns=Flashcards, Key=SearchPlaceholder}" />
+                                PlaceholderText="{markup:T Ns=Flashcards, Key=SearchPlaceholder}" />
                     </Grid>
                 </Border>
 

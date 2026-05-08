@@ -419,7 +419,7 @@
                         <TextBox x:Name="InputBox"
                                  Grid.Row="0" 
                                  Classes="TransparentBackground"
-                                 Watermark="{markup:T Ns=Chat, Key=AskPlaceholder}"
+                                 PlaceholderText="{markup:T Ns=Chat, Key=AskPlaceholder}"
                                  AcceptsReturn="False"
                                  TextWrapping="Wrap"
                                  MinHeight="40"
