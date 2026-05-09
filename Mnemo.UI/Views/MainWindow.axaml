@@ -20,10 +20,6 @@
         CanMinimize="True"
         CanResize="True"
         Background="{DynamicResource WorkspaceBackgroundBrush}">
-    <Window.KeyBindings>
-        <KeyBinding Gesture="Ctrl+K" Command="{Binding TopbarViewModel.OpenGlobalSearchCommand}" />
-        <KeyBinding Gesture="Meta+K" Command="{Binding TopbarViewModel.OpenGlobalSearchCommand}" />
-    </Window.KeyBindings>
 
 <Border CornerRadius="8" Background="{DynamicResource WorkspaceBackgroundBrush}" ClipToBounds="True">
     <Grid>
@@ -37,7 +33,9 @@
 
             <!-- Main Content: full width; resize handle overlays right edge when sidebar open (does not take layout space) -->
             <Grid Grid.Row="1" Grid.Column="1">
-                <ContentControl Content="{Binding Navigation.CurrentViewModel}"/>
+                <components:WorkspaceKeybindHost>
+                    <ContentControl Content="{Binding Navigation.CurrentViewModel}"/>
+                </components:WorkspaceKeybindHost>
                 <Border HorizontalAlignment="Right"
                         Width="12"
                         IsVisible="{Binding RightSidebarViewModel.ShowResizeHandle}"

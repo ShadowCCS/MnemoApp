@@ -162,6 +162,8 @@
     "NewNote": "Nytt notat",
     "NewNoteDescription": "Ctrl+N oppretter et nytt notat.",
     "ChangeBind": "Endre snarvei",
+    "KeybindManager": "Tastatursnarveier",
+    "KeybindManagerDescription": "Se tilordninger, konflikter og tilbakestill lagrede overstyringer til standard.",
     "Normal": "Normal",
     "Relaxed": "Avslappet",
     "Never": "Aldri",

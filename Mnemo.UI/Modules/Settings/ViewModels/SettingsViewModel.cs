@@ -31,6 +31,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IMainThreadDispatcher _mainThreadDispatcher;
     private readonly IUpdateService _updateService;
     private readonly UpdateOrchestrator _updateOrchestrator;
+    private readonly IKeyMap _keyMap;
 
     private bool _aiRuntimeInstalled;
     private bool _developerGateUnlocked;
@@ -98,7 +99,8 @@ public partial class SettingsViewModel : ViewModelBase
         IAiSetupOverlayPresenter aiSetupOverlay,
         IMainThreadDispatcher mainThreadDispatcher,
         IUpdateService updateService,
-        UpdateOrchestrator updateOrchestrator)
+        UpdateOrchestrator updateOrchestrator,
+        IKeyMap keyMap)
     {
         _settingsService = settingsService;
         _themeService = themeService;
@@ -112,6 +114,7 @@ public partial class SettingsViewModel : ViewModelBase
         _mainThreadDispatcher = mainThreadDispatcher;
         _updateService = updateService;
         _updateOrchestrator = updateOrchestrator;
+        _keyMap = keyMap;
 
         _aiInstallCoordinator.Completed += OnAiInstallCompleted;
 
@@ -373,7 +376,18 @@ public partial class SettingsViewModel : ViewModelBase
 
         var hotkeys = new SettingsCategoryViewModel(T("Hotkeys"), "avares://Mnemo.UI/Icons/Common/link.svg", "Hotkeys");
         var hotkeysGroup = new SettingsGroupViewModel(T("Shortcuts"), isCollapsible: true);
-        hotkeysGroup.Items.Add(new ActionSettingViewModel(T("GlobalQuickActions"), T("GlobalQuickActionsDescription"), T("ChangeBind")));
+        hotkeysGroup.Items.Add(new AsyncActionSettingViewModel(
+            T("KeybindManager"),
+            T("KeybindManagerDescription"),
+            T("OpenManager"),
+            async _ =>
+            {
+                await _mainThreadDispatcher.InvokeAsync(() =>
+                {
+                    KeybindManagerUi.TryOpen(_overlayService, _keyMap);
+                    return Task.CompletedTask;
+                }).ConfigureAwait(false);
+            }));
         hotkeysGroup.Items.Add(new ActionSettingViewModel(T("NewNote"), T("NewNoteDescription"), T("ChangeBind")));
         hotkeys.Groups.Add(hotkeysGroup);
 

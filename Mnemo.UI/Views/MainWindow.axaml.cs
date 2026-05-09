@@ -3,8 +3,13 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.Models.Keybinds;
+using Mnemo.Core.Services;
 using Mnemo.UI.Components.RightSidebar;
+using Mnemo.UI.Services;
 using Mnemo.UI.ViewModels;
 
 namespace Mnemo.UI.Views;
@@ -21,6 +26,37 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        AddHandler(InputElement.KeyDownEvent, OnGlobalKeyDownTunnel, RoutingStrategies.Tunnel);
+        Loaded += OnMainWindowLoaded;
+    }
+
+    private void OnMainWindowLoaded(object? sender, RoutedEventArgs e)
+    {
+        Loaded -= OnMainWindowLoaded;
+        RegisterKeybindHandlers();
+    }
+
+    private void RegisterKeybindHandlers()
+    {
+        if (Application.Current is not App app || app.Services == null) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+        var router = app.Services.GetRequiredService<IKeybindActionRouter>();
+        router.RegisterHandler("global.search", () => vm.TopbarViewModel.OpenGlobalSearchCommand.Execute(null));
+    }
+
+    private void OnGlobalKeyDownTunnel(object? sender, KeyEventArgs e)
+    {
+        if (e.Handled) return;
+        if (Application.Current is not App app || app.Services == null) return;
+
+        var keyMap = app.Services.GetRequiredService<IKeyMap>();
+        var router = app.Services.GetRequiredService<IKeybindActionRouter>();
+        var input = KeybindInputNormalizer.FromKeyEvent(e);
+        var r = keyMap.ProcessGlobalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
+        if (r.CompletedAction && !string.IsNullOrEmpty(r.ActionId))
+            router.TryExecute(r.ActionId);
+        if (r.Handled)
+            e.Handled = true;
     }
 
     /// <summary>Exposed for content views (e.g. Overview) to bind padding to; avoids resolving DataContext.RightSidebarViewModel from XAML.</summary>
@@ -50,6 +86,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             npc.PropertyChanged += OnRightSidebarViewModelPropertyChanged;
             _rightSidebarViewModelSubscribed = npc;
         }
+
+        RegisterKeybindHandlers();
     }
 
     private void OnRightSidebarViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

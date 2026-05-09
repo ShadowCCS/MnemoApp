@@ -1,10 +1,12 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.UI.Services;
 using Mnemo.UI.ViewModels;
 using System.Linq;
 
@@ -14,6 +16,9 @@ public class SidebarViewModel : ViewModelBase
 {
     private readonly ISidebarService _sidebarService;
     private readonly INavigationService _navigationService;
+    private readonly IOverlayService _overlayService;
+    private readonly IKeyMap _keyMap;
+    private readonly IMainThreadDispatcher _mainThreadDispatcher;
 
     public ObservableCollection<SidebarCategory> Categories => _sidebarService.Categories;
 
@@ -25,14 +30,24 @@ public class SidebarViewModel : ViewModelBase
 
     public ICommand ToggleSidebarCommand { get; }
     public ICommand NavigateCommand { get; }
+    public ICommand OpenKeybindManagerCommand { get; }
 
-    public SidebarViewModel(ISidebarService sidebarService, INavigationService navigationService)
+    public SidebarViewModel(
+        ISidebarService sidebarService,
+        INavigationService navigationService,
+        IOverlayService overlayService,
+        IKeyMap keyMap,
+        IMainThreadDispatcher mainThreadDispatcher)
     {
         _sidebarService = sidebarService;
         _navigationService = navigationService;
+        _overlayService = overlayService;
+        _keyMap = keyMap;
+        _mainThreadDispatcher = mainThreadDispatcher;
 
         ToggleSidebarCommand = new RelayCommand(() => IsSidebarCollapsed = !IsSidebarCollapsed);
         NavigateCommand = new RelayCommand<SidebarItem>(NavigateToItem);
+        OpenKeybindManagerCommand = new RelayCommand(() => _ = OpenKeybindManagerAsync());
 
         if (_sidebarService is INotifyPropertyChanged npc)
         {
@@ -58,6 +73,15 @@ public class SidebarViewModel : ViewModelBase
         
         // Set initial selection
         UpdateSelection();
+    }
+
+    private async Task OpenKeybindManagerAsync()
+    {
+        await _mainThreadDispatcher.InvokeAsync(() =>
+        {
+            KeybindManagerUi.TryOpen(_overlayService, _keyMap);
+            return Task.CompletedTask;
+        }).ConfigureAwait(false);
     }
 
     private void NavigateToItem(SidebarItem? item)

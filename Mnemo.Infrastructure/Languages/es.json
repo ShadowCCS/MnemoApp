@@ -159,6 +159,8 @@
     "NewNote": "Nueva nota",
     "NewNoteDescription": "Ctrl+N crea una nueva nota.",
     "ChangeBind": "Cambiar atajo",
+    "KeybindManager": "Atajos de teclado",
+    "KeybindManagerDescription": "Ver asignaciones, conflictos y restablecer anulaciones guardadas a los valores predeterminados.",
     "Normal": "Normal",
     "Relaxed": "Relajado",
     "Never": "Nunca",

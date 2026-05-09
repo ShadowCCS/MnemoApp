@@ -1,5 +1,7 @@
 using System;
+using Mnemo.Core.Models.Keybinds;
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Keybinds;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Infrastructure.Services.Tools;
 using Mnemo.UI.Components;
@@ -42,5 +44,23 @@ public class CoreUIModule : IModule
 
     public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
+    }
+
+    public void RegisterKeybindManifest(IKeybindManifestRegistry registry)
+    {
+        registry.Register(new KeybindActionDefinition
+        {
+            ActionId = "global.search",
+            Namespace = "global",
+            Scope = KeybindScope.Global,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+K")
+                }
+            ]
+        });
     }
 }

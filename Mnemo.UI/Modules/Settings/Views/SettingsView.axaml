@@ -97,7 +97,9 @@
         <DataTemplate x:Key="ActionSettingTemplate" x:DataType="vm:ActionSettingViewModel">
             <components:SettingsCard Title="{Binding Title}" Description="{Binding Description}" Margin="0,0,0,8">
                 <components:SettingsCard.RightContent>
-                    <Button Content="{Binding ActionText}" 
+                    <Button Content="{Binding ActionText}"
+                            Command="{Binding ActionCommand}"
+                            IsEnabled="{Binding HasAction}"
                             Padding="16,8"
                             CornerRadius="6"
                             Background="{DynamicResource SecondaryButtonBackgroundBrush}"

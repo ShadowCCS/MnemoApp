@@ -48,6 +48,7 @@ public partial class EditableBlock : UserControl
     private bool _backspaceHandledInTunnel;
     private string? _slashMenuOverlayId;
     private SlashCommandMenu? _currentSlashMenu;
+    private bool _keymapTextCaptureActive;
     private string? _formattingToolbarOverlayId;
     private InlineFormattingToolbar? _currentFormattingToolbar;
     private TopLevel? _toolbarPointerTopLevel;
@@ -720,6 +721,12 @@ public partial class EditableBlock : UserControl
         if (_viewModel == null || _stateManager == null) return;
 
         _viewModel.IsFocused = true;
+
+        if (!_keymapTextCaptureActive && Application.Current is App app && app.Services?.GetService<IKeyMap>() is { } keyMap)
+        {
+            keyMap.EnterTextCapture();
+            _keymapTextCaptureActive = true;
+        }
         
         if (sender is RichTextEditor editor)
         {
@@ -773,6 +780,13 @@ public partial class EditableBlock : UserControl
     private void CompleteLostFocus()
     {
         if (_viewModel == null || _stateManager == null) return;
+
+        if (_keymapTextCaptureActive && Application.Current is App app && app.Services?.GetService<IKeyMap>() is { } keyMap)
+        {
+            keyMap.LeaveTextCapture();
+            _keymapTextCaptureActive = false;
+        }
+
         _viewModel.IsFocused = false;
         var parentEditor = FindParentBlockEditor();
         parentEditor?.FlushTypingBatch();

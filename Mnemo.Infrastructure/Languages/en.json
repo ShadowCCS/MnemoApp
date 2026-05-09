@@ -162,6 +162,8 @@
     "NewNote": "New Note",
     "NewNoteDescription": "Ctrl+N creates a new note.",
     "ChangeBind": "Change shortcut",
+    "KeybindManager": "Keyboard shortcuts",
+    "KeybindManagerDescription": "View bindings, conflicts, and reset saved overrides to defaults.",
     "Normal": "Normal",
     "Relaxed": "Relaxed",
     "Never": "Never",

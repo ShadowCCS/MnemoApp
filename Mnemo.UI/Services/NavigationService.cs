@@ -123,12 +123,19 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
             var previousRoute = _history.Count > 0 ? _history.Peek() : null;
             var previousVm = CurrentViewModel;
 
+            var keyMap = _serviceProvider.GetService<IKeyMap>();
+            keyMap?.SetActiveRoute(route, RouteKeybindNamespaces.ForRoute(route));
+            keyMap?.OnNavigationChanged();
+
             var vm = _serviceProvider.GetRequiredService(vmType);
 
             if (vm is INavigationAware aware)
             {
                 aware.OnNavigatedTo(parameter);
             }
+
+            if (keyMap != null && vm is IKeybindContributor contributor)
+                contributor.RegisterEphemeralKeybinds(keyMap);
 
             _history.Push(route);
             CurrentViewModel = vm;

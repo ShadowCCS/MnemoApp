@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mnemo.UI.Components.Overlays"
+             x:Class="Mnemo.UI.Components.Overlays.KeybindManagerOverlay"
+             x:DataType="vm:KeybindManagerOverlayViewModel"
+             Width="640" MaxHeight="560">
+    <Border Background="{DynamicResource OverlayBackgroundBrush}"
+            CornerRadius="12"
+            Padding="20"
+            BoxShadow="0 8 32 0 #40000000">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+            <StackPanel Grid.Row="0" Spacing="4">
+                <TextBlock Text="Keybind manager"
+                           FontSize="18"
+                           FontFamily="{DynamicResource Font.SemiBold}"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <TextBlock Text="Static armed actions and conflicts. Reset restores manifest defaults."
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Spacing="6">
+                <TextBlock Text="Conflicts"
+                           FontFamily="{DynamicResource Font.Medium}"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <ListBox ItemsSource="{Binding Conflicts}"
+                         Background="Transparent"
+                         MaxHeight="100">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KeybindConflictRowVm">
+                            <TextBlock TextWrapping="Wrap" FontSize="12">
+                                <Run Text="{Binding Severity}"/><Run Text=": "/><Run Text="{Binding Message}"/>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Actions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KeybindActionRowVm">
+                            <Border Margin="0,0,0,8" Padding="10" CornerRadius="8"
+                                    Background="{DynamicResource CardBackgroundSecondaryBrush}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock FontFamily="{DynamicResource Font.Medium}" FontSize="13"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Text="{Binding ActionId}"/>
+                                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Text="{Binding Namespace}"/>
+                                    <TextBlock FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
+                                               Text="{Binding Bindings}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Content="Close" Click="OnCloseClick"/>
+                <Button Content="Reset all overrides" Command="{Binding ResetAllCommand}"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

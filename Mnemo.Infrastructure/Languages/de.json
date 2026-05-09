@@ -159,6 +159,8 @@
     "NewNote": "Neue Notiz",
     "NewNoteDescription": "Drücken Sie Strg+N, um eine neue Notiz zu erstellen.",
     "ChangeBind": "Ändern der Bindung",
+    "KeybindManager": "Tastenkürzel",
+    "KeybindManagerDescription": "Tastenbelegungen und Konflikte anzeigen und gespeicherte Überschreibungen auf Standard zurücksetzen.",
     "Normal": "Normal",
     "Relaxed": "Entspannt",
     "Never": "Nie",

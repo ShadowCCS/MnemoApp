@@ -22,6 +22,7 @@ using Mnemo.Infrastructure.Services.Flashcards;
 using Mnemo.Infrastructure.Services.Speech;
 using Mnemo.Infrastructure.Services.Statistics;
 using Mnemo.Infrastructure.Services.TextShortcuts;
+using Mnemo.Infrastructure.Services.Keybinds;
 using Mnemo.Infrastructure.Services.Tools;
 using Mnemo.Infrastructure.Services.Packaging;
 using Mnemo.Infrastructure.Services.Packaging.PayloadHandlers;
@@ -200,6 +201,19 @@ public static class Bootstrapper
         {
             module.ConfigureServices(registrar);
         }
+
+        var keybindManifestCollector = new KeybindManifestCollector();
+        foreach (var module in modules)
+        {
+            module.RegisterKeybindManifest(keybindManifestCollector);
+        }
+
+        services.AddSingleton<IKeybindRepository, SqliteKeybindRepository>();
+        services.AddSingleton<IKeyMap>(sp => new KeyMapService(
+            sp.GetRequiredService<IKeybindRepository>(),
+            sp.GetRequiredService<ILoggerService>(),
+            keybindManifestCollector.GetAll()));
+        services.AddSingleton<IKeybindActionRouter, KeybindActionRouter>();
 
         var buildSpSw = Stopwatch.StartNew();
         var serviceProvider = services.BuildServiceProvider();

@@ -159,6 +159,8 @@
     "NewNote": "新しいノート",
     "NewNoteDescription": "Ctrl+Nで新しいノートを作成します。",
     "ChangeBind": "変更する",
+    "KeybindManager": "キーボードショートカット",
+    "KeybindManagerDescription": "割り当てや競合を表示し、保存した上書きを既定にリセットします。",
     "Normal": "通常",
     "Relaxed": "リラックス",
     "Never": "決して",

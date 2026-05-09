@@ -25,5 +25,10 @@ public interface IModule
     /// (e.g. <see cref="IStatisticsManager"/>) so widget factories can wire data dependencies.
     /// </summary>
     void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services);
+
+    /// <summary>
+    /// Registers static keybind manifest entries. Called during bootstrap before the service provider is built.
+    /// </summary>
+    void RegisterKeybindManifest(IKeybindManifestRegistry registry) { }
 }
 

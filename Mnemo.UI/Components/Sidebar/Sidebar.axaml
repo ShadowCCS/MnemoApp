@@ -111,6 +111,7 @@
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         ToolTip.Tip="{markup:T Ns=Sidebar, Key=KeyboardShortcuts}"
+                        Command="{Binding OpenKeybindManagerCommand}"
                         Padding="12,8">
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Border Background="{DynamicResource CardBackgroundSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="6" CornerRadius="6">
