@@ -76,6 +76,8 @@
     "ClearNow": "Clear Now",
     "EnableGamification": "Enable Gamification",
     "EnableGamificationDescription": "Track XP, streaks, and levels as you learn.",
+    "EnableToasts": "Toast notifications",
+    "EnableToastsDescription": "Show pop-up toasts in the corner. When off, new alerts appear only in the notification list.",
     "AutoSave": "Auto-save",
     "AutoSaveDescription": "Save changes automatically every few seconds.",
     "SpellCheck": "Spell Check",
@@ -189,10 +191,17 @@
     "UpdatesSkippedVersionActive": "You chose to skip this version. Clear that in the database or wait for a newer tag.",
     "UpdatesAvailableSeeSettingsBadge": "Update available — see the dot on Settings in the sidebar.",
     "UpdatesNavigateToOverview": "Open Overview or Settings to see the update prompt.",
-    "UpdatesPromptShown": "Update prompt shown."
+    "UpdatesPromptShown": "Update prompt shown.",
+    "UpdateToastDescriptionFormat": "Version {0} is ready to install.",
+    "UpdateNow": "Update now",
+    "UpdateToastLater": "Later",
+    "PostUpdateToastTitle": "Update installed",
+    "PostUpdateToastDescriptionFormat": "Updated to version {0}."
   },
   "Onboarding": {
     "WelcomeTitle": "Welcome to Mnemo",
+    "PostOnboardingWelcomeTitle": "Welcome to Mnemo",
+    "PostOnboardingWelcomeMessage": "You're all set. Start from Overview or use the sidebar anytime.",
     "WelcomeDescription": "This application is under active development. Features may change and data formats are not yet final. Use at your own risk.",
     "PersonalizeTitle": "Personalize your experience",
     "PersonalizeDescription": "Pick a name, colors, and a profile picture so Mnemo feels like yours. You can change these anytime in Settings.",
@@ -557,6 +566,8 @@
     "TypePage": "Page"
   },
   "Topbar": {
+    "NotificationsTitle": "Notifications",
+    "NotificationsEmpty": "No notifications yet.",
     "SearchPlaceholder": "Search for a lesson, mindmap, etc.",
     "SearchShortcut": "Ctrl+K",
     "GlobalSearchOverlayHint": "Global search is opening here. Full results and actions are coming next.",

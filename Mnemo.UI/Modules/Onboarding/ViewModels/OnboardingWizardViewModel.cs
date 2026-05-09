@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.UI.Modules.Settings.ViewModels;
 using Mnemo.UI.ViewModels;
@@ -18,6 +19,7 @@ public partial class OnboardingWizardViewModel : ViewModelBase
     private readonly ILocalizationService _localizationService;
     private readonly IOverlayService _overlayService;
     private readonly INavigationService _navigationService;
+    private readonly IToastService _toastService;
     private string? _overlayId;
 
     private static readonly IReadOnlyList<OnboardingStepKind> Steps = new[]
@@ -73,12 +75,14 @@ public partial class OnboardingWizardViewModel : ViewModelBase
         ILocalizationService localizationService,
         IThemeService themeService,
         IOverlayService overlayService,
-        INavigationService navigationService)
+        INavigationService navigationService,
+        IToastService toastService)
     {
         _settingsService = settingsService;
         _localizationService = localizationService;
         _overlayService = overlayService;
         _navigationService = navigationService;
+        _toastService = toastService;
 
         string T(string key) => _localizationService.T(key, "Onboarding");
         LanguageSettingViewModel = new LanguageSettingViewModel(localizationService, settingsService);
@@ -160,6 +164,10 @@ public partial class OnboardingWizardViewModel : ViewModelBase
         if (!string.IsNullOrEmpty(_overlayId))
             _overlayService.CloseOverlay(_overlayId);
         _navigationService.NavigateTo("overview");
+
+        var welcomeTitle = _localizationService.T("PostOnboardingWelcomeTitle", "Onboarding");
+        var welcomeMessage = _localizationService.T("PostOnboardingWelcomeMessage", "Onboarding");
+        _toastService.SpawnToast(ToastType.Info, TimeSpan.FromSeconds(8), welcomeTitle, welcomeMessage);
     }
 
     public async Task LoadUserNameAsync()

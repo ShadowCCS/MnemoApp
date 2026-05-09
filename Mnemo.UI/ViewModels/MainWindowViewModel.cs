@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Mnemo.Core.Services;
 using Mnemo.UI.Services;
@@ -10,6 +11,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public INavigationService Navigation { get; }
     public ISidebarService Sidebar { get; }
     public IOverlayService OverlayService { get; }
+    /// <summary>Concrete toast host state (also exposed as <see cref="IToastService"/>).</summary>
+    public ToastService ToastPresenter { get; }
     public Components.Sidebar.SidebarViewModel SidebarViewModel { get; }
     public Components.RightSidebar.RightSidebarViewModel RightSidebarViewModel { get; }
     public Components.TopbarViewModel TopbarViewModel { get; }
@@ -26,7 +29,8 @@ public partial class MainWindowViewModel : ViewModelBase
         Components.RightSidebar.RightSidebarViewModel rightSidebarViewModel,
         Components.TopbarViewModel topbarViewModel,
         ISettingsService settingsService,
-        IOverlayService overlayService)
+        IOverlayService overlayService,
+        ToastService toastPresenter)
     {
         Navigation = navigation;
         Sidebar = sidebar;
@@ -34,6 +38,7 @@ public partial class MainWindowViewModel : ViewModelBase
         RightSidebarViewModel = rightSidebarViewModel;
         TopbarViewModel = topbarViewModel;
         OverlayService = overlayService;
+        ToastPresenter = toastPresenter;
         _settingsService = settingsService;
 
         // Load initial app icon asynchronously

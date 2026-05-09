@@ -76,6 +76,8 @@
     "ClearNow": "Borrar ahora",
     "EnableGamification": "Habilitar gamificación",
     "EnableGamificationDescription": "Rastree XP, rachas y niveles mientras aprende.",
+    "EnableToasts": "Notificaciones tipo toast",
+    "EnableToastsDescription": "Muestra toasts en la esquina. Si está desactivado, las alertas nuevas solo aparecen en la lista de notificaciones.",
     "AutoSave": "Guardado automático",
     "AutoSaveDescription": "Guarde los cambios automáticamente cada pocos segundos.",
     "SpellCheck": "Revisión ortográfica",
@@ -186,10 +188,17 @@
     "UpdatesSkippedVersionActive": "Omitiste esta versión.",
     "UpdatesAvailableSeeSettingsBadge": "Actualización disponible — punto junto a Ajustes en la barra lateral.",
     "UpdatesNavigateToOverview": "Abre Resumen o Ajustes para ver el aviso de actualización.",
-    "UpdatesPromptShown": "Aviso de actualización mostrado."
+    "UpdatesPromptShown": "Aviso de actualización mostrado.",
+    "UpdateToastDescriptionFormat": "La versión {0} está lista para instalarse.",
+    "UpdateNow": "Actualizar ahora",
+    "UpdateToastLater": "Más tarde",
+    "PostUpdateToastTitle": "Actualización instalada",
+    "PostUpdateToastDescriptionFormat": "Actualizado a la versión {0}."
   },
   "Onboarding": {
     "WelcomeTitle": "Bienvenido a Mnemo",
+    "PostOnboardingWelcomeTitle": "Bienvenido a Mnemo",
+    "PostOnboardingWelcomeMessage": "Todo listo. Empieza en Resumen o usa la barra lateral cuando quieras.",
     "WelcomeDescription": "Esta aplicación está en desarrollo activo. Las características pueden cambiar y los formatos de datos aún no son definitivos. Úsela bajo su propio riesgo.",
     "PersonalizeTitle": "Personalice su experiencia",
     "PersonalizeDescription": "Elija un nombre, colores y una foto de perfil para que Mnemo se sienta suyo. Puede cambiar esto en cualquier momento en la Configuración.",
@@ -554,6 +563,8 @@
     "TypePage": "Página"
   },
   "Topbar": {
+    "NotificationsTitle": "Notificaciones",
+    "NotificationsEmpty": "Aún no hay notificaciones.",
     "SearchPlaceholder": "Buscar una lección, mapa mental, etc.",
     "SearchShortcut": "Ctrl+K",
     "GlobalSearchOverlayHint": "La búsqueda global se abrirá aquí. Los resultados completos y acciones llegarán enseguida.",

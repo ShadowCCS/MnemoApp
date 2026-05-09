@@ -76,6 +76,8 @@
     "ClearNow": "Tøm nå",
     "EnableGamification": "Aktiver gamification",
     "EnableGamificationDescription": "Spor XP, streaks og nivåer mens du lærer.",
+    "EnableToasts": "Toast-varsler",
+    "EnableToastsDescription": "Vis toast-varsler i hjørnet. Når av, vises nye varsler bare i varsel-listen.",
     "AutoSave": "Autolagring",
     "AutoSaveDescription": "Lagre endringer automatisk hvert par sekunder.",
     "SpellCheck": "Stavekontroll",
@@ -189,10 +191,17 @@
     "UpdatesSkippedVersionActive": "Du valgte å hoppe over denne versjonen. Tøm dette i databasen eller vent på en nyere merking.",
     "UpdatesAvailableSeeSettingsBadge": "Oppdatering tilgjengelig — se etter prikken på Innstillinger i sidepanelet.",
     "UpdatesNavigateToOverview": "Åpne Oversikt eller Innstillinger for å se oppdateringsvarselet.",
-    "UpdatesPromptShown": "Oppdateringsvarsel vist."
+    "UpdatesPromptShown": "Oppdateringsvarsel vist.",
+    "UpdateToastDescriptionFormat": "Versjon {0} er klar til å installeres.",
+    "UpdateNow": "Oppdater nå",
+    "UpdateToastLater": "Senere",
+    "PostUpdateToastTitle": "Oppdatering installert",
+    "PostUpdateToastDescriptionFormat": "Oppdatert til versjon {0}."
   },
   "Onboarding": {
     "WelcomeTitle": "Velkommen til Mnemo",
+    "PostOnboardingWelcomeTitle": "Velkommen til Mnemo",
+    "PostOnboardingWelcomeMessage": "Du er klar. Start i Oversikt eller bruk sidepanelet når som helst.",
     "WelcomeDescription": "Denne applikasjonen er under aktiv utvikling. Funksjoner kan endres og dataformater er ikke endelige. Brukes på eget ansvar.",
     "PersonalizeTitle": "Tilpass din opplevelse",
     "PersonalizeDescription": "Velg navn, farger og et profilbilde slik at Mnemo føles som ditt. Du kan endre dette når som helst i Innstillinger.",
@@ -557,6 +566,8 @@
     "TypePage": "Side"
   },
   "Topbar": {
+    "NotificationsTitle": "Varsler",
+    "NotificationsEmpty": "Ingen varsler ennå.",
     "SearchPlaceholder": "Søk etter en leksjon, et tankekart, osv.",
     "SearchShortcut": "Ctrl+K",
     "GlobalSearchOverlayHint": "Globalt sok aapnes her. Fullstendige resultater og handlinger kommer snart.",

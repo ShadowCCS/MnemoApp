@@ -10,7 +10,7 @@ using Mnemo.UI.Modules.Updates.ViewModels;
 
 namespace Mnemo.UI.Modules.Updates.Services;
 
-/// <summary>Startup / manual update checks, gating, overlay, and settings badge.</summary>
+/// <summary>Startup / manual update checks, gating, manual overlay, automatic toast prompt, and settings badge.</summary>
 public sealed class UpdateOrchestrator : IDisposable
 {
     private const int CooldownHours = 6;
@@ -24,8 +24,10 @@ public sealed class UpdateOrchestrator : IDisposable
     private readonly ILocalizationService _localizationService;
     private readonly IMainThreadDispatcher _mainThreadDispatcher;
     private readonly ILoggerService _logger;
+    private readonly IToastService _toastService;
 
     private AppUpdateInfo? _pendingUpdate;
+    private string? _autoUpdateToastVersionShown;
     private bool _overlayOpen;
     private readonly object _overlayGate = new();
     private bool _started;
@@ -38,7 +40,8 @@ public sealed class UpdateOrchestrator : IDisposable
         ISidebarService sidebarService,
         ILocalizationService localizationService,
         IMainThreadDispatcher mainThreadDispatcher,
-        ILoggerService logger)
+        ILoggerService logger,
+        IToastService toastService)
     {
         _updateService = updateService;
         _settingsService = settingsService;
@@ -48,6 +51,7 @@ public sealed class UpdateOrchestrator : IDisposable
         _localizationService = localizationService;
         _mainThreadDispatcher = mainThreadDispatcher;
         _logger = logger;
+        _toastService = toastService;
     }
 
     /// <summary>Human-readable outcome for the last manual check (Settings button).</summary>
@@ -196,11 +200,49 @@ public sealed class UpdateOrchestrator : IDisposable
             return;
         }
 
+        var update = _pendingUpdate;
+        if (update == null)
+            return;
+
+        if (!userForced)
+        {
+            if (string.Equals(_autoUpdateToastVersionShown, update.Version, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var isPortableFlow = !_updateService.SupportsInAppApply;
+            prompts[update.Version] = promptCount + 1;
+            await _settingsService.SetAsync(UpdateSettingsKeys.PromptCountByVersion, prompts).ConfigureAwait(false);
+            _autoUpdateToastVersionShown = update.Version;
+
+            async Task RemindLaterFromAutoToastAsync()
+            {
+                await _settingsService.SetAsync(UpdateSettingsKeys.RemindAtUtc, DateTime.UtcNow.AddHours(24)).ConfigureAwait(false);
+                await _settingsService.SetAsync(UpdateSettingsKeys.SnoozeLaunchesRemaining, 2).ConfigureAwait(false);
+                _pendingUpdate = null;
+                _autoUpdateToastVersionShown = null;
+            }
+
+            _toastService.SpawnToast(
+                ToastType.Action,
+                TimeSpan.Zero,
+                T("UpdateAvailableTitle"),
+                string.Format(T("UpdateToastDescriptionFormat"), update.Version),
+                new ToastActionSpec
+                {
+                    PrimaryLabel = T("UpdateNow"),
+                    SecondaryLabel = T("UpdateToastLater"),
+                    OnPrimary = () => _ = OnAutoUpdatePrimaryAsync(update, isPortableFlow),
+                    OnSecondary = () => _ = RemindLaterFromAutoToastAsync(),
+                    OnDismissed = () => _ = RemindLaterFromAutoToastAsync(),
+                });
+
+            return;
+        }
+
         lock (_overlayGate)
             _overlayOpen = true;
 
-        var update = _pendingUpdate;
-        var isPortableFlow = !_updateService.SupportsInAppApply;
+        var isPortableFlowOverlay = !_updateService.SupportsInAppApply;
 
         void OnClosed()
         {
@@ -211,9 +253,10 @@ public sealed class UpdateOrchestrator : IDisposable
         var vm = new UpdateAvailableViewModel(
             update,
             _updateService,
+            _settingsService,
             _localizationService,
             _overlayService,
-            isPortableFlow,
+            isPortableFlowOverlay,
             onRemindLaterAsync: async () =>
             {
                 await _settingsService.SetAsync(UpdateSettingsKeys.RemindAtUtc, DateTime.UtcNow.AddHours(24)).ConfigureAwait(false);
@@ -246,11 +289,50 @@ public sealed class UpdateOrchestrator : IDisposable
         var overlayId = _overlayService.CreateOverlay(view, options, "UpdateAvailable");
         vm.SetOverlayId(overlayId);
 
-        prompts[_pendingUpdate.Version] = promptCount + 1;
+        prompts[update.Version] = promptCount + 1;
         await _settingsService.SetAsync(UpdateSettingsKeys.PromptCountByVersion, prompts).ConfigureAwait(false);
 
         if (userForced)
             LastManualCheckMessage = T("UpdatesPromptShown");
+    }
+
+    private async Task OnAutoUpdatePrimaryAsync(AppUpdateInfo update, bool isPortableFlow)
+    {
+        _pendingUpdate = null;
+        _autoUpdateToastVersionShown = null;
+
+        if (isPortableFlow)
+        {
+            await UpdateReleaseLauncher.LaunchLatestAsync().ConfigureAwait(true);
+            return;
+        }
+
+        try
+        {
+            var progress = new Progress<int>(_ => { });
+            var result = await _updateService.DownloadUpdatesAsync(update, progress, default).ConfigureAwait(false);
+            if (!result.IsSuccess)
+            {
+                _toastService.SpawnToast(
+                    ToastType.Warning,
+                    8.0,
+                    T("UpdateAvailableTitle"),
+                    result.ErrorMessage ?? T("UpdateDownloadFailed"));
+                return;
+            }
+
+            await _settingsService.SetAsync(UpdateSettingsKeys.PendingPostUpdateToastVersion, update.Version).ConfigureAwait(false);
+            await _mainThreadDispatcher.InvokeAsync(() =>
+            {
+                _updateService.ApplyUpdatesAndRestart();
+                return Task.CompletedTask;
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning("Updates", $"OnAutoUpdatePrimaryAsync: {ex.Message}");
+            _toastService.SpawnToast(ToastType.Warning, 8.0, T("UpdateAvailableTitle"), ex.Message);
+        }
     }
 
     private async Task<Dictionary<string, int>> LoadPromptCountsAsync()

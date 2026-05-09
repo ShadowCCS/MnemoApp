@@ -32,6 +32,7 @@
 
     <!-- Icon resources, organized by folder -->
     <AvaloniaResource Include="Icons\Common\*.svg" />
+    <AvaloniaResource Include="Icons\Toast\*.svg" />
     <AvaloniaResource Include="Icons\SlashCommand\*.svg" />
     <AvaloniaResource Include="Icons\FormattingToolbar\*.svg" />
     <AvaloniaResource Include="Icons\Assets\*.svg" />

@@ -99,6 +99,73 @@
                     <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/device-speaker.svg" Color="{DynamicResource TopbarIconsBrush}" Width="20" Height="20" />
                 </Button>
                 <Button Background="{DynamicResource TopbarButtonBackgroundBrush}" Foreground="{DynamicResource TopbarButtonForegroundBrush}" Height="34" Width="34" Padding="7" CornerRadius="19" BorderThickness="0">
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight" ShowMode="TransientWithDismissOnPointerMoveAway">
+                            <!-- No inner ScrollViewer: FlyoutPresenter template already wraps content in ScrollViewer.
+                                 No second Background/Border: presenter supplies rounded chrome; avoids square bleed in corners. -->
+                            <StackPanel MinWidth="300"
+                                        MaxWidth="380"
+                                        Margin="12,10"
+                                        Spacing="4">
+                                    <TextBlock Text="{markup:T Ns=Topbar, Key=NotificationsTitle}"
+                                               FontWeight="SemiBold"
+                                               FontSize="{DynamicResource FontSize.Body.Small}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="4,2,4,6" />
+                                    <TextBlock Text="{markup:T Ns=Topbar, Key=NotificationsEmpty}"
+                                               IsVisible="{Binding ShowsNotificationsEmpty}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextAlignment="Center"
+                                               Margin="8,12"
+                                               TextWrapping="Wrap" />
+                                    <ItemsControl IsVisible="{Binding HasNotifications}"
+                                                  ItemsSource="{Binding RecentNotifications}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="components:NotificationFlyoutRowViewModel">
+                                                <Border Padding="10,10"
+                                                        CornerRadius="8"
+                                                        Margin="0,2"
+                                                        Background="Transparent">
+                                                    <Border.Styles>
+                                                        <Style Selector="Border:pointerover">
+                                                            <Setter Property="Background" Value="{DynamicResource NotificationFlyoutRowHoverBrush}" />
+                                                        </Style>
+                                                    </Border.Styles>
+                                                    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                                                        <Ellipse Grid.RowSpan="2"
+                                                                 Width="10"
+                                                                 Height="10"
+                                                                 VerticalAlignment="Center"
+                                                                 Margin="0,0,10,0"
+                                                                 Fill="{Binding TypeAccentBrush}" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Title}"
+                                                                   FontWeight="SemiBold"
+                                                                   FontSize="{DynamicResource FontSize.Body.Small}"
+                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="2"
+                                                                   Text="{Binding TimeText}"
+                                                                   FontSize="{DynamicResource FontSize.Caption}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Top"
+                                                                   Margin="8,0,0,0" />
+                                                        <TextBlock Grid.Row="1"
+                                                                   Grid.Column="1"
+                                                                   Grid.ColumnSpan="2"
+                                                                   Text="{Binding Description}"
+                                                                   FontSize="{DynamicResource FontSize.Caption}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   TextWrapping="Wrap"
+                                                                   Margin="0,4,0,0" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
                     <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/bell.svg" Color="{DynamicResource TopbarIconsBrush}" Width="20" Height="20" />
                 </Button>
 

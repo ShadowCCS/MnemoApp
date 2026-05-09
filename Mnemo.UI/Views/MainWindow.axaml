@@ -62,6 +62,13 @@
                                       MinWidth="0"/>
         </Grid>
 
+        <components:ToastHost ZIndex="9000"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Bottom"
+                              Margin="0,0,20,88"
+                              MaxWidth="460"
+                              DataContext="{Binding ToastPresenter}" />
+
         <Button HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
                 Margin="0,0,20,24"

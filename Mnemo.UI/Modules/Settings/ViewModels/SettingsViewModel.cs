@@ -212,6 +212,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         var appGroup = new SettingsGroupViewModel(T("Application"), isCollapsible: true);
         appGroup.Items.Add(new ToggleSettingViewModel(_settingsService, "App.LaunchAtStartup", T("LaunchAtStartup"), T("LaunchAtStartupDescription")));
+        appGroup.Items.Add(new ToggleSettingViewModel(_settingsService, ToastService.EnableToastsSettingKey, T("EnableToasts"), T("EnableToastsDescription"), true));
         appGroup.Items.Add(new LanguageSettingViewModel(_localizationService, _settingsService));
         appGroup.Items.Add(new ActionSettingViewModel(T("ClearCache"), T("ClearCacheDescription"), T("ClearNow")));
 

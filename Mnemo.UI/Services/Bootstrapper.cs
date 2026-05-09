@@ -158,6 +158,8 @@ public static class Bootstrapper
         // 2. Register UI-specific Services
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IOverlayService, OverlayService>();
+        services.AddSingleton<ToastService>();
+        services.AddSingleton<IToastService>(sp => sp.GetRequiredService<ToastService>());
         services.AddSingleton<IUIService, UIService>();
         
         services.AddSingleton<NavigationService>();

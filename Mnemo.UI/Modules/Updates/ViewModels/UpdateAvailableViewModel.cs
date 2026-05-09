@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.Infrastructure.Services.Updates;
 using Mnemo.UI.Modules.Updates.Services;
 using Mnemo.UI.ViewModels;
 
@@ -12,6 +13,7 @@ namespace Mnemo.UI.Modules.Updates.ViewModels;
 public partial class UpdateAvailableViewModel : ViewModelBase
 {
     private readonly IUpdateService _updateService;
+    private readonly ISettingsService _settingsService;
     private readonly ILocalizationService _localization;
     private readonly IOverlayService _overlayService;
     private readonly bool _isPortableFlow;
@@ -23,6 +25,7 @@ public partial class UpdateAvailableViewModel : ViewModelBase
     public UpdateAvailableViewModel(
         AppUpdateInfo update,
         IUpdateService updateService,
+        ISettingsService settingsService,
         ILocalizationService localization,
         IOverlayService overlayService,
         bool isPortableFlow,
@@ -31,6 +34,7 @@ public partial class UpdateAvailableViewModel : ViewModelBase
         Func<Task> onSkipAsync)
     {
         _updateService = updateService;
+        _settingsService = settingsService;
         _localization = localization;
         _overlayService = overlayService;
         _isPortableFlow = isPortableFlow;
@@ -111,6 +115,7 @@ public partial class UpdateAvailableViewModel : ViewModelBase
                 return;
             }
 
+            await _settingsService.SetAsync(UpdateSettingsKeys.PendingPostUpdateToastVersion, Update.Version).ConfigureAwait(false);
             _updateService.ApplyUpdatesAndRestart();
         }
         finally

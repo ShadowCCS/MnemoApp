@@ -46,6 +46,21 @@
     <SolidColorBrush x:Key="NavElementBackgroundBrush" Color="{DynamicResource NavElementBackground}"/>
     <SolidColorBrush x:Key="ToastBackgroundPrimaryBrush" Color="{DynamicResource ToastBackgroundPrimary}"/>
     <SolidColorBrush x:Key="ToastBackgroundSecondaryBrush" Color="{DynamicResource ToastBackgroundSecondary}"/>
+    <SolidColorBrush x:Key="ToastAccentInfoBrush" Color="{DynamicResource ToastAccentInfo}"/>
+    <SolidColorBrush x:Key="ToastAccentSuccessBrush" Color="{DynamicResource ToastAccentSuccess}"/>
+    <SolidColorBrush x:Key="ToastAccentWarningBrush" Color="{DynamicResource ToastAccentWarning}"/>
+    <SolidColorBrush x:Key="ToastAccentActionBrush" Color="{DynamicResource ToastAccentAction}"/>
+    <SolidColorBrush x:Key="ToastAccentTaskBrush" Color="{DynamicResource ToastAccentTask}"/>
+    <SolidColorBrush x:Key="ToastIconBadgeInfoBrush" Color="{DynamicResource ToastIconBadgeInfo}"/>
+    <SolidColorBrush x:Key="ToastIconBadgeSuccessBrush" Color="{DynamicResource ToastIconBadgeSuccess}"/>
+    <SolidColorBrush x:Key="ToastIconBadgeWarningBrush" Color="{DynamicResource ToastIconBadgeWarning}"/>
+    <SolidColorBrush x:Key="ToastIconBadgeActionBrush" Color="{DynamicResource ToastIconBadgeAction}"/>
+    <SolidColorBrush x:Key="ToastIconBadgeTaskBrush" Color="{DynamicResource ToastIconBadgeTask}"/>
+    <SolidColorBrush x:Key="ToastDismissButtonBackgroundBrush" Color="{DynamicResource ToastDismissButtonBackground}"/>
+    <SolidColorBrush x:Key="ToastDismissButtonForegroundBrush" Color="{DynamicResource ToastDismissButtonForeground}"/>
+    <SolidColorBrush x:Key="ToastTimerTrackBrush" Color="{DynamicResource ToastTimerTrack}"/>
+    <SolidColorBrush x:Key="ToastTimerFillBrush" Color="{DynamicResource ToastTimerFill}"/>
+    <SolidColorBrush x:Key="NotificationFlyoutRowHoverBrush" Color="{DynamicResource NotificationFlyoutHover}"/>
     <SolidColorBrush x:Key="NavElementActiveBackgroundBrush" Color="{DynamicResource NavElementActiveBackground}"/>
     <SolidColorBrush x:Key="NavElementHoverBackgroundBrush" Color="{DynamicResource NavElementHoverBackground}"/>
     <SolidColorBrush x:Key="WidgetBackgroundPrimaryBrush" Color="{DynamicResource WidgetBackgroundPrimary}"/>

@@ -76,6 +76,8 @@
     "ClearNow": "Jetzt löschen",
     "EnableGamification": "Spielerische Elemente aktivieren",
     "EnableGamificationDescription": "Verfolgen Sie XP, Streaks und steigern Sie Ihr Level beim Lernen.",
+    "EnableToasts": "Toast-Benachrichtigungen",
+    "EnableToastsDescription": "Zeigt Toasts in der Ecke. Wenn aus, erscheinen neue Hinweise nur in der Benachrichtigungsliste.",
     "AutoSave": "Automatisches Speichern",
     "AutoSaveDescription": "Speichert Änderungen automatisch alle paar Sekunden.",
     "SpellCheck": "Rechtschreibprüfung",
@@ -186,10 +188,17 @@
     "UpdatesSkippedVersionActive": "Sie haben diese Version übersprungen.",
     "UpdatesAvailableSeeSettingsBadge": "Update verfügbar — Punkt neben Einstellungen in der Seitenleiste.",
     "UpdatesNavigateToOverview": "Öffnen Sie Übersicht oder Einstellungen für den Update-Hinweis.",
-    "UpdatesPromptShown": "Update-Hinweis angezeigt."
+    "UpdatesPromptShown": "Update-Hinweis angezeigt.",
+    "UpdateToastDescriptionFormat": "Version {0} kann installiert werden.",
+    "UpdateNow": "Jetzt aktualisieren",
+    "UpdateToastLater": "Später",
+    "PostUpdateToastTitle": "Update installiert",
+    "PostUpdateToastDescriptionFormat": "Aktualisiert auf Version {0}."
   },
   "Onboarding": {
     "WelcomeTitle": "Willkommen bei Mnemo",
+    "PostOnboardingWelcomeTitle": "Willkommen bei Mnemo",
+    "PostOnboardingWelcomeMessage": "Alles bereit. Starte in der Übersicht oder über die Seitenleiste.",
     "WelcomeDescription": "Diese Anwendung befindet sich im aktiven Entwicklungsstadium. Funktionen können sich ändern und Datenformate sind noch nicht finalisiert. Nutzen Sie dies auf eigene Gefahr.",
     "PersonalizeTitle": "Mnemo an dich anpassen",
     "PersonalizeDescription": "Wähle Name, Farben und ein Profilbild, damit sich Mnemo für dich anfühlt. Du kannst das später jederzeit in den Einstellungen ändern.",
@@ -548,6 +557,8 @@
     "TypePage": "Seite"
   },
   "Topbar": {
+    "NotificationsTitle": "Benachrichtigungen",
+    "NotificationsEmpty": "Noch keine Benachrichtigungen.",
     "SearchPlaceholder": "Suche nach einem Lernstoff, Mindmap etc.",
     "SearchShortcut": "Strg+K",
     "GlobalSearchOverlayHint": "Die globale Suche wird hier geoeffnet. Volle Ergebnisse und Aktionen folgen als Naechstes.",

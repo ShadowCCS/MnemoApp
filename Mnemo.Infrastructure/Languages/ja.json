@@ -76,6 +76,8 @@
     "ClearNow": "現在クリア",
     "EnableGamification": "ガミフィケーション有効化",
     "EnableGamificationDescription": "学習の経験値（XP）、連続日数、レベルアップを追跡します。",
+    "EnableToasts": "トースト通知",
+    "EnableToastsDescription": "画面隅にトーストを表示します。オフにすると、新しい通知は一覧にのみ表示されます。",
     "AutoSave": "オートセーブ",
     "AutoSaveDescription": "数秒ごとに変更を自動的に保存します。",
     "SpellCheck": "スペルチェック",
@@ -186,10 +188,17 @@
     "UpdatesSkippedVersionActive": "このバージョンはスキップ済みです。",
     "UpdatesAvailableSeeSettingsBadge": "アップデートあり — サイドバーの設定にバッジが表示されます。",
     "UpdatesNavigateToOverview": "概要または設定を開くと更新の案内が表示されます。",
-    "UpdatesPromptShown": "更新の案内を表示しました。"
+    "UpdatesPromptShown": "更新の案内を表示しました。",
+    "UpdateToastDescriptionFormat": "バージョン {0} をインストールできます。",
+    "UpdateNow": "今すぐ更新",
+    "UpdateToastLater": "あとで",
+    "PostUpdateToastTitle": "更新をインストールしました",
+    "PostUpdateToastDescriptionFormat": "バージョン {0} に更新しました。"
   },
   "Onboarding": {
     "WelcomeTitle": "Mnemoへようこそ",
+    "PostOnboardingWelcomeTitle": "Mnemoへようこそ",
+    "PostOnboardingWelcomeMessage": "準備ができました。概要から始めるか、サイドバーをご利用ください。",
     "WelcomeDescription": "このアプリケーションは活発に開発中です。機能が変更され、データフォーマットも未定です。ご自身の責任で使用してください。",
     "PersonalizeTitle": "体験をカスタマイズ",
     "PersonalizeDescription": "名前・見た目・アイコンを選んで、自分向けのMnemoにしましょう。あとから設定でいつでも変えられます。",
@@ -554,6 +563,8 @@
     "TypePage": "ページ"
   },
   "Topbar": {
+    "NotificationsTitle": "通知",
+    "NotificationsEmpty": "通知はまだありません。",
     "SearchPlaceholder": "レッスンやマインドマップなどを検索...",
     "SearchShortcut": "Cmd+K",
     "GlobalSearchOverlayHint": "グローバル検索はここに表示されます。結果一覧とアクションは次の更新で追加します。",

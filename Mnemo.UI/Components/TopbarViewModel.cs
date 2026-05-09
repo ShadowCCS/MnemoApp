@@ -24,8 +24,11 @@ public partial class TopbarViewModel : ViewModelBase
     private readonly INavigationService _navigation;
     private readonly ILocalizationService _localization;
     private readonly IGlobalSearchService _globalSearchService;
+    private readonly IToastService _toastService;
 
     public ObservableCollection<TopbarButtonModel> Buttons { get; } = new();
+
+    public ObservableCollection<NotificationFlyoutRowViewModel> RecentNotifications { get; } = new();
 
     [ObservableProperty]
     private bool _isGamificationEnabled;
@@ -48,7 +51,8 @@ public partial class TopbarViewModel : ViewModelBase
         ILoggerService logger,
         INavigationService navigation,
         ILocalizationService localization,
-        IGlobalSearchService globalSearchService)
+        IGlobalSearchService globalSearchService,
+        IToastService toastService)
     {
         _settingsService = settingsService;
         _overlayService = overlayService;
@@ -57,6 +61,10 @@ public partial class TopbarViewModel : ViewModelBase
         _navigation = navigation;
         _localization = localization;
         _globalSearchService = globalSearchService;
+        _toastService = toastService;
+
+        _toastService.NotificationHistoryChanged += (_, _) => Dispatcher.UIThread.Post(RefreshRecentNotifications);
+        RefreshRecentNotifications();
 
         // Initial load
         _isGamificationEnabled = _settingsService.GetAsync("App.EnableGamification", true).GetAwaiter().GetResult();
@@ -83,6 +91,19 @@ public partial class TopbarViewModel : ViewModelBase
                 ProfilePicturePath = _settingsService.GetAsync("User.ProfilePicture", "avares://Mnemo.UI/Assets/ProfilePictures/img2.png").GetAwaiter().GetResult();
             }
         };
+    }
+
+    public bool HasNotifications => RecentNotifications.Count > 0;
+
+    public bool ShowsNotificationsEmpty => RecentNotifications.Count == 0;
+
+    private void RefreshRecentNotifications()
+    {
+        RecentNotifications.Clear();
+        foreach (var e in _toastService.GetRecentNotifications(6))
+            RecentNotifications.Add(new NotificationFlyoutRowViewModel(e));
+        OnPropertyChanged(nameof(HasNotifications));
+        OnPropertyChanged(nameof(ShowsNotificationsEmpty));
     }
 
     private void ApplyGamificationLocalizedDefaults()

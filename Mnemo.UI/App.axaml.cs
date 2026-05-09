@@ -13,8 +13,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
 using Mnemo.Infrastructure.Services.AI;
+using Mnemo.Infrastructure.Services.Updates;
 using Mnemo.UI.Modules.Onboarding.Views;
 using Mnemo.UI.Modules.Updates.Services;
+using Mnemo.UI.Services;
 using Mnemo.UI.ViewModels;
 using Mnemo.UI.Views;
 
@@ -134,6 +136,38 @@ public partial class App : Application
         {
             Services?.GetService<ILoggerService>()?.Error("Updates", "UpdateOrchestrator.Start threw.", ex);
         }
+
+        try
+        {
+            await ShowPostUpdateToastIfNeededAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Services?.GetService<ILoggerService>()?.Error("Updates", "ShowPostUpdateToastIfNeededAsync threw.", ex);
+        }
+    }
+
+    private async Task ShowPostUpdateToastIfNeededAsync()
+    {
+        if (Services == null)
+            return;
+
+        var settings = Services.GetRequiredService<ISettingsService>();
+        var ver = await settings.GetAsync<string?>(UpdateSettingsKeys.PendingPostUpdateToastVersion).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(ver))
+            return;
+
+        var toastsEnabled = await settings.GetAsync(ToastService.EnableToastsSettingKey, true).ConfigureAwait(false);
+        if (!toastsEnabled)
+            return;
+
+        await settings.SetAsync<string?>(UpdateSettingsKeys.PendingPostUpdateToastVersion, null).ConfigureAwait(false);
+
+        var toast = Services.GetRequiredService<IToastService>();
+        var loc = Services.GetRequiredService<ILocalizationService>();
+        var title = loc.T("PostUpdateToastTitle", "Settings");
+        var description = string.Format(loc.T("PostUpdateToastDescriptionFormat", "Settings"), ver);
+        toast.SpawnToast(ToastType.Success, TimeSpan.FromSeconds(5), title, description);
     }
 
     private void DisposeServerManagerIfCreated()
@@ -207,15 +241,7 @@ public partial class App : Application
         var completed = await settingsService.GetAsync("Onboarding.Completed", false).ConfigureAwait(false);
         if (completed) return;
 
-        Mnemo.UI.Modules.Onboarding.ViewModels.OnboardingWizardViewModel vm;
-        try
-        {
-            vm = Services.GetRequiredService<Mnemo.UI.Modules.Onboarding.ViewModels.OnboardingWizardViewModel>();
-        }
-        catch (Exception ex)
-        {
-            throw;
-        }
+        var vm = Services.GetRequiredService<Mnemo.UI.Modules.Onboarding.ViewModels.OnboardingWizardViewModel>();
 
         try
         {
@@ -229,25 +255,18 @@ public partial class App : Application
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             if (Services == null) return;
-            try
+            var overlayService = Services.GetRequiredService<IOverlayService>();
+            var view = new OnboardingWizardView { DataContext = vm };
+            var options = new OverlayOptions
             {
-                var overlayService = Services.GetRequiredService<IOverlayService>();
-                var view = new OnboardingWizardView { DataContext = vm };
-                var options = new OverlayOptions
-                {
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    ShowBackdrop = true,
-                    CloseOnOutsideClick = false,
-                    CloseOnEscape = false
-                };
-                var id = overlayService.CreateOverlay(view, options, "OnboardingWizard");
-                vm.SetOverlayId(id);
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                ShowBackdrop = true,
+                CloseOnOutsideClick = false,
+                CloseOnEscape = false
+            };
+            var id = overlayService.CreateOverlay(view, options, "OnboardingWizard");
+            vm.SetOverlayId(id);
         }, DispatcherPriority.Normal);
     }
 
