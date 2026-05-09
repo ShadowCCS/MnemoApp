@@ -42,6 +42,9 @@ public static class KeybindGestureDisplayFormatter
 
     private static string FormatKeyToken(string token, bool mac)
     {
+        if (string.IsNullOrEmpty(token))
+            return "?";
+
         if (token.Length == 1 && char.IsLetter(token[0]))
             return token.ToUpperInvariant();
 

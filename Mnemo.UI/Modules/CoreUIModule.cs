@@ -68,23 +68,23 @@ public class CoreUIModule : IModule
             ]
         });
 
-        foreach (var (actionId, gesture, descriptionKey) in EditorKeybindManifest.Chords)
+        foreach (var chord in EditorKeybindManifest.Chords)
         {
             registry.Register(new KeybindActionDefinition
             {
-                ActionId = actionId,
+                ActionId = chord.ActionId,
                 Namespace = EditorKeybindManifest.Namespace,
                 Scope = KeybindScope.Local,
                 Module = "editor",
-                DisplayLabelKey = actionId,
-                DisplayDescriptionKey = descriptionKey,
-                DisplayCategoryKey = "category.formatting",
+                DisplayLabelKey = chord.ActionId,
+                DisplayDescriptionKey = chord.DescriptionKey,
+                DisplayCategoryKey = chord.DisplayCategoryKey,
                 Bindings =
                 [
                     new KeybindBindingEntry
                     {
                         Kind = KeybindBindingKind.Chord,
-                        Chord = CanonicalKeyGestureCodec.ParseChord(gesture)
+                        Chord = CanonicalKeyGestureCodec.ParseChord(chord.Gesture)
                     }
                 ]
             });
@@ -97,16 +97,25 @@ internal static class EditorKeybindManifest
 {
     public const string Namespace = "editor";
 
-    public static readonly (string ActionId, string Gesture, string? DescriptionKey)[] Chords =
+    public readonly record struct ChordEntry(
+        string ActionId,
+        string Gesture,
+        string? DescriptionKey,
+        string DisplayCategoryKey = "category.formatting");
+
+    public static readonly ChordEntry[] Chords =
     [
-        ("editor.bold", "Primary+B", null),
-        ("editor.italic", "Primary+I", null),
-        ("editor.underline", "Primary+U", null),
-        ("editor.strikethrough", "Primary+Shift+S", null),
-        ("editor.highlight", "Primary+Shift+H", null),
-        ("editor.link", "Primary+Shift+L", null),
-        ("editor.subscript", "Primary+OemComma", null),
-        ("editor.superscript", "Primary+OemPeriod", null),
+        new("editor.bold", "Primary+B", null),
+        new("editor.italic", "Primary+I", null),
+        new("editor.underline", "Primary+U", null),
+        new("editor.strikethrough", "Primary+Shift+S", null),
+        new("editor.highlight", "Primary+Shift+H", null),
+        new("editor.link", "Primary+Shift+L", null),
+        new("editor.subscript", "Primary+OemComma", null),
+        new("editor.superscript", "Primary+OemPeriod", null),
+        new("editor.clipboard.copy", "Primary+C", "editor.clipboard.copy.description", "category.clipboard"),
+        new("editor.clipboard.cut", "Primary+X", "editor.clipboard.cut.description", "category.clipboard"),
+        new("editor.clipboard.paste", "Primary+V", "editor.clipboard.paste.description", "category.clipboard"),
     ];
 }
 

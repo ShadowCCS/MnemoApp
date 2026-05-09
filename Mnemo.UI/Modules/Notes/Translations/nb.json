@@ -2,6 +2,7 @@
   "Keybinds": {
     "module.editor": "Redigeringsprogram",
     "category.formatting": "Formatering",
+    "category.clipboard": "Utklippstavle",
     "editor.bold": "Fet",
     "editor.italic": "Kursiv",
     "editor.underline": "Understreket",
@@ -12,6 +13,12 @@
     "editor.superscript": "Hevet skrift",
     "editor.bold.description": "Veksler fet skrift for markeringen.",
     "editor.italic.description": "Veksler kursiv for markeringen.",
-    "editor.underline.description": "Veksler understreking for markeringen."
+    "editor.underline.description": "Veksler understreking for markeringen.",
+    "editor.clipboard.copy": "Kopier",
+    "editor.clipboard.cut": "Klipp ut",
+    "editor.clipboard.paste": "Lim inn",
+    "editor.clipboard.copy.description": "Kopier markering eller valgte blokker.",
+    "editor.clipboard.cut.description": "Klipp ut markering eller valgte blokker.",
+    "editor.clipboard.paste.description": "Lim inn fra utklippstavlen i notatet."
   }
 }

@@ -2,6 +2,7 @@
   "Keybinds": {
     "module.editor": "Editor",
     "category.formatting": "Formatierung",
+    "category.clipboard": "Zwischenablage",
     "editor.bold": "Fett",
     "editor.italic": "Kursiv",
     "editor.underline": "Unterstrichen",
@@ -12,6 +13,12 @@
     "editor.superscript": "Hochgestellt",
     "editor.bold.description": "Fett für die Auswahl umschalten.",
     "editor.italic.description": "Kursiv für die Auswahl umschalten.",
-    "editor.underline.description": "Unterstreichung für die Auswahl umschalten."
+    "editor.underline.description": "Unterstreichung für die Auswahl umschalten.",
+    "editor.clipboard.copy": "Kopieren",
+    "editor.clipboard.cut": "Ausschneiden",
+    "editor.clipboard.paste": "Einfügen",
+    "editor.clipboard.copy.description": "Auswahl oder markierte Blöcke kopieren.",
+    "editor.clipboard.cut.description": "Auswahl oder markierte Blöcke ausschneiden.",
+    "editor.clipboard.paste.description": "Inhalt der Zwischenablage in die Notiz einfügen."
   }
 }

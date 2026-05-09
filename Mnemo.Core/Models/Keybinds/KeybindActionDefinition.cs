@@ -16,7 +16,7 @@ public sealed class KeybindActionDefinition
     public bool AllowedDuringTextCapture { get; init; }
     public IReadOnlyList<KeybindBindingEntry> Bindings { get; init; } = Array.Empty<KeybindBindingEntry>();
     public IReadOnlyList<string> ObsoleteIds { get; init; } = Array.Empty<string>();
-    /// <summary>When false, action has no effective bindings after merge.</summary>
+    /// <summary>When false, bindings are ignored for matching but may still be listed for UI (e.g. user-disabled globals).</summary>
     public bool Enabled { get; init; } = true;
 
     /// <summary>Owning product area for UI grouping (e.g. <c>core</c>, <c>editor</c>, <c>mindmap</c>, <c>flashcards</c>).</summary>

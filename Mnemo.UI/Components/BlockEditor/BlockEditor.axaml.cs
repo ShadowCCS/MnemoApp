@@ -2619,6 +2619,40 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private bool ShouldDeferSelectAllBlocksShortcut() =>
         IsFocusInsideNestedTextBox() || IsImageCaptionRichEditorFocused();
 
+    /// <summary>Invoked from the workspace keybind router when <c>editor.clipboard.*</c> matches (tunnel, before <see cref="Editor_KeyDown"/>).</summary>
+    public bool TryHandlePasteKeybind()
+    {
+        if (IsReadOnly)
+            return false;
+        if (IsFocusInsideNestedTextBox())
+            return false;
+        var hasBlockSelection = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.IsSelected);
+        _ = TryPasteFromClipboardAsync(hasBlockSelection);
+        return true;
+    }
+
+    /// <summary>Invoked from the workspace keybind router for <c>editor.clipboard.copy</c>.</summary>
+    public bool TryHandleCopyKeybind()
+    {
+        if (IsReadOnly)
+            return false;
+        if (IsFocusInsideNestedTextBox())
+            return false;
+        _ = TryCopySelectionToClipboardAsync();
+        return true;
+    }
+
+    /// <summary>Invoked from the workspace keybind router for <c>editor.clipboard.cut</c>.</summary>
+    public bool TryHandleCutKeybind()
+    {
+        if (IsReadOnly)
+            return false;
+        if (IsFocusInsideNestedTextBox())
+            return false;
+        _ = TryCutSelectionAsync();
+        return true;
+    }
+
     private void Editor_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Handled) return;

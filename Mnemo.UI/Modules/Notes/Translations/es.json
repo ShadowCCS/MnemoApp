@@ -2,6 +2,7 @@
   "Keybinds": {
     "module.editor": "Editor",
     "category.formatting": "Formato",
+    "category.clipboard": "Portapapeles",
     "editor.bold": "Negrita",
     "editor.italic": "Cursiva",
     "editor.underline": "Subrayado",
@@ -12,6 +13,12 @@
     "editor.superscript": "Superíndice",
     "editor.bold.description": "Activa o desactiva negrita en la selección.",
     "editor.italic.description": "Activa o desactiva cursiva en la selección.",
-    "editor.underline.description": "Activa o desactiva subrayado en la selección."
+    "editor.underline.description": "Activa o desactiva subrayado en la selección.",
+    "editor.clipboard.copy": "Copiar",
+    "editor.clipboard.cut": "Cortar",
+    "editor.clipboard.paste": "Pegar",
+    "editor.clipboard.copy.description": "Copia la selección o los bloques seleccionados.",
+    "editor.clipboard.cut.description": "Corta la selección o los bloques seleccionados.",
+    "editor.clipboard.paste.description": "Pega el portapapeles en la nota."
   }
 }

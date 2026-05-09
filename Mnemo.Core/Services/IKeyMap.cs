@@ -38,7 +38,8 @@ public interface IKeyMap
     IReadOnlyList<KeybindConflict> CheckConflictsStaticArmed();
 
     /// <summary>
-    /// All manifest and ephemeral actions merged with overrides (enabled only). Locals are included for every
+    /// All manifest and ephemeral actions merged with user overrides. Disabled actions remain listed
+    /// (<see cref="KeybindActionDefinition.Enabled"/> false) so UI can show an inactive state. Locals for every
     /// namespace — not filtered by <see cref="SetActiveRoute"/>. Use for the keybind manager / quick-actions catalog.
     /// </summary>
     IReadOnlyList<KeybindActionDefinition> GetAllStaticDefinitionsMerged();

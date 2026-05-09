@@ -252,7 +252,7 @@ public sealed class KeyMapService : IKeyMap
         foreach (var id in ids)
         {
             var merged = BuildMergedUnlocked(id);
-            if (merged == null || !merged.Enabled) continue;
+            if (merged == null) continue;
             list.Add(merged);
         }
 
@@ -320,7 +320,7 @@ public sealed class KeyMapService : IKeyMap
                 Namespace = man.Namespace,
                 Scope = man.Scope,
                 Enabled = false,
-                Bindings = Array.Empty<KeybindBindingEntry>(),
+                Bindings = man.Bindings,
                 ObsoleteIds = man.ObsoleteIds,
                 SuppressesGlobalsInContext = man.SuppressesGlobalsInContext,
                 AllowedDuringTextCapture = man.AllowedDuringTextCapture,

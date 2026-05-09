@@ -216,6 +216,7 @@ public static class Bootstrapper
             keybindManifestCollector.GetAll()));
         services.AddSingleton<IKeybindActionRouter, KeybindActionRouter>();
         services.AddSingleton<IEditorKeybindDispatch, EditorKeybindDispatch>();
+        services.AddSingleton<IBlockEditorClipboardKeybindDispatch, BlockEditorClipboardKeybindDispatch>();
         services.AddSingleton<IMindmapKeybindDispatch, MindmapKeybindDispatch>();
         services.AddSingleton<IFlashcardDeckKeybindContext, FlashcardDeckKeybindContext>();
         services.AddSingleton<IFlashcardKeybindDispatch, FlashcardKeybindDispatch>();

@@ -2,6 +2,7 @@
   "Keybinds": {
     "module.editor": "Editor",
     "category.formatting": "Formatting",
+    "category.clipboard": "Clipboard",
     "editor.bold": "Bold",
     "editor.italic": "Italic",
     "editor.underline": "Underline",
@@ -12,6 +13,12 @@
     "editor.superscript": "Superscript",
     "editor.bold.description": "Toggle bold on the selection.",
     "editor.italic.description": "Toggle italic on the selection.",
-    "editor.underline.description": "Toggle underline on the selection."
+    "editor.underline.description": "Toggle underline on the selection.",
+    "editor.clipboard.copy": "Copy",
+    "editor.clipboard.cut": "Cut",
+    "editor.clipboard.paste": "Paste",
+    "editor.clipboard.copy.description": "Copy the selection or selected blocks.",
+    "editor.clipboard.cut.description": "Cut the selection or selected blocks.",
+    "editor.clipboard.paste.description": "Paste from the clipboard into the note."
   }
 }

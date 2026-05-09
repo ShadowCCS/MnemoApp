@@ -2,6 +2,7 @@
   "Keybinds": {
     "module.editor": "エディター",
     "category.formatting": "書式",
+    "category.clipboard": "クリップボード",
     "editor.bold": "太字",
     "editor.italic": "斜体",
     "editor.underline": "下線",
@@ -12,6 +13,12 @@
     "editor.superscript": "上付き",
     "editor.bold.description": "選択範囲の太字を切り替えます。",
     "editor.italic.description": "選択範囲の斜体を切り替えます。",
-    "editor.underline.description": "選択範囲の下線を切り替えます。"
+    "editor.underline.description": "選択範囲の下線を切り替えます。",
+    "editor.clipboard.copy": "コピー",
+    "editor.clipboard.cut": "切り取り",
+    "editor.clipboard.paste": "貼り付け",
+    "editor.clipboard.copy.description": "選択範囲または選択したブロックをコピーします。",
+    "editor.clipboard.cut.description": "選択範囲または選択したブロックを切り取ります。",
+    "editor.clipboard.paste.description": "クリップボードをノートに貼り付けます。"
   }
 }

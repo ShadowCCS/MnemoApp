@@ -43,6 +43,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (DataContext is not MainWindowViewModel vm) return;
         var router = app.Services.GetRequiredService<IKeybindActionRouter>();
         var editorDispatch = app.Services.GetRequiredService<IEditorKeybindDispatch>();
+        var blockEditorClipboard = app.Services.GetRequiredService<IBlockEditorClipboardKeybindDispatch>();
         var mindmapDispatch = app.Services.GetRequiredService<IMindmapKeybindDispatch>();
         var flashcardDispatch = app.Services.GetRequiredService<IFlashcardKeybindDispatch>();
         router.RegisterHandler("global.search", () => vm.TopbarViewModel.OpenGlobalSearchCommand.Execute(null));
@@ -54,6 +55,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         router.RegisterHandler("editor.link", () => editorDispatch.Apply(InlineFormatKind.Link));
         router.RegisterHandler("editor.subscript", () => editorDispatch.Apply(InlineFormatKind.Subscript));
         router.RegisterHandler("editor.superscript", () => editorDispatch.Apply(InlineFormatKind.Superscript));
+        router.RegisterHandler("editor.clipboard.copy", () => blockEditorClipboard.TryCopy());
+        router.RegisterHandler("editor.clipboard.cut", () => blockEditorClipboard.TryCut());
+        router.RegisterHandler("editor.clipboard.paste", () => blockEditorClipboard.TryPaste());
         router.RegisterHandler("mindmap.recenter", () => mindmapDispatch.Recenter());
         router.RegisterHandler("mindmap.undo", () => mindmapDispatch.Undo());
         router.RegisterHandler("mindmap.redo", () => mindmapDispatch.Redo());
