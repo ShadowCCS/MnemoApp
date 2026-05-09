@@ -1,0 +1,17 @@
+{
+  "Keybinds": {
+    "module.mindmap": "マインドマップ",
+    "category.mindmap": "キャンバス",
+    "mindmap.recenter": "表示を中央に",
+    "mindmap.undo": "元に戻す",
+    "mindmap.redo": "やり直し",
+    "mindmap.clear-selection": "選択を解除",
+    "mindmap.delete-selection": "選択を削除",
+    "mindmap.copy": "コピー",
+    "mindmap.paste": "貼り付け",
+    "mindmap.duplicate": "複製",
+    "mindmap.add-child": "子ノードを追加",
+    "mindmap.enter": "兄弟を追加 / エッジを編集",
+    "mindmap.edit-edge-label": "エッジラベルを編集"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "Keybinds": {
+    "module.mindmap": "Mindmap",
+    "category.mindmap": "Leinwand",
+    "mindmap.recenter": "Ansicht zentrieren",
+    "mindmap.undo": "Rückgängig",
+    "mindmap.redo": "Wiederholen",
+    "mindmap.clear-selection": "Auswahl aufheben",
+    "mindmap.delete-selection": "Auswahl löschen",
+    "mindmap.copy": "Kopieren",
+    "mindmap.paste": "Einfügen",
+    "mindmap.duplicate": "Duplizieren",
+    "mindmap.add-child": "Kindknoten hinzufügen",
+    "mindmap.enter": "Geschwister hinzufügen / Kante bearbeiten",
+    "mindmap.edit-edge-label": "Kantenbeschriftung bearbeiten"
+  }
+}

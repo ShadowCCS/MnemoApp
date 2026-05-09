@@ -410,30 +410,7 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
         if (IsReadOnly)
             return;
 
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && e.Key == Key.S)
-        {
-            ApplyInlineFormat(InlineFormatKind.Strikethrough);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && e.Key == Key.H)
-        {
-            ApplyInlineFormat(InlineFormatKind.Highlight, ResolveHighlightColor());
-            e.Handled = true;
-            return;
-        }
-
-        // Ctrl+, = Subscript, Ctrl+. = Superscript (sticky toggle mode when no selection).
-        if (e.Key == Key.OemComma || e.Key == Key.OemPeriod)
-        {
-            var subSupKind = e.Key == Key.OemComma ? InlineFormatKind.Subscript : InlineFormatKind.Superscript;
-            HandleSubSupShortcut(subSupKind);
-            e.Handled = true;
-            return;
-        }
-
-        // Clear sticky sub/sup on navigation.
+        // Clear sticky sub/sup on navigation (formatting chords are handled via KeyMap tunnel).
         if (IsNavigationKey(e.Key))
         {
             bool isRight = e.Key == Key.Right;
@@ -442,25 +419,27 @@ public partial class RichDocumentEditor : UserControl, INotifyPropertyChanged
             if (isRight)
                 Editor?.SetPendingSubSup(false, false);
         }
+    }
 
-        switch (e.Key)
+    internal void TryApplyKeybindFormat(InlineFormatKind kind)
+    {
+        if (!IsToolbarEnabled)
+            return;
+        switch (kind)
         {
-            case Key.B:
-                ApplyInlineFormat(InlineFormatKind.Bold);
-                e.Handled = true;
-                break;
-            case Key.I:
-                ApplyInlineFormat(InlineFormatKind.Italic);
-                e.Handled = true;
-                break;
-            case Key.U:
-                ApplyInlineFormat(InlineFormatKind.Underline);
-                e.Handled = true;
-                break;
-            case Key.L when e.KeyModifiers.HasFlag(KeyModifiers.Shift):
+            case InlineFormatKind.Subscript:
+            case InlineFormatKind.Superscript:
+                HandleSubSupShortcut(kind);
+                return;
+            case InlineFormatKind.Link:
                 _ = EditLinkAsync();
-                e.Handled = true;
-                break;
+                return;
+            case InlineFormatKind.Highlight:
+                ApplyInlineFormat(InlineFormatKind.Highlight, ResolveHighlightColor());
+                return;
+            default:
+                ApplyInlineFormat(kind);
+                return;
         }
     }
 

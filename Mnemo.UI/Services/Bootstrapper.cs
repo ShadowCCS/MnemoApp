@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -214,6 +215,10 @@ public static class Bootstrapper
             sp.GetRequiredService<ILoggerService>(),
             keybindManifestCollector.GetAll()));
         services.AddSingleton<IKeybindActionRouter, KeybindActionRouter>();
+        services.AddSingleton<IEditorKeybindDispatch, EditorKeybindDispatch>();
+        services.AddSingleton<IMindmapKeybindDispatch, MindmapKeybindDispatch>();
+        services.AddSingleton<IFlashcardDeckKeybindContext, FlashcardDeckKeybindContext>();
+        services.AddSingleton<IFlashcardKeybindDispatch, FlashcardKeybindDispatch>();
 
         var buildSpSw = Stopwatch.StartNew();
         var serviceProvider = services.BuildServiceProvider();
@@ -323,13 +328,21 @@ public static class Bootstrapper
     private static IEnumerable<IModule> DiscoverModules()
     {
         // Scan Mnemo.* assemblies only; plugin assemblies can be loaded into the AppDomain before discovery.
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => a.FullName?.StartsWith("Mnemo.", StringComparison.Ordinal) == true);
+        var assemblySet = new HashSet<Assembly>();
+        foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (a.FullName?.StartsWith("Mnemo.", StringComparison.Ordinal) == true)
+                assemblySet.Add(a);
+        }
+
+        // Startup can run before every Mnemo.* assembly is in the AppDomain; UI modules always live here.
+        assemblySet.Add(typeof(Bootstrapper).Assembly);
+
         var moduleType = typeof(IModule);
         
         var foundModules = new List<IModule>();
 
-        foreach (var assembly in assemblies)
+        foreach (var assembly in assemblySet)
         {
             try
             {

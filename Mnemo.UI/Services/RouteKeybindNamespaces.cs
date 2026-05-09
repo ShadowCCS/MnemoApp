@@ -11,9 +11,12 @@ public static class RouteKeybindNamespaces
         return route switch
         {
             "overview" => "overview",
-            "notes" => "notes",
-            "mindmap" or "mindmap-detail" => "mindmap",
-            "flashcards" or "flashcards-detail" => "flashcards",
+            "notes" => "editor",
+            "mindmap" => null,
+            "mindmap-detail" => "mindmap",
+            "flashcards" => null,
+            "flashcard-deck" => "editor",
+            "flashcard-practice" => null,
             "settings" => "settings",
             "chat" => "chat",
             "path" or "path-detail" => "path",

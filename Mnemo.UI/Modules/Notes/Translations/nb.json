@@ -1,0 +1,17 @@
+{
+  "Keybinds": {
+    "module.editor": "Redigeringsprogram",
+    "category.formatting": "Formatering",
+    "editor.bold": "Fet",
+    "editor.italic": "Kursiv",
+    "editor.underline": "Understreket",
+    "editor.strikethrough": "Gjennomstreket",
+    "editor.highlight": "Utheving",
+    "editor.link": "Sett inn lenke",
+    "editor.subscript": "Senket skrift",
+    "editor.superscript": "Hevet skrift",
+    "editor.bold.description": "Veksler fet skrift for markeringen.",
+    "editor.italic.description": "Veksler kursiv for markeringen.",
+    "editor.underline.description": "Veksler understreking for markeringen."
+  }
+}

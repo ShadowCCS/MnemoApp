@@ -1,4 +1,6 @@
+using Mnemo.Core.Models.Keybinds;
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Keybinds;
 using Mnemo.Core.Services.Search;
 using Mnemo.Infrastructure.Services;
 using Mnemo.Infrastructure.Services.Search;
@@ -51,4 +53,56 @@ public class FlashcardsModule : IModule
     public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
     }
+
+    public void RegisterKeybindManifest(IKeybindManifestRegistry registry)
+    {
+        foreach (var def in FlashcardKeybindManifest.Definitions)
+            registry.Register(def);
+    }
+}
+
+internal static class FlashcardKeybindManifest
+{
+    public const string Namespace = "editor";
+
+    public static readonly KeybindActionDefinition[] Definitions =
+    [
+        new()
+        {
+            ActionId = "flashcard.save-and-new",
+            Namespace = Namespace,
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Module = "flashcards",
+            DisplayLabelKey = "flashcard.save-and-new",
+            DisplayCategoryKey = "category.flashcards_deck",
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+Enter"),
+                },
+            ],
+        },
+        new()
+        {
+            ActionId = "flashcard.wrap-cloze",
+            Namespace = Namespace,
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Module = "flashcards",
+            DisplayLabelKey = "flashcard.wrap-cloze",
+            DisplayDescriptionKey = "flashcard.wrap-cloze.description",
+            DisplayCategoryKey = "category.flashcards_deck",
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+Shift+C"),
+                },
+            ],
+        },
+    ];
 }

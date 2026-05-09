@@ -16,7 +16,10 @@ public interface IKeyMap
     void PushSuppression(string scope, KeybindSuppressionPolicy? policy);
     void PopSuppression(string scope);
 
-    /// <summary>Rich text / editor capture: while depth &gt; 0, global shortcuts are not matched (typing safety).</summary>
+    /// <summary>
+    /// Rich text / editor capture: while depth &gt; 0, most global shortcuts are not matched (typing safety).
+    /// Actions with <see cref="KeybindActionDefinition.AllowedDuringTextCapture"/> still match.
+    /// </summary>
     void EnterTextCapture();
     void LeaveTextCapture();
 
@@ -26,10 +29,22 @@ public interface IKeyMap
     void ResetSequences(KeybindSequenceScope scope);
     void OnNavigationChanged();
 
-    /// <summary>Enabled globals + locals for active namespace + ephemeral, merged with overrides, before suppression.</summary>
+    /// <summary>
+    /// Enabled globals + locals for active namespace + ephemeral, merged with overrides, before suppression.
+    /// Used for matching and context-specific UI.
+    /// </summary>
     IReadOnlyList<KeybindActionDefinition> GetStaticArmedDefinitions();
 
     IReadOnlyList<KeybindConflict> CheckConflictsStaticArmed();
+
+    /// <summary>
+    /// All manifest and ephemeral actions merged with overrides (enabled only). Locals are included for every
+    /// namespace — not filtered by <see cref="SetActiveRoute"/>. Use for the keybind manager / quick-actions catalog.
+    /// </summary>
+    IReadOnlyList<KeybindActionDefinition> GetAllStaticDefinitionsMerged();
+
+    /// <summary>Chord/sequence conflicts across <see cref="GetAllStaticDefinitionsMerged"/>.</summary>
+    IReadOnlyList<KeybindConflict> CheckConflictsAllStatic();
 
     Task ReloadOverridesAsync(CancellationToken cancellationToken = default);
 

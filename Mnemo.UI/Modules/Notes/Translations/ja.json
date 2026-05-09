@@ -1,0 +1,17 @@
+{
+  "Keybinds": {
+    "module.editor": "エディター",
+    "category.formatting": "書式",
+    "editor.bold": "太字",
+    "editor.italic": "斜体",
+    "editor.underline": "下線",
+    "editor.strikethrough": "取り消し線",
+    "editor.highlight": "ハイライト",
+    "editor.link": "リンクを挿入",
+    "editor.subscript": "下付き",
+    "editor.superscript": "上付き",
+    "editor.bold.description": "選択範囲の太字を切り替えます。",
+    "editor.italic.description": "選択範囲の斜体を切り替えます。",
+    "editor.underline.description": "選択範囲の下線を切り替えます。"
+  }
+}

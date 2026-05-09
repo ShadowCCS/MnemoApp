@@ -17,6 +17,7 @@ using Mnemo.Core.Services;
 using Mnemo.UI.Components.Overlays;
 using Mnemo.UI.Controls;
 using Mnemo.UI.Modules.Flashcards.ViewModels;
+using Mnemo.UI.Services;
 
 namespace Mnemo.UI.Modules.Flashcards.Views;
 
@@ -95,7 +96,21 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         DeckScrollViewer.ScrollChanged += OnDeckScrollChanged;
+        Loaded += OnFlashcardDeckLoaded;
+        Unloaded += OnFlashcardDeckUnloaded;
         AttachViewModel(DataContext as FlashcardDeckDetailViewModel);
+    }
+
+    private void OnFlashcardDeckLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (Application.Current is App app && app.Services?.GetService<IFlashcardDeckKeybindContext>() is { } ctx)
+            ctx.Attach(this);
+    }
+
+    private void OnFlashcardDeckUnloaded(object? sender, RoutedEventArgs e)
+    {
+        if (Application.Current is App app && app.Services?.GetService<IFlashcardDeckKeybindContext>() is { } ctx)
+            ctx.Detach(this);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e) =>
@@ -325,20 +340,8 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         if (frontEditor == null)
             return;
 
-        var nextOrdinal = ComputeNextClozeOrdinal(_viewModel.EditorFront);
+        var nextOrdinal = FlashcardClozeOrdinal.ComputeNext(_viewModel.EditorFront);
         frontEditor.TryWrapSelectionWithCloze(nextOrdinal);
-    }
-
-    private static int ComputeNextClozeOrdinal(string text)
-    {
-        var max = 0;
-        var matches = System.Text.RegularExpressions.Regex.Matches(text, @"\{\{c(\d+)::");
-        foreach (System.Text.RegularExpressions.Match m in matches)
-        {
-            if (int.TryParse(m.Groups[1].Value, out var n))
-                max = Math.Max(max, n);
-        }
-        return max + 1;
     }
 
     private static Border? FindShell(Control source) =>
@@ -428,31 +431,11 @@ public partial class FlashcardDeckDetailView : UserControl, INotifyPropertyChang
         return name;
     }
 
-    /// <summary>Ctrl+Enter saves and adds a new card; Ctrl+Shift+C wraps front selection in cloze markers; Esc collapses.</summary>
+    /// <summary>Esc collapses the expanded card; Ctrl+Enter and cloze wrap are handled via the app keymap.</summary>
     private void OnEditorKeyDown(object? sender, KeyEventArgs e)
     {
         if (_viewModel is null)
             return;
-
-        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-
-        if (ctrl && e.Key == Key.Enter)
-        {
-            _viewModel.SaveAndAddCardCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        if (ctrl && shift && e.Key == Key.C && sender is RichDocumentEditor editor && editor.Name == "FrontRichEditor")
-        {
-            if (!_viewModel.IsEditorClozeType)
-                return;
-            var nextOrdinal = ComputeNextClozeOrdinal(_viewModel.EditorFront);
-            if (editor.TryWrapSelectionWithCloze(nextOrdinal))
-                e.Handled = true;
-            return;
-        }
 
         if (e.Key == Key.Escape)
         {

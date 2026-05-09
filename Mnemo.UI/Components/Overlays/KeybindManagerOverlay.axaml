@@ -3,65 +3,220 @@
              xmlns:vm="using:Mnemo.UI.Components.Overlays"
              x:Class="Mnemo.UI.Components.Overlays.KeybindManagerOverlay"
              x:DataType="vm:KeybindManagerOverlayViewModel"
-             Width="640" MaxHeight="560">
+             Width="720"
+             MinWidth="560"
+             Height="600"
+             MinHeight="480"
+             MaxHeight="720">
     <Border Background="{DynamicResource OverlayBackgroundBrush}"
             CornerRadius="12"
             Padding="20"
             BoxShadow="0 8 32 0 #40000000">
-        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
-            <StackPanel Grid.Row="0" Spacing="4">
-                <TextBlock Text="Keybind manager"
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="0">
+            <!-- Header -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding OverlayTitle}"
                            FontSize="18"
                            FontFamily="{DynamicResource Font.SemiBold}"
-                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-                <TextBlock Text="Static armed actions and conflicts. Reset restores manifest defaults."
-                           FontSize="12"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           TextWrapping="Wrap"/>
-            </StackPanel>
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1"
+                        Padding="8,4"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Click="OnCloseClick"
+                        ToolTip.Tip="Close"
+                        VerticalAlignment="Top">
+                    <TextBlock Text="✕" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </Button>
+            </Grid>
 
-            <StackPanel Grid.Row="1" Spacing="6">
-                <TextBlock Text="Conflicts"
-                           FontFamily="{DynamicResource Font.Medium}"
-                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-                <ListBox ItemsSource="{Binding Conflicts}"
-                         Background="Transparent"
-                         MaxHeight="100">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:KeybindConflictRowVm">
-                            <TextBlock TextWrapping="Wrap" FontSize="12">
-                                <Run Text="{Binding Severity}"/><Run Text=": "/><Run Text="{Binding Message}"/>
-                            </TextBlock>
+            <TextBlock Grid.Row="1"
+                       Text="{Binding OverlaySubtitle}"
+                       FontSize="12"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,14"/>
+
+            <!-- Search + filters -->
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Margin="0,0,0,12">
+                <TextBox Grid.Column="0"
+                         Text="{Binding SearchQuery}"
+                         PlaceholderText="{Binding SearchWatermark}"
+                         MinHeight="36"/>
+                <ComboBox Grid.Column="1"
+                          MinWidth="160"
+                          VerticalAlignment="Center"
+                          ItemsSource="{Binding ModuleFilterOptions}"
+                          SelectedItem="{Binding SelectedModuleFilter}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KeybindModuleFilterOption">
+                            <TextBlock Text="{Binding Label}"
+                                       Foreground="{DynamicResource ComboBoxForegroundBrush}"/>
                         </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </StackPanel>
+                    </ComboBox.ItemTemplate>
+                    <ComboBox.SelectionBoxItemTemplate>
+                        <DataTemplate x:DataType="vm:KeybindModuleFilterOption">
+                            <TextBlock Text="{Binding Label}"
+                                       Foreground="{DynamicResource ComboBoxForegroundBrush}"/>
+                        </DataTemplate>
+                    </ComboBox.SelectionBoxItemTemplate>
+                </ComboBox>
+                <CheckBox Grid.Column="2"
+                          IsChecked="{Binding ShowConflictsOnly}"
+                          VerticalAlignment="Center"
+                          Content="{Binding ConflictsOnlyLabel}"/>
+            </Grid>
 
-            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Actions}">
+            <!-- Conflicts -->
+            <Border Grid.Row="3"
+                    IsVisible="{Binding HasConflicts}"
+                    Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                    CornerRadius="8"
+                    Padding="10"
+                    Margin="0,0,0,12">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="{Binding ConflictsHeader}"
+                               FontFamily="{DynamicResource Font.Medium}"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <ListBox ItemsSource="{Binding Conflicts}"
+                             Background="Transparent"
+                             MaxHeight="88">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:KeybindConflictRowVm">
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}">
+                                    <Run Text="{Binding Severity}"/><Run Text=": "/><Run Text="{Binding Message}"/>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="4"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="4,0,12,8"
+                          Margin="0,2,0,0">
+                <ItemsControl ItemsSource="{Binding ModuleSections}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:KeybindActionRowVm">
-                            <Border Margin="0,0,0,8" Padding="10" CornerRadius="8"
-                                    Background="{DynamicResource CardBackgroundSecondaryBrush}">
-                                <StackPanel Spacing="4">
-                                    <TextBlock FontFamily="{DynamicResource Font.Medium}" FontSize="13"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                               Text="{Binding ActionId}"/>
-                                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
-                                               Text="{Binding Namespace}"/>
-                                    <TextBlock FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
-                                               Text="{Binding Bindings}" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
+                        <DataTemplate x:DataType="vm:KeybindModuleSectionVm">
+                            <StackPanel Margin="0,0,0,20">
+                                <Grid Margin="0,0,0,8" ColumnDefinitions="Auto,*">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding ModuleHeaderUpper}"
+                                               FontSize="11"
+                                               FontFamily="{DynamicResource Font.SemiBold}"
+                                               LetterSpacing="0.8"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1"
+                                            Height="1"
+                                            Margin="12,0,0,0"
+                                            VerticalAlignment="Center"
+                                            Background="{DynamicResource TextFadedBrush}"
+                                            Opacity="0.35"/>
+                                </Grid>
+                                <ItemsControl ItemsSource="{Binding Categories}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:KeybindCategorySectionVm">
+                                            <StackPanel Margin="0,0,0,12">
+                                                <TextBlock Text="{Binding CategoryTitle}"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                           Margin="0,0,0,6"/>
+                                                <ItemsControl ItemsSource="{Binding Rows}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:KeybindActionRowVm">
+                                                            <Border Margin="0,0,0,6"
+                                                                    Padding="10,8"
+                                                                    CornerRadius="8"
+                                                                    Background="{DynamicResource CardBackgroundSecondaryBrush}">
+                                                                <Grid ColumnDefinitions="*,Auto"
+                                                                      ColumnSpacing="16">
+                                                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                                        <TextBlock Text="{Binding Title}"
+                                                                                   FontSize="13"
+                                                                                   FontFamily="{DynamicResource Font.Medium}"
+                                                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                                        <TextBlock Text="{Binding DetailLine}"
+                                                                                   FontSize="11"
+                                                                                   Foreground="{DynamicResource TextTertiaryBrush}"
+                                                                                   TextWrapping="Wrap"
+                                                                                   IsVisible="{Binding HasDetailLine}"/>
+                                                                        <TextBlock Text="{Binding ActionId}"
+                                                                                   FontSize="10"
+                                                                                   Foreground="{DynamicResource TextFadedBrush}"
+                                                                                   Opacity="0.85"
+                                                                                   IsVisible="{Binding ShowDeveloperActionId}"/>
+                                                                    </StackPanel>
+                                                                    <ItemsControl Grid.Column="1"
+                                                                                  ItemsSource="{Binding ShortcutStrip}"
+                                                                                  VerticalAlignment="Center"
+                                                                                  HorizontalAlignment="Right">
+                                                                        <ItemsControl.ItemsPanel>
+                                                                            <ItemsPanelTemplate>
+                                                                                <StackPanel Orientation="Horizontal" Spacing="4"/>
+                                                                            </ItemsPanelTemplate>
+                                                                        </ItemsControl.ItemsPanel>
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate x:DataType="vm:ShortcutDisplayPieceVm">
+                                                                                <Panel>
+                                                                                    <Border IsVisible="{Binding IsKeyPill}"
+                                                                                            CornerRadius="4"
+                                                                                            Padding="8,4"
+                                                                                            Background="{DynamicResource CardBackgroundPrimaryBrush}"
+                                                                                            BorderBrush="{DynamicResource TextFadedBrush}"
+                                                                                            BorderThickness="1">
+                                                                                        <TextBlock Text="{Binding Text}"
+                                                                                                   FontSize="11"
+                                                                                                   FontFamily="{DynamicResource Font.Medium}"
+                                                                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                                                    </Border>
+                                                                                    <TextBlock IsVisible="{Binding IsThenLabel}"
+                                                                                               Text="{Binding Text}"
+                                                                                               VerticalAlignment="Center"
+                                                                                               FontSize="11"
+                                                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                                               Margin="2,0"/>
+                                                                                    <TextBlock IsVisible="{Binding IsAlternativeSeparator}"
+                                                                                               Text="{Binding Text}"
+                                                                                               VerticalAlignment="Center"
+                                                                                               FontSize="12"
+                                                                                               Foreground="{DynamicResource TextTertiaryBrush}"
+                                                                                               Margin="4,0"/>
+                                                                                </Panel>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
 
-            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-                <Button Content="Close" Click="OnCloseClick"/>
-                <Button Content="Reset all overrides" Command="{Binding ResetAllCommand}"/>
-            </StackPanel>
+            <Grid Grid.Row="5" ColumnDefinitions="*,Auto" Margin="0,14,0,0">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding FooterStatusText}"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding CloseLabel}" Click="OnCloseClick"/>
+                    <Button Content="{Binding ResetAllLabel}" Command="{Binding ResetAllCommand}"/>
+                </StackPanel>
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

@@ -50,15 +50,45 @@ public sealed class KeyMapServiceTests
     }
 
     [Fact]
-    public void TextCapture_SuppressesGlobalChord()
+    public void TextCapture_SuppressesGlobalChord_WhenNotAllowedDuringCapture()
     {
         var logger = new TestLogger();
         var repo = new FakeKeybindRepository();
-        var sut = new KeyMapService(repo, logger, new[] { GlobalChord("global.search", "Primary+K") });
+        var sut = new KeyMapService(repo, logger, new[] { GlobalChord("global.other", "Primary+K") });
         sut.EnterTextCapture();
         var input = new KeybindPhysicalInput(KeybindModifierMask.Primary, "K");
         var r = sut.ProcessGlobalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
         Assert.False(r.Handled);
+    }
+
+    [Fact]
+    public void TextCapture_GlobalChord_Matches_WhenAllowedDuringTextCapture()
+    {
+        var logger = new TestLogger();
+        var repo = new FakeKeybindRepository();
+        var def = new KeybindActionDefinition
+        {
+            ActionId = "global.search",
+            Namespace = "global",
+            Scope = KeybindScope.Global,
+            AllowedDuringTextCapture = true,
+            Enabled = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+K"),
+                },
+            ],
+        };
+        var sut = new KeyMapService(repo, logger, new[] { def });
+        sut.EnterTextCapture();
+        var input = new KeybindPhysicalInput(KeybindModifierMask.Primary, "K");
+        var r = sut.ProcessGlobalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
+        Assert.True(r.Handled);
+        Assert.True(r.CompletedAction);
+        Assert.Equal("global.search", r.ActionId);
     }
 
     [Fact]
@@ -97,6 +127,89 @@ public sealed class KeyMapServiceTests
     }
 
     [Fact]
+    public void LocalChord_Matches_WhenActiveNamespaceMindmap()
+    {
+        var logger = new TestLogger();
+        var repo = new FakeKeybindRepository();
+        var def = new KeybindActionDefinition
+        {
+            ActionId = "mindmap.add-child",
+            Namespace = "mindmap",
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Tab"),
+                },
+            ],
+        };
+        var sut = new KeyMapService(repo, logger, new[] { def });
+        sut.SetActiveRoute("mindmap-detail", "mindmap");
+        var input = new KeybindPhysicalInput(KeybindModifierMask.None, "Tab");
+        var r = sut.ProcessLocalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
+        Assert.True(r.CompletedAction);
+        Assert.Equal("mindmap.add-child", r.ActionId);
+    }
+
+    [Fact]
+    public void LocalMindmap_NoMatch_WhenOverviewRoute_HasNullNamespace()
+    {
+        var logger = new TestLogger();
+        var repo = new FakeKeybindRepository();
+        var def = new KeybindActionDefinition
+        {
+            ActionId = "mindmap.add-child",
+            Namespace = "mindmap",
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Tab"),
+                },
+            ],
+        };
+        var sut = new KeyMapService(repo, logger, new[] { def });
+        sut.SetActiveRoute("mindmap", null);
+        var input = new KeybindPhysicalInput(KeybindModifierMask.None, "Tab");
+        var r = sut.ProcessLocalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
+        Assert.False(r.Handled);
+    }
+
+    [Fact]
+    public void LocalChord_Matches_WhenActiveNamespaceEditor()
+    {
+        var logger = new TestLogger();
+        var repo = new FakeKeybindRepository();
+        var def = new KeybindActionDefinition
+        {
+            ActionId = "editor.bold",
+            Namespace = "editor",
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+B"),
+                },
+            ],
+        };
+        var sut = new KeyMapService(repo, logger, new[] { def });
+        sut.SetActiveRoute("notes", "editor");
+        var input = new KeybindPhysicalInput(KeybindModifierMask.Primary, "B");
+        var r = sut.ProcessLocalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
+        Assert.True(r.CompletedAction);
+        Assert.Equal("editor.bold", r.ActionId);
+    }
+
+    [Fact]
     public void TextCapture_SuppressesSharedLeader()
     {
         var logger = new TestLogger();
@@ -110,5 +223,107 @@ public sealed class KeyMapServiceTests
         var g = new KeybindPhysicalInput(KeybindModifierMask.None, "G");
         var r = sut.ProcessGlobalKeyDown(g, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
         Assert.False(r.Handled);
+    }
+
+    [Fact]
+    public void LocalChord_FlashcardSaveAndNew_Matches_OnFlashcardDeckRoute()
+    {
+        var logger = new TestLogger();
+        var repo = new FakeKeybindRepository();
+        var def = new KeybindActionDefinition
+        {
+            ActionId = "flashcard.save-and-new",
+            Namespace = "editor",
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+Enter"),
+                },
+            ],
+        };
+        var sut = new KeyMapService(repo, logger, new[] { def });
+        sut.SetActiveRoute("flashcard-deck", "editor");
+        var input = new KeybindPhysicalInput(KeybindModifierMask.Primary, "Enter");
+        var r = sut.ProcessLocalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
+        Assert.True(r.CompletedAction);
+        Assert.Equal("flashcard.save-and-new", r.ActionId);
+    }
+
+    [Fact]
+    public void LocalChord_Flashcard_DoesNotMatch_OnFlashcardsLibraryRoute()
+    {
+        var logger = new TestLogger();
+        var repo = new FakeKeybindRepository();
+        var def = new KeybindActionDefinition
+        {
+            ActionId = "flashcard.save-and-new",
+            Namespace = "editor",
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+Enter"),
+                },
+            ],
+        };
+        var sut = new KeyMapService(repo, logger, new[] { def });
+        sut.SetActiveRoute("flashcards", null);
+        var input = new KeybindPhysicalInput(KeybindModifierMask.Primary, "Enter");
+        var r = sut.ProcessLocalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
+        Assert.False(r.Handled);
+    }
+
+    [Fact]
+    public void GetAllStaticDefinitionsMerged_IncludesAllLocalNamespaces_WhileArmedDoesNot()
+    {
+        var logger = new TestLogger();
+        var repo = new FakeKeybindRepository();
+        var global = GlobalChord("global.search", "Primary+K");
+        var editor = new KeybindActionDefinition
+        {
+            ActionId = "editor.bold",
+            Namespace = "editor",
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+B"),
+                },
+            ],
+        };
+        var mindmap = new KeybindActionDefinition
+        {
+            ActionId = "mindmap.undo",
+            Namespace = "mindmap",
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Primary+Z"),
+                },
+            ],
+        };
+        var sut = new KeyMapService(repo, logger, new[] { global, editor, mindmap });
+        sut.SetActiveRoute("overview", null);
+
+        var catalog = sut.GetAllStaticDefinitionsMerged();
+        Assert.Equal(3, catalog.Count);
+
+        var armed = sut.GetStaticArmedDefinitions();
+        Assert.Single(armed);
+        Assert.Equal("global.search", armed[0].ActionId);
     }
 }

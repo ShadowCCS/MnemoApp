@@ -1,6 +1,9 @@
 using System.Linq;
+using Avalonia;
+using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Core.Services;
 using Mnemo.UI.Components.Overlays;
+using Mnemo.UI;
 
 namespace Mnemo.UI.Services;
 
@@ -17,7 +20,11 @@ public static class KeybindManagerUi
                 overlays.CloseOverlay(existing.Id);
         }
 
-        var view = new KeybindManagerOverlay(keyMap);
+        if (Application.Current is not App app || app.Services == null)
+            return;
+        var localization = app.Services.GetRequiredService<ILocalizationService>();
+        var settings = app.Services.GetRequiredService<ISettingsService>();
+        var view = new KeybindManagerOverlay(keyMap, localization, settings);
         var id = overlays.CreateOverlay(
             view,
             new OverlayOptions

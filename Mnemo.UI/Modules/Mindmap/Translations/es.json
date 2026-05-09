@@ -1,0 +1,17 @@
+{
+  "Keybinds": {
+    "module.mindmap": "Mapa mental",
+    "category.mindmap": "Lienzo",
+    "mindmap.recenter": "Recentrar vista",
+    "mindmap.undo": "Deshacer",
+    "mindmap.redo": "Rehacer",
+    "mindmap.clear-selection": "Borrar selección",
+    "mindmap.delete-selection": "Eliminar selección",
+    "mindmap.copy": "Copiar",
+    "mindmap.paste": "Pegar",
+    "mindmap.duplicate": "Duplicar",
+    "mindmap.add-child": "Añadir nodo hijo",
+    "mindmap.enter": "Añadir hermano / editar arista",
+    "mindmap.edit-edge-label": "Editar etiqueta de arista"
+  }
+}

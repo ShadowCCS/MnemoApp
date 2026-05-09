@@ -1,5 +1,8 @@
 using System;
+using System.Linq;
+using Mnemo.Core.Models.Keybinds;
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Keybinds;
 using Mnemo.Core.Services.Search;
 using Microsoft.Extensions.DependencyInjection;
 using Mnemo.Infrastructure.Services;
@@ -21,6 +24,8 @@ public class MindmapModule : IModule
 
     public void RegisterTranslationSources(ITranslationSourceRegistry registry)
     {
+        var assembly = typeof(MindmapModule).Assembly;
+        registry.Add(new EmbeddedJsonTranslationSource(assembly, "Mnemo.UI.Modules.Mindmap.Translations"));
     }
 
     public void RegisterRoutes(INavigationRegistry registry)
@@ -43,4 +48,50 @@ public class MindmapModule : IModule
     public void RegisterWidgets(IWidgetRegistry registry, IServiceProvider services)
     {
     }
+
+    public void RegisterKeybindManifest(IKeybindManifestRegistry registry)
+    {
+        foreach (var def in MindmapKeybindManifest.Definitions)
+            registry.Register(def);
+    }
+}
+
+/// <summary>Canvas shortcuts for <c>mindmap-detail</c> (namespace <c>mindmap</c>).</summary>
+internal static class MindmapKeybindManifest
+{
+    public const string Namespace = "mindmap";
+
+    public static readonly KeybindActionDefinition[] Definitions =
+    [
+        Chords("mindmap.recenter", "Primary+D0", "Primary+NumPad0"),
+        Chords("mindmap.undo", "Primary+Z"),
+        Chords("mindmap.redo", "Primary+Y"),
+        Chords("mindmap.clear-selection", "Escape"),
+        Chords("mindmap.delete-selection", "Delete", "Back"),
+        Chords("mindmap.copy", "Primary+C"),
+        Chords("mindmap.paste", "Primary+V"),
+        Chords("mindmap.duplicate", "Primary+D"),
+        Chords("mindmap.add-child", "Tab"),
+        Chords("mindmap.enter", "Enter"),
+        Chords("mindmap.edit-edge-label", "F2"),
+    ];
+
+    private static KeybindActionDefinition Chords(string actionId, params string[] gestures) =>
+        new()
+        {
+            ActionId = actionId,
+            Namespace = Namespace,
+            Scope = KeybindScope.Local,
+            Enabled = true,
+            Module = "mindmap",
+            DisplayLabelKey = actionId,
+            DisplayCategoryKey = "category.mindmap",
+            Bindings = gestures
+                .Select(g => new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord(g),
+                })
+                .ToArray(),
+        };
 }

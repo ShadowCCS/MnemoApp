@@ -192,6 +192,13 @@
     "PracticeRevealPrefix": "",
     "PracticeRevealSpacebar": "Spacebar",
     "PracticeRevealSuffix": "で答えを表示"
+  },
+  "Keybinds": {
+    "module.flashcards": "フラッシュカード",
+    "category.flashcards_deck": "デッキの編集",
+    "flashcard.save-and-new": "カードを保存して次を追加",
+    "flashcard.wrap-cloze": "選択範囲を穴埋めで囲む",
+    "flashcard.wrap-cloze.description": "表面フィールドの選択を穴埋めマーカーで囲みます（穴埋めカードタイプ）。"
   }
 }
 

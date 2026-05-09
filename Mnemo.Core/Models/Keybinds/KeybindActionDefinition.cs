@@ -8,8 +8,26 @@ public sealed class KeybindActionDefinition
     public KeybindScope Scope { get; init; }
     /// <summary>When true, overlay may show that this binding suppresses globals in its UI context.</summary>
     public bool SuppressesGlobalsInContext { get; init; }
+
+    /// <summary>
+    /// When true, a <see cref="KeybindScope.Global"/> action still matches while rich-text
+    /// <c>EnterTextCapture</c> depth is &gt; 0 (e.g. global search from an editor).
+    /// </summary>
+    public bool AllowedDuringTextCapture { get; init; }
     public IReadOnlyList<KeybindBindingEntry> Bindings { get; init; } = Array.Empty<KeybindBindingEntry>();
     public IReadOnlyList<string> ObsoleteIds { get; init; } = Array.Empty<string>();
     /// <summary>When false, action has no effective bindings after merge.</summary>
     public bool Enabled { get; init; } = true;
+
+    /// <summary>Owning product area for UI grouping (e.g. <c>core</c>, <c>editor</c>, <c>mindmap</c>, <c>flashcards</c>).</summary>
+    public string? Module { get; init; }
+
+    /// <summary>Localization key under the <c>Keybinds</c> namespace for the short title (falls back to <see cref="ActionId"/>).</summary>
+    public string? DisplayLabelKey { get; init; }
+
+    /// <summary>Optional localization key under <c>Keybinds</c> for a longer description.</summary>
+    public string? DisplayDescriptionKey { get; init; }
+
+    /// <summary>Localization key under <c>Keybinds</c> for the category line (e.g. <c>category.formatting</c>).</summary>
+    public string? DisplayCategoryKey { get; init; }
 }

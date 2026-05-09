@@ -602,5 +602,21 @@
     "ExtensionPermissionRequest": "Erweiterungs-Erlaubnis-Anfrage",
     "RequestedPermissions": "Bitte um Erlaubnis:",
     "Approve": "Bestätigen"
+  },
+  "Keybinds": {
+    "keybindManager.title": "Tastenkürzel",
+    "keybindManager.subtitle": "Die Kürzel gelten für dieses Gerät. Zurücksetzen stellt die Standardbelegung wieder her.",
+    "keybindManager.searchPlaceholder": "Kürzel suchen",
+    "keybindManager.filterAllModules": "Alle Module",
+    "keybindManager.conflictsOnly": "Nur Konflikte",
+    "keybindManager.conflictsHeader": "Konflikte",
+    "keybindManager.then": "dann",
+    "keybindManager.footerCount": "{0} von {1} Kürzeln angezeigt",
+    "keybindManager.close": "Schließen",
+    "keybindManager.resetAll": "Alle Anpassungen zurücksetzen",
+    "module.core": "Kern",
+    "category.general": "Allgemein",
+    "global.search": "Globale Suche",
+    "global.search.description": "Suche in der gesamten Arbeitsumgebung öffnen."
   }
 }

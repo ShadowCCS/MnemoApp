@@ -611,5 +611,21 @@
     "ExtensionPermissionRequest": "Forespørsel om utvidelsestillatelse",
     "RequestedPermissions": "Forespurte tillatelser:",
     "Approve": "Godkjenn"
+  },
+  "Keybinds": {
+    "keybindManager.title": "Hurtighandlinger",
+    "keybindManager.subtitle": "Handlinger vises for denne enheten. Tilbakestill gjenoppretter standardene.",
+    "keybindManager.searchPlaceholder": "Søk i handlinger",
+    "keybindManager.filterAllModules": "Alle moduler",
+    "keybindManager.conflictsOnly": "Bare konflikter",
+    "keybindManager.conflictsHeader": "Konflikter",
+    "keybindManager.then": "deretter",
+    "keybindManager.footerCount": "{0} av {1} handlinger vises",
+    "keybindManager.close": "Lukk",
+    "keybindManager.resetAll": "Tilbakestill alle overstyringer",
+    "module.core": "Kjerne",
+    "category.general": "Generelt",
+    "global.search": "Globalt søk",
+    "global.search.description": "Åpne søk i hele arbeidsområdet."
   }
 }

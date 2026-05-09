@@ -16,9 +16,11 @@ using Avalonia.VisualTree;
 using Avalonia.Collections;
 using Mnemo.Core.Enums;
 using Mnemo.Core.Models.Mindmap;
+using Mnemo.Core.Models.Keybinds;
 using Mnemo.Core.Services;
 using MindmapModel = Mnemo.Core.Models.Mindmap.Mindmap;
 using Mnemo.UI.Modules.Mindmap.ViewModels;
+using Mnemo.UI.Services;
 
 namespace Mnemo.UI.Modules.Mindmap.Views;
 
@@ -190,6 +192,7 @@ public partial class MindmapView : UserControl
         if (_boundMindmapVm != null)
         {
             _boundMindmapVm.RecenterRequested -= OnRecenterRequested;
+            _boundMindmapVm.FocusEdgeLabelRequested -= OnFocusEdgeLabelRequested;
             _boundMindmapVm.ExportRequested -= OnExportRequested;
             _boundMindmapVm.Nodes.CollectionChanged -= OnNodesCollectionChanged;
             _boundMindmapVm.PropertyChanged -= OnMindmapViewModelPropertyChanged;
@@ -199,6 +202,7 @@ public partial class MindmapView : UserControl
         {
             _boundMindmapVm = vm;
             vm.RecenterRequested += OnRecenterRequested;
+            vm.FocusEdgeLabelRequested += OnFocusEdgeLabelRequested;
             vm.ExportRequested += OnExportRequested;
             vm.Nodes.CollectionChanged += OnNodesCollectionChanged;
             vm.PropertyChanged += OnMindmapViewModelPropertyChanged;
@@ -294,6 +298,8 @@ public partial class MindmapView : UserControl
         }
     }
 
+
+    private void OnFocusEdgeLabelRequested(EdgeViewModel edge) => FocusEdgeLabelBox(edge);
 
     private void OnRecenterRequested(object? sender, EventArgs e)
     {
@@ -950,91 +956,20 @@ public partial class MindmapView : UserControl
             vm.ClearHoverState();
     }
 
-    private async void OnMindmapKeyDown(object? sender, KeyEventArgs e)
+    private void OnMindmapKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MindmapViewModel vm) return;
+        if (DataContext is not MindmapViewModel) return;
+        if (Application.Current is not Mnemo.UI.App app || app.Services == null) return;
+        if (app.Services.GetService(typeof(IKeyMap)) is not IKeyMap keyMap) return;
+        if (app.Services.GetService(typeof(IKeybindActionRouter)) is not IKeybindActionRouter router) return;
 
-        if ((e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control &&
-            (e.Key == Key.D0 || e.Key == Key.NumPad0))
-        {
-            e.Handled = true;
-            vm.RecenterCommand.Execute(null);
+        var input = KeybindInputNormalizer.FromKeyEvent(e);
+        var r = keyMap.ProcessLocalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
+        if (!r.Handled) return;
+
+        if (r.CompletedAction && !string.IsNullOrEmpty(r.ActionId) && !router.TryExecute(r.ActionId))
             return;
-        }
-
-        if (!vm.IsEditingEnabled) return;
-
-        if (e.Key == Key.Z && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
-        {
-            e.Handled = true;
-            await vm.UndoAsync();
-            return;
-        }
-        if (e.Key == Key.Y && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
-        {
-            e.Handled = true;
-            await vm.RedoAsync();
-            return;
-        }
-
-        if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
-        {
-            e.Handled = true;
-            foreach (var node in vm.Nodes)
-                node.IsSelected = false;
-            vm.SelectedEdge = null;
-            vm.ClearHoverState();
-            return;
-        }
-
-        if ((e.Key == Key.Delete || e.Key == Key.Back) && e.KeyModifiers == KeyModifiers.None)
-        {
-            e.Handled = true;
-            if (vm.DeleteSelectedCommand.CanExecute(null))
-                vm.DeleteSelectedCommand.Execute(null);
-            return;
-        }
-
-        if (e.Key == Key.C && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
-        {
-            e.Handled = true;
-            vm.CopySelection();
-            return;
-        }
-
-        if (e.Key == Key.V && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
-        {
-            e.Handled = true;
-            await vm.PasteAsync();
-            return;
-        }
-
-        if (e.Key == Key.D && (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control)
-        {
-            e.Handled = true;
-            await vm.DuplicateSelectionAsync();
-            return;
-        }
-
-        if (e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.None)
-        {
-            e.Handled = true;
-            await vm.AddChildNodeAsync();
-            return;
-        }
-
-        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None && vm.SelectedEdge == null)
-        {
-            e.Handled = true;
-            await vm.AddSiblingNodeAsync();
-            return;
-        }
-
-        if (vm.SelectedEdge == null) return;
-        if (e.Key != Key.F2 && e.Key != Key.Enter) return;
         e.Handled = true;
-        vm.EdgeClicked(vm.SelectedEdge);
-        FocusEdgeLabelBox(vm.SelectedEdge);
     }
 
     private void OnNodePointerEnter(object? sender, PointerEventArgs e)

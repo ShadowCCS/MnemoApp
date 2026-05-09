@@ -1,0 +1,17 @@
+{
+  "Keybinds": {
+    "module.mindmap": "Tankekart",
+    "category.mindmap": "Lerret",
+    "mindmap.recenter": "Sentrer visning",
+    "mindmap.undo": "Angre",
+    "mindmap.redo": "Gjør om",
+    "mindmap.clear-selection": "Fjern utvalg",
+    "mindmap.delete-selection": "Slett utvalg",
+    "mindmap.copy": "Kopier",
+    "mindmap.paste": "Lim inn",
+    "mindmap.duplicate": "Dupliser",
+    "mindmap.add-child": "Legg til barnenode",
+    "mindmap.enter": "Legg til søsken / rediger kant",
+    "mindmap.edit-edge-label": "Rediger kantetikett"
+  }
+}

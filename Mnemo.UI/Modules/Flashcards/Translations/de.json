@@ -193,5 +193,12 @@
     "PracticeRevealPrefix": "Drücke",
     "PracticeRevealSpacebar": "Leertaste",
     "PracticeRevealSuffix": "zum Aufdecken"
+  },
+  "Keybinds": {
+    "module.flashcards": "Karteikarten",
+    "category.flashcards_deck": "Kartenstapel bearbeiten",
+    "flashcard.save-and-new": "Karte speichern und neue hinzufügen",
+    "flashcard.wrap-cloze": "Auswahl als Lücke markieren",
+    "flashcard.wrap-cloze.description": "Markiert die Auswahl im Vordergrundfeld als Lücke (Karteityp Lücke)."
   }
 }

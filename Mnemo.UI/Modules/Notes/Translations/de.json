@@ -1,0 +1,17 @@
+{
+  "Keybinds": {
+    "module.editor": "Editor",
+    "category.formatting": "Formatierung",
+    "editor.bold": "Fett",
+    "editor.italic": "Kursiv",
+    "editor.underline": "Unterstrichen",
+    "editor.strikethrough": "Durchgestrichen",
+    "editor.highlight": "Hervorheben",
+    "editor.link": "Link einfügen",
+    "editor.subscript": "Tiefgestellt",
+    "editor.superscript": "Hochgestellt",
+    "editor.bold.description": "Fett für die Auswahl umschalten.",
+    "editor.italic.description": "Kursiv für die Auswahl umschalten.",
+    "editor.underline.description": "Unterstreichung für die Auswahl umschalten."
+  }
+}

@@ -4,5 +4,7 @@ namespace Mnemo.UI.Services;
 public interface IKeybindActionRouter
 {
     void RegisterHandler(string actionId, Action handler);
+    /// <summary>When the handler returns false, the key chord is not treated as handled (event continues routing).</summary>
+    void RegisterHandler(string actionId, Func<bool> handler);
     bool TryExecute(string actionId);
 }

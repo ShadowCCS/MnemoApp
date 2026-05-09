@@ -193,5 +193,12 @@
     ,"PracticeRevealPrefix": "Press"
     ,"PracticeRevealSpacebar": "Spacebar"
     ,"PracticeRevealSuffix": "to reveal"
+  },
+  "Keybinds": {
+    "module.flashcards": "Flashcards",
+    "category.flashcards_deck": "Redigering av kortstokk",
+    "flashcard.save-and-new": "Lagre kort og legg til et nytt",
+    "flashcard.wrap-cloze": "Pakk inn utvalg som cloze",
+    "flashcard.wrap-cloze.description": "Pakk inn utvalget i frontfeltet med en cloze-markør (cloze-korttype)."
   }
 }

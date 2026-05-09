@@ -53,6 +53,11 @@ public class CoreUIModule : IModule
             ActionId = "global.search",
             Namespace = "global",
             Scope = KeybindScope.Global,
+            Module = "core",
+            DisplayLabelKey = "global.search",
+            DisplayDescriptionKey = "global.search.description",
+            DisplayCategoryKey = "category.general",
+            AllowedDuringTextCapture = true,
             Bindings =
             [
                 new KeybindBindingEntry
@@ -62,5 +67,46 @@ public class CoreUIModule : IModule
                 }
             ]
         });
+
+        foreach (var (actionId, gesture, descriptionKey) in EditorKeybindManifest.Chords)
+        {
+            registry.Register(new KeybindActionDefinition
+            {
+                ActionId = actionId,
+                Namespace = EditorKeybindManifest.Namespace,
+                Scope = KeybindScope.Local,
+                Module = "editor",
+                DisplayLabelKey = actionId,
+                DisplayDescriptionKey = descriptionKey,
+                DisplayCategoryKey = "category.formatting",
+                Bindings =
+                [
+                    new KeybindBindingEntry
+                    {
+                        Kind = KeybindBindingKind.Chord,
+                        Chord = CanonicalKeyGestureCodec.ParseChord(gesture)
+                    }
+                ]
+            });
+        }
     }
 }
+
+/// <summary>Local rich-text editor chords (namespace <c>editor</c> for notes/flashcards routes).</summary>
+internal static class EditorKeybindManifest
+{
+    public const string Namespace = "editor";
+
+    public static readonly (string ActionId, string Gesture, string? DescriptionKey)[] Chords =
+    [
+        ("editor.bold", "Primary+B", null),
+        ("editor.italic", "Primary+I", null),
+        ("editor.underline", "Primary+U", null),
+        ("editor.strikethrough", "Primary+Shift+S", null),
+        ("editor.highlight", "Primary+Shift+H", null),
+        ("editor.link", "Primary+Shift+L", null),
+        ("editor.subscript", "Primary+OemComma", null),
+        ("editor.superscript", "Primary+OemPeriod", null),
+    ];
+}
+

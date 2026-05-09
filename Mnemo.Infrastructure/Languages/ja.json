@@ -608,5 +608,21 @@
     "ExtensionPermissionRequest": "拡張機能の許可要求",
     "RequestedPermissions": "要求された権限：",
     "Approve": "承認"
+  },
+  "Keybinds": {
+    "keybindManager.title": "クイックアクション",
+    "keybindManager.subtitle": "表示はこの端末向けです。「リセット」で既定の割り当てに戻します。",
+    "keybindManager.searchPlaceholder": "アクションを検索",
+    "keybindManager.filterAllModules": "すべてのモジュール",
+    "keybindManager.conflictsOnly": "競合のみ",
+    "keybindManager.conflictsHeader": "競合",
+    "keybindManager.then": "次に",
+    "keybindManager.footerCount": "{1} 件中 {0} 件のアクションを表示",
+    "keybindManager.close": "閉じる",
+    "keybindManager.resetAll": "すべての上書きをリセット",
+    "module.core": "コア",
+    "category.general": "一般",
+    "global.search": "全体検索",
+    "global.search.description": "ワークスペース全体で検索を開きます。"
   }
 }

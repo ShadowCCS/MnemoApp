@@ -1,0 +1,17 @@
+{
+  "Keybinds": {
+    "module.mindmap": "Mind map",
+    "category.mindmap": "Canvas",
+    "mindmap.recenter": "Recenter view",
+    "mindmap.undo": "Undo",
+    "mindmap.redo": "Redo",
+    "mindmap.clear-selection": "Clear selection",
+    "mindmap.delete-selection": "Delete selection",
+    "mindmap.copy": "Copy",
+    "mindmap.paste": "Paste",
+    "mindmap.duplicate": "Duplicate",
+    "mindmap.add-child": "Add child node",
+    "mindmap.enter": "Add sibling / edit edge",
+    "mindmap.edit-edge-label": "Edit edge label"
+  }
+}

@@ -611,5 +611,21 @@
     "ExtensionPermissionRequest": "Extension Permission Request",
     "RequestedPermissions": "Requested Permissions:",
     "Approve": "Approve"
+  },
+  "Keybinds": {
+    "keybindManager.title": "Quick Actions",
+    "keybindManager.subtitle": "Actions are shown for this device. Reset restores defaults.",
+    "keybindManager.searchPlaceholder": "Search actions",
+    "keybindManager.filterAllModules": "All modules",
+    "keybindManager.conflictsOnly": "Conflicts only",
+    "keybindManager.conflictsHeader": "Conflicts",
+    "keybindManager.then": "then",
+    "keybindManager.footerCount": "{0} of {1} actions shown",
+    "keybindManager.close": "Close",
+    "keybindManager.resetAll": "Reset all overrides",
+    "module.core": "Core",
+    "category.general": "General",
+    "global.search": "Global search",
+    "global.search.description": "Open search across the workspace."
   }
 }

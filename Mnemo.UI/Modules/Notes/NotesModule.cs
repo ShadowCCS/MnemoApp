@@ -2,6 +2,7 @@ using System;
 using Mnemo.Core.Services;
 using Mnemo.Core.Services.Search;
 using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Infrastructure.Services;
 using Mnemo.Infrastructure.Services.Notes;
 using Mnemo.Infrastructure.Services.Search;
 using Mnemo.Infrastructure.Services.Tools;
@@ -18,6 +19,8 @@ public class NotesModule : IModule
 
     public void RegisterTranslationSources(ITranslationSourceRegistry registry)
     {
+        var assembly = typeof(NotesModule).Assembly;
+        registry.Add(new EmbeddedJsonTranslationSource(assembly, "Mnemo.UI.Modules.Notes.Translations"));
     }
 
     public void RegisterRoutes(INavigationRegistry registry)

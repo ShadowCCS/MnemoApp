@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
+using Mnemo.Core.Formatting;
 using Mnemo.Core.Models.Keybinds;
 using Mnemo.Core.Services;
 using Mnemo.UI.Components.RightSidebar;
@@ -41,7 +42,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (Application.Current is not App app || app.Services == null) return;
         if (DataContext is not MainWindowViewModel vm) return;
         var router = app.Services.GetRequiredService<IKeybindActionRouter>();
+        var editorDispatch = app.Services.GetRequiredService<IEditorKeybindDispatch>();
+        var mindmapDispatch = app.Services.GetRequiredService<IMindmapKeybindDispatch>();
+        var flashcardDispatch = app.Services.GetRequiredService<IFlashcardKeybindDispatch>();
         router.RegisterHandler("global.search", () => vm.TopbarViewModel.OpenGlobalSearchCommand.Execute(null));
+        router.RegisterHandler("editor.bold", () => editorDispatch.Apply(InlineFormatKind.Bold));
+        router.RegisterHandler("editor.italic", () => editorDispatch.Apply(InlineFormatKind.Italic));
+        router.RegisterHandler("editor.underline", () => editorDispatch.Apply(InlineFormatKind.Underline));
+        router.RegisterHandler("editor.strikethrough", () => editorDispatch.Apply(InlineFormatKind.Strikethrough));
+        router.RegisterHandler("editor.highlight", () => editorDispatch.Apply(InlineFormatKind.Highlight));
+        router.RegisterHandler("editor.link", () => editorDispatch.Apply(InlineFormatKind.Link));
+        router.RegisterHandler("editor.subscript", () => editorDispatch.Apply(InlineFormatKind.Subscript));
+        router.RegisterHandler("editor.superscript", () => editorDispatch.Apply(InlineFormatKind.Superscript));
+        router.RegisterHandler("mindmap.recenter", () => mindmapDispatch.Recenter());
+        router.RegisterHandler("mindmap.undo", () => mindmapDispatch.Undo());
+        router.RegisterHandler("mindmap.redo", () => mindmapDispatch.Redo());
+        router.RegisterHandler("mindmap.clear-selection", () => mindmapDispatch.ClearSelection());
+        router.RegisterHandler("mindmap.delete-selection", () => mindmapDispatch.DeleteSelection());
+        router.RegisterHandler("mindmap.copy", () => mindmapDispatch.Copy());
+        router.RegisterHandler("mindmap.paste", () => mindmapDispatch.Paste());
+        router.RegisterHandler("mindmap.duplicate", () => mindmapDispatch.Duplicate());
+        router.RegisterHandler("mindmap.add-child", () => mindmapDispatch.AddChild());
+        router.RegisterHandler("mindmap.enter", () => mindmapDispatch.Enter());
+        router.RegisterHandler("mindmap.edit-edge-label", () => mindmapDispatch.EditEdgeLabel());
+        router.RegisterHandler("flashcard.save-and-new", flashcardDispatch.TrySaveAndAddCard);
+        router.RegisterHandler("flashcard.wrap-cloze", flashcardDispatch.TryWrapClozeDeletion);
     }
 
     private void OnGlobalKeyDownTunnel(object? sender, KeyEventArgs e)
@@ -53,8 +78,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var router = app.Services.GetRequiredService<IKeybindActionRouter>();
         var input = KeybindInputNormalizer.FromKeyEvent(e);
         var r = keyMap.ProcessGlobalKeyDown(input, DateTime.UtcNow, SequenceSwallowMode.SwallowOnPrefixAdvance);
-        if (r.CompletedAction && !string.IsNullOrEmpty(r.ActionId))
-            router.TryExecute(r.ActionId);
+        if (r.CompletedAction && !string.IsNullOrEmpty(r.ActionId) && !router.TryExecute(r.ActionId))
+            return;
         if (r.Handled)
             e.Handled = true;
     }

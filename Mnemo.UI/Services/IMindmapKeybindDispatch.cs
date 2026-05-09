@@ -1,0 +1,17 @@
+namespace Mnemo.UI.Services;
+
+/// <summary>Executes mindmap canvas keybind actions for the active mindmap detail view model.</summary>
+public interface IMindmapKeybindDispatch
+{
+    void Recenter();
+    void Undo();
+    void Redo();
+    void ClearSelection();
+    void DeleteSelection();
+    void Copy();
+    void Paste();
+    void Duplicate();
+    void AddChild();
+    void Enter();
+    void EditEdgeLabel();
+}

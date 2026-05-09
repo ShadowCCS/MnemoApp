@@ -220,6 +220,9 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
 
     public event EventHandler? RecenterRequested;
 
+    /// <summary>Raised when the view should focus the edge label text box (keyboard shortcut).</summary>
+    public event Action<EdgeViewModel>? FocusEdgeLabelRequested;
+
     private sealed class CopiedNodeData
     {
         public string OriginalId { get; init; } = string.Empty;
@@ -528,6 +531,13 @@ public partial class MindmapViewModel : ViewModelBase, INavigationAware
         {
             _logger?.Error(nameof(MindmapViewModel), "Failed to process edge click", ex);
         }
+    }
+
+    public void BeginEditSelectedEdgeLabel()
+    {
+        if (SelectedEdge == null || !IsEditingEnabled) return;
+        EdgeClicked(SelectedEdge);
+        FocusEdgeLabelRequested?.Invoke(SelectedEdge);
     }
 
     public async void CommitEdgeLabel(EdgeViewModel edge)

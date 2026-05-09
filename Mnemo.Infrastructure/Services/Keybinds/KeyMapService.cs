@@ -175,7 +175,7 @@ public sealed class KeyMapService : IKeyMap
                 {
                     if (b.Kind != KeybindBindingKind.Chord || b.Chord is not { } chord) continue;
                     if (!CanonicalKeyGestureCodec.ChordsMatch(chord, input)) continue;
-                    if (IsGloballySuppressed(def.ActionId, def.Namespace))
+                    if (IsGloballySuppressed(def))
                         continue;
 
                     _globalSeqCandidates = null;
@@ -232,6 +232,32 @@ public sealed class KeyMapService : IKeyMap
 
     public IReadOnlyList<KeybindConflict> CheckConflictsStaticArmed() =>
         KeybindConflictAnalyzer.Analyze(GetStaticArmedDefinitions());
+
+    public IReadOnlyList<KeybindActionDefinition> GetAllStaticDefinitionsMerged()
+    {
+        lock (_lock)
+            return GetAllStaticDefinitionsMergedUnlocked();
+    }
+
+    public IReadOnlyList<KeybindConflict> CheckConflictsAllStatic() =>
+        KeybindConflictAnalyzer.Analyze(GetAllStaticDefinitionsMerged());
+
+    private IReadOnlyList<KeybindActionDefinition> GetAllStaticDefinitionsMergedUnlocked()
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var k in _manifest.Keys) ids.Add(k);
+        foreach (var k in _ephemeral.Keys) ids.Add(k);
+
+        var list = new List<KeybindActionDefinition>();
+        foreach (var id in ids)
+        {
+            var merged = BuildMergedUnlocked(id);
+            if (merged == null || !merged.Enabled) continue;
+            list.Add(merged);
+        }
+
+        return list;
+    }
 
     public async Task ReloadOverridesAsync(CancellationToken cancellationToken = default)
     {
@@ -296,7 +322,12 @@ public sealed class KeyMapService : IKeyMap
                 Enabled = false,
                 Bindings = Array.Empty<KeybindBindingEntry>(),
                 ObsoleteIds = man.ObsoleteIds,
-                SuppressesGlobalsInContext = man.SuppressesGlobalsInContext
+                SuppressesGlobalsInContext = man.SuppressesGlobalsInContext,
+                AllowedDuringTextCapture = man.AllowedDuringTextCapture,
+                Module = man.Module,
+                DisplayLabelKey = man.DisplayLabelKey,
+                DisplayDescriptionKey = man.DisplayDescriptionKey,
+                DisplayCategoryKey = man.DisplayCategoryKey
             };
         }
 
@@ -309,21 +340,26 @@ public sealed class KeyMapService : IKeyMap
             Enabled = true,
             Bindings = parsed.Count > 0 ? parsed : man.Bindings,
             ObsoleteIds = man.ObsoleteIds,
-            SuppressesGlobalsInContext = man.SuppressesGlobalsInContext
+            SuppressesGlobalsInContext = man.SuppressesGlobalsInContext,
+            AllowedDuringTextCapture = man.AllowedDuringTextCapture,
+            Module = man.Module,
+            DisplayLabelKey = man.DisplayLabelKey,
+            DisplayDescriptionKey = man.DisplayDescriptionKey,
+            DisplayCategoryKey = man.DisplayCategoryKey
         };
     }
 
-    private bool IsGloballySuppressed(string actionId, string actionNamespace)
+    private bool IsGloballySuppressed(KeybindActionDefinition def)
     {
-        if (_textCaptureDepth > 0)
+        if (_textCaptureDepth > 0 && !def.AllowedDuringTextCapture)
             return true;
 
         foreach (var (_, policy) in _suppression)
         {
             if (policy == null) continue;
             if (policy.SuppressAll) return true;
-            if (policy.OnlyActionIds != null && policy.OnlyActionIds.Contains(actionId)) return true;
-            if (policy.OnlyNamespaces != null && policy.OnlyNamespaces.Contains(actionNamespace)) return true;
+            if (policy.OnlyActionIds != null && policy.OnlyActionIds.Contains(def.ActionId)) return true;
+            if (policy.OnlyNamespaces != null && policy.OnlyNamespaces.Contains(def.Namespace)) return true;
         }
 
         return false;
@@ -335,7 +371,7 @@ public sealed class KeyMapService : IKeyMap
         {
             var def = BuildMergedUnlocked(id);
             if (def == null) continue;
-            if (!IsGloballySuppressed(id, def.Namespace))
+            if (!IsGloballySuppressed(def))
                 return false;
         }
 
@@ -350,24 +386,24 @@ public sealed class KeyMapService : IKeyMap
     {
         var sequences = globalArmed
             .SelectMany(d => d.Bindings.Where(b => b.Kind == KeybindBindingKind.Sequence && b.SequenceSteps is { Count: > 0 })
-                .Select(b => (d.ActionId, d.Namespace, Steps: b.SequenceSteps!.ToArray())))
+                .Select(b => (Def: d, Steps: b.SequenceSteps!.ToArray())))
             .ToList();
 
         if (_globalSeqCandidates == null || _globalSeqCandidates.Count == 0)
         {
             var starters = new List<SequenceCandidate>();
-            foreach (var (actionId, ns, steps) in sequences)
+            foreach (var (seqDef, steps) in sequences)
             {
                 if (!CanonicalKeyGestureCodec.ChordsMatch(steps[0], input)) continue;
                 if (steps.Length == 1)
                 {
-                    if (IsGloballySuppressed(actionId, ns))
+                    if (IsGloballySuppressed(seqDef))
                         continue;
                     _globalSeqCandidates = null;
-                    return new KeybindTunnelResult(true, true, actionId, false);
+                    return new KeybindTunnelResult(true, true, seqDef.ActionId, false);
                 }
 
-                starters.Add(new SequenceCandidate { ActionId = actionId, Steps = steps, Depth = 1 });
+                starters.Add(new SequenceCandidate { ActionId = seqDef.ActionId, Steps = steps, Depth = 1 });
             }
 
             if (starters.Count == 0)
@@ -401,8 +437,8 @@ public sealed class KeyMapService : IKeyMap
         if (completed.Count > 0)
         {
             var pick = completed[0];
-            var ns = globalArmed.FirstOrDefault(d => d.ActionId == pick.ActionId)?.Namespace ?? "";
-            if (IsGloballySuppressed(pick.ActionId, ns))
+            var pickDef = globalArmed.FirstOrDefault(d => d.ActionId == pick.ActionId);
+            if (pickDef == null || IsGloballySuppressed(pickDef))
             {
                 _globalSeqCandidates = null;
                 return KeybindTunnelResult.NoMatch();

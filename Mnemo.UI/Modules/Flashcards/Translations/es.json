@@ -192,6 +192,13 @@
     "PracticeRevealPrefix": "Pulsa",
     "PracticeRevealSpacebar": "Barra espaciadora",
     "PracticeRevealSuffix": "para revelar"
+  },
+  "Keybinds": {
+    "module.flashcards": "Tarjetas",
+    "category.flashcards_deck": "Edición del mazo",
+    "flashcard.save-and-new": "Guardar tarjeta y añadir otra",
+    "flashcard.wrap-cloze": "Envolver selección como cloze",
+    "flashcard.wrap-cloze.description": "Envuelve la selección del campo frontal en un marcador cloze (tipo de tarjeta cloze)."
   }
 }
 

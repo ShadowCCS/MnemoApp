@@ -608,5 +608,21 @@
     "ExtensionPermissionRequest": "Solicitud de permiso de extensión",
     "RequestedPermissions": "Permisos solicitados:",
     "Approve": "Aprobar"
+  },
+  "Keybinds": {
+    "keybindManager.title": "Acciones rápidas",
+    "keybindManager.subtitle": "Los atajos corresponden a este dispositivo. Restablecer vuelve a los valores predeterminados.",
+    "keybindManager.searchPlaceholder": "Buscar acciones",
+    "keybindManager.filterAllModules": "Todos los módulos",
+    "keybindManager.conflictsOnly": "Solo conflictos",
+    "keybindManager.conflictsHeader": "Conflictos",
+    "keybindManager.then": "luego",
+    "keybindManager.footerCount": "{0} de {1} atajos mostrados",
+    "keybindManager.close": "Cerrar",
+    "keybindManager.resetAll": "Restablecer todas las personalizaciones",
+    "module.core": "Núcleo",
+    "category.general": "General",
+    "global.search": "Búsqueda global",
+    "global.search.description": "Abrir la búsqueda en todo el espacio de trabajo."
   }
 }

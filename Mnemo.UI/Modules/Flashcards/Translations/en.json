@@ -193,5 +193,12 @@
     ,"PracticeRevealPrefix": "Press"
     ,"PracticeRevealSpacebar": "Spacebar"
     ,"PracticeRevealSuffix": "to reveal"
+  },
+  "Keybinds": {
+    "module.flashcards": "Flashcards",
+    "category.flashcards_deck": "Deck editing",
+    "flashcard.save-and-new": "Save card and add another",
+    "flashcard.wrap-cloze": "Wrap selection as cloze",
+    "flashcard.wrap-cloze.description": "Wrap the front field selection in a cloze marker (cloze card type)."
   }
 }

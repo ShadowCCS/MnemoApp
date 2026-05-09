@@ -851,8 +851,18 @@ public partial class EditableBlock : UserControl
         if (e.Key != Key.Back)
             _backspaceHandledInTunnel = false;
 
-        if (TryHandleInlineFormatShortcut(e, editor))
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0
+            && (e.KeyModifiers & KeyModifiers.Alt) == 0
+            && (e.KeyModifiers & KeyModifiers.Shift) != 0
+            && e.Key == Key.E
+            && !IsReadOnly
+            && _viewModel != null
+            && _viewModel.Type != BlockType.Code)
+        {
+            ApplyInlineEquation();
+            e.Handled = true;
             return;
+        }
 
         // Navigation keys clear sticky sub/sup mode; the right-arrow case at a sub/sup span boundary
         // additionally forces the next insertion to be non-sub/sup (escape from trailing style).
@@ -866,12 +876,12 @@ public partial class EditableBlock : UserControl
                 editor.SetPendingSubSup(false, false); // escape one char, then natural
         }
 
-        if (_viewModel.Type != BlockType.Image)
+        if (_viewModel!.Type != BlockType.Image)
         {
             // Run after TextInput so "* " / "- " is in the buffer (KeyDown runs before the space is inserted).
             if (e.Key == Key.Space)
             {
-                var typeForShortcut = _viewModel.Type;
+                var typeForShortcut = _viewModel!.Type;
                 Dispatcher.UIThread.Post(() =>
                 {
                     if (_viewModel == null || _viewModel.Type != typeForShortcut) return;
@@ -920,61 +930,27 @@ public partial class EditableBlock : UserControl
 
     #region Keyboard and Input Handling
 
-    /// <summary>
-    /// Ctrl+B/I/U, Ctrl+Shift+S (strikethrough), Ctrl+Shift+H (highlight), Ctrl+Shift+L (link / unlink),
-    /// Ctrl+, (subscript), Ctrl+. (superscript).
-    /// Sub/sup use sticky toggle mode when there is no selection: press once to enter, once more to exit.
-    /// All other formats apply to the word at caret when there is no selection.
-    /// </summary>
-    private bool TryHandleInlineFormatShortcut(KeyEventArgs e, RichTextEditor editor)
+    /// <summary>Invoked from <c>EditorKeybindDispatch</c> when a manifest chord matches (tunnel phase).</summary>
+    internal void TryApplyEditorKeybind(InlineFormatKind kind, RichTextEditor editor)
     {
-        if (IsReadOnly || e.Handled || _viewModel == null || _viewModel.Type == BlockType.Code)
-            return false;
+        if (IsReadOnly || _viewModel == null || _viewModel.Type == BlockType.Code)
+            return;
 
-        var mods = e.KeyModifiers;
-        if ((mods & KeyModifiers.Control) == 0 || (mods & KeyModifiers.Alt) != 0)
-            return false;
-
-        bool shift = (mods & KeyModifiers.Shift) != 0;
-
-        if (e.Key == Key.L && shift)
+        if (kind == InlineFormatKind.Link)
         {
-            e.Handled = true;
             _ = HandleLinkShortcutAsync(editor);
-            return true;
+            return;
         }
 
-        if (e.Key == Key.E && shift)
+        if (kind is InlineFormatKind.Subscript or InlineFormatKind.Superscript)
         {
-            ApplyInlineEquation();
-            e.Handled = true;
-            return true;
+            HandleSubSupShortcut(editor, kind);
+            return;
         }
-
-        // Sub/superscript use sticky toggle mode (no shift, no Alt already gated above).
-        if (e.Key == Key.OemComma || e.Key == Key.OemPeriod)
-        {
-            var subSupKind = e.Key == Key.OemComma ? InlineFormatKind.Subscript : InlineFormatKind.Superscript;
-            HandleSubSupShortcut(editor, subSupKind);
-            e.Handled = true;
-            return true;
-        }
-
-        InlineFormatKind? kind = e.Key switch
-        {
-            Key.B when !shift => InlineFormatKind.Bold,
-            Key.I when !shift => InlineFormatKind.Italic,
-            Key.U when !shift => InlineFormatKind.Underline,
-            Key.S when shift => InlineFormatKind.Strikethrough,
-            Key.H when shift => InlineFormatKind.Highlight,
-            _ => null
-        };
-        if (kind == null)
-            return false;
 
         if (kind == InlineFormatKind.Bold
             && _viewModel.Type is BlockType.Heading1 or BlockType.Heading2 or BlockType.Heading3 or BlockType.Heading4)
-            return false;
+            return;
 
         string? color = null;
         if (kind == InlineFormatKind.Highlight
@@ -985,24 +961,21 @@ public partial class EditableBlock : UserControl
         var blockEditor = FindParentBlockEditor();
         if (blockEditor?.HasCrossBlockTextSelection() == true)
         {
-            ApplyInlineFormat(kind.Value, color);
-            e.Handled = true;
-            return true;
+            ApplyInlineFormat(kind, color);
+            return;
         }
 
         if (GetSelectionRange() == null)
         {
             var word = editor.TryGetWordRangeAtCaret();
             if (word == null)
-                return false;
+                return;
             editor.SelectionStart = word.Value.Start;
             editor.SelectionEnd = word.Value.End;
             editor.CaretIndex = word.Value.End;
         }
 
-        ApplyInlineFormat(kind.Value, color);
-        e.Handled = true;
-        return true;
+        ApplyInlineFormat(kind, color);
     }
 
     /// <summary>
