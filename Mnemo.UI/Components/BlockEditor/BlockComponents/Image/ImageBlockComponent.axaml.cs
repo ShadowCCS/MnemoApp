@@ -915,7 +915,7 @@ public partial class ImageBlockComponent : BlockComponentBase
         var vm = ViewModel;
         if (vm == null || _imageAssetService == null) return;
 
-        var oldPath = vm.ImagePath;
+        var previousStoredPath = vm.ImagePath;
 
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel == null) return;
@@ -941,8 +941,9 @@ public partial class ImageBlockComponent : BlockComponentBase
         var result = await _imageAssetService.ImportAndCopyAsync(sourcePath, vm.Id);
         if (!result.IsSuccess) return;
 
-        if (!string.IsNullOrEmpty(oldPath) && oldPath != result.Value)
-            await _imageAssetService.DeleteStoredFileAsync(oldPath);
+        var editor = this.FindAncestorOfType<BlockEditor>();
+        if (!string.Equals(previousStoredPath, result.Value, StringComparison.OrdinalIgnoreCase))
+            editor?.RegisterReleasedStoredImagePath(previousStoredPath);
 
         vm.NotifyStructuralChangeStarting();
         vm.ImagePath = result.Value!;

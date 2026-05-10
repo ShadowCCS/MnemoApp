@@ -20,6 +20,8 @@ public class HistoryManager : IHistoryManager
     public bool CanRedo => _redoStack.Count > 0;
     public bool IsBatching => _batchOperations != null;
 
+    public event Action? Cleared;
+
     public event Action? StateChanged;
 
     [Conditional("DEBUG")]
@@ -139,6 +141,7 @@ public class HistoryManager : IHistoryManager
         _undoStack.Clear();
         _redoStack.Clear();
         DiscardBatch();
+        Cleared?.Invoke();
         StateChanged?.Invoke();
     }
 }

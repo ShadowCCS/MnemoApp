@@ -49,6 +49,12 @@ public interface IHistoryManager
     void Clear();
 
     /// <summary>
+    /// Raised after <see cref="Clear"/> discards the stacks. Undo/redo can no longer restore
+    /// prior document state — hosts use this to reclaim resources (e.g. stored image files).
+    /// </summary>
+    event Action? Cleared;
+
+    /// <summary>
     /// Raised after any push, undo, redo, or clear that changes CanUndo/CanRedo.
     /// </summary>
     event Action? StateChanged;

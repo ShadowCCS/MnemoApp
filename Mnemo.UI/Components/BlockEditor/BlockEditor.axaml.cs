@@ -128,7 +128,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     public IHistoryManager? History
     {
         get => _history;
-        set => _history = value;
+        set
+        {
+            if (ReferenceEquals(_history, value)) return;
+            if (_history != null)
+                _history.Cleared -= OnHistoryManagerCleared;
+            _history = value;
+            if (_history != null)
+                _history.Cleared += OnHistoryManagerCleared;
+        }
     }
 
     /// <summary>Optional: set from the host view for Mnemo JSON + markdown clipboard.</summary>
@@ -178,10 +186,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
     }
 
-    private static readonly TimeSpan OrphanImageDeleteDelay = TimeSpan.FromSeconds(2);
-    private static readonly object PendingOrphanImageDeletesGate = new();
-    private static readonly Dictionary<string, CancellationTokenSource> PendingOrphanImageDeletes = new(StringComparer.OrdinalIgnoreCase);
     private const string NativeTwoColumnMetaKey = "nativeTwoColumn";
+
+    /// <summary>
+    /// Stored image paths the user has replaced or removed from the document; safe to delete once
+    /// <see cref="IHistoryManager"/> can no longer undo (see <see cref="IHistoryManager.Cleared"/>).
+    /// Paths are removed when they appear again in the document (undo) via <see cref="ReconcileReleasedStoredImagePathsWithDocument"/>.
+    /// </summary>
+    private readonly HashSet<string> _releasedStoredImagePaths = new(StringComparer.OrdinalIgnoreCase);
 
     public static readonly StyledProperty<bool> IsReadOnlyProperty =
         AvaloniaProperty.Register<BlockEditor, bool>(nameof(IsReadOnly), defaultValue: false);
@@ -321,6 +333,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             _globalPointerReleasedHandler = null;
             _topLevel = null;
         }
+
+        if (_history != null)
+            _history.Cleared -= OnHistoryManagerCleared;
 
         EndBlockDragGhost();
     }
@@ -840,9 +855,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _pendingCaretBefore = null;
         _history?.Clear();
 
-        // Unsubscribe from old blocks (do not delete image assets — they may still belong to the note on disk)
+        // Unsubscribe from old blocks (do not register released paths — note switch / persistence owns asset lifetime).
         foreach (var block in Blocks)
-            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: false);
+            UnsubscribeFromBlock(block, registerReleasedStoredImagePath: false);
 
         // Create new collection to ensure proper UI notification
         var newBlocks = new ObservableCollection<BlockViewModel>();
@@ -898,6 +913,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         RefreshPageBlockTitles();
 
+        ReconcileReleasedStoredImagePathsWithDocument();
+
         // Focus the first block after UI updates to make it immediately editable
         if (newBlocks.Count > 0)
         {
@@ -947,7 +964,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         BeginStructuralChange();
 
-        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+        UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
         Blocks.RemoveAt(index);
 
         var tc = (TwoColumnBlockViewModel)BlockFactory.CreateBlock(BlockType.TwoColumn, block.Order);
@@ -1006,7 +1023,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         BeginStructuralChange();
 
-        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+        UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
         Blocks.RemoveAt(index);
 
         int insertAt = index;
@@ -1041,7 +1058,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void SubscribeToBlock(BlockViewModel block)
     {
-        CancelPendingOrphanImageDeletesForBlock(block);
         block.ContentChanged += OnBlockContentChanged;
         block.PropertyChanged += OnBlockPropertyChanged;
         block.DeleteRequested += OnBlockDeleteRequested;
@@ -1085,20 +1101,21 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (e.OldItems != null)
         {
             foreach (BlockViewModel o in e.OldItems)
-                UnsubscribeFromBlock(o, removeStoredImageIfOrphan: false);
+                UnsubscribeFromBlock(o, registerReleasedStoredImagePath: false);
         }
         UpdateListNumbers();
         NotifyBlocksChanged();
     }
 
-    /// <param name="removeStoredImageIfOrphan">
-    /// True when the block is permanently removed from the document (delete, merge, paste replace, etc.).
-    /// False when detaching for reorder, column moves, undo/redo restore, or reparenting — the same block (or its image path) may still be in use.
+    /// <param name="registerReleasedStoredImagePath">
+    /// True when the block is permanently removed or replaced (delete, merge, paste replace, etc.).
+    /// False when detaching for reorder, column moves, undo/redo restore, or reparenting.
     /// </param>
-    private void UnsubscribeFromBlock(BlockViewModel block, bool removeStoredImageIfOrphan = false)
+    private void UnsubscribeFromBlock(BlockViewModel block, bool registerReleasedStoredImagePath = false)
     {
-        if (removeStoredImageIfOrphan)
-            QueueDeleteOrphanImageForRemovedBlock(block);
+        if (registerReleasedStoredImagePath && block.Type == BlockType.Image)
+            RegisterReleasedStoredImagePathCore(block.ImagePath);
+
         block.ContentChanged -= OnBlockContentChanged;
         block.PropertyChanged -= OnBlockPropertyChanged;
         block.DeleteRequested -= OnBlockDeleteRequested;
@@ -1117,9 +1134,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             tc.ColumnChildrenChanged -= OnTwoColumnColumnChildrenChanged;
             foreach (var c in tc.LeftColumnBlocks.ToList())
-                UnsubscribeFromBlock(c, removeStoredImageIfOrphan);
+                UnsubscribeFromBlock(c, registerReleasedStoredImagePath);
             foreach (var c in tc.RightColumnBlocks.ToList())
-                UnsubscribeFromBlock(c, removeStoredImageIfOrphan);
+                UnsubscribeFromBlock(c, registerReleasedStoredImagePath);
         }
     }
 
@@ -1243,7 +1260,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var col = block.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
             col.Remove(block);
             BlockHierarchy.ClearChildOwnership(block);
-            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+            UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
             if (col.Count == 0)
             {
                 var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
@@ -1254,7 +1271,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         else
         {
-            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+            UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
             Blocks.Remove(block);
         }
 
@@ -1287,7 +1304,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             col.Remove(block);
             BlockHierarchy.ClearChildOwnership(block);
-            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+            UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
             if (col.Count == 0)
             {
                 var ph = BlockFactory.CreateBlock(BlockType.Text, 0);
@@ -1323,7 +1340,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var topIdx = Blocks.IndexOf(tc);
                 if (topIdx < 0) return;
-                UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
+                UnsubscribeFromBlock(tc, registerReleasedStoredImagePath: true);
                 Blocks.RemoveAt(topIdx);
                 var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
                 SubscribeToBlock(placeholder);
@@ -1349,7 +1366,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var topIdx = Blocks.IndexOf(tc);
                 if (topIdx < 0) return;
-                UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
+                UnsubscribeFromBlock(tc, registerReleasedStoredImagePath: true);
                 Blocks.RemoveAt(topIdx);
                 var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
                 SubscribeToBlock(placeholder);
@@ -1381,7 +1398,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (Blocks.Count == 1)
         {
             if (block.Type == BlockType.Image)
-                QueueDeleteOrphanImageForRemovedBlock(block);
+                RegisterReleasedStoredImagePathCore(block.ImagePath);
             block.Content = string.Empty;
             block.Type = BlockType.Text;
             block.IsFocused = true;
@@ -1390,7 +1407,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+        UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
         Blocks.Remove(block);
 
         var targetIndex = index > 0 ? index - 1 : 0;
@@ -1475,17 +1492,17 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var promoted = filledCol.ToList();
         foreach (var b in emptyCol.ToList())
         {
-            UnsubscribeFromBlock(b, removeStoredImageIfOrphan: true);
+            UnsubscribeFromBlock(b, registerReleasedStoredImagePath: true);
             emptyCol.Remove(b);
         }
         foreach (var b in promoted)
         {
-            UnsubscribeFromBlock(b, removeStoredImageIfOrphan: false);
+            UnsubscribeFromBlock(b, registerReleasedStoredImagePath: false);
             filledCol.Remove(b);
             BlockHierarchy.ClearChildOwnership(b);
         }
 
-        UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: false);
+        UnsubscribeFromBlock(tc, registerReleasedStoredImagePath: false);
         Blocks.RemoveAt(topIdx);
 
         int insertAt = topIdx;
@@ -1509,7 +1526,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var ci = col.IndexOf(block);
         if (ci < 0) return false;
 
-        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+        UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
         col.RemoveAt(ci);
         BlockHierarchy.ClearChildOwnership(block);
 
@@ -1550,7 +1567,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
         var topIdx = Blocks.IndexOf(tc);
         if (topIdx < 0) return;
-        UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
+        UnsubscribeFromBlock(tc, registerReleasedStoredImagePath: true);
         Blocks.RemoveAt(topIdx);
         var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
         SubscribeToBlock(placeholder);
@@ -3470,7 +3487,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var topLevel = toRemove.Where(b => b.OwnerTwoColumn == null).OrderByDescending(b => Blocks.IndexOf(b)).ToList();
         foreach (var block in topLevel)
         {
-            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+            UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
             Blocks.Remove(block);
         }
 
@@ -3500,7 +3517,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var topIdx = Blocks.IndexOf(tc);
                 if (topIdx < 0) continue;
-                UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
+                UnsubscribeFromBlock(tc, registerReleasedStoredImagePath: true);
                 Blocks.RemoveAt(topIdx);
                 ReorderBlocks();
                 continue;
@@ -3724,7 +3741,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             {
                 var topIdx = Blocks.IndexOf(tc);
                 if (topIdx < 0) return;
-                UnsubscribeFromBlock(tc, removeStoredImageIfOrphan: true);
+                UnsubscribeFromBlock(tc, registerReleasedStoredImagePath: true);
                 Blocks.RemoveAt(topIdx);
                 var placeholder = BlockFactory.CreateBlock(BlockType.Text, 0);
                 SubscribeToBlock(placeholder);
@@ -3733,7 +3750,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 return;
             }
 
-            UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+            UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
             col.RemoveAt(ci);
             BlockHierarchy.ClearChildOwnership(block);
             if (col.Count == 0)
@@ -3757,7 +3774,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return;
         }
 
-        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+        UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
         Blocks.Remove(block);
         ReorderBlocks();
     }
@@ -4147,7 +4164,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     foreach (int i in selectedIndices.OrderByDescending(x => x))
                     {
                         var block = Blocks[i];
-                        UnsubscribeFromBlock(block, removeStoredImageIfOrphan: true);
+                        UnsubscribeFromBlock(block, registerReleasedStoredImagePath: true);
                         Blocks.RemoveAt(i);
                     }
                     insertIndex = firstIndex;
@@ -4245,6 +4262,34 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return val.ToString() ?? string.Empty;
     }
 
+    /// <summary>
+    /// Marks a path under the app images directory as no longer shown in the document (e.g. image replaced).
+    /// The file is kept until <see cref="IHistoryManager.Cleared"/> and then removed if still unused.
+    /// </summary>
+    public void RegisterReleasedStoredImagePath(string? path)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => RegisterReleasedStoredImagePath(path));
+            return;
+        }
+
+        RegisterReleasedStoredImagePathCore(path);
+    }
+
+    private void RegisterReleasedStoredImagePathCore(string? path)
+    {
+        var n = NormalizePathForImageCompare(path);
+        if (n == null || !MnemoAppPaths.IsPathUnderImagesDirectory(n)) return;
+        _releasedStoredImagePaths.Add(n);
+    }
+
+    private void ReconcileReleasedStoredImagePathsWithDocument()
+    {
+        var referenced = CollectReferencedStoredImagePathsNormalized();
+        _releasedStoredImagePaths.RemoveWhere(referenced.Contains);
+    }
+
     private static string? NormalizePathForImageCompare(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return null;
@@ -4258,101 +4303,54 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         }
     }
 
-    private bool AnyOtherImageBlockUsesPath(string path, BlockViewModel excludeBlock)
+    /// <summary>
+    /// After <see cref="IHistoryManager.Clear"/>, undo cannot restore prior edits; delete stored image files
+    /// that were explicitly released during this session and are still not referenced by the document.
+    /// </summary>
+    private void OnHistoryManagerCleared()
     {
-        var norm = NormalizePathForImageCompare(path);
-        if (norm == null) return false;
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(OnHistoryManagerCleared, DispatcherPriority.Normal);
+            return;
+        }
+
+        var referenced = CollectReferencedStoredImagePathsNormalized();
+        _ = DeleteReleasedStoredImagesAfterHistoryClearedAsync(referenced);
+    }
+
+    private HashSet<string> CollectReferencedStoredImagePathsNormalized()
+    {
+        var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var b in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
         {
-            if (ReferenceEquals(b, excludeBlock)) continue;
             if (b.Type != BlockType.Image) continue;
-            var other = NormalizePathForImageCompare(b.ImagePath);
-            if (other != null && string.Equals(other, norm, StringComparison.OrdinalIgnoreCase))
-                return true;
+            var n = NormalizePathForImageCompare(b.ImagePath);
+            if (n != null)
+                referenced.Add(n);
         }
 
-        return false;
+        return referenced;
     }
 
-    private void QueueDeleteOrphanImageForRemovedBlock(BlockViewModel removedBlock)
+    private async Task DeleteReleasedStoredImagesAfterHistoryClearedAsync(HashSet<string> referencedNormalizedPaths)
     {
-        if (removedBlock.Type != BlockType.Image) return;
-        var path = removedBlock.ImagePath;
-        if (string.IsNullOrWhiteSpace(path)) return;
-        if (!MnemoAppPaths.IsPathUnderImagesDirectory(path)) return;
-        if (AnyOtherImageBlockUsesPath(path, removedBlock)) return;
-        var normalizedPath = NormalizePathForImageCompare(path);
-        if (normalizedPath == null) return;
-
         var svc = ResolveImageAssetService();
         if (svc == null) return;
-        var cts = new CancellationTokenSource();
-        lock (PendingOrphanImageDeletesGate)
+
+        foreach (var path in _releasedStoredImagePaths.ToArray())
         {
-            if (PendingOrphanImageDeletes.TryGetValue(normalizedPath, out var previous))
+            if (referencedNormalizedPaths.Contains(path))
+                continue;
+            try
             {
-                previous.Cancel();
-                previous.Dispose();
+                await svc.DeleteStoredFileAsync(path, default).ConfigureAwait(false);
+                _releasedStoredImagePaths.Remove(path);
             }
-            PendingOrphanImageDeletes[normalizedPath] = cts;
-        }
-        _ = DeleteOrphanImageFileAfterDelayAsync(svc, normalizedPath, removedBlock, cts);
-    }
-
-    private async Task DeleteOrphanImageFileAfterDelayAsync(
-        IImageAssetService svc,
-        string normalizedPath,
-        BlockViewModel removedBlock,
-        CancellationTokenSource cts)
-    {
-        try
-        {
-            await Task.Delay(OrphanImageDeleteDelay, cts.Token).ConfigureAwait(false);
-            if (cts.IsCancellationRequested) return;
-            if (AnyOtherImageBlockUsesPath(normalizedPath, removedBlock)) return;
-            await svc.DeleteStoredFileAsync(normalizedPath, cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected when undo/redo or reparenting reuses the same image path.
-        }
-        catch
-        {
-            // Best-effort; avoid surfacing IO errors from background cleanup.
-        }
-        finally
-        {
-            lock (PendingOrphanImageDeletesGate)
+            catch
             {
-                if (PendingOrphanImageDeletes.TryGetValue(normalizedPath, out var current) && ReferenceEquals(current, cts))
-                    PendingOrphanImageDeletes.Remove(normalizedPath);
+                // Best-effort cleanup.
             }
-            cts.Dispose();
-        }
-    }
-
-    private void CancelPendingOrphanImageDeletesForBlock(BlockViewModel block)
-    {
-        if (block.Type == BlockType.Image)
-            CancelPendingOrphanImageDelete(block.ImagePath);
-
-        if (block is not TwoColumnBlockViewModel tc) return;
-        foreach (var c in tc.LeftColumnBlocks)
-            CancelPendingOrphanImageDeletesForBlock(c);
-        foreach (var c in tc.RightColumnBlocks)
-            CancelPendingOrphanImageDeletesForBlock(c);
-    }
-
-    private void CancelPendingOrphanImageDelete(string? path)
-    {
-        var normalizedPath = NormalizePathForImageCompare(path);
-        if (normalizedPath == null) return;
-        lock (PendingOrphanImageDeletesGate)
-        {
-            if (!PendingOrphanImageDeletes.Remove(normalizedPath, out var cts))
-                return;
-            cts.Cancel();
-            cts.Dispose();
         }
     }
 
@@ -4929,7 +4927,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         foreach (var idx in indices.OrderByDescending(i => i))
         {
             var vm = Blocks[idx];
-            UnsubscribeFromBlock(vm, removeStoredImageIfOrphan: false);
+            UnsubscribeFromBlock(vm, registerReleasedStoredImagePath: false);
             Blocks.RemoveAt(idx);
         }
 
@@ -5235,7 +5233,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 var ti = Blocks.IndexOf(dragged);
                 if (ti >= 0)
                 {
-                    UnsubscribeFromBlock(dragged, removeStoredImageIfOrphan: false);
+                    UnsubscribeFromBlock(dragged, registerReleasedStoredImagePath: false);
                     Blocks.RemoveAt(ti);
                 }
             }
@@ -5381,7 +5379,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (cell.OwnerTwoColumn is TwoColumnBlockViewModel tc)
         {
             var col = cell.IsLeftColumn ? tc.LeftColumnBlocks : tc.RightColumnBlocks;
-            UnsubscribeFromBlock(cell, removeStoredImageIfOrphan: false);
+            UnsubscribeFromBlock(cell, registerReleasedStoredImagePath: false);
             col.Remove(cell);
             BlockHierarchy.ClearChildOwnership(cell);
             if (col.Count == 0)
@@ -5396,7 +5394,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
         var sibling = cell.GetColumnSibling(Blocks);
         if (sibling == null) return null;
-        UnsubscribeFromBlock(cell, removeStoredImageIfOrphan: false);
+        UnsubscribeFromBlock(cell, registerReleasedStoredImagePath: false);
         var idx = Blocks.IndexOf(cell);
         if (idx < 0) return null;
         Blocks.RemoveAt(idx);
@@ -5429,7 +5427,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         {
             var tIdxBefore = Blocks.IndexOf(target);
             var sIdx = Blocks.IndexOf(targetSib);
-            UnsubscribeFromBlock(targetSib, removeStoredImageIfOrphan: false);
+            UnsubscribeFromBlock(targetSib, registerReleasedStoredImagePath: false);
             Blocks.RemoveAt(sIdx);
             ColumnPairHelper.ClearPair(target, targetSib);
             SubscribeToBlock(targetSib);
@@ -5444,12 +5442,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var draggedIdx = Blocks.IndexOf(dragged);
         if (draggedIdx >= 0)
         {
-            UnsubscribeFromBlock(dragged, removeStoredImageIfOrphan: false);
+            UnsubscribeFromBlock(dragged, registerReleasedStoredImagePath: false);
             Blocks.RemoveAt(draggedIdx);
             if (draggedIdx < targetIdx) targetIdx--;
         }
 
-        UnsubscribeFromBlock(target, removeStoredImageIfOrphan: false);
+        UnsubscribeFromBlock(target, registerReleasedStoredImagePath: false);
         Blocks.RemoveAt(targetIdx);
 
         var left = dropOnLeftEdge ? dragged : target;
@@ -5746,7 +5744,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             foreach (var kvp in existingById)
             {
                 if (!usedIds.Contains(kvp.Key))
-                    UnsubscribeFromBlock(kvp.Value, removeStoredImageIfOrphan: false);
+                    UnsubscribeFromBlock(kvp.Value, registerReleasedStoredImagePath: false);
             }
 
             // Ensure at least one block
@@ -5783,6 +5781,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             UpdateListNumbers();
 
             ApplyCaretFocus(caret);
+            ReconcileReleasedStoredImagePathsWithDocument();
             BlocksChanged?.Invoke();
         }
         finally
