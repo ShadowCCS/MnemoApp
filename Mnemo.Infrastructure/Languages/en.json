@@ -252,7 +252,6 @@
     "CollapseSidebar": "Collapse sidebar",
     "ExpandSidebar": "Expand sidebar",
     "QuickActions": "Quick Actions",
-    "QuickActionsShortcut": "alt + shift + Q",
     "KeyboardShortcuts": "Keyboard shortcuts",
     "DevelopmentBuild": "Development Build - Alpha"
   },
@@ -571,7 +570,6 @@
     "NotificationsTitle": "Notifications",
     "NotificationsEmpty": "No notifications yet.",
     "SearchPlaceholder": "Search for a lesson, mindmap, etc.",
-    "SearchShortcut": "Ctrl+K",
     "GlobalSearchOverlayHint": "Global search is opening here. Full results and actions are coming next.",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0} Days",
@@ -635,6 +633,8 @@
     "module.core": "Core",
     "category.general": "General",
     "global.search": "Global search",
-    "global.search.description": "Open search across the workspace."
+    "global.search.description": "Open search across the workspace.",
+    "global.quick-actions": "Quick actions",
+    "global.quick-actions.description": "Open the quick actions catalog (keyboard shortcuts)."
   }
 }

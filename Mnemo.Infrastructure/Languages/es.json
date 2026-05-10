@@ -249,7 +249,6 @@
     "CollapseSidebar": "Contraer barra lateral",
     "ExpandSidebar": "Expandir barra lateral",
     "QuickActions": "Acciones rápidas",
-    "QuickActionsShortcut": "alt + shift + Q",
     "KeyboardShortcuts": "Atajos de teclado",
     "DevelopmentBuild": "Versión de desarrollo - Alfa"
   },
@@ -568,7 +567,6 @@
     "NotificationsTitle": "Notificaciones",
     "NotificationsEmpty": "Aún no hay notificaciones.",
     "SearchPlaceholder": "Buscar una lección, mapa mental, etc.",
-    "SearchShortcut": "Ctrl+K",
     "GlobalSearchOverlayHint": "La búsqueda global se abrirá aquí. Los resultados completos y acciones llegarán enseguida.",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0} Días",
@@ -632,6 +630,8 @@
     "module.core": "Núcleo",
     "category.general": "General",
     "global.search": "Búsqueda global",
-    "global.search.description": "Abrir la búsqueda en todo el espacio de trabajo."
+    "global.search.description": "Abrir la búsqueda en todo el espacio de trabajo.",
+    "global.quick-actions": "Acciones rápidas",
+    "global.quick-actions.description": "Abrir el catálogo de acciones rápidas (atajos de teclado)."
   }
 }

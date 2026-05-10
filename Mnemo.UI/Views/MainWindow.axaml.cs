@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -46,7 +47,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var blockEditorClipboard = app.Services.GetRequiredService<IBlockEditorClipboardKeybindDispatch>();
         var mindmapDispatch = app.Services.GetRequiredService<IMindmapKeybindDispatch>();
         var flashcardDispatch = app.Services.GetRequiredService<IFlashcardKeybindDispatch>();
-        router.RegisterHandler("global.search", () => vm.TopbarViewModel.OpenGlobalSearchCommand.Execute(null));
+        var overlayService = app.Services.GetRequiredService<IOverlayService>();
+        var keyMap = app.Services.GetRequiredService<IKeyMap>();
+
+        void RegisterGlobalWithOptionalToggle(string actionId, Action ifToggle, Action ifOpenOnly)
+        {
+            router.RegisterHandler(actionId, () =>
+            {
+                var merged = keyMap.GetAllStaticDefinitionsMerged()
+                    .FirstOrDefault(d => string.Equals(d.ActionId, actionId, StringComparison.Ordinal));
+                if (merged is { ToggleOnRepeat: true })
+                    ifToggle();
+                else
+                    ifOpenOnly();
+                return true;
+            });
+        }
+
+        RegisterGlobalWithOptionalToggle(
+            "global.search",
+            vm.TopbarViewModel.TryToggleGlobalSearch,
+            () => vm.TopbarViewModel.OpenGlobalSearchCommand.Execute(null));
+        RegisterGlobalWithOptionalToggle(
+            "global.quick-actions",
+            () => KeybindManagerUi.TryToggle(overlayService, keyMap),
+            () => KeybindManagerUi.TryOpen(overlayService, keyMap));
         router.RegisterHandler("editor.bold", () => editorDispatch.Apply(InlineFormatKind.Bold));
         router.RegisterHandler("editor.italic", () => editorDispatch.Apply(InlineFormatKind.Italic));
         router.RegisterHandler("editor.underline", () => editorDispatch.Apply(InlineFormatKind.Underline));

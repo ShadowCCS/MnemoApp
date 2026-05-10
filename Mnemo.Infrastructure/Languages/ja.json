@@ -249,7 +249,6 @@
     "CollapseSidebar": "サイドバーを折りたたむ",
     "ExpandSidebar": "サイドバーを開く",
     "QuickActions": "クイックアクション",
-    "QuickActionsShortcut": "Alt+Shift+Q",
     "KeyboardShortcuts": "キーボードショートカット",
     "DevelopmentBuild": "開発版 - ベータ"
   },
@@ -568,7 +567,6 @@
     "NotificationsTitle": "通知",
     "NotificationsEmpty": "通知はまだありません。",
     "SearchPlaceholder": "レッスンやマインドマップなどを検索...",
-    "SearchShortcut": "Cmd+K",
     "GlobalSearchOverlayHint": "グローバル検索はここに表示されます。結果一覧とアクションは次の更新で追加します。",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0}日連続",
@@ -632,6 +630,8 @@
     "module.core": "コア",
     "category.general": "一般",
     "global.search": "全体検索",
-    "global.search.description": "ワークスペース全体で検索を開きます。"
+    "global.search.description": "ワークスペース全体で検索を開きます。",
+    "global.quick-actions": "クイックアクション",
+    "global.quick-actions.description": "クイックアクションとキーボードショートカットの一覧を開きます。"
   }
 }

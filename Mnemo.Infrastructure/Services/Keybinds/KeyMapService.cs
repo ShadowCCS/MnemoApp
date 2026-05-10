@@ -7,6 +7,8 @@ namespace Mnemo.Infrastructure.Services.Keybinds;
 
 public sealed class KeyMapService : IKeyMap
 {
+    public event EventHandler? MergedDefinitionsChanged;
+
     private const double DefaultSequenceTimeoutSeconds = 1.5;
     private readonly IKeybindRepository _repository;
     private readonly ILoggerService _logger;
@@ -267,6 +269,8 @@ public sealed class KeyMapService : IKeyMap
             _overrides = loaded.ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
             _logger.Debug("Keybinds", $"Overrides loaded: {_overrides.Count} rows.");
         }
+
+        MergedDefinitionsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public async Task ApplyUserOverrideAsync(string actionId, KeybindOverrideDocument? document, CancellationToken cancellationToken = default)
@@ -327,7 +331,8 @@ public sealed class KeyMapService : IKeyMap
                 Module = man.Module,
                 DisplayLabelKey = man.DisplayLabelKey,
                 DisplayDescriptionKey = man.DisplayDescriptionKey,
-                DisplayCategoryKey = man.DisplayCategoryKey
+                DisplayCategoryKey = man.DisplayCategoryKey,
+                ToggleOnRepeat = man.ToggleOnRepeat
             };
         }
 
@@ -345,7 +350,8 @@ public sealed class KeyMapService : IKeyMap
             Module = man.Module,
             DisplayLabelKey = man.DisplayLabelKey,
             DisplayDescriptionKey = man.DisplayDescriptionKey,
-            DisplayCategoryKey = man.DisplayCategoryKey
+            DisplayCategoryKey = man.DisplayCategoryKey,
+            ToggleOnRepeat = man.ToggleOnRepeat
         };
     }
 

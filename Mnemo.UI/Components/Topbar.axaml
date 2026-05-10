@@ -83,7 +83,7 @@
                                 Padding="8,2"
                                 VerticalAlignment="Center">
                             <TextBlock x:Name="SearchShortcutText"
-                                       Text="{markup:T Ns=Topbar, Key=SearchShortcut}"
+                                       Text="{Binding GlobalSearchShortcutDisplay}"
                                        FontSize="{DynamicResource FontSize.Caption}"
                                        Foreground="{DynamicResource TextFadedBrush}"
                                        VerticalAlignment="Center" />

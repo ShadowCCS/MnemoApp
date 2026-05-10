@@ -123,7 +123,7 @@
                             <TextBlock Text="{markup:T Ns=Sidebar, Key=QuickActions}"
                                        Foreground="{DynamicResource QuickActionsTextPrimaryBrush}"
                                        FontSize="{DynamicResource FontSize.Body.Small}"/>
-                            <TextBlock Text="{markup:T Ns=Sidebar, Key=QuickActionsShortcut}" 
+                            <TextBlock Text="{Binding QuickActionsShortcutDisplay}" 
                                        FontSize="{DynamicResource FontSize.Caption}" 
                                        Foreground="{DynamicResource QuickActionsTextSecondaryBrush}"/>
                         </StackPanel>

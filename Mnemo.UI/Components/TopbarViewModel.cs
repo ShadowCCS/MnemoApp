@@ -8,8 +8,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.UI.Components.Overlays;
 using Mnemo.Core.Models;
+using Mnemo.Core.Models.Keybinds;
 using Mnemo.Core.Models.Statistics;
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Keybinds;
 using Mnemo.Core.Services.Search;
 using Mnemo.UI.ViewModels;
 
@@ -25,6 +27,7 @@ public partial class TopbarViewModel : ViewModelBase
     private readonly ILocalizationService _localization;
     private readonly IGlobalSearchService _globalSearchService;
     private readonly IToastService _toastService;
+    private readonly IKeyMap _keyMap;
 
     public ObservableCollection<TopbarButtonModel> Buttons { get; } = new();
 
@@ -44,6 +47,9 @@ public partial class TopbarViewModel : ViewModelBase
     [ObservableProperty]
     private string _gamificationStreakText = string.Empty;
 
+    [ObservableProperty]
+    private string _globalSearchShortcutDisplay = string.Empty;
+
     public TopbarViewModel(
         ISettingsService settingsService,
         IOverlayService overlayService,
@@ -52,7 +58,8 @@ public partial class TopbarViewModel : ViewModelBase
         INavigationService navigation,
         ILocalizationService localization,
         IGlobalSearchService globalSearchService,
-        IToastService toastService)
+        IToastService toastService,
+        IKeyMap keyMap)
     {
         _settingsService = settingsService;
         _overlayService = overlayService;
@@ -62,6 +69,7 @@ public partial class TopbarViewModel : ViewModelBase
         _localization = localization;
         _globalSearchService = globalSearchService;
         _toastService = toastService;
+        _keyMap = keyMap;
 
         _toastService.NotificationHistoryChanged += (_, _) => Dispatcher.UIThread.Post(RefreshRecentNotifications);
         RefreshRecentNotifications();
@@ -78,6 +86,10 @@ public partial class TopbarViewModel : ViewModelBase
             ApplyGamificationLocalizedDefaults();
             _ = RefreshGamificationFromAnalyticsAsync();
         };
+
+        _keyMap.MergedDefinitionsChanged += (_, _) =>
+            Dispatcher.UIThread.Post(RefreshGlobalSearchShortcutDisplay);
+        RefreshGlobalSearchShortcutDisplay();
 
         // Listen for changes
         _settingsService.SettingChanged += (s, key) =>
@@ -111,6 +123,9 @@ public partial class TopbarViewModel : ViewModelBase
         GamificationXpText = string.Format(_localization.T("GamificationXpFormat", "Topbar"), 0);
         GamificationStreakText = string.Format(_localization.T("GamificationStreakFormat", "Topbar"), 0);
     }
+
+    private void RefreshGlobalSearchShortcutDisplay() =>
+        GlobalSearchShortcutDisplay = KeybindActionShortcutLabel.ForAction(_keyMap, "global.search");
 
     private async Task RefreshGamificationFromAnalyticsAsync()
     {
@@ -188,6 +203,19 @@ public partial class TopbarViewModel : ViewModelBase
                 ? Avalonia.Controls.WindowState.Normal
                 : Avalonia.Controls.WindowState.Maximized;
         }
+    }
+
+    /// <summary>When global search is open, closes it; otherwise opens it. Used when <see cref="KeybindActionDefinition.ToggleOnRepeat"/> is set.</summary>
+    public void TryToggleGlobalSearch()
+    {
+        var existing = _overlayService.Overlays.FirstOrDefault(o => o.Name == "GlobalSearch");
+        if (existing != null)
+        {
+            _overlayService.CloseOverlay(existing.Id);
+            return;
+        }
+
+        OpenGlobalSearch();
     }
 
     [RelayCommand]

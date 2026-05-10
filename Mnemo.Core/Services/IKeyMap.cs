@@ -5,6 +5,9 @@ namespace Mnemo.Core.Services;
 /// <summary>Central keybind registry: matching only; execution is the UI keybind action router.</summary>
 public interface IKeyMap
 {
+    /// <summary>Fired after override storage is reloaded and merged definitions change.</summary>
+    event EventHandler? MergedDefinitionsChanged;
+
     /// <summary>Replace built-in manifest table (from bootstrap). Does not clear overrides.</summary>
     void ReplaceManifestDefinitions(IReadOnlyList<KeybindActionDefinition> definitions);
 

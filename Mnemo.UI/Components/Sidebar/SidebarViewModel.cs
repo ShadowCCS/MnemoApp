@@ -6,6 +6,7 @@ using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.Core.Services.Keybinds;
 using Mnemo.UI.Services;
 using Mnemo.UI.ViewModels;
 using System.Linq;
@@ -31,6 +32,14 @@ public class SidebarViewModel : ViewModelBase
     public ICommand ToggleSidebarCommand { get; }
     public ICommand NavigateCommand { get; }
     public ICommand OpenKeybindManagerCommand { get; }
+
+    private string _quickActionsShortcutDisplay = string.Empty;
+
+    public string QuickActionsShortcutDisplay
+    {
+        get => _quickActionsShortcutDisplay;
+        private set => SetProperty(ref _quickActionsShortcutDisplay, value);
+    }
 
     public SidebarViewModel(
         ISidebarService sidebarService,
@@ -73,6 +82,18 @@ public class SidebarViewModel : ViewModelBase
         
         // Set initial selection
         UpdateSelection();
+
+        QuickActionsShortcutDisplay = KeybindActionShortcutLabel.ForAction(_keyMap, "global.quick-actions");
+        _keyMap.MergedDefinitionsChanged += (_, _) => _ = RefreshQuickActionsShortcutDisplayAsync();
+    }
+
+    private async Task RefreshQuickActionsShortcutDisplayAsync()
+    {
+        await _mainThreadDispatcher.InvokeAsync(() =>
+        {
+            QuickActionsShortcutDisplay = KeybindActionShortcutLabel.ForAction(_keyMap, "global.quick-actions");
+            return Task.CompletedTask;
+        }).ConfigureAwait(false);
     }
 
     private async Task OpenKeybindManagerAsync()

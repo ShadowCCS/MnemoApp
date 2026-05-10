@@ -58,12 +58,33 @@ public class CoreUIModule : IModule
             DisplayDescriptionKey = "global.search.description",
             DisplayCategoryKey = "category.general",
             AllowedDuringTextCapture = true,
+            ToggleOnRepeat = true,
             Bindings =
             [
                 new KeybindBindingEntry
                 {
                     Kind = KeybindBindingKind.Chord,
                     Chord = CanonicalKeyGestureCodec.ParseChord("Primary+K")
+                }
+            ]
+        });
+
+        registry.Register(new KeybindActionDefinition
+        {
+            ActionId = "global.quick-actions",
+            Namespace = "global",
+            Scope = KeybindScope.Global,
+            Module = "core",
+            DisplayLabelKey = "global.quick-actions",
+            DisplayDescriptionKey = "global.quick-actions.description",
+            DisplayCategoryKey = "category.general",
+            ToggleOnRepeat = true,
+            Bindings =
+            [
+                new KeybindBindingEntry
+                {
+                    Kind = KeybindBindingKind.Chord,
+                    Chord = CanonicalKeyGestureCodec.ParseChord("Alt+Shift+Q")
                 }
             ]
         });

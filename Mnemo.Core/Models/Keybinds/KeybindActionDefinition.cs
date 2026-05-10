@@ -19,6 +19,12 @@ public sealed class KeybindActionDefinition
     /// <summary>When false, bindings are ignored for matching but may still be listed for UI (e.g. user-disabled globals).</summary>
     public bool Enabled { get; init; } = true;
 
+    /// <summary>
+    /// When true, a <see cref="KeybindScope.Global"/> action may dismiss its UI target if it is already open
+    /// (e.g. same shortcut closes the global search overlay). Handlers decide what counts as &quot;open&quot;.
+    /// </summary>
+    public bool ToggleOnRepeat { get; init; }
+
     /// <summary>Owning product area for UI grouping (e.g. <c>core</c>, <c>editor</c>, <c>mindmap</c>, <c>flashcards</c>).</summary>
     public string? Module { get; init; }
 

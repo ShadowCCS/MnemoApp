@@ -252,7 +252,6 @@
     "CollapseSidebar": "Skjul sidepanel",
     "ExpandSidebar": "Vis sidepanel",
     "QuickActions": "Hurtighandlinger",
-    "QuickActionsShortcut": "alt + shift + Q",
     "KeyboardShortcuts": "Hurtigtaster",
     "DevelopmentBuild": "Utviklingsversjon - Alpha"
   },
@@ -571,7 +570,6 @@
     "NotificationsTitle": "Varsler",
     "NotificationsEmpty": "Ingen varsler ennå.",
     "SearchPlaceholder": "Søk etter en leksjon, et tankekart, osv.",
-    "SearchShortcut": "Ctrl+K",
     "GlobalSearchOverlayHint": "Globalt sok aapnes her. Fullstendige resultater og handlinger kommer snart.",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0} dager",
@@ -635,6 +633,8 @@
     "module.core": "Kjerne",
     "category.general": "Generelt",
     "global.search": "Globalt søk",
-    "global.search.description": "Åpne søk i hele arbeidsområdet."
+    "global.search.description": "Åpne søk i hele arbeidsområdet.",
+    "global.quick-actions": "Hurtighandlinger",
+    "global.quick-actions.description": "Åpne katalogen over hurtighandlinger (tastatursnarveier)."
   }
 }

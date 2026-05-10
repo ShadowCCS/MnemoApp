@@ -249,7 +249,6 @@
     "CollapseSidebar": "Seitenleiste zusammenfalten",
     "ExpandSidebar": "Seitenleiste ausklappen",
     "QuickActions": "Schnellaktionen",
-    "QuickActionsShortcut": "Alt+Shift+Q",
     "KeyboardShortcuts": "Tastaturkürzel",
     "DevelopmentBuild": "Entwicklungsversion – Alpha"
   },
@@ -562,7 +561,6 @@
     "NotificationsTitle": "Benachrichtigungen",
     "NotificationsEmpty": "Noch keine Benachrichtigungen.",
     "SearchPlaceholder": "Suche nach einem Lernstoff, Mindmap etc.",
-    "SearchShortcut": "Strg+K",
     "GlobalSearchOverlayHint": "Die globale Suche wird hier geoeffnet. Volle Ergebnisse und Aktionen folgen als Naechstes.",
     "GamificationXpFormat": "{0:N0} XP",
     "GamificationStreakFormat": "{0} Tage",
@@ -626,6 +624,8 @@
     "module.core": "Kern",
     "category.general": "Allgemein",
     "global.search": "Globale Suche",
-    "global.search.description": "Suche in der gesamten Arbeitsumgebung öffnen."
+    "global.search.description": "Suche in der gesamten Arbeitsumgebung öffnen.",
+    "global.quick-actions": "Schnellaktionen",
+    "global.quick-actions.description": "Katalog der Schnellaktionen und Tastenkürzel öffnen."
   }
 }
