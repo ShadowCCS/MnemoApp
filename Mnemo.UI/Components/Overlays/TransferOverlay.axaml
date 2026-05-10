@@ -39,6 +39,7 @@
                                    LeftIconPath="avares://Mnemo.UI/Icons/MindmapToolbar/download.svg"
                                    RightIconPath="avares://Mnemo.UI/Icons/Flyout/export.svg"
                                    IsLeftSelected="{Binding IsImportMode}"
+                                   RightIsEnabled="{Binding IsExportAvailable}"
                                    LeftCommand="{Binding SelectImportCommand}"
                                    RightCommand="{Binding SelectExportCommand}" />
 

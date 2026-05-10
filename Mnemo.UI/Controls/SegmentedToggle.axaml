@@ -22,6 +22,18 @@
             <Setter Property="Background" Value="#12000000"/>
         </Style>
 
+        <Style Selector="Button.segment:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#12000000"/>
+        </Style>
+
+        <Style Selector="Button.segment.selected:pointerover">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <Style Selector="Button.segment.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
         <Style Selector="Button.segment:pressed">
             <Setter Property="RenderTransform" Value="scale(0.98)"/>
         </Style>
@@ -44,6 +56,8 @@
 
             <Button Grid.Column="0"
                     Classes="segment"
+                    Classes.selected="{Binding #Root.IsLeftSelected}"
+                    IsEnabled="{Binding #Root.LeftIsEnabled}"
                     Command="{Binding #Root.LeftCommand}"
                     Click="OnLeftClicked">
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
@@ -55,6 +69,8 @@
 
             <Button Grid.Column="1"
                     Classes="segment"
+                    Classes.selected="{Binding #Root.IsRightSelected}"
+                    IsEnabled="{Binding #Root.RightIsEnabled}"
                     Command="{Binding #Root.RightCommand}"
                     Click="OnRightClicked">
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">

@@ -533,22 +533,38 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     }
 
     [RelayCommand]
-    private async Task NewNoteAsync()
+    private async Task NewNoteAsync(NoteTreeItemViewModel? context)
     {
-        var note = new Note { Title = "Untitled", FolderId = null };
+        var parentFolderId = ResolveCreationFolderId(context);
+        var note = new Note
+        {
+            Title = "Untitled",
+            FolderId = parentFolderId,
+            FolderPath = BuildFolderPath(parentFolderId),
+            Order = GetNextNoteOrder(parentFolderId)
+        };
 
         Notes.Add(note);
-        var item = new NoteTreeItemViewModel(note);
+        var result = await _noteService.SaveNoteAsync(note);
+        if (!result.IsSuccess)
+        {
+            Notes.Remove(note);
+            return;
+        }
 
-        // Insert after all root-level folders so notes group below folders, newest first
-        var insertIndex = RootTreeItems.TakeWhile(i => i.IsFolder).Count();
-        RootTreeItems.Insert(insertIndex, item);
-        AllNotesTreeItems.Insert(0, item);
+        if (!string.IsNullOrEmpty(parentFolderId))
+            _expandedFolderIds.Add(parentFolderId);
+
+        await BuildTreeAsync(_foldersById.Values.ToList(), Notes.ToList());
+        RefreshAllNotesFlatList();
         RefreshFlattenedTreeItems();
-        SelectedTreeItem = item;
-        SelectedNote = note;
+        RefreshFavouriteNotes();
 
-        _ = await _noteService.SaveNoteAsync(note);
+        var item = FindTreeItemByNoteId(RootTreeItems, note.NoteId)
+            ?? AllNotesTreeItems.FirstOrDefault(i => i.Note?.NoteId == note.NoteId);
+        if (item != null)
+            SelectedTreeItem = item;
+        SelectedNote = note;
 
         _ = StatisticsRecorder.IncrementDailyCounterAsync(_statistics, _logger,
             StatisticsNamespaces.Notes, NoteStatKinds.DailySummary, "notes_created");
@@ -854,17 +870,68 @@ public partial class NotesViewModel : ViewModelBase, INavigationAware
     }
 
     [RelayCommand]
-    private async Task NewFolderAsync()
+    private async Task NewFolderAsync(NoteTreeItemViewModel? context)
     {
-        var folder = new NoteFolder { Name = "New folder", ParentId = null };
+        var parentFolderId = ResolveCreationFolderId(context);
+        var folder = new NoteFolder
+        {
+            Name = "New folder",
+            ParentId = parentFolderId,
+            Order = GetNextFolderOrder(parentFolderId)
+        };
         var result = await _folderService.SaveFolderAsync(folder);
         if (!result.IsSuccess) return;
 
         _foldersById[folder.FolderId] = folder;
+        if (!string.IsNullOrEmpty(parentFolderId))
+            _expandedFolderIds.Add(parentFolderId);
         var folders = _foldersById.Values.ToList();
         var notes = Notes.ToList();
         await BuildTreeAsync(folders, notes);
         RefreshFlattenedTreeItems();
+    }
+
+    private string? ResolveCreationFolderId(NoteTreeItemViewModel? context)
+    {
+        if (context?.FolderId != null)
+            return context.FolderId;
+        if (context?.Note != null)
+            return context.Note.FolderId;
+        if (SelectedTreeItem?.FolderId != null)
+            return SelectedTreeItem.FolderId;
+        if (SelectedTreeItem?.Note != null)
+            return SelectedTreeItem.Note.FolderId;
+        return SelectedNote?.FolderId;
+    }
+
+    private int GetNextNoteOrder(string? folderId) =>
+        Notes.Where(n => string.Equals(n.FolderId, folderId, StringComparison.Ordinal))
+            .Select(n => n.Order)
+            .DefaultIfEmpty(-1)
+            .Max() + 1;
+
+    private int GetNextFolderOrder(string? parentFolderId) =>
+        _foldersById.Values
+            .Where(f => string.Equals(f.ParentId, parentFolderId, StringComparison.Ordinal))
+            .Select(f => f.Order)
+            .DefaultIfEmpty(-1)
+            .Max() + 1;
+
+    private string BuildFolderPath(string? folderId)
+    {
+        if (string.IsNullOrWhiteSpace(folderId))
+            return string.Empty;
+
+        var names = new Stack<string>();
+        var current = folderId;
+        while (!string.IsNullOrWhiteSpace(current) && _foldersById.TryGetValue(current, out var folder))
+        {
+            if (!string.IsNullOrWhiteSpace(folder.Name))
+                names.Push(folder.Name);
+            current = folder.ParentId;
+        }
+
+        return string.Join(" / ", names);
     }
 
     /// <summary>

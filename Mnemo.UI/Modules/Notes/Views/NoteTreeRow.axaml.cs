@@ -289,9 +289,10 @@ public partial class NoteTreeRow : UserControl
 
     private void OnNewNoteClick(object? sender, RoutedEventArgs e)
     {
+        if (sender is not Control c || c.Tag is not NoteTreeItemViewModel item) return;
         var vm = FindNotesViewModel();
         if (vm == null) return;
-        _ = vm.NewNoteCommand.ExecuteAsync(null);
+        _ = vm.NewNoteCommand.ExecuteAsync(item);
     }
 
     private void OnDuplicateClick(object? sender, RoutedEventArgs e)

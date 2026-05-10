@@ -356,16 +356,16 @@ public partial class NotesView : UserControl
         if (coordinator == null || overlayService == null)
             return;
 
-        var button = sender as Button;
-        var startTransfer = string.Equals(button?.Tag?.ToString(), "transfer", StringComparison.OrdinalIgnoreCase);
         var capabilities = coordinator.GetCapabilities("notes");
         var overlay = new TransferOverlay();
+        var canExportSelectedNote = vm.SelectedNote != null;
+        overlay.IsExportAvailable = canExportSelectedNote;
         overlay.SetLocalizedChrome(
             "TransferOverlayTitle", "Notes",
             "TransferOverlayDescription", "Notes",
             "Continue", "Common",
             "Cancel", "Common");
-        overlay.Initialize(capabilities, startTransfer);
+        overlay.Initialize(capabilities, defaultImport: !canExportSelectedNote);
 
         var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
         {
@@ -437,6 +437,11 @@ public partial class NotesView : UserControl
                 await vm.LoadNotesCommand.ExecuteAsync(null);
             return;
         }
+
+        if (vm.SelectedNote == null)
+            return;
+
+        await FlushEditorToSelectedNoteAsync().ConfigureAwait(true);
 
         var saveFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {

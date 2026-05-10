@@ -29,6 +29,12 @@ public partial class SegmentedToggle : UserControl
     public static readonly StyledProperty<ICommand?> RightCommandProperty =
         AvaloniaProperty.Register<SegmentedToggle, ICommand?>(nameof(RightCommand));
 
+    public static readonly StyledProperty<bool> LeftIsEnabledProperty =
+        AvaloniaProperty.Register<SegmentedToggle, bool>(nameof(LeftIsEnabled), true);
+
+    public static readonly StyledProperty<bool> RightIsEnabledProperty =
+        AvaloniaProperty.Register<SegmentedToggle, bool>(nameof(RightIsEnabled), true);
+
     public static readonly StyledProperty<IBrush?> SelectedForegroundBrushProperty =
         AvaloniaProperty.Register<SegmentedToggle, IBrush?>(nameof(SelectedForegroundBrush));
 
@@ -39,6 +45,11 @@ public partial class SegmentedToggle : UserControl
         AvaloniaProperty.RegisterDirect<SegmentedToggle, int>(
             nameof(SelectedIndex),
             o => o.SelectedIndex);
+
+    public static readonly DirectProperty<SegmentedToggle, bool> IsRightSelectedProperty =
+        AvaloniaProperty.RegisterDirect<SegmentedToggle, bool>(
+            nameof(IsRightSelected),
+            o => o.IsRightSelected);
 
     public static readonly DirectProperty<SegmentedToggle, IBrush> LeftForegroundProperty =
         AvaloniaProperty.RegisterDirect<SegmentedToggle, IBrush>(
@@ -51,10 +62,13 @@ public partial class SegmentedToggle : UserControl
             o => o.RightForeground);
 
     private int _selectedIndex;
+    private bool _isRightSelected;
     private IBrush _leftForeground = Brushes.White;
     private IBrush _rightForeground = Brushes.Gray;
 
     public int SelectedIndex => _selectedIndex;
+
+    public bool IsRightSelected => _isRightSelected;
 
     public IBrush LeftForeground => _leftForeground;
 
@@ -105,6 +119,9 @@ public partial class SegmentedToggle : UserControl
     public ICommand? LeftCommand { get => GetValue(LeftCommandProperty); set => SetValue(LeftCommandProperty, value); }
     public ICommand? RightCommand { get => GetValue(RightCommandProperty); set => SetValue(RightCommandProperty, value); }
 
+    public bool LeftIsEnabled { get => GetValue(LeftIsEnabledProperty); set => SetValue(LeftIsEnabledProperty, value); }
+    public bool RightIsEnabled { get => GetValue(RightIsEnabledProperty); set => SetValue(RightIsEnabledProperty, value); }
+
     private void OnLeftClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         IsLeftSelected = true;
@@ -124,6 +141,7 @@ public partial class SegmentedToggle : UserControl
         var rightForeground = IsLeftSelected ? unselectedForeground : selectedForeground;
 
         SetAndRaise(SelectedIndexProperty, ref _selectedIndex, selectedIndex);
+        SetAndRaise(IsRightSelectedProperty, ref _isRightSelected, !IsLeftSelected);
         SetAndRaise(LeftForegroundProperty, ref _leftForeground, leftForeground);
         SetAndRaise(RightForegroundProperty, ref _rightForeground, rightForeground);
     }

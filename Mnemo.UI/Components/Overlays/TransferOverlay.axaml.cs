@@ -73,6 +73,9 @@ public partial class TransferOverlay : UserControl
     public static readonly StyledProperty<bool> IsExportModeProperty =
         AvaloniaProperty.Register<TransferOverlay, bool>(nameof(IsExportMode), false);
 
+    public static readonly StyledProperty<bool> IsExportAvailableProperty =
+        AvaloniaProperty.Register<TransferOverlay, bool>(nameof(IsExportAvailable), true);
+
     public static readonly StyledProperty<bool> DuplicateOnConflictProperty =
         AvaloniaProperty.Register<TransferOverlay, bool>(nameof(DuplicateOnConflict), true);
 
@@ -118,7 +121,11 @@ public partial class TransferOverlay : UserControl
         ConfirmCommand = new RelayCommand(OnConfirm);
         CancelCommand = new RelayCommand(() => OnResult?.Invoke(null));
         SelectImportCommand = new RelayCommand(() => IsImportMode = true);
-        SelectExportCommand = new RelayCommand(() => IsImportMode = false);
+        SelectExportCommand = new RelayCommand(() =>
+        {
+            if (IsExportAvailable)
+                IsImportMode = false;
+        });
         InitializeComponent();
         DataContext = this;
         PropertyChanged += OnOverlayPropertyChanged;
@@ -157,6 +164,8 @@ public partial class TransferOverlay : UserControl
 
     public bool IsExportMode { get => GetValue(IsExportModeProperty); private set => SetValue(IsExportModeProperty, value); }
 
+    public bool IsExportAvailable { get => GetValue(IsExportAvailableProperty); set => SetValue(IsExportAvailableProperty, value); }
+
     public bool DuplicateOnConflict { get => GetValue(DuplicateOnConflictProperty); set => SetValue(DuplicateOnConflictProperty, value); }
 
     public bool StrictUnknownPayloads { get => GetValue(StrictUnknownPayloadsProperty); set => SetValue(StrictUnknownPayloadsProperty, value); }
@@ -183,7 +192,7 @@ public partial class TransferOverlay : UserControl
     {
         _allCapabilities.Clear();
         _allCapabilities.AddRange(capabilities);
-        IsImportMode = defaultImport;
+        IsImportMode = defaultImport || !IsExportAvailable;
         IsExportMode = !IsImportMode;
         RebuildFormats();
     }
@@ -268,6 +277,8 @@ public partial class TransferOverlay : UserControl
     {
         if (SelectedFormat == null)
             return;
+        if (!IsImportMode && !IsExportAvailable)
+            return;
 
         OnResult?.Invoke(new TransferOverlayResult
         {
@@ -282,8 +293,18 @@ public partial class TransferOverlay : UserControl
     {
         if (e.Property == IsImportModeProperty)
         {
+            if (!IsImportMode && !IsExportAvailable)
+            {
+                IsImportMode = true;
+                return;
+            }
+
             IsExportMode = !IsImportMode;
             RebuildFormats();
+        }
+        else if (e.Property == IsExportAvailableProperty && !IsExportAvailable && !IsImportMode)
+        {
+            IsImportMode = true;
         }
     }
 }
