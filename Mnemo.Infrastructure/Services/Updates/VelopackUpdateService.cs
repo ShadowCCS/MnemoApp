@@ -22,6 +22,12 @@ public sealed class VelopackUpdateService : IUpdateService, IDisposable
     /// <summary>Velopack feed root per RID (GitHub Pages). Legacy builds still use .../stable/ without RID (Windows-only copy in CI).</summary>
     private static readonly string StableFeedUrl =
         $"https://onemnemo.github.io/mnemo/updates/stable/{RuntimeInformation.RuntimeIdentifier}/";
+
+    /// <summary>
+    /// Velopack in-process download/apply: Windows portable (unzipped) builds are excluded; Linux/macOS AppImage/.app use the feed when installed.
+    /// </summary>
+    private static bool CanUseVelopackOnlineUpdate(UpdateManager um) =>
+        um.IsInstalled && (!OperatingSystem.IsWindows() || !um.IsPortable);
     private static readonly Uri ReleasesLatestApi = new("https://api.github.com/repos/onemnemo/mnemo/releases/latest");
 
     private readonly ILoggerService _logger;
@@ -57,7 +63,7 @@ public sealed class VelopackUpdateService : IUpdateService, IDisposable
             try
             {
                 var um = GetOrCreateUpdateManager();
-                return um.IsInstalled && !um.IsPortable;
+                return CanUseVelopackOnlineUpdate(um);
             }
             catch (Exception ex)
             {
@@ -94,7 +100,7 @@ public sealed class VelopackUpdateService : IUpdateService, IDisposable
         try
         {
             var um = GetOrCreateUpdateManager();
-            if (um.IsInstalled && !um.IsPortable)
+            if (CanUseVelopackOnlineUpdate(um))
             {
                 try
                 {

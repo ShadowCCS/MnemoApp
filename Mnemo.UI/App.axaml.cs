@@ -167,7 +167,7 @@ public partial class App : Application
         var loc = Services.GetRequiredService<ILocalizationService>();
         var title = loc.T("PostUpdateToastTitle", "Settings");
         var description = string.Format(loc.T("PostUpdateToastDescriptionFormat", "Settings"), ver);
-        toast.SpawnToast(ToastType.Success, TimeSpan.FromSeconds(5), title, description);
+        toast.SpawnToast(ToastType.Info, TimeSpan.FromSeconds(5), title, description);
     }
 
     private void DisposeServerManagerIfCreated()

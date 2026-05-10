@@ -25,6 +25,9 @@ jobs:
           - rid: linux-x64
             os: ubuntu-latest
             mainexe: Mnemo.UI
+          - rid: linux-arm64
+            os: ubuntu-latest
+            mainexe: Mnemo.UI
           - rid: osx-x64
             # macos-13 is largely retired on GHA; cross-publish osx-x64 from a current image.
             os: macos-14
@@ -142,7 +145,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p feed/updates/stable
-          for rid in win-x64 linux-x64 osx-x64 osx-arm64; do
+          for rid in win-x64 linux-x64 linux-arm64 osx-x64 osx-arm64; do
             src="artifacts/vpk-$rid"
             if [ ! -d "$src" ]; then
               echo "warning: missing artifact dir $src" >&2
