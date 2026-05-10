@@ -368,6 +368,8 @@
     "DeleteFolderConfirmMessage": "Mappen «{0}» og alt innhold vil bli permanent slettet. Dette kan ikke angres.",
     "NewFolder": "Ny mappe",
     "ToggleFavorite": "Legg til/fjern fra favoritter",
+    "ResetEditorZoom": "Tilbakestill zoom",
+    "ResetEditorZoomTip": "100 % zoom og topp av notat (Ctrl+0). Midtklikk+dra eller Alt+dra for å panorere. Ctrl+rulle for zoom.",
     "MoreActions": "Flere handlinger",
     "Transfer": "Overfør",
     "Export": "Eksporter",

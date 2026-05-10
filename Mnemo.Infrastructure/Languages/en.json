@@ -368,6 +368,8 @@
     "DeleteFolderConfirmMessage": "Folder “{0}” and everything inside it will be permanently removed. This cannot be undone.",
     "NewFolder": "New folder",
     "ToggleFavorite": "Toggle favorite",
+    "ResetEditorZoom": "Reset zoom",
+    "ResetEditorZoomTip": "100% zoom and top of note (Ctrl+0). Middle-click drag or Alt+drag to pan. Ctrl+scroll to zoom.",
     "MoreActions": "More actions",
     "Transfer": "Transfer",
     "Export": "Export",

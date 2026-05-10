@@ -365,6 +365,8 @@
     "DeleteFolderConfirmMessage": "Der Ordner „{0}“ und sein gesamter Inhalt werden dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.",
     "NewFolder": "Neue Ordner",
     "ToggleFavorite": "Lieblingsstatus wechseln",
+    "ResetEditorZoom": "Zoom zurücksetzen",
+    "ResetEditorZoomTip": "100 % Zoom und Notizanfang (Strg+0). Mit mittlerer Maustaste oder Alt+Ziehen schwenken. Strg+Mausrad zum Zoomen.",
     "MoreActions": "Mehr Aktionen",
     "Transfer": "Transfer",
     "Export": "Exportieren",

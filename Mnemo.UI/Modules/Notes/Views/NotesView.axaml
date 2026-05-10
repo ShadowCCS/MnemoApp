@@ -32,6 +32,7 @@
     <SplitView DisplayMode="Inline"
                IsPaneOpen="{Binding IsSidebarOpen}"
                OpenPaneLength="280"
+               CompactPaneLength="0"
                Background="Transparent"
                IsVisible="{Binding !IsLoading}"
                PaneBackground="{DynamicResource NotesPaneBackgroundBrush}">
@@ -207,8 +208,23 @@
             </Border>
         </SplitView.Pane>
 
-        <ScrollViewer x:Name="EditorScrollViewer" IsVisible="{Binding !IsLoading}">
-            <StackPanel Margin="32,24,32,32" Spacing="0" MaxWidth="{Binding EditorMaxWidth}" HorizontalAlignment="Stretch">
+        <ScrollViewer x:Name="EditorScrollViewer"
+                      IsVisible="{Binding !IsLoading}"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      SizeChanged="OnEditorScrollViewerSizeChanged"
+                      LayoutUpdated="OnEditorScrollViewerLayoutUpdated">
+            <!-- Scroll extent: outer width = max(viewport, zoomed doc) so narrow columns center without margin/extent mismatch. -->
+            <Border x:Name="EditorScrollWidthHost" Background="Transparent"
+                    HorizontalAlignment="Left" VerticalAlignment="Top">
+            <!-- Camera zoom host: editor lays out at normal width; only the scroll extent/render transform is scaled. -->
+            <views:EditorZoomHost x:Name="EditorZoomExtentHost"
+                                  HorizontalAlignment="Center" VerticalAlignment="Top"
+                                  ClipToBounds="False">
+                    <StackPanel x:Name="EditorDocumentPanel"
+                                Margin="32,24,32,32" Spacing="0"
+                                HorizontalAlignment="Left" VerticalAlignment="Top"
+                                RenderTransformOrigin="0,0">
                 <!-- Top Bar with Sidebar Toggle and Breadcrumbs -->
                 <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,12">
                     <Button Grid.Column="0" Command="{Binding ToggleSidebarCommand}"
@@ -287,6 +303,8 @@
                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                 </StackPanel>
             </StackPanel>
+            </views:EditorZoomHost>
+            </Border>
         </ScrollViewer>
     </SplitView>
 </UserControl>

@@ -365,6 +365,8 @@
     "DeleteFolderConfirmMessage": "La carpeta “{0}” y todo lo que contiene se eliminarán permanentemente. Esto no se puede deshacer.",
     "NewFolder": "Nueva carpeta",
     "ToggleFavorite": "Alternar favorito",
+    "ResetEditorZoom": "Restablecer zoom",
+    "ResetEditorZoomTip": "Zoom 100 % y inicio de la nota (Ctrl+0). Arrastrar con el botón central o Alt+arrastrar para desplazar. Ctrl + rueda para zoom.",
     "MoreActions": "Más acciones",
     "Transfer": "Transferir",
     "Export": "Exportar",
