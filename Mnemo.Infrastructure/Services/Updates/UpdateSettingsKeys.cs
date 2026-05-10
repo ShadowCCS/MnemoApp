@@ -9,6 +9,9 @@ public static class UpdateSettingsKeys
     public const string LastCheckedUtc = "Updates.LastCheckedUtc";
     public const string PromptCountByVersion = "Updates.PromptCountByVersion";
 
+    /// <summary>Serialized pending update offer from the last successful check; used to resume prompts while the network check is cooldown-gated.</summary>
+    public const string PendingOfferJson = "Updates.PendingOfferJson";
+
     /// <summary>Set immediately before in-app restart so the next launch can show a one-shot success toast.</summary>
     public const string PendingPostUpdateToastVersion = "Updates.PendingPostUpdateToastVersion";
 }

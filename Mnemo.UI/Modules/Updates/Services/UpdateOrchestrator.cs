@@ -117,7 +117,10 @@ public sealed class UpdateOrchestrator : IDisposable
             {
                 var last = await _settingsService.GetAsync<DateTime?>(UpdateSettingsKeys.LastCheckedUtc).ConfigureAwait(false);
                 if (last.HasValue && DateTime.UtcNow - last.Value < TimeSpan.FromHours(CooldownHours))
+                {
+                    await TryResumePendingOfferFromSettingsAsync().ConfigureAwait(false);
                     return;
+                }
             }
 
             var result = await _updateService.CheckForUpdatesAsync().ConfigureAwait(false);
@@ -136,10 +139,12 @@ public sealed class UpdateOrchestrator : IDisposable
                     LastManualCheckMessage = T("UpdatesUpToDate");
                 _pendingUpdate = null;
                 SetSettingsUpdateBadge(false);
+                await ClearPersistedPendingOfferAsync().ConfigureAwait(false);
                 return;
             }
 
             _pendingUpdate = result.Value;
+            await PersistPendingOfferAsync(result.Value).ConfigureAwait(false);
             await TryPresentAsync(userInitiated).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -210,8 +215,6 @@ public sealed class UpdateOrchestrator : IDisposable
                 return;
 
             var isPortableFlow = !_updateService.SupportsInAppApply;
-            prompts[update.Version] = promptCount + 1;
-            await _settingsService.SetAsync(UpdateSettingsKeys.PromptCountByVersion, prompts).ConfigureAwait(false);
             _autoUpdateToastVersionShown = update.Version;
 
             async Task RemindLaterFromAutoToastAsync()
@@ -223,7 +226,7 @@ public sealed class UpdateOrchestrator : IDisposable
             }
 
             _toastService.SpawnToast(
-                ToastType.Action,
+                ToastType.Info,
                 TimeSpan.Zero,
                 T("UpdateAvailableTitle"),
                 string.Format(T("UpdateToastDescriptionFormat"), update.Version),
@@ -233,7 +236,6 @@ public sealed class UpdateOrchestrator : IDisposable
                     SecondaryLabel = T("UpdateToastLater"),
                     OnPrimary = () => _ = OnAutoUpdatePrimaryAsync(update, isPortableFlow),
                     OnSecondary = () => _ = RemindLaterFromAutoToastAsync(),
-                    OnDismissed = () => _ = RemindLaterFromAutoToastAsync(),
                 });
 
             return;
@@ -273,6 +275,7 @@ public sealed class UpdateOrchestrator : IDisposable
             {
                 await _settingsService.SetAsync(UpdateSettingsKeys.SkippedVersion, update.Version).ConfigureAwait(false);
                 _pendingUpdate = null;
+                await ClearPersistedPendingOfferAsync().ConfigureAwait(false);
             });
 
         vm.OverlayClosed += OnClosed;
@@ -322,6 +325,7 @@ public sealed class UpdateOrchestrator : IDisposable
             }
 
             await _settingsService.SetAsync(UpdateSettingsKeys.PendingPostUpdateToastVersion, update.Version).ConfigureAwait(false);
+            await ClearPersistedPendingOfferAsync().ConfigureAwait(false);
             await _mainThreadDispatcher.InvokeAsync(() =>
             {
                 _updateService.ApplyUpdatesAndRestart();
@@ -334,6 +338,36 @@ public sealed class UpdateOrchestrator : IDisposable
             _toastService.SpawnToast(ToastType.Warning, 8.0, T("UpdateAvailableTitle"), ex.Message);
         }
     }
+
+    private async Task TryResumePendingOfferFromSettingsAsync()
+    {
+        var json = await _settingsService.GetAsync<string?>(UpdateSettingsKeys.PendingOfferJson).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(json))
+            return;
+
+        var info = AppUpdateInfoPersistence.Deserialize(json);
+        if (info == null)
+        {
+            await ClearPersistedPendingOfferAsync().ConfigureAwait(false);
+            return;
+        }
+
+        var skipped = await _settingsService.GetAsync<string?>(UpdateSettingsKeys.SkippedVersion).ConfigureAwait(false);
+        if (UpdateGatePolicy.IsSkipped(skipped, info.Version))
+        {
+            await ClearPersistedPendingOfferAsync().ConfigureAwait(false);
+            return;
+        }
+
+        _pendingUpdate = info;
+        await TryPresentAsync(userForced: false).ConfigureAwait(false);
+    }
+
+    private Task PersistPendingOfferAsync(AppUpdateInfo info) =>
+        _settingsService.SetAsync(UpdateSettingsKeys.PendingOfferJson, AppUpdateInfoPersistence.Serialize(info));
+
+    private Task ClearPersistedPendingOfferAsync() =>
+        _settingsService.SetAsync<string?>(UpdateSettingsKeys.PendingOfferJson, null);
 
     private async Task<Dictionary<string, int>> LoadPromptCountsAsync()
     {

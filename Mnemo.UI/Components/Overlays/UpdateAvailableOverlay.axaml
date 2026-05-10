@@ -7,7 +7,7 @@
     <Border MaxWidth="520"
             Padding="24"
             CornerRadius="12"
-            Background="{DynamicResource CardBackgroundPrimaryBrush}"
+            Background="{DynamicResource OverlayBackgroundBrush}"
             BorderBrush="{DynamicResource IconsSeparationBarBrush}"
             BorderThickness="1">
         <StackPanel Spacing="16">

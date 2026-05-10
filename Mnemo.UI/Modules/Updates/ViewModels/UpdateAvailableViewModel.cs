@@ -116,6 +116,7 @@ public partial class UpdateAvailableViewModel : ViewModelBase
             }
 
             await _settingsService.SetAsync(UpdateSettingsKeys.PendingPostUpdateToastVersion, Update.Version).ConfigureAwait(false);
+            await _settingsService.SetAsync<string?>(UpdateSettingsKeys.PendingOfferJson, null).ConfigureAwait(false);
             _updateService.ApplyUpdatesAndRestart();
         }
         finally
