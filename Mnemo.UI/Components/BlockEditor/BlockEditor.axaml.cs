@@ -1836,7 +1836,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (ordered[i].Type == BlockType.NumberedList)
             {
                 if (i == 0 || ordered[i - 1].Type != BlockType.NumberedList)
-                    listNumber = 1;
+                    listNumber = Math.Max(1, ordered[i].ListNumberIndex);
                 ordered[i].ListNumberIndex = listNumber++;
             }
             else

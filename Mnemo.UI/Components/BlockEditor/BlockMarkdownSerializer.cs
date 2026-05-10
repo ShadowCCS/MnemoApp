@@ -263,10 +263,14 @@ public static class BlockMarkdownSerializer
             }
 
             // Numbered list: digit(s) + .
-            if (Regex.IsMatch(trimmed, @"^\d+\.\s"))
+            var numberedMatch = Regex.Match(trimmed, @"^(\d+)\.\s");
+            if (numberedMatch.Success)
             {
                 var content = Regex.Replace(trimmed, @"^\d+\.\s*", "", RegexOptions.None).Trim();
-                result.Add(CreateBlockWithContent(BlockType.NumberedList, content, order++));
+                var vm = CreateBlockWithContent(BlockType.NumberedList, content, order++);
+                if (int.TryParse(numberedMatch.Groups[1].Value, out var listNumberIndex))
+                    vm.ListNumberIndex = Math.Max(1, listNumberIndex);
+                result.Add(vm);
                 i++;
                 continue;
             }

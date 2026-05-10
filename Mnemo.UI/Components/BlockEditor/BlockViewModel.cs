@@ -38,6 +38,7 @@ public class BlockViewModel : INotifyPropertyChanged
     private Dictionary<string, object> _meta;
     private int _order;
     private int _listNumberIndex = 1;
+    private const string ListNumberIndexMetaKey = "listNumberIndex";
     /// <summary>Fenced code language; canonical with <see cref="CodePayload"/> on persist. Not stored in <see cref="Meta"/>.</summary>
     private string _codeLanguage = "csharp";
 
@@ -732,6 +733,7 @@ public class BlockViewModel : INotifyPropertyChanged
 
         ApplyPayloadFieldsToMeta(block.Payload, _meta);
         InitImageFromBlock(block);
+        InitListNumberIndexFromMeta();
 
         block.EnsureSpans();
         _spans = InlineSpanFormatApplier.Normalize(block.Spans);
@@ -767,6 +769,23 @@ public class BlockViewModel : INotifyPropertyChanged
         if (val is string s) return s;
         if (val is JsonElement je && je.ValueKind == JsonValueKind.String) return je.GetString() ?? string.Empty;
         return val.ToString() ?? string.Empty;
+    }
+
+    private static int ReadMetaInt(Dictionary<string, object> meta, string key, int fallback)
+    {
+        if (!meta.TryGetValue(key, out var val) || val == null) return fallback;
+        if (val is int i) return i;
+        if (val is long l && l >= int.MinValue && l <= int.MaxValue) return (int)l;
+        if (val is JsonElement je && je.TryGetInt32(out var parsed)) return parsed;
+        return int.TryParse(val.ToString(), out var fromString) ? fromString : fallback;
+    }
+
+    private void InitListNumberIndexFromMeta()
+    {
+        if (_type != BlockType.NumberedList)
+            return;
+
+        _listNumberIndex = Math.Max(1, ReadMetaInt(_meta, ListNumberIndexMetaKey, 1));
     }
 
     private static void ApplyPayloadFieldsToMeta(BlockPayload payload, Dictionary<string, object> meta)
@@ -942,6 +961,9 @@ public class BlockViewModel : INotifyPropertyChanged
         if (_type != BlockType.Page && _meta.Remove("reference_note_id"))
             metaChanged = true;
 
+        if (_type != BlockType.NumberedList && _meta.Remove(ListNumberIndexMetaKey))
+            metaChanged = true;
+
         if (OwnerTwoColumn != null)
         {
             if (_meta.Remove(ColumnPairHelper.PairIdKey)) metaChanged = true;
@@ -973,6 +995,10 @@ public class BlockViewModel : INotifyPropertyChanged
             Meta = new Dictionary<string, object>(Meta),
             Order = Order
         };
+
+        if (Type == BlockType.NumberedList)
+            block.Meta[ListNumberIndexMetaKey] = ListNumberIndex;
+
         if (Type == BlockType.Code)
             block.Meta.Remove("language");
         if (Type == BlockType.Equation)

@@ -1230,6 +1230,15 @@ public partial class EditableBlock : UserControl
                 _viewModel.Content = string.Empty;
             _stateManager.PreviousText = _viewModel.Content ?? string.Empty;
             _focusManager?.ClearCache();
+
+            if (blockType == BlockType.NumberedList)
+            {
+                _viewModel.ListNumberIndex = meta != null
+                    && meta.TryGetValue(MarkdownShortcutDetector.ShortcutListNumberIndexKey, out var listIndexObj)
+                    && listIndexObj is int listIndex
+                    ? listIndex
+                    : 1;
+            }
             
             if (meta != null)
             {
@@ -1237,7 +1246,8 @@ public partial class EditableBlock : UserControl
                     _viewModel.CodeLanguage = langObj.ToString() ?? "csharp";
                 foreach (var kvp in meta)
                 {
-                    if (kvp.Key == MarkdownShortcutDetector.ShortcutReplacementContentKey)
+                    if (kvp.Key == MarkdownShortcutDetector.ShortcutReplacementContentKey
+                        || kvp.Key == MarkdownShortcutDetector.ShortcutListNumberIndexKey)
                         continue;
                     if (blockType == BlockType.Code && kvp.Key == "language")
                         continue;
