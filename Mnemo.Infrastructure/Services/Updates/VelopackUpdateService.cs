@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,7 +18,10 @@ namespace Mnemo.Infrastructure.Services.Updates;
 public sealed class VelopackUpdateService : IUpdateService, IDisposable
 {
     private const string GithubRepoUrl = "https://github.com/onemnemo/mnemo";
-    private const string StableFeedUrl = "https://onemnemo.github.io/mnemo/updates/stable/";
+
+    /// <summary>Velopack feed root per RID (GitHub Pages). Legacy builds still use .../stable/ without RID (Windows-only copy in CI).</summary>
+    private static readonly string StableFeedUrl =
+        $"https://onemnemo.github.io/mnemo/updates/stable/{RuntimeInformation.RuntimeIdentifier}/";
     private static readonly Uri ReleasesLatestApi = new("https://api.github.com/repos/onemnemo/mnemo/releases/latest");
 
     private readonly ILoggerService _logger;
