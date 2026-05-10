@@ -1,0 +1,122 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:icons="using:Mnemo.UI.Controls"
+             x:Class="Mnemo.UI.Modules.Notes.Views.NotePdfExportOverlay"
+             x:CompileBindings="False"
+             Width="1040"
+             MaxWidth="1100"
+             MaxHeight="780">
+    <Border CornerRadius="16"
+            BorderThickness="1"
+            BorderBrush="{DynamicResource BorderBrush}"
+            Background="{DynamicResource OverlayBackgroundBrush}"
+            Padding="0">
+        <Grid RowDefinitions="Auto,*" Margin="0">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="24,20,24,12">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="TitleText"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               FontSize="{DynamicResource FontSize.Heading3}"
+                               FontFamily="{DynamicResource Font.Bold}" />
+                    <TextBlock x:Name="DescriptionText"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{DynamicResource FontSize.Body.Small}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        x:Name="CloseButton"
+                        Classes="ghost"
+                        Padding="6"
+                        Click="OnCloseClick">
+                    <icons:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Common/x.svg"
+                                   Width="18"
+                                   Height="18"
+                                   Color="{DynamicResource TextSecondaryBrush}" />
+                </Button>
+            </Grid>
+
+            <Grid Grid.Row="1" ColumnDefinitions="320,*" Margin="24,0,24,20" ColumnSpacing="16">
+                <Border Grid.Column="0"
+                        CornerRadius="12"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                        Padding="16">
+                    <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Name="PaperLabel"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       FontSize="{DynamicResource FontSize.Body}" />
+                            <ComboBox x:Name="PaperCombo" HorizontalAlignment="Stretch" SelectionChanged="OnSettingChanged" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Name="MarginLabel"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       FontSize="{DynamicResource FontSize.Body}" />
+                            <ComboBox x:Name="MarginCombo" HorizontalAlignment="Stretch" SelectionChanged="OnSettingChanged" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Name="FontSizeLabel"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       FontSize="{DynamicResource FontSize.Body}" />
+                            <ComboBox x:Name="FontSizeCombo" HorizontalAlignment="Stretch" SelectionChanged="OnSettingChanged" />
+                        </StackPanel>
+                        <CheckBox x:Name="IncludeTitleCheck"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  IsChecked="True" />
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Name="PageNumberPositionLabel"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       FontSize="{DynamicResource FontSize.Body}" />
+                            <ComboBox x:Name="PageNumberPositionCombo" HorizontalAlignment="Stretch" SelectionChanged="OnSettingChanged" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Name="PageNumberFormatLabel"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       FontSize="{DynamicResource FontSize.Body}" />
+                            <ComboBox x:Name="PageNumberFormatCombo" HorizontalAlignment="Stretch" SelectionChanged="OnSettingChanged" />
+                        </StackPanel>
+                        <Button x:Name="ExportButton"
+                                Classes="accent"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Padding="12,10"
+                                Click="OnExportClick" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1"
+                        CornerRadius="12"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        Background="{DynamicResource CardBackgroundSecondaryBrush}"
+                        Padding="12">
+                    <Grid RowDefinitions="Auto,*">
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="4,0,4,8">
+                            <TextBlock x:Name="PreviewCaption"
+                                       FontFamily="{DynamicResource Font.SemiBold}"
+                                       FontSize="{DynamicResource FontSize.Body.Small}"
+                                       Foreground="{DynamicResource TextTertiaryBrush}" />
+                            <TextBlock x:Name="PreviewStatusText"
+                                       Grid.Column="1"
+                                       FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                                       Foreground="{DynamicResource TextTertiaryBrush}" />
+                        </Grid>
+                        <ScrollViewer Grid.Row="1"
+                                      MinHeight="560"
+                                      Background="Transparent"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="PreviewHost" Spacing="16" />
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

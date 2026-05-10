@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -736,6 +737,33 @@ public partial class NotesView : UserControl
         if (editor == null)
             return;
         await vm.SaveNoteWithContentAsync(vm.SelectedNote, editor.GetBlocks(), null).ConfigureAwait(true);
+    }
+
+    private async void OnExportPdfClick(object? sender, RoutedEventArgs e)
+    {
+        var app = Application.Current as App;
+        var services = app?.Services;
+        if (services == null || DataContext is not NotesViewModel vm || vm.SelectedNote == null)
+            return;
+        var overlayService = services.GetService<IOverlayService>();
+        if (overlayService == null)
+            return;
+        await FlushEditorToSelectedNoteAsync().ConfigureAwait(true);
+        var note = vm.SelectedNote;
+        var json = JsonSerializer.Serialize(note);
+        var clone = JsonSerializer.Deserialize<Note>(json);
+        if (clone == null)
+            return;
+        var overlay = new NotePdfExportOverlay();
+        overlay.InitializeForNote(clone);
+        var overlayId = overlayService.CreateOverlay(overlay, new OverlayOptions
+        {
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            ShowBackdrop = true,
+            CloseOnOutsideClick = true
+        }, "NotePdfExport");
+        overlay.CloseRequested = () => overlayService.CloseOverlay(overlayId);
     }
 
     private async void OnTitleBoxLostFocus(object? sender, RoutedEventArgs e)

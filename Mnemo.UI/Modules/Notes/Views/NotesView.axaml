@@ -244,8 +244,8 @@
 
                 <!-- Title, metadata, separator and content (visible when a note is selected) -->
                 <StackPanel IsVisible="{Binding SelectedNote, Converter={StaticResource NullToBoolConverter}}" Spacing="0">
-                    <!-- Title row with favorite star -->
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                    <!-- Title row: PDF export + favorite -->
+                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
                         <TextBox Grid.Column="0" Text="{Binding SelectedNoteTitle, Mode=TwoWay}"
                                  MinWidth="0"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -258,7 +258,16 @@
                                  Padding="0"
                                 PlaceholderText="{markup:T Ns=Notes, Key=NoteTitlePlaceholder}"
                                  x:Name="NoteTitleBox"/>
-                        <Button Grid.Column="1" Command="{Binding ToggleFavoriteCommand}"
+                        <Button Grid.Column="1"
+                                Background="Transparent" BorderThickness="0" Padding="8,4"
+                                Cursor="Hand"
+                                Click="OnExportPdfClick"
+                                ToolTip.Tip="{markup:T Ns=Notes, Key=ToolbarExportPdf}">
+                            <controls:SvgIcon SvgPath="avares://Mnemo.UI/Icons/Flyout/export.svg"
+                                              Width="22" Height="22"
+                                              Color="{DynamicResource TextTertiaryBrush}"/>
+                        </Button>
+                        <Button Grid.Column="2" Command="{Binding ToggleFavoriteCommand}"
                                 Background="Transparent" BorderThickness="0" Padding="8,4"
                                 Cursor="Hand" ToolTip.Tip="{markup:T Ns=Notes, Key=ToggleFavorite}">
                             <Grid>

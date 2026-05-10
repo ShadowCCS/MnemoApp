@@ -19,6 +19,7 @@ using Mnemo.Infrastructure.Services.AI;
 using Mnemo.Infrastructure.Services.AI.PlatformHardware;
 using Mnemo.Infrastructure.Services.Knowledge;
 using Mnemo.Infrastructure.Services.Notes;
+using Mnemo.Infrastructure.Services.Notes.Pdf;
 using Mnemo.Infrastructure.Services.Flashcards;
 using Mnemo.Infrastructure.Services.Speech;
 using Mnemo.Infrastructure.Services.Statistics;
@@ -32,6 +33,7 @@ using Mnemo.Infrastructure.Services.ImportExport.Adapters;
 using Mnemo.Infrastructure.Services.Spellcheck;
 using Mnemo.Infrastructure.Services.Search;
 using Mnemo.Core.Services.Search;
+using Mnemo.UI.Modules.Notes.Services;
 
 namespace Mnemo.UI.Services;
 
@@ -136,6 +138,8 @@ public static class Bootstrapper
         services.AddSingleton<ILearningPathService, LearningPathService>();
         services.AddSingleton<INoteService, NoteService>();
         services.AddSingleton<INoteFolderService, NoteFolderService>();
+        services.AddSingleton<INotePdfLatexImageRenderer, NotePdfLatexImageRenderer>();
+        services.AddSingleton<INotePdfExportService, NotePdfExportService>();
         services.AddSingleton(FlashcardFsrsParameters.Default);
         services.AddSingleton<IFlashcardScheduler, FsrsFlashcardScheduler>();
         services.AddSingleton<IFlashcardScheduler, Sm2FlashcardScheduler>();
