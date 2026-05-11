@@ -55,6 +55,7 @@ public static class Bootstrapper
         services.AddSingleton<DatasetExporter>();
         services.AddSingleton<ILaTeXEngine, LaTeXEngine>();
         services.AddSingleton<IMarkdownProcessor, MarkdownProcessor>();
+        services.AddSingleton<ITextMateSyntaxHighlighter, TextMateSyntaxHighlighter>();
         services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
         services.AddSingleton<INoteClipboardPayloadCodec, NoteClipboardPayloadCodec>();
         services.AddSingleton<INoteClipboardPlatformService, NoteClipboardPlatformService>();

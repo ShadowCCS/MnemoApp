@@ -16,6 +16,7 @@ using Mnemo.UI.Components.BlockEditor.BlockComponents.Checklist;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Image;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Equation;
 using Mnemo.UI.Components.BlockEditor.BlockComponents.Page;
+using Mnemo.UI.Components.BlockEditor.BlockComponents.Sketch;
 using System;
 using System.Globalization;
 
@@ -44,6 +45,7 @@ public class BlockTypeToComponentConverter : IValueConverter
             BlockType.Image => new ImageBlockComponent(),
             BlockType.Equation => new EquationBlockComponent(),
             BlockType.Page => new PageBlockComponent(),
+            BlockType.Sketch => new SketchBlockComponent(),
             _ => new TextBlockComponent()
         };
     }

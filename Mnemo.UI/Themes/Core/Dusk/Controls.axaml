@@ -13,6 +13,18 @@
     <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource TextTertiary}"/>
     <SolidColorBrush x:Key="TextFadedBrush" Color="{DynamicResource TextFaded}"/>
     <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextDisabled}"/>
+    <SolidColorBrush x:Key="SyntaxCodeDefaultBrush" Color="{DynamicResource SyntaxCodeDefault}"/>
+    <SolidColorBrush x:Key="SyntaxCodeKeywordBrush" Color="{DynamicResource SyntaxCodeKeyword}"/>
+    <SolidColorBrush x:Key="SyntaxCodeStringBrush" Color="{DynamicResource SyntaxCodeString}"/>
+    <SolidColorBrush x:Key="SyntaxCodeCommentBrush" Color="{DynamicResource SyntaxCodeComment}"/>
+    <SolidColorBrush x:Key="SyntaxCodeNumberBrush" Color="{DynamicResource SyntaxCodeNumber}"/>
+    <SolidColorBrush x:Key="SyntaxCodeTypeBrush" Color="{DynamicResource SyntaxCodeType}"/>
+    <SolidColorBrush x:Key="SyntaxCodeFunctionBrush" Color="{DynamicResource SyntaxCodeFunction}"/>
+    <SolidColorBrush x:Key="SyntaxCodeOperatorBrush" Color="{DynamicResource SyntaxCodeOperator}"/>
+    <SolidColorBrush x:Key="SyntaxCodePunctuationBrush" Color="{DynamicResource SyntaxCodePunctuation}"/>
+    <SolidColorBrush x:Key="SyntaxCodeVariableBrush" Color="{DynamicResource SyntaxCodeVariable}"/>
+    <SolidColorBrush x:Key="SyntaxCodeMarkupBrush" Color="{DynamicResource SyntaxCodeMarkup}"/>
+    <SolidColorBrush x:Key="SyntaxCodeInvalidBrush" Color="{DynamicResource SyntaxCodeInvalid}"/>
     <SolidColorBrush x:Key="ToastTitleColorBrush" Color="{DynamicResource ToastTitleColor}"/>
     <SolidColorBrush x:Key="ToastDescriptionColorBrush" Color="{DynamicResource ToastDescriptionColor}"/>
     <SolidColorBrush x:Key="BreadcrumbTextBrush" Color="{DynamicResource BreadcrumbText}"/>

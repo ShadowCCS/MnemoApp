@@ -23,6 +23,7 @@ public static class BlockFactory
             BlockType.TwoColumn => CreateTwoColumnBlock(order),
             BlockType.Equation => CreateEquationBlock(order),
             BlockType.Page => CreatePageBlock(order),
+            BlockType.Sketch => new BlockViewModel(BlockType.Sketch, "A -> B", order),
             _ => new BlockViewModel(BlockType.Text, "", order)
         };
     }

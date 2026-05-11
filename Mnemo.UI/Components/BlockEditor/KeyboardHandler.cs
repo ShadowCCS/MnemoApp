@@ -1,6 +1,7 @@
+using System;
+using Avalonia.Controls;
 using Avalonia.Input;
 using Mnemo.Core.Models;
-using System;
 
 namespace Mnemo.UI.Components.BlockEditor;
 
@@ -57,6 +58,61 @@ public class KeyboardHandler
                 EscapePressed?.Invoke();
                 break;
         }
+    }
+
+    /// <summary>Plain <see cref="TextBox"/> blocks (e.g. code): same structural keys as rich text, line-local Up/Down.</summary>
+    public void HandleLegacyTextBoxKeyDown(KeyEventArgs e, TextBox editor, BlockViewModel? viewModel)
+    {
+        if (e.Handled || viewModel == null) return;
+
+        LastKey = e.Key;
+        var text = editor.Text ?? string.Empty;
+        var caretIndex = editor.CaretIndex;
+        var selectionLength = Math.Abs(editor.SelectionEnd - editor.SelectionStart);
+
+        switch (e.Key)
+        {
+            case Key.Back:
+                HandlePlainTextBackspace(e, text, caretIndex, selectionLength, viewModel);
+                break;
+
+            case Key.Up:
+                if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) == 0
+                    && !e.KeyModifiers.HasFlag(KeyModifiers.Shift)
+                    && IsCaretOnFirstLine(editor, text, caretIndex))
+                {
+                    e.Handled = true;
+                    RequestFocusPrevious?.Invoke(null);
+                }
+                break;
+
+            case Key.Down:
+                if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) == 0
+                    && !e.KeyModifiers.HasFlag(KeyModifiers.Shift)
+                    && IsCaretOnLastLine(editor, text, caretIndex))
+                {
+                    e.Handled = true;
+                    RequestFocusNext?.Invoke(null);
+                }
+                break;
+
+            case Key.Escape:
+                e.Handled = true;
+                EscapePressed?.Invoke();
+                break;
+        }
+    }
+
+    private static bool IsCaretOnFirstLine(TextBox tb, string text, int caretIndex)
+    {
+        caretIndex = Math.Clamp(caretIndex, 0, text.Length);
+        return text.AsSpan(0, caretIndex).IndexOf('\n') < 0;
+    }
+
+    private static bool IsCaretOnLastLine(TextBox tb, string text, int caretIndex)
+    {
+        caretIndex = Math.Clamp(caretIndex, 0, text.Length);
+        return text.AsSpan(caretIndex).IndexOf('\n') < 0;
     }
 
     /// <summary>
@@ -135,35 +191,45 @@ public class KeyboardHandler
         }
 
         if (caretIndex == 0)
+            HandlePlainTextBackspace(e, text, caretIndex, selectionLength, viewModel);
+    }
+
+    /// <summary>Structural backspace at line start for plain text or rich text (caret column 0).</summary>
+    private void HandlePlainTextBackspace(KeyEventArgs e, string text, int caretIndex, int selectionLength, BlockViewModel viewModel)
+    {
+        if (selectionLength != 0)
+            return;
+
+        if (caretIndex != 0)
+            return;
+
+        var isEmpty = BlockEditorContentPolicy.IsVisuallyEmpty(text);
+        if (isEmpty)
         {
-            var isEmpty = BlockEditorContentPolicy.IsVisuallyEmpty(text);
-            if (isEmpty)
+            if (viewModel.Type == BlockType.Image)
             {
-                if (viewModel.Type == BlockType.Image)
-                {
-                    e.Handled = true;
-                    viewModel.NotifyStructuralChangeStarting();
-                    viewModel.RequestDeleteAndFocusAbove();
-                    return;
-                }
                 e.Handled = true;
-                BackspaceOnEmpty?.Invoke();
-            }
-            else if (viewModel.Type == BlockType.Image)
-            {
-                // Caption: backspace at start of non-empty text — do not merge into previous block.
+                viewModel.NotifyStructuralChangeStarting();
+                viewModel.RequestDeleteAndFocusAbove();
                 return;
             }
-            else if (viewModel.Type != BlockType.Text)
-            {
-                e.Handled = true;
-                ConvertToTextPreservingContent?.Invoke();
-            }
-            else
-            {
-                e.Handled = true;
-                MergeWithPrevious?.Invoke();
-            }
+            e.Handled = true;
+            BackspaceOnEmpty?.Invoke();
+        }
+        else if (viewModel.Type == BlockType.Image)
+        {
+            // Caption: backspace at start of non-empty text — do not merge into previous block.
+            return;
+        }
+        else if (viewModel.Type != BlockType.Text)
+        {
+            e.Handled = true;
+            ConvertToTextPreservingContent?.Invoke();
+        }
+        else
+        {
+            e.Handled = true;
+            MergeWithPrevious?.Invoke();
         }
     }
 

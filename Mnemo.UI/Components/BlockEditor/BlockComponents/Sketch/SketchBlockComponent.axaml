@@ -1,0 +1,53 @@
+<UserControl
+    x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Sketch.SketchBlockComponent"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Mnemo.UI.Controls"
+    HorizontalAlignment="Stretch"
+    x:CompileBindings="False">
+    <Border
+        x:Name="RootBorder"
+        Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+        BorderThickness="1"
+        CornerRadius="6"
+        Cursor="Hand"
+        MinHeight="150"
+        Padding="12"
+        PointerPressed="RootBorder_PointerPressed">
+        <Grid RowDefinitions="Auto,8,*">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock
+                    FontSize="12"
+                    FontWeight="SemiBold"
+                    Foreground="{DynamicResource TextSecondaryBrush}"
+                    Text="Sketch diagram" />
+                <TextBlock
+                    Grid.Column="1"
+                    FontSize="12"
+                    Foreground="{DynamicResource TextTertiaryBrush}"
+                    Text="Click to edit" />
+            </Grid>
+            <Border
+                Grid.Row="2"
+                Background="{DynamicResource SystemControlBackgroundChromeLowBrush}"
+                CornerRadius="6"
+                Padding="12">
+                <Grid RowDefinitions="*,Auto" MinWidth="320">
+                    <controls:SketchSvgView
+                        x:Name="Preview"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top" />
+                    <TextBlock
+                        x:Name="DiagnosticsText"
+                        Grid.Row="1"
+                        Margin="0,8,0,0"
+                        Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                        FontSize="12"
+                        IsVisible="False"
+                        TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

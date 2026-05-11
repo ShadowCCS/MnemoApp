@@ -49,6 +49,7 @@ public static class BlockMarkdownSerializer
             BlockType.Checklist => block.IsChecked ? $"- [x] {body}" : $"- [ ] {body}",
             BlockType.Quote => "> " + body.Replace("\n", "\n> ", StringComparison.Ordinal),
             BlockType.Code => SerializeCodeFence(block),
+            BlockType.Sketch => SerializeSketchFence(block),
             BlockType.Divider => "---",
             BlockType.Image => SerializeImageMarkdown(block),
             BlockType.Equation => "$$\n" + block.EquationLatex + "\n$$",
@@ -72,6 +73,12 @@ public static class BlockMarkdownSerializer
         return string.IsNullOrEmpty(lang)
             ? "```\n" + body + "\n```"
             : "```" + lang + "\n" + body + "\n```";
+    }
+
+    private static string SerializeSketchFence(BlockViewModel block)
+    {
+        var body = block.Content ?? string.Empty;
+        return "```sketch\n" + body + "\n```";
     }
 
     /// <summary>Inline markdown for rich blocks; code/divider use literal <see cref="BlockViewModel.Content"/> in <see cref="SerializeBlock"/>.</summary>
@@ -151,6 +158,7 @@ public static class BlockMarkdownSerializer
             if (trimmed.StartsWith("```", StringComparison.Ordinal))
             {
                 var fenceLang = trimmed.Length > 3 ? trimmed[3..].Trim() : string.Empty;
+                var isSketch = string.Equals(fenceLang, "sketch", StringComparison.OrdinalIgnoreCase);
                 var language = string.IsNullOrEmpty(fenceLang) ? "csharp" : fenceLang;
                 var codeContent = new System.Text.StringBuilder();
                 i++;
@@ -166,10 +174,12 @@ public static class BlockMarkdownSerializer
                     codeContent.Append(codeLine);
                     i++;
                 }
-                var codeBlock = BlockFactory.CreateBlock(BlockType.Code, order++);
-                codeBlock.CodeLanguage = language;
-                codeBlock.Content = codeContent.ToString();
-                result.Add(codeBlock);
+                var blockType = isSketch ? BlockType.Sketch : BlockType.Code;
+                var fencedBlock = BlockFactory.CreateBlock(blockType, order++);
+                if (!isSketch)
+                    fencedBlock.CodeLanguage = language;
+                fencedBlock.Content = codeContent.ToString();
+                result.Add(fencedBlock);
                 continue;
             }
 
@@ -306,7 +316,7 @@ public static class BlockMarkdownSerializer
         return vm;
     }
 
-    private static bool IsMultilineBlock(BlockType type) => type is BlockType.Code or BlockType.Equation;
+    private static bool IsMultilineBlock(BlockType type) => type is BlockType.Code or BlockType.Equation or BlockType.Sketch;
 
     private static string UnescapeMarkdownImageAlt(string alt) =>
         alt.Replace("\\]", "]", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);

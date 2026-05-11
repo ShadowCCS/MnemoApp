@@ -208,6 +208,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         set => SetValue(IsReadOnlyProperty, value);
     }
 
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsReadOnlyProperty)
+        {
+            foreach (var eb in this.GetVisualDescendants().OfType<EditableBlock>())
+                eb.SyncReadOnlyChromeFromBlockEditor();
+        }
+    }
+
     public ObservableCollection<BlockViewModel> Blocks
     {
         get => _blocks;

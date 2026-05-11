@@ -2,27 +2,110 @@
     x:Class="Mnemo.UI.Components.BlockEditor.BlockComponents.Code.CodeBlockComponent"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Mnemo.UI.Controls"
+    HorizontalAlignment="Stretch"
     x:CompileBindings="False">
     <Border
-        Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
-        CornerRadius="4"
-        Padding="12">
-        <TextBox
-            x:Name="InputTextBox"
-            AcceptsReturn="True"
-            Background="Transparent"
-            BorderThickness="0"
-            FontFamily="Cascadia Code,Consolas,Courier New"
-            FontSize="13"
-            Padding="0"
-            Text="{Binding Content, Mode=TwoWay}"
-            TextWrapping="NoWrap"
-            PlaceholderText="{Binding Watermark}" />
+        x:Name="RootBorder"
+        HorizontalAlignment="Stretch"
+        Background="{DynamicResource TextControlBackgroundBrush}"
+        BorderBrush="{DynamicResource RichTextSeparationLineBrush}"
+        BorderThickness="1"
+        CornerRadius="6">
+        <Grid RowDefinitions="Auto,*">
+            <!-- Header -->
+            <Border
+                Grid.Row="0"
+                Background="{DynamicResource TextControlBackgroundBrush}"
+                BorderBrush="{DynamicResource NotesEditorSeparator}"
+                BorderThickness="0,0,0,1"
+                Padding="8,4">
+                <Grid ColumnDefinitions="*,Auto">
+                    <ComboBox
+                        x:Name="LanguageCombo"
+                        Grid.Column="0"
+                        MinWidth="160"
+                        MaxWidth="360"
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        PlaceholderText="Language" />
+                    <TextBlock
+                        x:Name="LanguageReadLabel"
+                        Grid.Column="0"
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource TextTertiaryBrush}"
+                        IsVisible="False"
+                        TextWrapping="NoWrap" />
+                    <Button
+                        x:Name="CopyButton"
+                        Grid.Column="1"
+                        Margin="8,0,0,0"
+                        Padding="8,4"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Background="{DynamicResource TextControlBackgroundBrush}"
+                        Foreground="{DynamicResource TextSecondaryBrush}"
+                        BorderBrush="{DynamicResource RichTextSeparationLineBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Content="Copy" />
+                </Grid>
+            </Border>
+
+            <!-- Body: highlighted text + transparent editor overlay (same scroll) -->
+            <ScrollViewer
+                x:Name="BodyScroll"
+                Grid.Row="1"
+                HorizontalAlignment="Stretch"
+                HorizontalScrollBarVisibility="Auto"
+                VerticalScrollBarVisibility="Auto"
+                MinHeight="120"
+                MaxHeight="480"
+                Background="{DynamicResource TextControlBackgroundBrush}">
+                <Grid MinHeight="120" HorizontalAlignment="Stretch">
+                    <controls:TextSelectionBackgroundLayer
+                        x:Name="SelectionBackground"
+                        ZIndex="0"
+                        IsHitTestVisible="False"
+                        FontFamily="Cascadia Code,Consolas,Courier New,monospace"
+                        FontSize="13"
+                        LineHeight="20"
+                        SelectionBrush="{DynamicResource TextControlSelectionHighlightColorBrush}"
+                        TextPadding="10,8,10,10"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="HighlightBlock"
+                        ZIndex="1"
+                        Padding="10,8,10,10"
+                        HorizontalAlignment="Stretch"
+                        FontFamily="Cascadia Code,Consolas,Courier New,monospace"
+                        FontSize="13"
+                        LineHeight="20"
+                        TextWrapping="Wrap"
+                        Foreground="{DynamicResource SyntaxCodeDefaultBrush}"
+                        IsHitTestVisible="False" />
+                    <TextBox
+                        x:Name="CodeEditor"
+                        ZIndex="2"
+                        AcceptsReturn="True"
+                        Padding="10,8,10,10"
+                        HorizontalAlignment="Stretch"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontFamily="Cascadia Code,Consolas,Courier New,monospace"
+                        FontSize="13"
+                        LineHeight="20"
+                        Foreground="Transparent"
+                        CaretBrush="{DynamicResource TextControlForegroundBrush}"
+                        SelectionBrush="Transparent"
+                        SelectionForegroundBrush="Transparent"
+                        Text="{Binding Content, Mode=TwoWay}"
+                        TextWrapping="Wrap"
+                        PlaceholderText="{Binding Watermark}" />
+                </Grid>
+            </ScrollViewer>
+        </Grid>
     </Border>
 </UserControl>
-
-
-
-
-
-

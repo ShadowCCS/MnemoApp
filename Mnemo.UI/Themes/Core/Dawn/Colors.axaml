@@ -470,6 +470,20 @@
     <Color x:Key="NotesPaneDivider">#EBEAE9</Color>
     <Color x:Key="NotesEditorSeparator">#EBEAE9</Color>
 
+    <!-- Code syntax highlighting (TextMate scopes → brushes in Controls.axaml) -->
+    <Color x:Key="SyntaxCodeDefault">#1A1A1A</Color>
+    <Color x:Key="SyntaxCodeKeyword">#6F42C1</Color>
+    <Color x:Key="SyntaxCodeString">#0B6E0B</Color>
+    <Color x:Key="SyntaxCodeComment">#6A737D</Color>
+    <Color x:Key="SyntaxCodeNumber">#0550AE</Color>
+    <Color x:Key="SyntaxCodeType">#0077C8</Color>
+    <Color x:Key="SyntaxCodeFunction">#6639B7</Color>
+    <Color x:Key="SyntaxCodeOperator">#A40E26</Color>
+    <Color x:Key="SyntaxCodePunctuation">#57606A</Color>
+    <Color x:Key="SyntaxCodeVariable">#24292F</Color>
+    <Color x:Key="SyntaxCodeMarkup">#116329</Color>
+    <Color x:Key="SyntaxCodeInvalid">#D1242F</Color>
+
     <!-- Slider -->
     <Color x:Key="SliderTrackFill">#E5E5E5</Color>
     <Color x:Key="SliderTrackValueFill">#e95b45</Color>

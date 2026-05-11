@@ -22,14 +22,19 @@ public class MarkdownRenderer : IMarkdownRenderer
 {
     private readonly ILaTeXEngine _latexEngine;
     private readonly ISettingsService _settingsService;
+    private readonly ITextMateSyntaxHighlighter _syntaxHighlighter;
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
-    public MarkdownRenderer(ILaTeXEngine latexEngine, ISettingsService settingsService)
+    public MarkdownRenderer(
+        ILaTeXEngine latexEngine,
+        ISettingsService settingsService,
+        ITextMateSyntaxHighlighter syntaxHighlighter)
     {
         _latexEngine = latexEngine;
         _settingsService = settingsService;
+        _syntaxHighlighter = syntaxHighlighter;
     }
 
     public async Task<Control> RenderAsync(string markdown, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground = null)
@@ -649,9 +654,13 @@ public class MarkdownRenderer : IMarkdownRenderer
     private async Task<Control> RenderCodeBlockAsync(CodeBlock codeBlock)
     {
         var fenced = codeBlock as FencedCodeBlock;
-        var language = fenced?.Info ?? string.Empty;
+        var language = (fenced?.Info ?? string.Empty).Trim();
         var code = fenced?.Lines.ToString() ?? ((LeafBlock)codeBlock).Lines.ToString();
         var codeFontSize = await GetCodeFontSizeAsync();
+        var app = Application.Current!;
+        var defaultFg = (app.TryGetResource("SyntaxCodeDefaultBrush", app.ActualThemeVariant, out var synFg) && synFg is IBrush sb)
+            ? sb
+            : (IBrush)app.FindResource("TextPrimaryBrush")!;
 
         var container = new Border
         {
@@ -662,251 +671,85 @@ public class MarkdownRenderer : IMarkdownRenderer
             Margin = new Thickness(0, 8)
         };
 
-        var stackPanel = new StackPanel();
-
-        if (!string.IsNullOrEmpty(language))
+        var header = new Grid
         {
-            var headerPanel = new Grid
-            {
-                Height = 32,
-                Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
-                Margin = new Thickness(0, 0, 0, 1)
-            };
+            Height = 32,
+            Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
+            Margin = new Thickness(0, 0, 0, 1)
+        };
+        header.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        header.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
 
-            var languageLabel = new TextBlock
-            {
-                Text = language.ToUpper(),
-                FontWeight = FontWeight.SemiBold,
-                FontSize = 12,
-                Foreground = (IBrush)Application.Current!.FindResource("TextTertiaryBrush")!,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0)
-            };
-
-            var copyButton = new Button
-            {
-                Content = "Copy",
-                FontSize = 11,
-                Padding = new Thickness(8, 4),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
-                Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!,
-                BorderBrush = (IBrush)Application.Current!.FindResource("RichTextSeparationLineBrush")!,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4)
-            };
-
-            copyButton.Click += async (sender, e) =>
-            {
-                try
-                {
-                    var topLevel = TopLevel.GetTopLevel(copyButton);
-                    if (topLevel?.Clipboard != null)
-                    {
-                        await topLevel.Clipboard.SetTextAsync(code);
-                    }
-                }
-                catch
-                {
-                    // Clipboard access might fail
-                }
-            };
-
-            headerPanel.Children.Add(languageLabel);
-            headerPanel.Children.Add(copyButton);
-            stackPanel.Children.Add(headerPanel);
-        }
-        else
+        var displayLang = string.IsNullOrEmpty(language) ? "text" : language;
+        var languageLabel = new TextBlock
         {
-            var copyButton = new Button
+            Text = displayLang.ToUpperInvariant(),
+            FontWeight = FontWeight.SemiBold,
+            FontSize = 12,
+            Foreground = (IBrush)Application.Current!.FindResource("TextTertiaryBrush")!,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+        Grid.SetColumn(languageLabel, 0);
+
+        var copyButton = new Button
+        {
+            Content = "Copy",
+            FontSize = 11,
+            Padding = new Thickness(8, 4),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0),
+            Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
+            Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!,
+            BorderBrush = (IBrush)Application.Current!.FindResource("RichTextSeparationLineBrush")!,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4)
+        };
+        Grid.SetColumn(copyButton, 1);
+        copyButton.Click += async (_, _) =>
+        {
+            try
             {
-                Content = "Copy",
-                FontSize = 11,
-                Padding = new Thickness(8, 4),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(0, 8, 8, 0),
-                Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
-                Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!,
-                BorderBrush = (IBrush)Application.Current!.FindResource("RichTextSeparationLineBrush")!,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4)
-            };
-
-            copyButton.Click += async (sender, e) =>
+                var topLevel = TopLevel.GetTopLevel(copyButton);
+                if (topLevel?.Clipboard != null)
+                    await topLevel.Clipboard.SetTextAsync(code);
+            }
+            catch
             {
-                try
-                {
-                    var topLevel = TopLevel.GetTopLevel(copyButton);
-                    if (topLevel?.Clipboard != null)
-                    {
-                        await topLevel.Clipboard.SetTextAsync(code);
-                    }
-                }
-                catch
-                {
-                    // Clipboard access might fail
-                }
-            };
+                // Clipboard access might fail
+            }
+        };
 
-            stackPanel.Children.Add(copyButton);
-        }
+        header.Children.Add(languageLabel);
+        header.Children.Add(copyButton);
 
+        var codeFont = new FontFamily("JetBrains Mono, Cascadia Code, Consolas, Courier New, monospace");
         var codeTextBlock = new TextBlock
         {
-            Text = code,
-            FontFamily = new FontFamily("JetBrains Mono, Consolas, 'Courier New', monospace"),
+            FontFamily = codeFont,
             FontSize = codeFontSize,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!,
-            Padding = new Thickness(12),
+            TextWrapping = TextWrapping.NoWrap,
+            Foreground = defaultFg,
+            Padding = new Thickness(12, 8, 12, 12),
             Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!
         };
 
-        if (!string.IsNullOrEmpty(language))
-        {
-            ApplyBasicSyntaxHighlighting(codeTextBlock, code, language);
-        }
+        _syntaxHighlighter.ApplyToTextBlock(codeTextBlock, code, string.IsNullOrEmpty(language) ? null : language, defaultFg);
 
-        stackPanel.Children.Add(codeTextBlock);
+        var scroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            MaxHeight = 420,
+            Content = codeTextBlock
+        };
+
+        var stackPanel = new StackPanel();
+        stackPanel.Children.Add(header);
+        stackPanel.Children.Add(scroll);
         container.Child = stackPanel;
         return container;
-    }
-
-    private void ApplyBasicSyntaxHighlighting(TextBlock textBlock, string code, string language)
-    {
-        var inlines = new InlineCollection();
-        var lines = code.Split('\n');
-        
-        foreach (var line in lines)
-        {
-            var processedLine = ProcessLineForSyntaxHighlighting(line, language);
-            inlines.AddRange(processedLine);
-            inlines.Add(new LineBreak());
-        }
-
-        if (inlines.Count > 0 && inlines[inlines.Count - 1] is LineBreak)
-        {
-            inlines.RemoveAt(inlines.Count - 1);
-        }
-
-        textBlock.Inlines = inlines;
-    }
-
-    private List<Avalonia.Controls.Documents.Inline> ProcessLineForSyntaxHighlighting(string line, string language)
-    {
-        var inlines = new List<Avalonia.Controls.Documents.Inline>();
-        var currentText = line;
-        
-        var patterns = GetHighlightingPatterns(language);
-        
-        foreach (var (pattern, brushKey) in patterns)
-        {
-            var matches = System.Text.RegularExpressions.Regex.Matches(currentText, pattern);
-            if (matches.Count > 0)
-            {
-                var lastIndex = 0;
-                foreach (System.Text.RegularExpressions.Match match in matches)
-                {
-                    if (match.Index > lastIndex)
-                    {
-                        inlines.Add(new Run 
-                        { 
-                            Text = currentText.Substring(lastIndex, match.Index - lastIndex),
-                            Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!
-                        });
-                    }
-                    
-                    inlines.Add(new Run 
-                    { 
-                        Text = match.Value,
-                        Foreground = (IBrush)Application.Current!.FindResource(brushKey)!
-                    });
-                    
-                    lastIndex = match.Index + match.Length;
-                }
-                
-                if (lastIndex < currentText.Length)
-                {
-                    inlines.Add(new Run 
-                    { 
-                        Text = currentText.Substring(lastIndex),
-                        Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!
-                    });
-                }
-                return inlines;
-            }
-        }
-        
-        inlines.Add(new Run 
-        { 
-            Text = line,
-            Foreground = (IBrush)Application.Current!.FindResource("TextPrimaryBrush")!
-        });
-        
-        return inlines;
-    }
-
-    private List<(string pattern, string brushKey)> GetHighlightingPatterns(string language)
-    {
-        return language.ToLower() switch
-        {
-            "csharp" or "cs" => new List<(string, string)>
-            {
-                (@"\b(using|namespace|class|interface|public|private|protected|static|void|int|string|bool|var|if|else|for|while|foreach|return|new|this|base)\b", "KeywordBrush"),
-                (@"//.*$", "CommentBrush"),
-                (@"""[^""]*""", "StringBrush"),
-                (@"'[^']*'", "StringBrush")
-            },
-            "javascript" or "js" => new List<(string, string)>
-            {
-                (@"\b(function|var|let|const|if|else|for|while|return|new|this|class|extends|import|export)\b", "KeywordBrush"),
-                (@"//.*$", "CommentBrush"),
-                (@"""[^""]*""", "StringBrush"),
-                (@"'[^']*'", "StringBrush")
-            },
-            "python" or "py" => new List<(string, string)>
-            {
-                (@"\b(def|class|if|else|elif|for|while|return|import|from|as|try|except|finally|with|lambda)\b", "KeywordBrush"),
-                (@"#.*$", "CommentBrush"),
-                (@"""[^""]*""", "StringBrush"),
-                (@"'[^']*'", "StringBrush")
-            },
-            "html" => new List<(string, string)>
-            {
-                (@"<[^>]+>", "TagBrush"),
-                (@"&[a-zA-Z]+;", "EntityBrush")
-            },
-            "css" => new List<(string, string)>
-            {
-                (@"[.#]?[a-zA-Z-]+\s*{", "SelectorBrush"),
-                (@"[a-zA-Z-]+\s*:", "PropertyBrush"),
-                (@"//.*$", "CommentBrush")
-            },
-            "json" => new List<(string, string)>
-            {
-                (@"""[^""]*""(?=\s*:)", "KeywordBrush"), // Keys
-                (@"""[^""]*""", "StringBrush"), // Values
-                (@"\b(true|false|null)\b", "KeywordBrush"),
-                (@"\b[0-9]+\b", "NumberBrush")
-            },
-            "sql" => new List<(string, string)>
-            {
-                (@"\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|JOIN|GROUP|ORDER|BY|HAVING|CREATE|TABLE|ALTER|DROP|INTO|VALUES|SET|AND|OR|NOT|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|ON)\b", "KeywordBrush"),
-                (@"--.*$", "CommentBrush"),
-                (@"""[^""]*""", "StringBrush"),
-                (@"'[^']*'", "StringBrush")
-            },
-            "yaml" or "yml" => new List<(string, string)>
-            {
-                (@"^\s*[a-zA-Z0-9_-]+\s*:", "KeywordBrush"), // Keys
-                (@"#.*$", "CommentBrush"),
-                (@"""[^""]*""", "StringBrush"),
-                (@"'[^']*'", "StringBrush")
-            },
-            _ => new List<(string, string)>()
-        };
     }
 
     private async Task<Control> RenderQuoteAsync(QuoteBlock quote, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground)

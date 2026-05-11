@@ -226,6 +226,7 @@ public partial class EditableBlock : UserControl
         if (_currentBlockComponent != null)
         {
             _currentBlockComponent.TextBoxGotFocus -= HandleBlockComponentGotFocus;
+            _currentBlockComponent.LegacyTextBoxGotFocus -= HandleLegacyTextBoxGotFocus;
             _currentBlockComponent.TextBoxLostFocus -= HandleBlockComponentLostFocus;
             _currentBlockComponent.TextBoxTextChanged -= HandleBlockComponentTextChanged;
             _currentBlockComponent.TextBoxKeyDown -= HandleBlockComponentKeyDown;
@@ -281,6 +282,7 @@ public partial class EditableBlock : UserControl
         if (_currentBlockComponent != null)
         {
             _currentBlockComponent.TextBoxGotFocus -= HandleBlockComponentGotFocus;
+            _currentBlockComponent.LegacyTextBoxGotFocus -= HandleLegacyTextBoxGotFocus;
             _currentBlockComponent.TextBoxLostFocus -= HandleBlockComponentLostFocus;
             _currentBlockComponent.TextBoxTextChanged -= HandleBlockComponentTextChanged;
             _currentBlockComponent.TextBoxKeyDown -= HandleBlockComponentKeyDown;
@@ -302,6 +304,7 @@ public partial class EditableBlock : UserControl
             }
 
             component.TextBoxGotFocus += HandleBlockComponentGotFocus;
+            component.LegacyTextBoxGotFocus += HandleLegacyTextBoxGotFocus;
             component.TextBoxLostFocus += HandleBlockComponentLostFocus;
             component.TextBoxTextChanged += HandleBlockComponentTextChanged;
             component.TextBoxKeyDown += HandleBlockComponentKeyDown;
@@ -334,6 +337,9 @@ public partial class EditableBlock : UserControl
         UpdateGutterVerticalAlignment();
     }
 
+    /// <summary>Called when <see cref="BlockEditor.IsReadOnly"/> changes after blocks are already mounted.</summary>
+    internal void SyncReadOnlyChromeFromBlockEditor() => ApplyReadOnlyState();
+
     private void ApplyReadOnlyState()
     {
         var readOnly = IsReadOnly;
@@ -345,6 +351,10 @@ public partial class EditableBlock : UserControl
             DragDrop.SetAllowDrop(BlockContainer, !readOnly);
         if (_currentEditor != null)
             _currentEditor.IsReadOnly = readOnly;
+        if (_currentBlockComponent?.GetLegacyTextBox() is TextBox legacyTb)
+            legacyTb.IsReadOnly = readOnly;
+        if (_currentBlockComponent is IBlockEditorReadOnlyChrome readOnlyChrome)
+            readOnlyChrome.ApplyBlockEditorReadOnly(readOnly);
     }
 
     /// <summary>
@@ -506,6 +516,11 @@ public partial class EditableBlock : UserControl
     {
         TextBox_GotFocus(editor, new RoutedEventArgs());
     }
+
+    private void HandleLegacyTextBoxGotFocus(object? sender, TextBox textBox)
+    {
+        TextBox_GotFocus(textBox, new RoutedEventArgs());
+    }
     
     private void HandleBlockComponentLostFocus(object? sender, RoutedEventArgs e)
     {
@@ -514,18 +529,39 @@ public partial class EditableBlock : UserControl
     
     private void HandleBlockComponentTextChanged(object? sender, TextChangedEventArgs e)
     {
-        if (sender is BlockComponentBase component && component.GetRichTextEditor() is RichTextEditor editor)
-        {
+        if (sender is not BlockComponentBase component)
+            return;
+        if (component.GetRichTextEditor() is RichTextEditor editor)
             TextBox_TextChanged(editor, e);
-        }
+        else if (component.GetLegacyTextBox() is TextBox tb)
+            LegacyTextBox_TextChanged(tb, e);
+    }
+
+    private void LegacyTextBox_TextChanged(TextBox tb, TextChangedEventArgs e)
+    {
+        if (IsReadOnly || _viewModel == null || _stateManager == null)
+            return;
+        if (_stateManager.IsUpdatingFromViewModel)
+            return;
+        var text = tb.Text ?? string.Empty;
+        var previousText = _stateManager.PreviousText;
+        if (text == previousText)
+            return;
+        _viewModel.PreviousContent = previousText;
+        var parentEditor = FindParentBlockEditor();
+        parentEditor?.TrackTypingEdit(_viewModel, previousText);
+        _viewModel.Content = text;
+        _stateManager.PreviousText = text;
     }
     
     private void HandleBlockComponentKeyDown(object? sender, KeyEventArgs e)
     {
-        if (sender is BlockComponentBase component && component.GetRichTextEditor() is RichTextEditor editor)
-        {
+        if (sender is not BlockComponentBase component || _viewModel == null || _keyboardHandler == null)
+            return;
+        if (component.GetRichTextEditor() is RichTextEditor editor)
             TextBox_KeyDown(editor, e);
-        }
+        else if (component.GetLegacyTextBox() is TextBox tb)
+            _keyboardHandler.HandleLegacyTextBoxKeyDown(e, tb, _viewModel);
     }
 
     private void SetupDragDrop()
@@ -596,7 +632,7 @@ public partial class EditableBlock : UserControl
     /// </summary>
     private void UpdateEditableBlockAlignment()
     {
-        var stretchRow = _viewModel?.Type is BlockType.Divider or BlockType.Page;
+        var stretchRow = _viewModel?.Type is BlockType.Divider or BlockType.Page or BlockType.Code;
         if (BlockContentChrome != null)
             BlockContentChrome.HorizontalAlignment = stretchRow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
         if (BlockContentControl != null)
@@ -729,9 +765,9 @@ public partial class EditableBlock : UserControl
         }
         
         if (sender is RichTextEditor editor)
-        {
             _stateManager.PreviousText = editor.Text;
-        }
+        else if (sender is TextBox tb)
+            _stateManager.PreviousText = tb.Text ?? string.Empty;
     }
 
     private void TextBox_LostFocus(object? sender, RoutedEventArgs e)
@@ -1227,7 +1263,7 @@ public partial class EditableBlock : UserControl
                 _viewModel.Content = replacementText;
             }
             else
-                _viewModel.Content = string.Empty;
+                _viewModel.Content = blockType == BlockType.Sketch ? "A -> B" : string.Empty;
             _stateManager.PreviousText = _viewModel.Content ?? string.Empty;
             _focusManager?.ClearCache();
 
@@ -1256,7 +1292,8 @@ public partial class EditableBlock : UserControl
             }
         }
 
-        var addedBlockBelow = (blockType == BlockType.Divider || blockType == BlockType.Image) && EnsureEditableBlockBelowIfNeeded();
+        var addedBlockBelow = blockType is BlockType.Divider or BlockType.Image or BlockType.Sketch
+            && EnsureEditableBlockBelowIfNeeded();
 
         if (!addedBlockBelow)
         {
@@ -1288,7 +1325,7 @@ public partial class EditableBlock : UserControl
     }
 
     private static bool IsEditableBlockType(BlockType type) =>
-        type is not BlockType.Divider and not BlockType.Image and not BlockType.Equation and not BlockType.Page;
+        type is not BlockType.Divider and not BlockType.Image and not BlockType.Equation and not BlockType.Page and not BlockType.Sketch;
 
     #endregion
 
@@ -1423,13 +1460,14 @@ public partial class EditableBlock : UserControl
 
         _viewModel.NotifyStructuralChangeStarting();
         _viewModel.Type = blockType;
-        _viewModel.Content = string.Empty;
-        _stateManager.PreviousText = string.Empty;
+        _viewModel.Content = blockType == BlockType.Sketch ? "A -> B" : string.Empty;
+        _stateManager.PreviousText = _viewModel.Content ?? string.Empty;
         _stateManager.SetNormal();
         _focusManager?.ClearCache();
 
         // When converting to a non-editable block, ensure there is an editable block below so the user can keep typing
-        var addedBlockBelow = blockType is BlockType.Divider or BlockType.Image or BlockType.Equation && EnsureEditableBlockBelowIfNeeded();
+        var addedBlockBelow = blockType is BlockType.Divider or BlockType.Image or BlockType.Equation or BlockType.Sketch
+            && EnsureEditableBlockBelowIfNeeded();
 
         if (!addedBlockBelow)
         {
@@ -2415,11 +2453,14 @@ public partial class EditableBlock : UserControl
     }
 
     /// <summary>This block's RTE only — never the globally focused editor (cross-block selection must paint on each block).</summary>
-    private RichTextEditor? GetEditor() =>
+    private RichTextEditor? GetRichEditor() =>
         _currentBlockComponent?.GetRichTextEditor();
 
+    private TextBox? GetPlainEditor() =>
+        _currentBlockComponent?.GetLegacyTextBox();
+
     /// <summary>Live rich-text control when this block is not using a plain <see cref="TextBox"/>.</summary>
-    public RichTextEditor? TryGetRichTextEditor() => GetEditor() as RichTextEditor;
+    public RichTextEditor? TryGetRichTextEditor() => GetRichEditor();
 
     public string? GetSelectedText()
     {
@@ -2434,12 +2475,21 @@ public partial class EditableBlock : UserControl
 
     public (int start, int end)? GetSelectionRange()
     {
-        var editor = GetEditor();
-        if (editor == null) return null;
-        int start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
-        int end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
-        if (start >= end) return null;
-        return (start, end);
+        if (GetRichEditor() is { } rte)
+        {
+            int start = Math.Min(rte.SelectionStart, rte.SelectionEnd);
+            int end = Math.Max(rte.SelectionStart, rte.SelectionEnd);
+            if (start >= end) return null;
+            return (start, end);
+        }
+        if (GetPlainEditor() is { } tb)
+        {
+            int start = Math.Min(tb.SelectionStart, tb.SelectionEnd);
+            int end = Math.Max(tb.SelectionStart, tb.SelectionEnd);
+            if (start >= end) return null;
+            return (start, end);
+        }
+        return null;
     }
 
     /// <summary>True if the current non-empty selection overlaps any linked run.</summary>
@@ -2453,34 +2503,69 @@ public partial class EditableBlock : UserControl
 
     public int? GetCaretIndex()
     {
-        var editor = GetEditor();
-        return editor?.CaretIndex;
+        if (GetRichEditor() is { } rte)
+            return rte.CaretIndex;
+        if (GetPlainEditor() is { } tb)
+            return tb.CaretIndex;
+        return null;
     }
 
     public (int start, int end)? GetSelectionOrCaretRange()
     {
-        var editor = GetEditor();
-        if (editor == null) return null;
-        int start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
-        int end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
-        return (start, end);
+        if (GetRichEditor() is { } rte)
+        {
+            int start = Math.Min(rte.SelectionStart, rte.SelectionEnd);
+            int end = Math.Max(rte.SelectionStart, rte.SelectionEnd);
+            return (start, end);
+        }
+        if (GetPlainEditor() is { } tb)
+        {
+            int start = Math.Min(tb.SelectionStart, tb.SelectionEnd);
+            int end = Math.Max(tb.SelectionStart, tb.SelectionEnd);
+            return (start, end);
+        }
+        return null;
     }
 
     public void SetCaretIndex(int index)
     {
-        var editor = GetEditor();
-        if (editor == null) return;
-        int c = Math.Clamp(index, 0, editor.TextLength);
-        editor.CaretIndex = c;
-        editor.SelectionStart = c;
-        editor.SelectionEnd = c;
+        if (GetRichEditor() is { } rte)
+        {
+            int c = Math.Clamp(index, 0, rte.TextLength);
+            rte.CaretIndex = c;
+            rte.SelectionStart = c;
+            rte.SelectionEnd = c;
+            return;
+        }
+        if (GetPlainEditor() is { } tb)
+        {
+            var len = tb.Text?.Length ?? 0;
+            int c = Math.Clamp(index, 0, len);
+            tb.CaretIndex = c;
+            tb.SelectionStart = c;
+            tb.SelectionEnd = c;
+        }
     }
 
     public bool DeleteSelection()
     {
         var range = GetSelectionRange();
         if (range == null || _viewModel == null) return false;
-        var editor = GetEditor();
+        if (GetPlainEditor() is { } plainTb)
+        {
+            var plainText = plainTb.Text ?? string.Empty;
+            int delStart = range.Value.start;
+            int delEnd = range.Value.end;
+            if (delEnd <= delStart || delStart < 0 || delEnd > plainText.Length) return false;
+            var newPlain = plainText.Remove(delStart, delEnd - delStart);
+            _viewModel.Content = newPlain;
+            plainTb.Text = newPlain;
+            plainTb.CaretIndex = delStart;
+            plainTb.SelectionStart = delStart;
+            plainTb.SelectionEnd = delStart;
+            return true;
+        }
+        var editor = GetRichEditor();
         if (editor == null) return false;
         string text = editor.Text;
         int start = range.Value.start;
@@ -2511,7 +2596,24 @@ public partial class EditableBlock : UserControl
 
     public bool InsertTextAtCursor(string text)
     {
-        var editor = GetEditor();
+        if (GetPlainEditor() is { } plain)
+        {
+            if (_viewModel == null) return false;
+            int insStart = Math.Min(plain.SelectionStart, plain.SelectionEnd);
+            int insEnd = Math.Max(plain.SelectionStart, plain.SelectionEnd);
+            var plainFlat = plain.Text ?? string.Empty;
+            insStart = Math.Clamp(insStart, 0, plainFlat.Length);
+            insEnd = Math.Clamp(insEnd, 0, plainFlat.Length);
+            var insertedPlain = plainFlat.Remove(insStart, insEnd - insStart).Insert(insStart, text);
+            _viewModel.Content = insertedPlain;
+            plain.Text = insertedPlain;
+            var plainCaret = insStart + text.Length;
+            plain.CaretIndex = plainCaret;
+            plain.SelectionStart = plainCaret;
+            plain.SelectionEnd = plainCaret;
+            return true;
+        }
+        var editor = GetRichEditor();
         if (editor == null || _viewModel == null) return false;
         int start = Math.Min(editor.SelectionStart, editor.SelectionEnd);
         int end = Math.Max(editor.SelectionStart, editor.SelectionEnd);
@@ -2550,7 +2652,17 @@ public partial class EditableBlock : UserControl
 
     public void ApplyTextSelection(int start, int end)
     {
-        var editor = GetEditor();
+        if (GetPlainEditor() is { } plainSelTb)
+        {
+            int plainLen = plainSelTb.Text?.Length ?? 0;
+            int pSelStart = Math.Clamp(Math.Min(start, end), 0, plainLen);
+            int pSelEnd = Math.Clamp(Math.Max(start, end), 0, plainLen);
+            plainSelTb.SelectionStart = pSelStart;
+            plainSelTb.SelectionEnd = pSelEnd;
+            plainSelTb.CaretIndex = pSelEnd;
+            return;
+        }
+        var editor = GetRichEditor();
         if (editor == null) return;
         int len = editor is RichTextEditor rte ? rte.SelectionIndexUpperBound : editor.TextLength;
         int selStart = Math.Clamp(Math.Min(start, end), 0, len);
@@ -2624,11 +2736,31 @@ public partial class EditableBlock : UserControl
 
     public int GetCharacterIndexFromPoint(Point pointInBlock)
     {
-        var editor = GetEditor();
-        if (editor == null) return 0;
-        var ptInEditor = this.TranslatePoint(pointInBlock, editor);
-        if (!ptInEditor.HasValue) return 0;
-        return editor.HitTestPoint(ptInEditor.Value);
+        if (GetRichEditor() is { } editor)
+        {
+            var ptInEditor = this.TranslatePoint(pointInBlock, editor);
+            if (!ptInEditor.HasValue) return 0;
+            return editor.HitTestPoint(ptInEditor.Value);
+        }
+        if (GetPlainEditor() is { } tb)
+        {
+            var ptInTb = this.TranslatePoint(pointInBlock, tb);
+            if (!ptInTb.HasValue) return 0;
+            var rel = ptInTb.Value;
+            var lineHeight = tb.FontSize * 1.35;
+            if (lineHeight <= 0) return 0;
+            var text = tb.Text ?? string.Empty;
+            var line = Math.Clamp((int)(rel.Y / lineHeight), 0, int.MaxValue);
+            var col = Math.Max(0, (int)(rel.X / (tb.FontSize * 0.55)));
+            var lines = text.Split('\n');
+            if (line >= lines.Length)
+                return text.Length;
+            var lineStart = 0;
+            for (int i = 0; i < line; i++)
+                lineStart += lines[i].Length + 1;
+            return Math.Clamp(lineStart + Math.Min(col, lines[line].Length), 0, text.Length);
+        }
+        return 0;
     }
 
     private BlockEditor? FindParentBlockEditor()

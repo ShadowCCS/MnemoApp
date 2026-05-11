@@ -487,6 +487,20 @@
     <Color x:Key="NotesSectionHeaderForeground">#9A9694</Color>
     <Color x:Key="NotesPaneDivider">#2E2D2C</Color>
     <Color x:Key="NotesEditorSeparator">#2E2D2C</Color>
+
+    <!-- Code syntax highlighting -->
+    <Color x:Key="SyntaxCodeDefault">#D4D4D4</Color>
+    <Color x:Key="SyntaxCodeKeyword">#C586C0</Color>
+    <Color x:Key="SyntaxCodeString">#CE9178</Color>
+    <Color x:Key="SyntaxCodeComment">#6A9955</Color>
+    <Color x:Key="SyntaxCodeNumber">#B5CEA8</Color>
+    <Color x:Key="SyntaxCodeType">#4EC9B0</Color>
+    <Color x:Key="SyntaxCodeFunction">#DCDCAA</Color>
+    <Color x:Key="SyntaxCodeOperator">#D4D4D4</Color>
+    <Color x:Key="SyntaxCodePunctuation">#9D9D9D</Color>
+    <Color x:Key="SyntaxCodeVariable">#9CDCFE</Color>
+    <Color x:Key="SyntaxCodeMarkup">#569CD6</Color>
+    <Color x:Key="SyntaxCodeInvalid">#F44747</Color>
 </ResourceDictionary>
 
 
