@@ -23,12 +23,15 @@ public enum SketchTokenKind
 {
     Identifier,
     String,
+    HexColor,
     Number,
     Boolean,
     Colon,
     Comma,
     LeftBracket,
     RightBracket,
+    LeftParen,
+    RightParen,
     LeftBrace,
     RightBrace,
     ArrowDirected,
@@ -52,12 +55,21 @@ public sealed record RawSketchEdgeDecl(
     RawSketchNodeRef Source,
     RawSketchNodeRef Target,
     string? Label,
+    IReadOnlyList<RawSketchProperty> Properties,
     SourceSpan Span) : RawSketchStatement(Span);
 
 public sealed record RawSketchNodeDecl(
     RawSketchNodeRef Ref,
     string? Label,
+    IReadOnlyList<RawSketchProperty> Properties,
     SourceSpan Span) : RawSketchStatement(Span);
+
+public sealed record RawSketchClassDecl(
+    string Name,
+    IReadOnlyList<RawSketchProperty> Properties,
+    SourceSpan Span) : RawSketchStatement(Span);
+
+public sealed record RawSketchProperty(string Key, string Value, SourceSpan Span);
 
 public sealed record RawSketchComment(string Text, SourceSpan Span) : RawSketchStatement(Span);
 
@@ -79,6 +91,7 @@ public sealed record ResolvedSketchDiagram(
 public sealed record ResolvedSketchNode(
     string Id,
     string Label,
+    ResolvedSketchStyle Style,
     bool Declared,
     bool Implicit,
     IReadOnlyList<SourceSpan> SourceSpans);
@@ -88,7 +101,25 @@ public sealed record ResolvedSketchEdge(
     string SourceId,
     string TargetId,
     string? Label,
+    ResolvedSketchStyle Style,
     SourceSpan SourceSpan);
+
+public sealed record ResolvedSketchStyle(
+    SketchColorValue? Fill = null,
+    SketchColorValue? Stroke = null,
+    double? StrokeWidth = null,
+    string? Shape = null);
+
+public enum SketchColorKind
+{
+    Named,
+    Hex,
+    Rgb,
+    Rgba,
+    Theme
+}
+
+public sealed record SketchColorValue(SketchColorKind Kind, string Value);
 
 public sealed record LaidOutSketchDiagram(
     IReadOnlyList<LaidOutSketchNode> Nodes,
@@ -100,6 +131,7 @@ public sealed record LaidOutSketchNode(
     string Id,
     string Label,
     IReadOnlyList<string> LabelLines,
+    ResolvedSketchStyle Style,
     double X,
     double Y,
     double Width,
@@ -110,6 +142,7 @@ public sealed record LaidOutSketchEdge(
     string SourceId,
     string TargetId,
     string? Label,
+    ResolvedSketchStyle Style,
     double X1,
     double Y1,
     double X2,

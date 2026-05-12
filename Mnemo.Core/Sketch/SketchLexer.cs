@@ -36,6 +36,9 @@ public sealed class SketchLexer
 
             if (c == '#')
             {
+                if (IsHexFunctionArgument() && TryReadHexColor())
+                    continue;
+
                 ReadComment();
                 continue;
             }
@@ -67,6 +70,18 @@ public sealed class SketchLexer
             if (c == ']')
             {
                 AddFixed(SketchTokenKind.RightBracket, "]", 1);
+                continue;
+            }
+
+            if (c == '(')
+            {
+                AddFixed(SketchTokenKind.LeftParen, "(", 1);
+                continue;
+            }
+
+            if (c == ')')
+            {
+                AddFixed(SketchTokenKind.RightParen, ")", 1);
                 continue;
             }
 
@@ -180,6 +195,38 @@ public sealed class SketchLexer
         _tokens.Add(new SketchToken(SketchTokenKind.Comment, text, text[1..].Trim(), new SourceSpan(start, CurrentPosition)));
     }
 
+    private bool TryReadHexColor()
+    {
+        var length = 0;
+        while (IsHexDigit(Peek(length + 1)))
+            length++;
+
+        if (length is not (3 or 4 or 6 or 8))
+            return false;
+
+        var next = Peek(length + 1);
+        if (char.IsLetterOrDigit(next) || next is '_' or '-')
+            return false;
+
+        var start = CurrentPosition;
+        Advance();
+        for (var i = 0; i < length; i++)
+            Advance();
+
+        var text = _source[start.Offset.._offset];
+        _tokens.Add(new SketchToken(SketchTokenKind.HexColor, text, text, new SourceSpan(start, CurrentPosition)));
+        return true;
+    }
+
+    private bool IsHexFunctionArgument()
+    {
+        if (_tokens.Count < 2 || _tokens[^1].Kind != SketchTokenKind.LeftParen)
+            return false;
+
+        return _tokens[^2].Kind == SketchTokenKind.Identifier
+               && string.Equals(_tokens[^2].Value, "hex", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void ReadString()
     {
         var start = CurrentPosition;
@@ -266,5 +313,10 @@ public sealed class SketchLexer
 
     private static bool IsIdentifierStart(char c) => char.IsLetter(c) || c == '_';
 
-    private static bool IsIdentifierPart(char c) => char.IsLetterOrDigit(c) || c is '_' or '-';
+    private static bool IsIdentifierPart(char c) => char.IsLetterOrDigit(c) || c is '_' or '-' or '.';
+
+    private static bool IsHexDigit(char c) =>
+        c is >= '0' and <= '9'
+        or >= 'a' and <= 'f'
+        or >= 'A' and <= 'F';
 }

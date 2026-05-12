@@ -114,12 +114,13 @@ public static class SketchSyntaxHighlighter
             SketchTokenKind.Identifier => identifierIsEdgeTarget
                 ? defaultForeground
                 : ThemeBrush("SyntaxCodeTypeBrush", defaultForeground),
-            SketchTokenKind.String => ThemeBrush("SyntaxCodeStringBrush", defaultForeground),
+            SketchTokenKind.String or SketchTokenKind.HexColor => ThemeBrush("SyntaxCodeStringBrush", defaultForeground),
             SketchTokenKind.Number or SketchTokenKind.Boolean => ThemeBrush("SyntaxCodeNumberBrush", defaultForeground),
             SketchTokenKind.Comment => ThemeBrush("SyntaxCodeCommentBrush", defaultForeground),
             SketchTokenKind.ArrowDirected => ThemeBrush("SyntaxCodeOperatorBrush", defaultForeground),
-            SketchTokenKind.LeftBracket or SketchTokenKind.RightBracket or SketchTokenKind.LeftBrace
-            or SketchTokenKind.RightBrace or SketchTokenKind.Colon or SketchTokenKind.Comma
+            SketchTokenKind.LeftBracket or SketchTokenKind.RightBracket or SketchTokenKind.LeftParen
+            or SketchTokenKind.RightParen or SketchTokenKind.LeftBrace or SketchTokenKind.RightBrace
+            or SketchTokenKind.Colon or SketchTokenKind.Comma
                 => ThemeBrush("SyntaxCodePunctuationBrush", defaultForeground),
             SketchTokenKind.Invalid => ThemeBrush("SyntaxCodeInvalidBrush", defaultForeground),
             _ => defaultForeground

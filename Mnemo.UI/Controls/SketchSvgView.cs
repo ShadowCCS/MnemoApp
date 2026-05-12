@@ -300,10 +300,124 @@ public sealed class SketchSvgView : Control
     {
         if (string.Equals(value, "transparent", StringComparison.OrdinalIgnoreCase))
             return Brushes.Transparent;
+        if (TryResolveThemeBrush(value, out var themeBrush))
+            return themeBrush;
+        if (TryParseRgbBrush(value, out var rgbBrush))
+            return rgbBrush;
         return Color.TryParse(value, out var color)
             ? new SolidColorBrush(color)
             : Brushes.Transparent;
     }
+
+    private static bool TryResolveThemeBrush(string value, out IBrush brush)
+    {
+        brush = Brushes.Transparent;
+        if (!TryReadThemeReference(value, out var token))
+            return false;
+
+        var app = Application.Current;
+        if (app == null)
+            return true;
+
+        var key = ResolveThemeResourceKey(token);
+        if (app.TryGetResource(key + "Brush", app.ActualThemeVariant, out var brushResource) && brushResource is IBrush resourceBrush)
+        {
+            brush = resourceBrush;
+            return true;
+        }
+
+        if (app.TryGetResource(key, app.ActualThemeVariant, out var colorResource) && colorResource is Color resourceColor)
+        {
+            brush = new SolidColorBrush(resourceColor);
+            return true;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadThemeReference(string value, out string token)
+    {
+        token = string.Empty;
+        if (value.StartsWith("theme.", StringComparison.OrdinalIgnoreCase))
+        {
+            token = value["theme.".Length..].Trim();
+            return token.Length > 0;
+        }
+
+        if (value.StartsWith("theme(", StringComparison.OrdinalIgnoreCase) && value.EndsWith(')'))
+        {
+            token = value["theme(".Length..^1].Trim();
+            return token.Length > 0;
+        }
+
+        return false;
+    }
+
+    private static bool TryParseRgbBrush(string value, out IBrush brush)
+    {
+        brush = Brushes.Transparent;
+        var isRgb = TryReadFunction(value, "rgb", out var rgb);
+        var isRgba = TryReadFunction(value, "rgba", out var rgba);
+        if (!isRgb && !isRgba)
+            return false;
+
+        var parts = (isRgb ? rgb : rgba)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length != (isRgb ? 3 : 4))
+            return true;
+
+        if (!byte.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var r)
+            || !byte.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var g)
+            || !byte.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var b))
+            return true;
+
+        var a = (byte)255;
+        if (isRgba)
+        {
+            if (!double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var alpha))
+                return true;
+            a = (byte)Math.Round(Math.Clamp(alpha, 0, 1) * 255);
+        }
+
+        brush = new SolidColorBrush(Color.FromArgb(a, r, g, b));
+        return true;
+    }
+
+    private static bool TryReadFunction(string value, string name, out string argument)
+    {
+        argument = string.Empty;
+        var prefix = name + "(";
+        if (!value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || !value.EndsWith(')'))
+            return false;
+
+        argument = value[prefix.Length..^1];
+        return true;
+    }
+
+    private static string ResolveThemeResourceKey(string token)
+    {
+        return token.ToLowerInvariant() switch
+        {
+            "swatch1" => "WidgetIconBackground1",
+            "swatch2" => "WidgetIconBackground2",
+            "swatch3" => "WidgetIconBackground3",
+            "swatch4" => "WidgetIconBackground4",
+            "swatch5" => "WidgetIconBackground5",
+            "accent" => "CardAccent",
+            "background" => "WorkspaceBackground",
+            "surface" => "CardBackgroundSecondary",
+            "text" or "text.primary" => "TextPrimary",
+            "text.secondary" => "TextSecondary",
+            _ => string.Concat(token
+                .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(Capitalize))
+        };
+    }
+
+    private static string Capitalize(string value) =>
+        value.Length == 0
+            ? string.Empty
+            : char.ToUpperInvariant(value[0]) + value[1..];
 
     private sealed record ParsedSketchSvg(
         double Width,
