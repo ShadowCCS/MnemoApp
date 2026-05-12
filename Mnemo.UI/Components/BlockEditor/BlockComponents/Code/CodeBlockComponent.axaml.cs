@@ -34,15 +34,29 @@ public partial class CodeBlockComponent : BlockComponentBase, IBlockEditorReadOn
             SyncSelectionBackground();
             ScheduleHighlightRefresh();
         };
-        CodeEditor.KeyDown += (_, _) => Dispatcher.UIThread.Post(SyncSelectionBackground, DispatcherPriority.Input);
-        CodeEditor.KeyUp += (_, _) => SyncSelectionBackground();
-        CodeEditor.PointerPressed += (_, _) => Dispatcher.UIThread.Post(SyncSelectionBackground, DispatcherPriority.Input);
-        CodeEditor.PointerMoved += (_, _) => SyncSelectionBackground();
-        CodeEditor.PointerReleased += (_, _) => SyncSelectionBackground();
-        CodeEditor.GotFocus += (_, _) => SyncSelectionBackground();
-        HighlightBlock.LayoutUpdated += (_, _) => SyncEditorMinHeight();
+        CodeEditor.KeyDown += (_, _) => PostSyncSelectionIfAlive();
+        CodeEditor.KeyUp += (_, _) => PostSyncSelectionIfAlive();
+        CodeEditor.PointerPressed += (_, _) => PostSyncSelectionIfAlive();
+        CodeEditor.PointerMoved += (_, _) => PostSyncSelectionIfAlive();
+        CodeEditor.PointerReleased += (_, _) => PostSyncSelectionIfAlive();
+        CodeEditor.GotFocus += (_, _) => PostSyncSelectionIfAlive();
+        HighlightBlock.LayoutUpdated += (_, _) =>
+        {
+            SyncEditorMinHeight();
+            SyncCodeEditorHostWidth();
+        };
 
         DataContextChanged += OnDataContextChanged;
+    }
+
+    private void PostSyncSelectionIfAlive()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (VisualRoot is null)
+                return;
+            SyncSelectionBackground();
+        }, DispatcherPriority.Input);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -61,6 +75,7 @@ public partial class CodeBlockComponent : BlockComponentBase, IBlockEditorReadOn
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        LanguageCombo.IsDropDownOpen = false;
         if (Application.Current != null && _themeChangedHandler != null)
             Application.Current.ActualThemeVariantChanged -= _themeChangedHandler;
         _highlightDebounce?.Stop();
@@ -143,12 +158,31 @@ public partial class CodeBlockComponent : BlockComponentBase, IBlockEditorReadOn
             _vm.CodeLanguage = li.Id;
     }
 
+    private void CodeScroll_SizeChanged(object? sender, SizeChangedEventArgs e) => SyncCodeEditorHostWidth();
+
+    private void SyncCodeEditorHostWidth()
+    {
+        if (HighlightBlock == null || CodeEditorHost == null || CodeScroll == null || CodeEditor == null
+            || SelectionBackground == null)
+            return;
+
+        var tw = HighlightBlock.Bounds.Width;
+        if (tw <= 0 || double.IsNaN(tw))
+            return;
+
+        var viewport = CodeScroll.Bounds.Width;
+        var minW = Math.Max(200, Math.Max(tw, viewport > 1 ? viewport : tw));
+        CodeEditorHost.MinWidth = minW;
+        CodeEditor.MinWidth = minW;
+        SelectionBackground.MinWidth = minW;
+    }
+
     private void UpdateLanguageReadLabel()
     {
         var id = (_vm?.CodeLanguage ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(id))
         {
-            LanguageReadLabel.Text = "TEXT";
+            LanguageReadLabel.Text = "Plain text";
             return;
         }
 
@@ -179,9 +213,11 @@ public partial class CodeBlockComponent : BlockComponentBase, IBlockEditorReadOn
                  ?? Brushes.Gainsboro;
         var code = _vm?.Content ?? string.Empty;
         var lang = _vm?.CodeLanguage;
+        LineNumbersBlock.Text = SketchSyntaxHighlighter.BuildLineNumberText(code);
         _syntaxHighlighter.ApplyToTextBlock(HighlightBlock, code, lang, fg);
         SyncSelectionBackground();
         SyncEditorMinHeight();
+        Dispatcher.UIThread.Post(SyncCodeEditorHostWidth, DispatcherPriority.Loaded);
     }
 
     private void SyncSelectionBackground()

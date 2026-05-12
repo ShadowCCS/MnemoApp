@@ -115,8 +115,8 @@ public partial class SketchBlockComponent : BlockComponentBase
                 ShowBackdrop = true,
                 CloseOnOutsideClick = false,
                 CloseOnEscape = true,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
             },
             "SketchEditor");
     }

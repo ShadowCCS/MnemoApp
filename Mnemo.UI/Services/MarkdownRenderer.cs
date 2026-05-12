@@ -14,6 +14,7 @@ using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using Mnemo.Core.Models.Markdown;
 using Mnemo.Core.Services;
+using Mnemo.UI.Controls;
 using Mnemo.UI.Services.LaTeX.Layout.Boxes;
 
 namespace Mnemo.UI.Services;
@@ -664,31 +665,33 @@ public class MarkdownRenderer : IMarkdownRenderer
 
         var container = new Border
         {
-            Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
-            BorderBrush = (IBrush)Application.Current!.FindResource("RichTextSeparationLineBrush")!,
+            Background = (IBrush)app.FindResource("TextControlBackgroundBrush")!,
+            BorderBrush = (IBrush)app.FindResource("RichTextSeparationLineBrush")!,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(6),
+            CornerRadius = new CornerRadius(10),
             Margin = new Thickness(0, 8)
         };
 
-        var header = new Grid
+        var headerBorder = new Border
         {
-            Height = 32,
-            Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
-            Margin = new Thickness(0, 0, 0, 1)
+            Background = (IBrush)app.FindResource("TextControlBackgroundBrush")!,
+            BorderBrush = (IBrush)app.FindResource("NotesEditorSeparatorBrush")!,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(12, 8)
         };
+
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
         header.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         header.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
 
-        var displayLang = string.IsNullOrEmpty(language) ? "text" : language;
         var languageLabel = new TextBlock
         {
-            Text = displayLang.ToUpperInvariant(),
+            Text = SketchSyntaxHighlighter.GetDisplayLanguageLabel(language),
             FontWeight = FontWeight.SemiBold,
             FontSize = 12,
-            Foreground = (IBrush)Application.Current!.FindResource("TextTertiaryBrush")!,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(12, 0, 0, 0)
+            Foreground = (IBrush)app.FindResource("TextTertiaryBrush")!,
+            VerticalAlignment = VerticalAlignment.Center
         };
         Grid.SetColumn(languageLabel, 0);
 
@@ -696,17 +699,16 @@ public class MarkdownRenderer : IMarkdownRenderer
         {
             Content = "Copy",
             FontSize = 11,
-            Padding = new Thickness(8, 4),
+            Padding = new Thickness(10, 6),
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0),
-            Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!,
-            Foreground = (IBrush)Application.Current!.FindResource("TextSecondaryBrush")!,
-            BorderBrush = (IBrush)Application.Current!.FindResource("RichTextSeparationLineBrush")!,
+            Background = (IBrush)app.FindResource("TextControlBackgroundBrush")!,
+            Foreground = (IBrush)app.FindResource("TextSecondaryBrush")!,
+            BorderBrush = (IBrush)app.FindResource("RichTextSeparationLineBrush")!,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4)
+            CornerRadius = new CornerRadius(8)
         };
-        Grid.SetColumn(copyButton, 1);
+        Grid.SetColumn(copyButton, 2);
         copyButton.Click += async (_, _) =>
         {
             try
@@ -723,31 +725,72 @@ public class MarkdownRenderer : IMarkdownRenderer
 
         header.Children.Add(languageLabel);
         header.Children.Add(copyButton);
+        headerBorder.Child = header;
 
         var codeFont = new FontFamily("JetBrains Mono, Cascadia Code, Consolas, Courier New, monospace");
+        var lineHeight = codeFontSize * (20.0 / 13.0);
         var codeTextBlock = new TextBlock
         {
             FontFamily = codeFont,
             FontSize = codeFontSize,
+            LineHeight = lineHeight,
             TextWrapping = TextWrapping.NoWrap,
             Foreground = defaultFg,
-            Padding = new Thickness(12, 8, 12, 12),
-            Background = (IBrush)Application.Current!.FindResource("TextControlBackgroundBrush")!
+            Padding = new Thickness(10, 8, 10, 10)
         };
 
         _syntaxHighlighter.ApplyToTextBlock(codeTextBlock, code, string.IsNullOrEmpty(language) ? null : language, defaultFg);
 
-        var scroll = new ScrollViewer
+        var lineNumberBlock = new TextBlock
+        {
+            Text = SketchSyntaxHighlighter.BuildLineNumberText(code),
+            Padding = new Thickness(6, 8, 8, 10),
+            FontFamily = codeFont,
+            FontSize = codeFontSize,
+            LineHeight = lineHeight,
+            Foreground = (IBrush)app.FindResource("TextTertiaryBrush")!,
+            TextAlignment = TextAlignment.Right,
+            TextWrapping = TextWrapping.NoWrap,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+
+        var gutter = new Border
+        {
+            Width = 48,
+            MinHeight = 120,
+            Background = (IBrush)app.FindResource("NotesEditorSeparatorBrush")!,
+            BorderBrush = (IBrush)app.FindResource("RichTextSeparationLineBrush")!,
+            BorderThickness = new Thickness(0, 0, 1, 0),
+            Child = lineNumberBlock
+        };
+
+        var codeScroll = new ScrollViewer
         {
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            MaxHeight = 420,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             Content = codeTextBlock
         };
 
+        var bodyGrid = new Grid();
+        bodyGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        bodyGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        Grid.SetColumn(gutter, 0);
+        Grid.SetColumn(codeScroll, 1);
+        bodyGrid.Children.Add(gutter);
+        bodyGrid.Children.Add(codeScroll);
+
+        var outerScroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            MaxHeight = 420,
+            Background = (IBrush)app.FindResource("TextControlBackgroundBrush")!,
+            Content = bodyGrid
+        };
+
         var stackPanel = new StackPanel();
-        stackPanel.Children.Add(header);
-        stackPanel.Children.Add(scroll);
+        stackPanel.Children.Add(headerBorder);
+        stackPanel.Children.Add(outerScroll);
         container.Child = stackPanel;
         return container;
     }

@@ -54,6 +54,12 @@ public sealed class TextMateSyntaxHighlighter : ITextMateSyntaxHighlighter
     {
         target.Inlines?.Clear();
 
+        if (SketchSyntaxHighlighter.IsSketchLanguage(languageFenceId))
+        {
+            SketchSyntaxHighlighter.ApplyToTextBlock(target, code ?? string.Empty, defaultForeground);
+            return;
+        }
+
         var registry = EnsureRegistry();
         var grammar = ResolveGrammar(registry, languageFenceId);
         if (grammar == null || string.IsNullOrEmpty(code))

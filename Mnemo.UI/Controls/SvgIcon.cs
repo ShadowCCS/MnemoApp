@@ -187,6 +187,9 @@ namespace Mnemo.UI.Controls
 
             public void Render(ImmediateDrawingContext context)
             {
+                if (context.PlatformImpl is null)
+                    return;
+
                 var leaseFeature = context.PlatformImpl.GetFeature<ISkiaSharpApiLeaseFeature>();
                 if (leaseFeature == null) return;
 

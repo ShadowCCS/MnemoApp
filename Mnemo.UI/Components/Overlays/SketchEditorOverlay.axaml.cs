@@ -2,12 +2,12 @@ using System;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Mnemo.Core.Sketch;
+using Mnemo.UI.Services;
 
 namespace Mnemo.UI.Components.Overlays;
 
@@ -16,14 +16,22 @@ public partial class SketchEditorOverlay : UserControl
     private const double MinZoom = 0.25;
     private const double MaxZoom = 6;
     private const double ZoomStep = 1.2;
+    // Shell uses explicit W/H from host bounds; Max* alone does not expand (Border sizes to children).
+    private const double ShellViewportWidthScale = 0.88;
+    private const double ShellViewportHeightScale = 0.84;
+    private const double ShellMaxWidthAbs = 2560;
+    private const double ShellMaxHeightAbs = 1440;
+    private const double ShellRootMarginTotal = 16;
 
     private readonly SketchCompiler _compiler = new();
     private bool _isPanning;
     private Point _lastPanPoint;
+    private Size _lastShellCap;
 
     public SketchEditorOverlay()
     {
         InitializeComponent();
+        LayoutUpdated += (_, _) => UpdateShellViewportCap();
     }
 
     public event Action<string>? SaveRequested;
@@ -91,7 +99,38 @@ public partial class SketchEditorOverlay : UserControl
     protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
+        UpdateShellViewportCap();
         ResetPreviewView();
+    }
+
+    private void UpdateShellViewportCap()
+    {
+        var shell = this.FindControl<Border>("ShellCard");
+        var top = TopLevel.GetTopLevel(this);
+        if (shell == null || top == null)
+            return;
+
+        var client = top.ClientSize;
+        var availW = Math.Max(Bounds.Width - ShellRootMarginTotal, 80);
+        var availH = Math.Max(Bounds.Height - ShellRootMarginTotal, 80);
+        if (Bounds.Width < 80 || Bounds.Height < 80)
+        {
+            availW = Math.Max(client.Width - ShellRootMarginTotal, 80);
+            availH = Math.Max(client.Height - ShellRootMarginTotal, 80);
+        }
+
+        var next = new Size(
+            Math.Clamp(availW * ShellViewportWidthScale, 280, ShellMaxWidthAbs),
+            Math.Clamp(availH * ShellViewportHeightScale, 200, ShellMaxHeightAbs));
+
+        if (Math.Abs(next.Width - _lastShellCap.Width) < 0.5 && Math.Abs(next.Height - _lastShellCap.Height) < 0.5)
+            return;
+
+        _lastShellCap = next;
+        shell.MaxWidth = next.Width;
+        shell.MaxHeight = next.Height;
+        shell.Width = next.Width;
+        shell.Height = next.Height;
     }
 
     private void SaveButton_Click(object? sender, RoutedEventArgs e)
@@ -128,21 +167,8 @@ public partial class SketchEditorOverlay : UserControl
     private void RefreshSourceHighlight(string source)
     {
         SourceHighlight.Inlines?.Clear();
-
-        var lexer = new SketchLexer(source);
-        var (tokens, _) = lexer.Lex();
-        var offset = 0;
-        foreach (var token in tokens.Where(t => t.Kind != SketchTokenKind.EndOfFile).OrderBy(t => t.Span.Start.Offset))
-        {
-            if (token.Span.Start.Offset > offset)
-                AddSourceRun(source[offset..token.Span.Start.Offset], ResolveSourceBrush(SketchTokenKind.Identifier, string.Empty));
-
-            AddSourceRun(token.Text, ResolveSourceBrush(token.Kind, token.Value));
-            offset = Math.Max(offset, token.Span.End.Offset);
-        }
-
-        if (offset < source.Length)
-            AddSourceRun(source[offset..], ResolveSourceBrush(SketchTokenKind.Identifier, string.Empty));
+        var def = ThemeBrush("SyntaxCodeDefaultBrush");
+        SketchSyntaxHighlighter.ApplyToTextBlock(SourceHighlight, source, def);
     }
 
     private void SyncSourceSelectionBackground()
@@ -151,31 +177,6 @@ public partial class SketchEditorOverlay : UserControl
         SourceSelectionBackgroundLayer.Text = editor.Text ?? string.Empty;
         SourceSelectionBackgroundLayer.SelectionStart = editor.SelectionStart;
         SourceSelectionBackgroundLayer.SelectionEnd = editor.SelectionEnd;
-    }
-
-    private void AddSourceRun(string text, IBrush brush)
-    {
-        if (string.IsNullOrEmpty(text))
-            return;
-
-        SourceHighlight.Inlines?.Add(new Run(text) { Foreground = brush });
-    }
-
-    private static IBrush ResolveSourceBrush(SketchTokenKind kind, string value)
-    {
-        return kind switch
-        {
-            SketchTokenKind.KeywordSketch or SketchTokenKind.KeywordClass or SketchTokenKind.KeywordGroup or SketchTokenKind.KeywordEdge
-                => ThemeBrush("SyntaxCodeKeywordBrush"),
-            SketchTokenKind.String => ThemeBrush("SyntaxCodeStringBrush"),
-            SketchTokenKind.Number or SketchTokenKind.Boolean => ThemeBrush("SyntaxCodeNumberBrush"),
-            SketchTokenKind.Comment => ThemeBrush("SyntaxCodeCommentBrush"),
-            SketchTokenKind.ArrowDirected => ThemeBrush("SyntaxCodeOperatorBrush"),
-            SketchTokenKind.LeftBracket or SketchTokenKind.RightBracket or SketchTokenKind.LeftBrace or SketchTokenKind.RightBrace
-                or SketchTokenKind.Colon or SketchTokenKind.Comma => ThemeBrush("SyntaxCodePunctuationBrush"),
-            SketchTokenKind.Invalid => ThemeBrush("SyntaxCodeInvalidBrush"),
-            _ => ThemeBrush("SyntaxCodeDefaultBrush")
-        };
     }
 
     private static IBrush ThemeBrush(string key)

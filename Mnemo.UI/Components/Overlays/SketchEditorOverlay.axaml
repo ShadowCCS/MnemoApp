@@ -4,17 +4,18 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:Mnemo.UI.Controls"
     x:CompileBindings="False">
-    <Grid Background="Transparent">
+    <Grid Margin="8" Background="Transparent">
         <Border
-            Width="1040"
-            Height="720"
+            x:Name="ShellCard"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
+            MinWidth="280"
+            MinHeight="200"
             Background="{DynamicResource OverlayBackgroundBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
             CornerRadius="16"
-            Padding="20">
+            Padding="16">
             <Grid RowDefinitions="Auto,16,*,16,Auto">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="4">
@@ -65,7 +66,7 @@
                                 HorizontalScrollBarVisibility="Auto"
                                 VerticalScrollBarVisibility="Auto"
                                 Background="{DynamicResource TextControlBackgroundBrush}">
-                                <Grid MinHeight="520">
+                                <Grid MinHeight="0">
                                     <controls:TextSelectionBackgroundLayer
                                         x:Name="SourceSelectionBackground"
                                         ZIndex="0"
@@ -114,7 +115,7 @@
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="12">
-                        <Grid RowDefinitions="Auto,8,*,Auto">
+                        <Grid RowDefinitions="Auto,8,*,64">
                             <Grid ColumnDefinitions="*,Auto">
                                 <StackPanel Spacing="2">
                                     <TextBlock
@@ -183,14 +184,19 @@
                                         IsHitTestVisible="False" />
                                 </Grid>
                             </Border>
-                            <TextBlock
-                                x:Name="DiagnosticsText"
+                            <ScrollViewer
                                 Grid.Row="3"
-                                Margin="0,10,0,0"
-                                Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                                FontSize="12"
-                                IsVisible="False"
-                                TextWrapping="Wrap" />
+                                Margin="0,8,0,0"
+                                HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto"
+                                Background="Transparent">
+                                <TextBlock
+                                    x:Name="DiagnosticsText"
+                                    Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                    FontSize="12"
+                                    IsVisible="False"
+                                    TextWrapping="Wrap" />
+                            </ScrollViewer>
                         </Grid>
                     </Border>
                 </Grid>
