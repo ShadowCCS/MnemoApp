@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Linq;
 using Avalonia;
@@ -9,6 +10,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Mnemo.Core.Models;
+using Mnemo.Core.Services;
 using Mnemo.UI.Modules.Chat.ViewModels;
 using Mnemo.UI.Services;
 
@@ -26,20 +28,26 @@ public partial class ChatView : UserControl
     }
 
     private ScrollViewer? _chatScrollViewer;
+    private ItemsRepeater? _chatMessagesRepeater;
     private ChatViewModel? _currentVm;
     private TextBox? _inputBox;
     private readonly EventHandler<KeyEventArgs> _inputBoxKeyDownHandler;
+    private readonly IPerfDiagnostics? _perf;
+    private DispatcherTimer? _chatMetricsDebounce;
 
     public ChatView()
     {
         InitializeComponent();
         _inputBoxKeyDownHandler = InputBox_KeyDown;
+        if (Application.Current is App app)
+            _perf = app.Services?.GetService(typeof(IPerfDiagnostics)) as IPerfDiagnostics;
     }
 
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         _chatScrollViewer = this.FindControl<ScrollViewer>("ChatScrollViewer");
+        _chatMessagesRepeater = this.FindControl<ItemsRepeater>("ChatMessagesRepeater");
         if (_chatScrollViewer != null)
             _chatScrollViewer.ScrollChanged += OnScrollChanged;
         _inputBox = this.FindControl<TextBox>("InputBox");
@@ -62,6 +70,9 @@ public partial class ChatView : UserControl
             _chatScrollViewer.ScrollChanged -= OnScrollChanged;
             _chatScrollViewer = null;
         }
+        _chatMessagesRepeater = null;
+        _chatMetricsDebounce?.Stop();
+        _chatMetricsDebounce = null;
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -115,6 +126,36 @@ public partial class ChatView : UserControl
             _chatScrollViewer.Offset.Y,
             _chatScrollViewer.Extent.Height,
             _chatScrollViewer.Viewport.Height);
+        ScheduleChatListMetrics();
+    }
+
+    private void ScheduleChatListMetrics()
+    {
+        if (_perf is not { IsEnabled: true })
+            return;
+
+        _chatMetricsDebounce ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        _chatMetricsDebounce.Tick -= OnChatMetricsDebounceTick;
+        _chatMetricsDebounce.Tick += OnChatMetricsDebounceTick;
+        _chatMetricsDebounce.Stop();
+        _chatMetricsDebounce.Start();
+    }
+
+    private void OnChatMetricsDebounceTick(object? sender, EventArgs e)
+    {
+        _chatMetricsDebounce?.Stop();
+        if (_perf is not { IsEnabled: true } || DataContext is not ChatViewModel vm)
+            return;
+
+        var total = vm.Messages.Count;
+        var realized = 0;
+        if (_chatMessagesRepeater != null)
+        {
+            foreach (var child in _chatMessagesRepeater.GetVisualChildren())
+                realized++;
+        }
+        _perf.RecordMetric("Chat", "messages.total", total, detail: "bound collection count");
+        _perf.RecordMetric("Chat", "messages.realized", realized, detail: "ItemsRepeater visual children (approx realized)");
     }
 
     private void InputBox_KeyDown(object? sender, KeyEventArgs e)

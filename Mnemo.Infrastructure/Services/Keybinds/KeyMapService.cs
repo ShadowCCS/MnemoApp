@@ -29,6 +29,11 @@ public sealed class KeyMapService : IKeyMap
     private List<SequenceCandidate>? _localSeqCandidates;
     private DateTime _localSeqStartedUtc;
 
+    // Armed-defs cache, partitioned. Null = invalid. Rebuilt on demand under _lock.
+    // Invalidated by any mutation to _manifest, _ephemeral, _overrides, or _activeNamespace.
+    private List<KeybindActionDefinition>? _armedGlobalCache;
+    private List<KeybindActionDefinition>? _armedLocalCache;
+
     [DebuggerDisplay("{ActionId} depth {Depth}")]
     private sealed class SequenceCandidate
     {
@@ -42,7 +47,22 @@ public sealed class KeyMapService : IKeyMap
         _repository = repository;
         _logger = logger;
         ReplaceManifestDefinitions(bootstrapManifest.ToList());
-        ReloadOverridesAsync().GetAwaiter().GetResult();
+        // Don't block the constructing thread (Bootstrapper.Build runs on the UI thread).
+        // The repository may hit SQLite/disk; load overrides off-thread and merge in via the
+        // existing lock. The window between ctor and first keystroke makes the gap invisible
+        // in practice; any user override that lands after the first key event uses the cache
+        // invalidation in ReloadOverridesAsync.
+        _ = Task.Run(async () =>
+        {
+            try { await ReloadOverridesAsync().ConfigureAwait(false); }
+            catch (Exception ex) { _logger.Error("Keybinds", $"Initial override load failed: {ex.Message}"); }
+        });
+    }
+
+    private void InvalidateArmedCacheUnlocked()
+    {
+        _armedGlobalCache = null;
+        _armedLocalCache = null;
     }
 
     public void ReplaceManifestDefinitions(IReadOnlyList<KeybindActionDefinition> definitions)
@@ -50,6 +70,7 @@ public sealed class KeyMapService : IKeyMap
         lock (_lock)
         {
             _manifest = definitions.ToDictionary(d => d.ActionId, StringComparer.Ordinal);
+            InvalidateArmedCacheUnlocked();
             _logger.Debug("Keybinds", $"Manifest replaced: {_manifest.Count} actions.");
         }
     }
@@ -80,6 +101,7 @@ public sealed class KeyMapService : IKeyMap
 #endif
                 }
             }
+            InvalidateArmedCacheUnlocked();
         }
     }
 
@@ -87,8 +109,11 @@ public sealed class KeyMapService : IKeyMap
     {
         lock (_lock)
         {
+            var nsChanged = !string.Equals(_activeNamespace, activeNamespace, StringComparison.Ordinal);
             _activeRoute = route;
             _activeNamespace = activeNamespace;
+            if (nsChanged)
+                _armedLocalCache = null; // global bucket unaffected by namespace
             _logger.Debug("Keybinds", $"Active route '{route}', namespace '{activeNamespace}'.");
         }
     }
@@ -154,6 +179,7 @@ public sealed class KeyMapService : IKeyMap
             _globalSeqCandidates = null;
             _localSeqCandidates = null;
             _ephemeral.Clear();
+            InvalidateArmedCacheUnlocked();
         }
     }
 
@@ -169,7 +195,7 @@ public sealed class KeyMapService : IKeyMap
 
             TryExpireGlobalSequence(utcNow);
 
-            var armed = GetStaticArmedDefinitionsUnlocked().Where(d => d.Scope == KeybindScope.Global && d.Enabled).ToList();
+            var armed = EnsureGlobalArmedUnlocked();
 
             foreach (var def in armed)
             {
@@ -205,10 +231,7 @@ public sealed class KeyMapService : IKeyMap
 
             TryExpireLocalSequence(utcNow);
 
-            var armed = GetStaticArmedDefinitionsUnlocked()
-                .Where(d => d.Scope == KeybindScope.Local && d.Enabled &&
-                            string.Equals(d.Namespace, _activeNamespace, StringComparison.Ordinal))
-                .ToList();
+            var armed = EnsureLocalArmedUnlocked();
 
             foreach (var def in armed)
             {
@@ -267,6 +290,7 @@ public sealed class KeyMapService : IKeyMap
         lock (_lock)
         {
             _overrides = loaded.ToDictionary(k => k.Key, v => v.Value, StringComparer.Ordinal);
+            InvalidateArmedCacheUnlocked();
             _logger.Debug("Keybinds", $"Overrides loaded: {_overrides.Count} rows.");
         }
 
@@ -290,6 +314,21 @@ public sealed class KeyMapService : IKeyMap
 
     private IReadOnlyList<KeybindActionDefinition> GetStaticArmedDefinitionsUnlocked()
     {
+        var global = EnsureGlobalArmedUnlocked();
+        var local = EnsureLocalArmedUnlocked();
+        if (local.Count == 0) return global;
+        if (global.Count == 0) return local;
+        var list = new List<KeybindActionDefinition>(global.Count + local.Count);
+        list.AddRange(global);
+        list.AddRange(local);
+        return list;
+    }
+
+    // Cached: armed Global definitions (Enabled=true). Independent of _activeNamespace.
+    private List<KeybindActionDefinition> EnsureGlobalArmedUnlocked()
+    {
+        if (_armedGlobalCache != null) return _armedGlobalCache;
+
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var k in _manifest.Keys) ids.Add(k);
         foreach (var k in _ephemeral.Keys) ids.Add(k);
@@ -301,11 +340,29 @@ public sealed class KeyMapService : IKeyMap
             if (merged == null || !merged.Enabled) continue;
             if (merged.Scope == KeybindScope.Global)
                 list.Add(merged);
-            else if (string.Equals(merged.Namespace, _activeNamespace, StringComparison.Ordinal))
+        }
+        return _armedGlobalCache = list;
+    }
+
+    // Cached: armed Local definitions for the current _activeNamespace.
+    private List<KeybindActionDefinition> EnsureLocalArmedUnlocked()
+    {
+        if (_armedLocalCache != null) return _armedLocalCache;
+
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var k in _manifest.Keys) ids.Add(k);
+        foreach (var k in _ephemeral.Keys) ids.Add(k);
+
+        var list = new List<KeybindActionDefinition>();
+        foreach (var id in ids)
+        {
+            var merged = BuildMergedUnlocked(id);
+            if (merged == null || !merged.Enabled) continue;
+            if (merged.Scope == KeybindScope.Local
+                && string.Equals(merged.Namespace, _activeNamespace, StringComparison.Ordinal))
                 list.Add(merged);
         }
-
-        return list;
+        return _armedLocalCache = list;
     }
 
     private KeybindActionDefinition? BuildMergedUnlocked(string actionId)

@@ -32,6 +32,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IUpdateService _updateService;
     private readonly UpdateOrchestrator _updateOrchestrator;
     private readonly IKeyMap _keyMap;
+    private readonly IPerfDiagnostics _perf;
 
     private bool _aiRuntimeInstalled;
     private bool _developerGateUnlocked;
@@ -100,7 +101,8 @@ public partial class SettingsViewModel : ViewModelBase
         IMainThreadDispatcher mainThreadDispatcher,
         IUpdateService updateService,
         UpdateOrchestrator updateOrchestrator,
-        IKeyMap keyMap)
+        IKeyMap keyMap,
+        IPerfDiagnostics perf)
     {
         _settingsService = settingsService;
         _themeService = themeService;
@@ -115,6 +117,7 @@ public partial class SettingsViewModel : ViewModelBase
         _updateService = updateService;
         _updateOrchestrator = updateOrchestrator;
         _keyMap = keyMap;
+        _perf = perf;
 
         _aiInstallCoordinator.Completed += OnAiInstallCompleted;
 
@@ -409,6 +412,37 @@ public partial class SettingsViewModel : ViewModelBase
             };
             var devGroup = new SettingsGroupViewModel("Developer tools", isCollapsible: true);
             devGroup.Items.Add(new SettingsNoticeViewModel("Reserved for developers", "This page holds developer-only preferences and diagnostics. More options will appear here over time."));
+            devGroup.Items.Add(new ToggleSettingViewModel(
+                _settingsService,
+                IPerfDiagnostics.EnabledSettingKey,
+                "Performance diagnostics",
+                "Records module load, overlay, markdown render timings, chat list metrics, and memory snapshots. Startup timings are always buffered; when enabled, entries also go to the debug log file and console.",
+                false));
+            devGroup.Items.Add(new AsyncActionSettingViewModel(
+                "View performance log",
+                "Opens a scrollable report of the last ~500 diagnostic entries.",
+                "Open log",
+                async _ =>
+                {
+                    var overlay = new Components.Overlays.PerfDiagnosticsOverlay(_perf);
+                    _overlayService.CreateOverlay(overlay, new OverlayOptions
+                    {
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                        ShowBackdrop = true,
+                        CloseOnOutsideClick = true
+                    }, "PerfDiagnostics");
+                    await Task.CompletedTask;
+                }));
+            devGroup.Items.Add(new AsyncActionSettingViewModel(
+                "Capture memory snapshot",
+                "Records managed heap and working set into the performance log.",
+                "Snapshot",
+                async _ =>
+                {
+                    _perf.CaptureMemorySnapshot("manual (settings)");
+                    await Task.CompletedTask;
+                }));
             devGroup.Items.Add(new ToggleSettingViewModel(_settingsService, ChatDatasetSettings.LoggingEnabledKey, "Log conversations for dataset", "Append each turn (manager model + chat model request/response) as one JSON object per line to %LocalAppData%\\mnemo\\chat_dataset\\conversations.jsonl. Off by default.", false));
             devGroup.Items.Add(new AsyncActionSettingViewModel(
                 "Export training datasets",

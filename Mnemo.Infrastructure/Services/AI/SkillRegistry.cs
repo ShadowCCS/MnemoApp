@@ -47,6 +47,15 @@ public sealed class SkillRegistry : ISkillRegistry
         }
     }
 
+    public void Unload()
+    {
+        lock (_lock)
+        {
+            _skills = new Dictionary<string, LoadedSkill>(StringComparer.OrdinalIgnoreCase);
+            _loaded = false;
+        }
+    }
+
     public IReadOnlyList<SkillDefinition> GetEnabledSkills()
     {
         lock (_lock)

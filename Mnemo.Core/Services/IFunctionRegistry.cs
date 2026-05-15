@@ -6,6 +6,7 @@ namespace Mnemo.Core.Services;
 public interface IFunctionRegistry
 {
     void RegisterTool(AIToolDefinition tool);
+    void ClearTools();
     IEnumerable<AIToolDefinition> GetTools();
 }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace Mnemo.Core.Sketch;
 
@@ -279,28 +280,52 @@ public sealed class SketchParser
 
     private static string FormatLabel(IReadOnlyList<SketchToken> tokens)
     {
+        if (tokens.Count == 0)
+            return string.Empty;
         if (tokens.Count == 1 && tokens[0].Kind == SketchTokenKind.String)
             return tokens[0].Value;
 
-        return string.Join(
-            " ",
-            tokens
-                .Where(t => t.Kind != SketchTokenKind.Invalid)
-                .Select(t => t.Value)
-                .Where(t => !string.IsNullOrWhiteSpace(t)))
-            .Trim();
+        var sb = new StringBuilder();
+        foreach (var t in tokens)
+        {
+            if (t.Kind == SketchTokenKind.Invalid)
+                continue;
+            var v = t.Value;
+            if (string.IsNullOrWhiteSpace(v))
+                continue;
+            if (sb.Length > 0)
+                sb.Append(' ');
+            sb.Append(v);
+        }
+        // Trim trailing whitespace from the buffer in-place rather than allocating a trimmed copy.
+        while (sb.Length > 0 && char.IsWhiteSpace(sb[sb.Length - 1]))
+            sb.Length--;
+        var start = 0;
+        while (start < sb.Length && char.IsWhiteSpace(sb[start]))
+            start++;
+        return start == 0 ? sb.ToString() : sb.ToString(start, sb.Length - start);
     }
 
     private static string FormatPropertyValue(IReadOnlyList<SketchToken> tokens)
     {
+        if (tokens.Count == 0)
+            return string.Empty;
         if (tokens.Count == 1 && tokens[0].Kind == SketchTokenKind.String)
             return tokens[0].Value;
 
-        return string.Concat(
-            tokens
-                .Where(t => t.Kind != SketchTokenKind.Invalid)
-                .Select(t => t.Text))
-            .Trim();
+        var sb = new StringBuilder();
+        foreach (var t in tokens)
+        {
+            if (t.Kind == SketchTokenKind.Invalid)
+                continue;
+            sb.Append(t.Text);
+        }
+        while (sb.Length > 0 && char.IsWhiteSpace(sb[sb.Length - 1]))
+            sb.Length--;
+        var start = 0;
+        while (start < sb.Length && char.IsWhiteSpace(sb[start]))
+            start++;
+        return start == 0 ? sb.ToString() : sb.ToString(start, sb.Length - start);
     }
 
     private void SkipNewlines()

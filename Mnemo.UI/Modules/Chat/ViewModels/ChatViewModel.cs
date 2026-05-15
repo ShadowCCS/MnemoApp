@@ -1827,7 +1827,21 @@ public class ChatViewModel : ViewModelBase, INavigationAware, IDisposable
             if (_isHistoryReady && _chatSessions.Count > 0)
             {
                 var doc = BuildPersistDocument();
-                _chatHistoryService.SaveAsync(doc).ConfigureAwait(false).GetAwaiter().GetResult();
+                // Dispose runs on the UI thread (via NavigationService.CurrentViewModel setter).
+                // Persist on the threadpool so navigation stays smooth; log failures from the continuation.
+                var historyService = _chatHistoryService;
+                var logger = _logger;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await historyService.SaveAsync(doc).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error("Chat", $"History flush on dispose failed: {ex}");
+                    }
+                });
             }
         }
         catch (Exception ex)

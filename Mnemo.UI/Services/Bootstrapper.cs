@@ -50,6 +50,7 @@ public static class Bootstrapper
         services.AddSingleton<IChatModuleHistoryService, ChatModuleHistoryService>();
         services.AddSingleton<IChatHistoryClearService, ChatHistoryClearService>();
         services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IPerfDiagnostics, PerfDiagnosticsService>();
         services.AddSingleton<IUpdateService, VelopackUpdateService>();
         services.AddSingleton<IChatDatasetLogger, ChatDatasetLogger>();
         services.AddSingleton<DatasetExporter>();
@@ -188,8 +189,10 @@ public static class Bootstrapper
 
         // 3. Discover modules and register translation sources (before building provider)
         var discoverSw = Stopwatch.StartNew();
-        var modules = DiscoverModules();
-        Console.WriteLine($"DiscoverModules: {discoverSw.ElapsedMilliseconds}ms");
+        var modules = DiscoverModules().ToList();
+        var discoverMs = discoverSw.ElapsedMilliseconds;
+        services.AddSingleton<IReadOnlyList<IModule>>(modules);
+        services.AddSingleton<IAiAssistantToolHost, AiAssistantToolHost>();
         var translationRegistry = new TranslationSourceRegistry();
         translationRegistry.Add(new EmbeddedBuiltInTranslationSource());
         foreach (var module in modules)
@@ -228,9 +231,14 @@ public static class Bootstrapper
 
         var buildSpSw = Stopwatch.StartNew();
         var serviceProvider = services.BuildServiceProvider();
-        Console.WriteLine($"BuildServiceProvider: {buildSpSw.ElapsedMilliseconds}ms");
+        var buildSpMs = buildSpSw.ElapsedMilliseconds;
 
         var logger = serviceProvider.GetRequiredService<ILoggerService>();
+        var perf = serviceProvider.GetRequiredService<IPerfDiagnostics>();
+        perf.RecordTiming("Startup", "DiscoverModules", discoverMs);
+        perf.RecordTiming("Startup", "BuildServiceProvider", buildSpMs);
+        using (perf.Measure("Startup", "Bootstrapper.pre-window"))
+            perf.CaptureMemorySnapshot("after BuildServiceProvider");
 
         // Welcome-note seed: runs once on fresh install, fire-and-forget so DB I/O doesn't block startup.
         _ = Task.Run(async () =>
@@ -275,19 +283,13 @@ public static class Bootstrapper
         var modelRegistry = serviceProvider.GetRequiredService<IAIModelRegistry>();
         _ = modelRegistry.RefreshAsync();
 
-        // Skill loading reads from disk; fire-and-forget so the window isn't delayed.
-        var skillRegistry = serviceProvider.GetRequiredService<ISkillRegistry>();
-        _ = skillRegistry.LoadAsync().ContinueWith(t =>
-        {
-            if (t.IsFaulted)
-                logger.Warning("Bootstrapper", $"Failed to load skill registry: {t.Exception?.GetBaseException().Message}");
-        }, TaskScheduler.Default);
+        // Tools + skill manifests load only when AI.EnableAssistant is on (see AiAssistantToolHost).
+        _ = serviceProvider.GetRequiredService<IAiAssistantToolHost>();
 
         // Local llama-server processes start on first generation route (LlamaCppHttpTextService / orchestration).
 
-        // 7. Register Routes, Sidebar Items, Tools and Widgets
+        // 7. Register Routes, Sidebar Items, and Widgets (tools deferred to AiAssistantToolHost)
         var navRegistry = serviceProvider.GetRequiredService<INavigationRegistry>();
-        var funcRegistry = serviceProvider.GetRequiredService<IFunctionRegistry>();
         var sidebarService = serviceProvider.GetRequiredService<ISidebarService>();
         var widgetRegistry = serviceProvider.GetRequiredService<IWidgetRegistry>();
 
@@ -296,22 +298,21 @@ public static class Bootstrapper
             var moduleName = module.GetType().Name;
             var regSw = Stopwatch.StartNew();
             module.RegisterRoutes(navRegistry);
-            Console.WriteLine($"{moduleName}.RegisterRoutes: {regSw.ElapsedMilliseconds}ms");
+            var routesMs = regSw.ElapsedMilliseconds;
+            perf.RecordTiming("Startup", $"{moduleName}.RegisterRoutes", routesMs);
 
             regSw.Restart();
             module.RegisterSidebarItems(sidebarService);
-            Console.WriteLine($"{moduleName}.RegisterSidebarItems: {regSw.ElapsedMilliseconds}ms");
-
-            regSw.Restart();
-            module.RegisterTools(funcRegistry, serviceProvider);
-            Console.WriteLine($"{moduleName}.RegisterTools: {regSw.ElapsedMilliseconds}ms");
+            var sidebarMs = regSw.ElapsedMilliseconds;
+            perf.RecordTiming("Startup", $"{moduleName}.RegisterSidebarItems", sidebarMs);
 
             regSw.Restart();
             module.RegisterWidgets(widgetRegistry, serviceProvider);
-            Console.WriteLine($"{moduleName}.RegisterWidgets: {regSw.ElapsedMilliseconds}ms");
+            var widgetsMs = regSw.ElapsedMilliseconds;
+            perf.RecordTiming("Startup", $"{moduleName}.RegisterWidgets", widgetsMs);
         }
 
-        ToolManifestValidator.ValidateAndLog(skillRegistry, funcRegistry, logger);
+        perf.CaptureMemorySnapshot("after module registration");
 
         _ = serviceProvider.GetRequiredService<NavigationStatisticsTracker>();
 
@@ -345,35 +346,35 @@ public static class Bootstrapper
         assemblySet.Add(typeof(Bootstrapper).Assembly);
 
         var moduleType = typeof(IModule);
-        
-        var foundModules = new List<IModule>();
+        var foundModules = new List<IModule>(32);
 
         foreach (var assembly in assemblySet)
         {
+            Type[] types;
             try
             {
-                var types = assembly.GetTypes()
-                    .Where(t => moduleType.IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-                
-                foreach (var type in types)
-                {
-                    try
-                    {
-                        if (Activator.CreateInstance(type) is IModule module)
-                        {
-                            foundModules.Add(module);
-                        }
-                    }
-                    catch
-                    {
-                        // Module instantiation failures are ignored during discovery phase
-                        // Logger will be available after provider is built if we need to log this
-                    }
-                }
+                // GetExportedTypes is cheaper than GetTypes (skips internal/nested-private; all IModule impls are public).
+                types = assembly.GetExportedTypes();
             }
             catch
             {
-                // Skip assemblies that can't be scanned
+                continue;
+            }
+
+            foreach (var type in types)
+            {
+                if (type.IsInterface || type.IsAbstract) continue;
+                if (!moduleType.IsAssignableFrom(type)) continue;
+
+                try
+                {
+                    if (Activator.CreateInstance(type) is IModule module)
+                        foundModules.Add(module);
+                }
+                catch
+                {
+                    // Module instantiation failures are ignored during discovery phase.
+                }
             }
         }
         return foundModules;

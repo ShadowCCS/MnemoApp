@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Mnemo.Core.Sketch;
 
@@ -18,18 +17,23 @@ public sealed class SketchLayoutEngine
     {
         var ranks = ComputeRanks(diagram);
         var rankOffsets = new Dictionary<int, double>();
-        var laidOutNodes = new List<LaidOutSketchNode>();
+        var laidOutNodes = new List<LaidOutSketchNode>(diagram.Nodes.Count);
 
         foreach (var node in diagram.Nodes)
         {
             var rank = ranks.TryGetValue(node.Id, out var knownRank) ? knownRank : 0;
             rankOffsets.TryGetValue(rank, out var offsetInRank);
             var labelLines = SketchTextWrapping.WrapLabel(node.Label);
-            var labelWidth = labelLines.Max(SketchTextWrapping.MeasureLineWidth);
+
+            double labelWidth = 0;
+            foreach (var line in labelLines)
+            {
+                var w = SketchTextWrapping.MeasureLineWidth(line);
+                if (w > labelWidth) labelWidth = w;
+            }
+
             var nodeWidth = Math.Clamp(labelWidth + NodeHorizontalPadding, MinNodeWidth, MaxNodeWidth);
-            var nodeHeight = Math.Max(
-                48,
-                labelLines.Count * SketchTextWrapping.LineHeight + NodeVerticalPadding);
+            var nodeHeight = Math.Max(48, labelLines.Count * SketchTextWrapping.LineHeight + NodeVerticalPadding);
             var nodeY = Padding + offsetInRank;
             rankOffsets[rank] = offsetInRank + nodeHeight + VerticalGap;
 
@@ -44,49 +48,66 @@ public sealed class SketchLayoutEngine
                 nodeHeight));
         }
 
-        var byId = laidOutNodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
-        var laidOutEdges = diagram.Edges
-            .Where(e => byId.ContainsKey(e.SourceId) && byId.ContainsKey(e.TargetId))
-            .Select(e =>
-            {
-                var source = byId[e.SourceId];
-                var target = byId[e.TargetId];
-                return new LaidOutSketchEdge(
-                    e.Id,
-                    e.SourceId,
-                    e.TargetId,
-                    e.Label,
-                    e.Style,
-                    source.X + source.Width,
-                    source.Y + source.Height / 2,
-                    target.X,
-                    target.Y + target.Height / 2);
-            })
-            .ToArray();
+        var byId = new Dictionary<string, LaidOutSketchNode>(laidOutNodes.Count, StringComparer.Ordinal);
+        foreach (var n in laidOutNodes)
+            byId[n.Id] = n;
 
-        var width = laidOutNodes.Count == 0 ? 2 * Padding : laidOutNodes.Max(n => n.X + n.Width + Padding);
-        var height = laidOutNodes.Count == 0 ? 2 * Padding : laidOutNodes.Max(n => n.Y + n.Height + Padding);
-        return new LaidOutSketchDiagram(laidOutNodes, laidOutEdges, new SketchBounds(width, height), diagram.Diagnostics);
+        var laidOutEdges = new List<LaidOutSketchEdge>(diagram.Edges.Count);
+        foreach (var e in diagram.Edges)
+        {
+            if (!byId.TryGetValue(e.SourceId, out var source) || !byId.TryGetValue(e.TargetId, out var target))
+                continue;
+
+            laidOutEdges.Add(new LaidOutSketchEdge(
+                e.Id,
+                e.SourceId,
+                e.TargetId,
+                e.Label,
+                e.Style,
+                source.X + source.Width,
+                source.Y + source.Height / 2,
+                target.X,
+                target.Y + target.Height / 2));
+        }
+
+        double maxRight = 2 * Padding;
+        double maxBottom = 2 * Padding;
+        if (laidOutNodes.Count > 0)
+        {
+            maxRight = 0;
+            maxBottom = 0;
+            foreach (var n in laidOutNodes)
+            {
+                var r = n.X + n.Width + Padding;
+                var b = n.Y + n.Height + Padding;
+                if (r > maxRight) maxRight = r;
+                if (b > maxBottom) maxBottom = b;
+            }
+        }
+
+        return new LaidOutSketchDiagram(laidOutNodes, laidOutEdges, new SketchBounds(maxRight, maxBottom), diagram.Diagnostics);
     }
 
     private static Dictionary<string, int> ComputeRanks(ResolvedSketchDiagram diagram)
     {
-        var ranks = diagram.Nodes.ToDictionary(n => n.Id, _ => 0, StringComparer.Ordinal);
-        var nodeIds = new HashSet<string>(ranks.Keys, StringComparer.Ordinal);
+        var ranks = new Dictionary<string, int>(diagram.Nodes.Count, StringComparer.Ordinal);
+        foreach (var n in diagram.Nodes)
+            ranks[n.Id] = 0;
 
         for (var i = 0; i < diagram.Nodes.Count; i++)
         {
             var changed = false;
             foreach (var edge in diagram.Edges)
             {
-                if (!nodeIds.Contains(edge.SourceId) || !nodeIds.Contains(edge.TargetId))
+                if (!ranks.TryGetValue(edge.SourceId, out var sourceRank)
+                    || !ranks.TryGetValue(edge.TargetId, out var targetRank))
                     continue;
 
-                var targetRank = Math.Max(ranks[edge.TargetId], ranks[edge.SourceId] + 1);
-                if (targetRank == ranks[edge.TargetId])
+                var nextRank = sourceRank + 1;
+                if (nextRank <= targetRank)
                     continue;
 
-                ranks[edge.TargetId] = targetRank;
+                ranks[edge.TargetId] = nextRank;
                 changed = true;
             }
 

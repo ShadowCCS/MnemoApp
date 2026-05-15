@@ -27,6 +27,9 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
     private readonly Dictionary<string, string> _routeNames = new();
     private object? _currentViewModel;
     private readonly Stack<string> _history = new();
+    // Cached snapshot of AI.EnableAssistant — read on every NavigateTo. Refreshed via SettingChanged
+    // so we never block the UI thread on ISettingsService.GetAsync.
+    private volatile bool _aiAssistantEnabled;
 
     public NavigationService(IServiceProvider serviceProvider, ISettingsService settingsService)
     {
@@ -34,13 +37,36 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
         _settingsService = settingsService;
         Breadcrumbs = new ObservableCollection<BreadcrumbItem>();
         _settingsService.SettingChanged += OnSettingsChanged;
+        _ = InitializeAiAssistantFlagAsync();
     }
 
-    private void OnSettingsChanged(object? sender, string key)
+    private async System.Threading.Tasks.Task InitializeAiAssistantFlagAsync()
+    {
+        try
+        {
+            _aiAssistantEnabled = await _settingsService.GetAsync(AiAssistantEnabledKey, false).ConfigureAwait(false);
+        }
+        catch
+        {
+            _aiAssistantEnabled = false;
+        }
+    }
+
+    private async void OnSettingsChanged(object? sender, string key)
     {
         if (key != AiAssistantEnabledKey)
             return;
-        var enabled = _settingsService.GetAsync(AiAssistantEnabledKey, false).GetAwaiter().GetResult();
+
+        bool enabled;
+        try
+        {
+            enabled = await _settingsService.GetAsync(AiAssistantEnabledKey, false).ConfigureAwait(true);
+        }
+        catch
+        {
+            enabled = false;
+        }
+        _aiAssistantEnabled = enabled;
         if (enabled)
             return;
         var route = CurrentRoute;
@@ -48,8 +74,7 @@ public class NavigationService : INavigationService, INotifyPropertyChanged
             ResetStackAndNavigateTo("overview", null);
     }
 
-    private bool IsAiAssistantEnabled() =>
-        _settingsService.GetAsync(AiAssistantEnabledKey, false).GetAwaiter().GetResult();
+    private bool IsAiAssistantEnabled() => _aiAssistantEnabled;
 
     private void ResetStackAndNavigateTo(string route, object? parameter)
     {

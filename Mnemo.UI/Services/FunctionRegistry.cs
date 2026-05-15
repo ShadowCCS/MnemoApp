@@ -13,6 +13,8 @@ public class FunctionRegistry : IFunctionRegistry
         _tools.Add(tool);
     }
 
+    public void ClearTools() => _tools.Clear();
+
     public IEnumerable<AIToolDefinition> GetTools() => _tools;
 }
 

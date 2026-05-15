@@ -24,22 +24,50 @@ public class MarkdownRenderer : IMarkdownRenderer
     private readonly ILaTeXEngine _latexEngine;
     private readonly ISettingsService _settingsService;
     private readonly ITextMateSyntaxHighlighter _syntaxHighlighter;
+    private readonly IPerfDiagnostics _perf;
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
+    // Cached settings (per renderer instance). Each render previously did 6 async settings reads per block;
+    // a 50-block document hit ISettingsService.GetAsync ~300 times. Snapshot once, invalidate on SettingChanged.
+    private double? _blockSpacing;
+    private double? _baseFontSize;
+    private double? _codeFontSize;
+    private double? _mathFontSize;
+    private double? _lineHeight;
+    private double? _letterSpacing;
+
     public MarkdownRenderer(
         ILaTeXEngine latexEngine,
         ISettingsService settingsService,
-        ITextMateSyntaxHighlighter syntaxHighlighter)
+        ITextMateSyntaxHighlighter syntaxHighlighter,
+        IPerfDiagnostics perf)
     {
         _latexEngine = latexEngine;
         _settingsService = settingsService;
         _syntaxHighlighter = syntaxHighlighter;
+        _perf = perf;
+        _settingsService.SettingChanged += OnSettingChanged;
+    }
+
+    private void OnSettingChanged(object? sender, string key)
+    {
+        if (!key.StartsWith("Markdown.", StringComparison.Ordinal)) return;
+        switch (key)
+        {
+            case "Markdown.BlockSpacing": _blockSpacing = null; break;
+            case "Markdown.FontSize": _baseFontSize = null; break;
+            case "Markdown.CodeFontSize": _codeFontSize = null; break;
+            case "Markdown.MathFontSize": _mathFontSize = null; break;
+            case "Markdown.LineHeight": _lineHeight = null; break;
+            case "Markdown.LetterSpacing": _letterSpacing = null; break;
+        }
     }
 
     public async Task<Control> RenderAsync(string markdown, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground = null)
     {
+        using var scope = _perf.Measure("Render", "MarkdownRenderer.RenderAsync", $"{markdown.Length} chars");
         var document = Markdig.Markdown.Parse(markdown, Pipeline);
         var spacing = await GetBlockSpacingAsync();
         var container = new StackPanel { Spacing = spacing };
@@ -51,54 +79,67 @@ public class MarkdownRenderer : IMarkdownRenderer
                 container.Children.Add(rendered);
         }
 
+        _perf.RecordMetric("Render", "MarkdownRenderer.blocks", document.Count, detail: $"{container.Children.Count} controls");
         return container;
     }
 
     private async Task<double> GetBlockSpacingAsync()
     {
+        if (_blockSpacing is { } cached) return cached;
         var val = await _settingsService.GetAsync("Markdown.BlockSpacing", "Normal");
-        return val switch
+        var result = val switch
         {
             "Compact" => 6.0,
             "Relaxed" => 20.0,
             _ => 12.0
         };
+        _blockSpacing = result;
+        return result;
     }
 
     private async Task<double> GetBaseFontSizeAsync()
     {
+        if (_baseFontSize is { } cached) return cached;
         var val = await _settingsService.GetAsync("Markdown.FontSize", "16px");
-        if (double.TryParse(val.Replace("px", ""), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var result)) return result;
-        return 16.0;
+        var result = double.TryParse(val.Replace("px", ""), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : 16.0;
+        _baseFontSize = result;
+        return result;
     }
 
     private async Task<double> GetCodeFontSizeAsync()
     {
+        if (_codeFontSize is { } cached) return cached;
         var val = await _settingsService.GetAsync("Markdown.CodeFontSize", "16px");
-        if (double.TryParse(val.Replace("px", ""), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var result)) return result;
-        return 16.0;
+        var result = double.TryParse(val.Replace("px", ""), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : 16.0;
+        _codeFontSize = result;
+        return result;
     }
 
     private async Task<double> GetMathFontSizeAsync(bool isDisplay)
     {
+        if (_mathFontSize is { } cached) return isDisplay ? cached + 2 : cached;
         var val = await _settingsService.GetAsync("Markdown.MathFontSize", "16px");
-        if (double.TryParse(val.Replace("px", ""), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var result)) 
-            return isDisplay ? result + 2 : result;
-        return isDisplay ? 18.0 : 16.0;
+        var result = double.TryParse(val.Replace("px", ""), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : 16.0;
+        _mathFontSize = result;
+        return isDisplay ? result + 2 : result;
     }
 
     private async Task<double> GetLineHeightAsync()
     {
+        if (_lineHeight is { } cached) return cached;
         var val = await _settingsService.GetAsync("Markdown.LineHeight", "1.2");
-        if (double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var result)) return result;
-        return 1.2;
+        var result = double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : 1.2;
+        _lineHeight = result;
+        return result;
     }
 
     private async Task<double> GetLetterSpacingAsync()
     {
+        if (_letterSpacing is { } cached) return cached;
         var val = await _settingsService.GetAsync("Markdown.LetterSpacing", "0");
-        if (double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var result)) return result;
-        return 0.0;
+        var result = double.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : 0.0;
+        _letterSpacing = result;
+        return result;
     }
 
     private async Task<Control?> RenderBlockAsync(Markdig.Syntax.Block block, Dictionary<string, MarkdownSpecialInline> specialInlines, IBrush? foreground, int listDepth = 0)

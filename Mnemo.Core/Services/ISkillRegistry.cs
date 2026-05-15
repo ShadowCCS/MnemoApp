@@ -9,6 +9,9 @@ public interface ISkillRegistry
 {
     Task LoadAsync(CancellationToken ct = default);
     Task ReloadAsync(CancellationToken ct = default);
+
+    /// <summary>Drops in-memory skill manifests so disk is not re-read until the next <see cref="LoadAsync"/>.</summary>
+    void Unload();
     IReadOnlyList<SkillDefinition> GetEnabledSkills();
     SkillDefinition? TryGet(string id);
     SkillInjectionContext GetInjection(string? skillId);

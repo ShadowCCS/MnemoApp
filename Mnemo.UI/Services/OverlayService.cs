@@ -13,16 +13,22 @@ public class OverlayService : IOverlayService
     public ObservableCollection<OverlayInstance> Overlays { get; } = new();
     private readonly Dictionary<string, TaskCompletionSource<object?>> _completionSources = new();
     private readonly Dictionary<string, Type> _typeCache = new();
+    private readonly IPerfDiagnostics _perf;
+
+    public OverlayService(IPerfDiagnostics perf)
+    {
+        _perf = perf;
+    }
 
     public void Show(string overlayName, object? parameter = null)
     {
+        using var scope = _perf.Measure("Overlay", "Show", overlayName);
         if (!_typeCache.TryGetValue(overlayName, out var type))
         {
-            // Simple registry-less resolution: search for the type by name
-            type = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .FirstOrDefault(t => t.Name == overlayName || t.FullName == overlayName);
-            
+            // Cold-path: scan only Mnemo.* assemblies, and only their exported types.
+            // SelectMany(a => a.GetTypes()) over every loaded assembly was forcing type-table
+            // realization for the entire AppDomain on each first miss.
+            type = FindOverlayType(overlayName);
             if (type != null) _typeCache[overlayName] = type;
         }
 
@@ -30,6 +36,26 @@ public class OverlayService : IOverlayService
 
         var content = Activator.CreateInstance(type);
         CreateOverlay(content!, new OverlayOptions(), overlayName);
+    }
+
+    private static Type? FindOverlayType(string overlayName)
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.FullName?.StartsWith("Mnemo.", StringComparison.Ordinal) != true)
+                continue;
+
+            Type[] types;
+            try { types = assembly.GetExportedTypes(); }
+            catch { continue; }
+
+            foreach (var t in types)
+            {
+                if (t.Name == overlayName || t.FullName == overlayName)
+                    return t;
+            }
+        }
+        return null;
     }
 
     public void Hide()
@@ -62,6 +88,7 @@ public class OverlayService : IOverlayService
 
     public string CreateOverlay(object content, OverlayOptions options, string? name = null)
     {
+        using var scope = _perf.Measure("Overlay", "CreateOverlay", name ?? content.GetType().Name);
         var instance = new OverlayInstance
         {
             Content = content,

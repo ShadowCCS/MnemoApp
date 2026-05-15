@@ -421,8 +421,14 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </Grid>
-                    <ItemsControl ItemsSource="{Binding Messages}" HorizontalAlignment="Stretch">
-                        <ItemsControl.ItemTemplate>
+                    <!-- ItemsRepeater virtualizes vertically; works correctly even inside ScrollViewer > StackPanel chain (unlike ItemsControl + VirtualizingStackPanel). -->
+                    <ItemsRepeater x:Name="ChatMessagesRepeater"
+                                   ItemsSource="{Binding Messages}"
+                                   HorizontalAlignment="Stretch">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Orientation="Vertical"/>
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
                             <DataTemplate DataType="vm:ChatMessageViewModel">
                                 <Panel Margin="0,0,0,32" MinWidth="0">
                                     <!-- Assistant Message -->
@@ -808,8 +814,8 @@
                                     </Grid>
                                 </Panel>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
                     </StackPanel>
                     </Border>
                 </Grid>

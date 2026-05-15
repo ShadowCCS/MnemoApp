@@ -19,6 +19,24 @@
     <AssemblyVersion>0.6.3</AssemblyVersion>
     <AssemblyFileVersion>0.6.3</AssemblyFileVersion>
     <AssemblyInformationalVersion>0.6.3-dev</AssemblyInformationalVersion>
+
+    <!--
+      Performance tuning:
+      - ServerGarbageCollection: desktop app does enough work in background threads (AI gen, embed,
+        markdown render, knowledge indexing, history flushes) that the multi-heap, parallel server
+        GC outperforms workstation GC. Concurrent stays on so foreground pauses remain short.
+      - TieredPGO + ReadyToRunComposite are picked up by `dotnet publish` to cut JIT cold-start.
+      - InvariantGlobalization=false stays default; we need locale-aware formatting for chat/dates.
+    -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- ReadyToRun pre-JITs assemblies during publish; trades disk size for startup time. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
   </PropertyGroup>
 
   <ItemGroup>
@@ -60,6 +78,7 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.0.2" />
+    <PackageReference Include="Avalonia.Controls.ItemsRepeater" Version="12.0.0" />
     <PackageReference Include="Avalonia.Desktop" Version="12.0.2" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.2" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.1" />
