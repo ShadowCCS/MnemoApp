@@ -651,6 +651,13 @@ public partial class NotesView : UserControl
         _editorZoom = newZ;
         ApplyEditorCameraZoom();
 
+        // Force a synchronous layout pass so ScrollViewer.Extent reflects the new zoom before
+        // we set Offset. Without this, the ScrollViewer coerces Offset against the pre-zoom
+        // extent (clamping any larger value to the old max), which strands the cursor anchor
+        // off-target whenever zooming in. The virtualized BlockEditor only re-measures realized
+        // rows here, so the cost is bounded.
+        scroll.UpdateLayout();
+
         var newExtent = GetEditorZoomedExtentSize(newZ);
         var newOuterWidth = outer.Width > 1 ? outer.Width : Math.Max(newExtent.Width, viewport.Width);
         var newHostX = Math.Max(0, (newOuterWidth - newExtent.Width) / 2);

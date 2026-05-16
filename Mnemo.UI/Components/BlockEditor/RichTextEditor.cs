@@ -407,18 +407,22 @@ public class RichTextEditor : Control, ICustomHitTest
     private const double SubSuperscriptFontSizeRatio = 0.75;
 
     /// <summary>
-    /// Width for <see cref="BuildLayout"/> / hit-test sync: <see cref="Bounds"/> can still be narrow before the
-    /// next arrange even when the visual parent (e.g. column) is already wide — max with parent avoids stale layout.
+    /// Width for <see cref="BuildLayout"/> / hit-test sync after a layout pass has settled.
+    /// Uses <see cref="Bounds.Width"/> (set by ArrangeOverride) and <see cref="_lastLayoutWidth"/>
+    /// (set momentarily during arrange before BuildLayout resets it).
+    ///
+    /// NOTE: Do NOT include the visual parent's Bounds.Width here. When the RichTextEditor sits in
+    /// the inner <c>*</c> column of a multi-column block (numbered list, bullet list, checklist,
+    /// quote …), the parent Grid is the full block width while the editor is only the narrower
+    /// <c>*</c> column. Taking the max with the parent width causes EnsureLayoutForVerticalNavigation
+    /// to rebuild the text layout at the wrong (wider) width on the first pointer hit-test, making
+    /// text reflow wider than the actual column on click.
     /// </summary>
     private double ComputeEffectiveLayoutMaxWidth()
     {
         var wSelf = Bounds.Width > 0 && !double.IsNaN(Bounds.Width) ? Bounds.Width : 0;
         var wArrange = _lastLayoutWidth > 0 && !double.IsNaN(_lastLayoutWidth) ? _lastLayoutWidth : 0;
-        var wParent = 0.0;
-        if (this.GetVisualParent() is Control pc && pc.Bounds.Width > 0 && !double.IsNaN(pc.Bounds.Width))
-            wParent = pc.Bounds.Width;
-
-        var m = Math.Max(wSelf, Math.Max(wArrange, wParent));
+        var m = Math.Max(wSelf, wArrange);
         if (m <= 0)
             return MinLayoutWidth;
         return Math.Min(MaxLayoutWidth, m);
@@ -2061,7 +2065,9 @@ public class RichTextEditor : Control, ICustomHitTest
         try
         {
             await service.AddWordAsync(word, _spellcheckLanguages, CancellationToken.None).ConfigureAwait(false);
-            ScheduleSpellcheck(force: true);
+            // ScheduleSpellcheck touches DispatcherTimer and VisualRoot — must run on the UI thread.
+            // ConfigureAwait(false) above resumes on a thread-pool thread, so we post back explicitly.
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ScheduleSpellcheck(force: true));
         }
         catch (Exception)
         {

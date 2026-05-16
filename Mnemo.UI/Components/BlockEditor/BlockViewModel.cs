@@ -389,6 +389,24 @@ public class BlockViewModel : INotifyPropertyChanged
         if (_spans.Count == 0)
             _spans.Add(InlineSpan.Plain(string.Empty));
         EnsureHeadingBold();
+
+        // Detect URLs that exist as plain text (e.g. loaded from storage, pasted, or undo'd
+        // from an older format). CommitSpansFromEditor does the same check on every keystroke;
+        // SetSpans must do it too so links are detected on initial load and after undo/redo.
+        if (_type != BlockType.Code)
+        {
+            var flat = InlineSpanFormatApplier.Flatten(_spans);
+            if (MayContainAutoLink(flat))
+            {
+                var autolinked = InlineAutoLink.Apply(_spans);
+                if (!SpansListContentEqual(_spans, autolinked))
+                {
+                    _spans = autolinked;
+                    EnsureHeadingBold();
+                }
+            }
+        }
+
         _cachedFlatContent = InlineSpanFormatApplier.Flatten(_spans);
         OnPropertyChanged(nameof(Content));
         OnPropertyChanged(nameof(Spans));
@@ -762,6 +780,23 @@ public class BlockViewModel : INotifyPropertyChanged
         if (_spans.Count == 0)
             _spans.Add(InlineSpan.Plain(string.Empty));
         EnsureHeadingBold();
+
+        // Apply autolink so URLs stored as plain text (e.g. older notes, imports) get link
+        // styling immediately on load rather than only after the first keystroke.
+        if (_type != BlockType.Code)
+        {
+            var loadFlat = InlineSpanFormatApplier.Flatten(_spans);
+            if (MayContainAutoLink(loadFlat))
+            {
+                var autolinked = InlineAutoLink.Apply(_spans);
+                if (!SpansListContentEqual(_spans, autolinked))
+                {
+                    _spans = autolinked;
+                    EnsureHeadingBold();
+                }
+            }
+        }
+
         _cachedFlatContent = InlineSpanFormatApplier.Flatten(_spans);
 
         EnsureMetaKeys();

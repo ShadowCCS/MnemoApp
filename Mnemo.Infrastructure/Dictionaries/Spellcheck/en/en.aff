@@ -1,3 +1,11 @@
+# Affix file for en_US-large Hunspell Dictionary.
+#
+# Version 2026.02.25
+# Wed Feb 25 15:37:24 2026 -0500 [7e99eda]
+# 
+# https://wordlist.aspell.net
+# 
+
 SET UTF-8
 TRY esianrtolcdugmphbyfvkwzESIANRTOLCDUGMPHBYFVKWZ'
 ICONV 1
@@ -14,7 +22,7 @@ ONLYINCOMPOUND c
 COMPOUNDRULE 2
 COMPOUNDRULE n*1t
 COMPOUNDRULE n*mp
-WORDCHARS 0123456789
+WORDCHARS 0123456789’
 
 PFX A Y 1
 PFX A   0     re         .
@@ -43,8 +51,8 @@ SFX V   0     ive        [^e]
 
 SFX N Y 3
 SFX N   e     ion        e
-SFX N   y     ication    y
-SFX N   0     en         [^ey]
+SFX N   y     ication    y 
+SFX N   0     en         [^ey] 
 
 SFX X Y 3
 SFX X   e     ions       e
@@ -53,14 +61,14 @@ SFX X   0     ens        [^ey]
 
 SFX H N 2
 SFX H   y     ieth       y
-SFX H   0     th         [^y]
+SFX H   0     th         [^y] 
 
 SFX Y Y 1
 SFX Y   0     ly         .
 
 SFX G Y 2
 SFX G   e     ing        e
-SFX G   0     ing        [^e]
+SFX G   0     ing        [^e] 
 
 SFX J Y 2
 SFX J   e     ings       e

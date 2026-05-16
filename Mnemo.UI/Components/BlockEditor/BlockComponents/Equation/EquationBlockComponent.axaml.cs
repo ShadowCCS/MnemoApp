@@ -101,11 +101,19 @@ public partial class EquationBlockComponent : BlockComponentBase
             _scrollParent.ScrollChanged += OnParentScrollChanged;
     }
 
-    private void OnParentScrollChanged(object? sender, ScrollChangedEventArgs e) => ScheduleViewportRender();
+    private void OnParentScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        // Only re-evaluate when the scroll offset actually moved (user scrolled).
+        // Extent-only changes come from our own content layout updates (e.g. swapping
+        // the LaTeXRenderer in/out) and must not trigger a new render cycle.
+        if (e.OffsetDelta.Y == 0 && e.OffsetDelta.X == 0)
+            return;
+        ScheduleViewportRender();
+    }
 
     private void ScheduleViewportRender()
     {
-        _viewportDebounceTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+        _viewportDebounceTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
         _viewportDebounceTimer.Tick -= OnViewportDebounceTick;
         _viewportDebounceTimer.Tick += OnViewportDebounceTick;
         _viewportDebounceTimer.Stop();
@@ -127,16 +135,20 @@ public partial class EquationBlockComponent : BlockComponentBase
         var scroll = _scrollParent ?? this.FindAncestorOfType<ScrollViewer>();
         if (scroll == null) return true;
 
+        // TranslatePoint to a ScrollViewer returns viewport-relative coordinates:
+        // 0 = top of the visible area, scroll.Viewport.Height = bottom.
+        // Do NOT add scroll.Offset.Y here — that would mix document-absolute and
+        // viewport-relative spaces and cause visible items to appear "off-screen".
         var tl = this.TranslatePoint(new Point(0, 0), scroll);
         if (!tl.HasValue) return true;
 
         double top = tl.Value.Y;
         double h = Bounds.Height;
-        if (double.IsNaN(h) || h <= 0) h = 1;
+        if (double.IsNaN(h) || h <= 0) h = 60; // safe fallback: assume a normal block height
         double bottom = top + h;
 
-        double vy0 = scroll.Offset.Y - ViewportBufferPx;
-        double vy1 = scroll.Offset.Y + scroll.Viewport.Height + ViewportBufferPx;
+        double vy0 = -ViewportBufferPx;
+        double vy1 = scroll.Viewport.Height + ViewportBufferPx;
         return bottom >= vy0 && top <= vy1;
     }
 
