@@ -6,8 +6,10 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -29,9 +31,18 @@ public partial class NotesView : UserControl
     private bool _editorOpenNoteWired;
     private bool _blocksChangedSubscribed;
     private DispatcherTimer? _saveDebounceTimer;
+    private bool _saveTimerRunning;
     /// <summary>Note we have pending unsaved block changes for. When flushing on note switch, SelectedNote is already the new note; we must save this one with editor content.</summary>
     private Note? _pendingSaveNote;
     private const int SaveDebounceMs = 500;
+    /// <summary>
+    /// Content fingerprint as of the last successful save (per <see cref="_pendingSaveNote"/>, or
+    /// the selected note when no pending save is tracked). Autosave compares the editor's current
+    /// fingerprint against this to skip JSON-serialize + SQLite write when nothing changed.
+    /// </summary>
+    private (string NoteId, long Fingerprint)? _lastSavedFingerprint;
+    /// <summary>Cached BlockEditor lookup; FindControl is too expensive to call on every keystroke.</summary>
+    private BlockEditor? _cachedBlockEditor;
 
     internal DragCoordinator? _dragCoordinator;
     private Window? _attachedWindow;
@@ -41,6 +52,13 @@ public partial class NotesView : UserControl
     private bool _editorScrollPanning;
     private Point _editorPanLastPosition;
     private IPointer? _editorPanPointer;
+    private bool _editorScrollbarThumbDragging;
+    private IPointer? _editorScrollbarThumbPointer;
+    private Control? _editorScrollbarDragTrack;
+    private Thumb? _editorScrollbarDragThumb;
+    private double _editorScrollbarDragPointerOffsetY;
+    private bool _editorScrollbarDragSyncScheduled;
+    private double _editorScrollbarDragRatio;
     private double _editorZoom = 1.0;
     private Size _lastEditorDocumentSizeForZoom;
     private const double EditorMinZoom = 0.5;
@@ -54,6 +72,7 @@ public partial class NotesView : UserControl
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        _cachedBlockEditor = null;
         if (DataContext is not NotesViewModel vm)
             return;
 
@@ -90,12 +109,17 @@ public partial class NotesView : UserControl
 
     private void FlushPendingSave()
     {
-        if (_saveDebounceTimer != null)
+        if (_saveTimerRunning)
         {
-            _saveDebounceTimer.Stop();
-            _saveDebounceTimer.Tick -= OnSaveDebounceTimerTick;
             OnSaveDebounceTimerTick(null, EventArgs.Empty);
         }
+    }
+
+    private BlockEditor? GetBlockEditor()
+    {
+        if (_cachedBlockEditor != null) return _cachedBlockEditor;
+        _cachedBlockEditor = this.FindControl<BlockEditor>("NoteBlockEditor");
+        return _cachedBlockEditor;
     }
 
     private void LoadBlocksForCurrentNote()
@@ -103,7 +127,7 @@ public partial class NotesView : UserControl
         if (DataContext is not NotesViewModel vm)
             return;
 
-        var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
+        var editor = GetBlockEditor();
         if (editor == null)
             return;
 
@@ -143,6 +167,13 @@ public partial class NotesView : UserControl
             _blocksChangedSubscribed = true;
             editor.BlocksChanged += OnBlockEditorBlocksChanged;
         }
+
+        // Snapshot the just-loaded document so the next BlocksChanged tick (which can fire spuriously
+        // — first-block focus, page-title refresh, etc.) skips a redundant initial save.
+        var loadedNoteId = vm.SelectedNote?.NoteId;
+        _lastSavedFingerprint = loadedNoteId != null
+            ? (loadedNoteId, editor.ComputeContentFingerprint())
+            : null;
     }
 
     private void OnBlockEditorBlocksChanged()
@@ -150,25 +181,29 @@ public partial class NotesView : UserControl
         if (DataContext is not NotesViewModel vm || vm.SelectedNote == null)
             return;
 
+        // Avoid walking document metrics here — BlocksChanged fires often during editing and large notes
+        // make visual tree work expensive.
+
         _pendingSaveNote = vm.SelectedNote;
-        _saveDebounceTimer?.Stop();
-        _saveDebounceTimer = new DispatcherTimer
+
+        if (_saveDebounceTimer == null)
         {
-            Interval = TimeSpan.FromMilliseconds(SaveDebounceMs)
-        };
-        _saveDebounceTimer.Tick += OnSaveDebounceTimerTick;
+            _saveDebounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(SaveDebounceMs)
+            };
+            _saveDebounceTimer.Tick += OnSaveDebounceTimerTick;
+        }
+
+        _saveDebounceTimer.Stop();
         _saveDebounceTimer.Start();
+        _saveTimerRunning = true;
     }
 
     private async void OnSaveDebounceTimerTick(object? sender, EventArgs e)
     {
-        var timer = _saveDebounceTimer;
-        _saveDebounceTimer = null;
-        if (timer != null)
-        {
-            timer.Stop();
-            timer.Tick -= OnSaveDebounceTimerTick;
-        }
+        _saveDebounceTimer?.Stop();
+        _saveTimerRunning = false;
 
         var noteToSave = _pendingSaveNote;
         _pendingSaveNote = null;
@@ -176,14 +211,38 @@ public partial class NotesView : UserControl
         if (DataContext is not NotesViewModel vm)
             return;
 
-        var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
+        var editor = GetBlockEditor();
         if (editor == null)
             return;
 
+        var targetNote = noteToSave ?? vm.SelectedNote;
+        if (targetNote == null)
+            return;
+
+        // Cheap structural hash of the live document. Compared to the fingerprint of the previous
+        // save for THIS note; if equal, the autosave tick was triggered by something other than a
+        // content edit (e.g. focus loss, redundant BlocksChanged from a no-op gesture) and we skip
+        // getBlocks + JSON serialize + SQLite write entirely.
+        var currentFingerprint = editor.ComputeContentFingerprint();
+        if (_lastSavedFingerprint is { } last
+            && last.NoteId == targetNote.NoteId
+            && last.Fingerprint == currentFingerprint)
+        {
+            return;
+        }
+
+        var blocks = editor.GetBlocks();
+
+        // Storage layer (SqliteStorageProvider.SaveAsync) runs the JSON-serialize step on the
+        // threadpool so this await does not block the UI thread on synchronous serialization of
+        // 1500 blocks. ModifiedText / title PropertyChanged work still runs on the UI thread
+        // (we're back here via the captured sync context after the awaited Task completes).
         if (noteToSave != null)
-            await vm.SaveNoteWithContentAsync(noteToSave, editor.GetBlocks(), null);
-        else if (vm.SelectedNote != null)
-            await vm.SaveCurrentNoteAsync(editor.GetBlocks(), null);
+            await vm.SaveNoteWithContentAsync(noteToSave, blocks, null);
+        else
+            await vm.SaveCurrentNoteAsync(blocks, null);
+
+        _lastSavedFingerprint = (targetNote.NoteId, currentFingerprint);
     }
 
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
@@ -289,8 +348,8 @@ public partial class NotesView : UserControl
         var scroll = this.FindControl<ScrollViewer>("EditorScrollViewer");
         if (scroll == null) return;
         scroll.AddHandler(PointerPressedEvent, OnEditorScrollViewerPointerPressed, RoutingStrategies.Tunnel);
-        scroll.PointerMoved += OnEditorScrollViewerPointerMoved;
-        scroll.PointerReleased += OnEditorScrollViewerPointerReleased;
+        scroll.AddHandler(PointerMovedEvent, OnEditorScrollViewerPointerMoved, RoutingStrategies.Bubble, handledEventsToo: true);
+        scroll.AddHandler(PointerReleasedEvent, OnEditorScrollViewerPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
         scroll.PointerCaptureLost += OnEditorScrollViewerPointerCaptureLost;
         _editorScrollPanHandlersWired = true;
     }
@@ -303,8 +362,8 @@ public partial class NotesView : UserControl
         if (scroll != null)
         {
             scroll.RemoveHandler(PointerPressedEvent, OnEditorScrollViewerPointerPressed);
-            scroll.PointerMoved -= OnEditorScrollViewerPointerMoved;
-            scroll.PointerReleased -= OnEditorScrollViewerPointerReleased;
+            scroll.RemoveHandler(PointerMovedEvent, OnEditorScrollViewerPointerMoved);
+            scroll.RemoveHandler(PointerReleasedEvent, OnEditorScrollViewerPointerReleased);
             scroll.PointerCaptureLost -= OnEditorScrollViewerPointerCaptureLost;
         }
         _editorScrollPanHandlersWired = false;
@@ -316,6 +375,8 @@ public partial class NotesView : UserControl
         if (scroll == null) return;
 
         var pt = e.GetCurrentPoint(scroll);
+        TryBeginEditorScrollbarThumbDrag(e);
+
         if (pt.Properties.IsMiddleButtonPressed)
         {
             TryBeginEditorScrollPan(scroll, e);
@@ -343,6 +404,8 @@ public partial class NotesView : UserControl
 
     private void OnEditorScrollViewerPointerMoved(object? sender, PointerEventArgs e)
     {
+        UpdateEditorScrollbarThumbDrag(e);
+
         if (!_editorScrollPanning) return;
         var scroll = sender as ScrollViewer ?? this.FindControl<ScrollViewer>("EditorScrollViewer");
         if (scroll == null || !ReferenceEquals(e.Pointer.Captured, scroll)) return;
@@ -356,6 +419,9 @@ public partial class NotesView : UserControl
 
     private void OnEditorScrollViewerPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_editorScrollbarThumbDragging && ReferenceEquals(e.Pointer, _editorScrollbarThumbPointer))
+            EndEditorScrollbarThumbDrag();
+
         var scroll = sender as ScrollViewer ?? this.FindControl<ScrollViewer>("EditorScrollViewer");
         if (scroll == null || !_editorScrollPanning) return;
         if (!ReferenceEquals(e.Pointer.Captured, scroll)) return;
@@ -368,6 +434,7 @@ public partial class NotesView : UserControl
 
     private void OnEditorScrollViewerPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
+        EndEditorScrollbarThumbDrag();
         EndEditorScrollPanIfNeeded();
     }
 
@@ -382,10 +449,96 @@ public partial class NotesView : UserControl
             scroll.Cursor = Cursor.Default;
     }
 
+    private void TryBeginEditorScrollbarThumbDrag(PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+
+        if (e.Source is not Visual source)
+            return;
+
+        var thumb = source as Thumb ?? source.GetVisualAncestors().OfType<Thumb>().FirstOrDefault();
+        if (thumb == null)
+            return;
+
+        var scrollBar = source as ScrollBar ?? source.GetVisualAncestors().OfType<ScrollBar>().FirstOrDefault();
+        if (scrollBar?.Orientation != Orientation.Vertical)
+            return;
+
+        if (thumb.GetVisualParent() is not Control track || track.Bounds.Height <= thumb.Bounds.Height)
+            return;
+
+        var thumbTop = thumb.TranslatePoint(new Point(0, 0), track);
+        if (!thumbTop.HasValue)
+            return;
+
+        _editorScrollbarThumbDragging = true;
+        _editorScrollbarThumbPointer = e.Pointer;
+        _editorScrollbarDragTrack = track;
+        _editorScrollbarDragThumb = thumb;
+        _editorScrollbarDragPointerOffsetY = e.GetPosition(track).Y - thumbTop.Value.Y;
+    }
+
+    private void UpdateEditorScrollbarThumbDrag(PointerEventArgs e)
+    {
+        if (!_editorScrollbarThumbDragging || !ReferenceEquals(e.Pointer, _editorScrollbarThumbPointer))
+            return;
+
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            EndEditorScrollbarThumbDrag();
+            return;
+        }
+
+        if (_editorScrollbarDragTrack == null || _editorScrollbarDragThumb == null)
+            return;
+
+        var usableTrack = _editorScrollbarDragTrack.Bounds.Height - _editorScrollbarDragThumb.Bounds.Height;
+        if (usableTrack <= 1)
+            return;
+
+        var pointerY = e.GetPosition(_editorScrollbarDragTrack).Y;
+        var thumbTop = Math.Clamp(pointerY - _editorScrollbarDragPointerOffsetY, 0, usableTrack);
+        _editorScrollbarDragRatio = thumbTop / usableTrack;
+
+        if (_editorScrollbarDragSyncScheduled)
+            return;
+
+        _editorScrollbarDragSyncScheduled = true;
+        Dispatcher.UIThread.Post(ApplyEditorScrollbarThumbDragRatio, DispatcherPriority.Input);
+    }
+
+    private void ApplyEditorScrollbarThumbDragRatio()
+    {
+        _editorScrollbarDragSyncScheduled = false;
+        if (!_editorScrollbarThumbDragging)
+            return;
+
+        var scroll = this.FindControl<ScrollViewer>("EditorScrollViewer");
+        if (scroll == null)
+            return;
+
+        var maxY = Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height);
+        var y = Math.Clamp(_editorScrollbarDragRatio, 0, 1) * maxY;
+        if (Math.Abs(scroll.Offset.Y - y) > 0.5)
+            scroll.Offset = new Vector(scroll.Offset.X, y);
+    }
+
+    private void EndEditorScrollbarThumbDrag()
+    {
+        _editorScrollbarThumbDragging = false;
+        _editorScrollbarThumbPointer = null;
+        _editorScrollbarDragTrack = null;
+        _editorScrollbarDragThumb = null;
+        _editorScrollbarDragPointerOffsetY = 0;
+        _editorScrollbarDragRatio = 0;
+    }
+
     private void OnGutterPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         if (e.ClickCount > 1) return;
+        if (IsScrollBarChrome(e.Source as Visual)) return;
 
         var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
         if (editor == null) return;
@@ -397,6 +550,15 @@ public partial class NotesView : UserControl
         if (posInEditor.Y < 0 || posInEditor.Y > editor.Bounds.Height) return;
 
         editor.ArmExternalBoxSelect(posInEditor, e.Pointer);
+    }
+
+    private static bool IsScrollBarChrome(Visual? source)
+    {
+        if (source == null)
+            return false;
+
+        return source is ScrollBar or Thumb
+            || source.GetVisualAncestors().Any(a => a is ScrollBar or Thumb);
     }
 
     /// <summary>100% zoom, scroll to origin, end pan gesture; extent resyncs on next layout.</summary>
@@ -415,7 +577,7 @@ public partial class NotesView : UserControl
     {
         if (_editorZoomHandlersWired) return;
         var scroll = this.FindControl<ScrollViewer>("EditorScrollViewer");
-        var doc = this.FindControl<StackPanel>("EditorDocumentPanel");
+        var doc = this.FindControl<Panel>("EditorDocumentPanel");
         if (scroll == null || doc == null) return;
         scroll.AddHandler(PointerWheelChangedEvent, OnEditorScrollViewerPointerWheelChanged, RoutingStrategies.Tunnel);
         scroll.ScrollChanged += OnEditorScrollViewerScrollChanged;
@@ -428,7 +590,7 @@ public partial class NotesView : UserControl
     {
         if (!_editorZoomHandlersWired) return;
         var scroll = this.FindControl<ScrollViewer>("EditorScrollViewer");
-        var doc = this.FindControl<StackPanel>("EditorDocumentPanel");
+        var doc = this.FindControl<Panel>("EditorDocumentPanel");
         scroll?.RemoveHandler(PointerWheelChangedEvent, OnEditorScrollViewerPointerWheelChanged);
         if (scroll != null)
             scroll.ScrollChanged -= OnEditorScrollViewerScrollChanged;
@@ -440,7 +602,7 @@ public partial class NotesView : UserControl
     private void OnEditorDocumentLayoutUpdated(object? sender, EventArgs e)
     {
         SyncEditorDocumentLayoutWidth();
-        var doc = this.FindControl<StackPanel>("EditorDocumentPanel");
+        var doc = this.FindControl<Panel>("EditorDocumentPanel");
         if (doc == null) return;
         var s = GetEditorDocumentNaturalSize(doc);
         if (s.Width <= 1 || s.Height <= 1) return;
@@ -500,7 +662,7 @@ public partial class NotesView : UserControl
     }
 
     /// <summary>Desired document size for zoom extent; render transforms do not change layout bounds.</summary>
-    private Size GetEditorDocumentNaturalSize(StackPanel doc)
+    private Size GetEditorDocumentNaturalSize(Panel doc)
     {
         Size s;
         var d = doc.DesiredSize;
@@ -528,7 +690,7 @@ public partial class NotesView : UserControl
     private void ApplyEditorCameraZoom()
     {
         var host = this.FindControl<EditorZoomHost>("EditorZoomExtentHost");
-        var doc = this.FindControl<StackPanel>("EditorDocumentPanel");
+        var doc = this.FindControl<Panel>("EditorDocumentPanel");
         if (host == null || doc == null) return;
         SyncEditorDocumentLayoutWidth();
         var s = GetEditorDocumentNaturalSize(doc);
@@ -552,19 +714,6 @@ public partial class NotesView : UserControl
         ApplyEditorCameraZoom();
         SyncEditorScrollWidthHost();
         Dispatcher.UIThread.Post(ClampEditorScrollOffset, DispatcherPriority.Loaded);
-    }
-
-    private void OnEditorScrollViewerLayoutUpdated(object? sender, EventArgs e)
-    {
-        if (SyncEditorDocumentLayoutWidth())
-        {
-            _lastEditorDocumentSizeForZoom = default;
-            ApplyEditorCameraZoom();
-        }
-        else
-        {
-            SyncEditorScrollWidthHost();
-        }
     }
 
     private void OnEditorScrollViewerScrollChanged(object? sender, ScrollChangedEventArgs e)
@@ -594,13 +743,15 @@ public partial class NotesView : UserControl
         if (vw <= 1)
             vw = scroll.Bounds.Width;
         var targetW = vw > 1 ? Math.Max(cw, vw) : cw;
-        outer.Width = targetW;
-        outer.Height = ch;
+        if (double.IsNaN(outer.Width) || Math.Abs(outer.Width - targetW) > 0.5)
+            outer.Width = targetW;
+        if (outer.IsSet(Control.HeightProperty))
+            outer.ClearValue(Control.HeightProperty);
     }
 
     private Size GetEditorZoomedExtentSize(double zoom)
     {
-        var doc = this.FindControl<StackPanel>("EditorDocumentPanel");
+        var doc = this.FindControl<Panel>("EditorDocumentPanel");
         if (doc == null)
             return default;
 
@@ -623,7 +774,7 @@ public partial class NotesView : UserControl
             return false;
 
         var scroll = this.FindControl<ScrollViewer>("EditorScrollViewer");
-        var doc = this.FindControl<StackPanel>("EditorDocumentPanel");
+        var doc = this.FindControl<Panel>("EditorDocumentPanel");
         var host = this.FindControl<EditorZoomHost>("EditorZoomExtentHost");
         if (scroll == null || doc == null || host == null)
             return false;
@@ -705,7 +856,7 @@ public partial class NotesView : UserControl
         if (DataContext is NotesViewModel vm)
             vm.PropertyChanged -= OnViewModelPropertyChanged;
 
-        var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
+        var editor = GetBlockEditor();
         if (editor != null)
         {
             if (_editorOpenNoteWired)
@@ -720,6 +871,15 @@ public partial class NotesView : UserControl
             }
         }
 
+        if (_saveDebounceTimer != null)
+        {
+            _saveDebounceTimer.Stop();
+            _saveDebounceTimer.Tick -= OnSaveDebounceTimerTick;
+            _saveDebounceTimer = null;
+            _saveTimerRunning = false;
+        }
+        _cachedBlockEditor = null;
+
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -733,7 +893,7 @@ public partial class NotesView : UserControl
     {
         if (DataContext is not NotesViewModel vm || vm.SelectedNote == null)
             return;
-        var editor = this.FindControl<BlockEditor>("NoteBlockEditor");
+        var editor = GetBlockEditor();
         if (editor == null)
             return;
         await vm.SaveNoteWithContentAsync(vm.SelectedNote, editor.GetBlocks(), null).ConfigureAwait(true);
@@ -898,4 +1058,5 @@ public partial class NotesView : UserControl
         await overlayService.CreateDialogAsync(exportResult.IsSuccess ? "Export complete" : "Export failed",
             exportResult.IsSuccess ? "Notes export finished." : exportResult.ErrorMessage ?? "Export failed.").ConfigureAwait(true);
     }
+
 }

@@ -71,7 +71,11 @@ public class SqliteStorageProvider : IStorageProvider
         try
         {
             await EnsureInitializedAsync().ConfigureAwait(false);
-            var json = JsonSerializer.Serialize(data);
+            // JsonSerializer.Serialize is synchronous CPU work. For large payloads (e.g. a Note with
+            // 1500 blocks) this would block the UI thread for 10-30 ms on every autosave when callers
+            // invoke SaveAsync from a UI dispatcher tick. Dispatching to the threadpool keeps the UI
+            // responsive and lets SQLite I/O overlap with the next frame.
+            var json = await Task.Run(() => JsonSerializer.Serialize(data)).ConfigureAwait(false);
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
             var command = connection.CreateCommand();

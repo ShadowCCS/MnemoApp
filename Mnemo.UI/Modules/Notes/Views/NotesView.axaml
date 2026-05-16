@@ -212,8 +212,7 @@
                       IsVisible="{Binding !IsLoading}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto"
-                      SizeChanged="OnEditorScrollViewerSizeChanged"
-                      LayoutUpdated="OnEditorScrollViewerLayoutUpdated">
+                      SizeChanged="OnEditorScrollViewerSizeChanged">
             <!-- Scroll extent: outer width = max(viewport, zoomed doc) so narrow columns center without margin/extent mismatch. -->
             <Border x:Name="EditorScrollWidthHost" Background="Transparent"
                     HorizontalAlignment="Left" VerticalAlignment="Top">
@@ -221,12 +220,19 @@
             <views:EditorZoomHost x:Name="EditorZoomExtentHost"
                                   HorizontalAlignment="Center" VerticalAlignment="Top"
                                   ClipToBounds="False">
-                    <StackPanel x:Name="EditorDocumentPanel"
-                                Margin="32,24,32,32" Spacing="0"
-                                HorizontalAlignment="Left" VerticalAlignment="Top"
-                                RenderTransformOrigin="0,0">
+                    <!--
+                      Vertical StackPanel between ScrollViewer and BlockEditor passes unbounded height to children
+                      and disables ItemsRepeater virtualization (Avalonia perf guide). Grid rows avoid that; a long
+                      scrollbar still reflects full document extent — virtualization only limits realized controls.
+                    -->
+                    <Grid x:Name="EditorDocumentPanel"
+                          Margin="32,24,32,32"
+                          HorizontalAlignment="Left" VerticalAlignment="Top"
+                          RenderTransformOrigin="0,0"
+                          MinWidth="0"
+                          RowDefinitions="Auto,*">
                 <!-- Top Bar with Sidebar Toggle and Breadcrumbs -->
-                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,12">
+                <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,12">
                     <Button Grid.Column="0" Command="{Binding ToggleSidebarCommand}"
                             IsVisible="{Binding !IsSidebarOpen}"
                             Background="Transparent" BorderThickness="0"
@@ -242,10 +248,13 @@
                                           VerticalAlignment="Center"/>
                 </Grid>
 
+                <Grid Grid.Row="1" MinHeight="0" MinWidth="0">
                 <!-- Title, metadata, separator and content (visible when a note is selected) -->
-                <StackPanel IsVisible="{Binding SelectedNote, Converter={StaticResource NullToBoolConverter}}" Spacing="0">
+                <Grid IsVisible="{Binding SelectedNote, Converter={StaticResource NullToBoolConverter}}"
+                      MinWidth="0"
+                      RowDefinitions="Auto,Auto,Auto,*">
                     <!-- Title row: PDF export + favorite -->
-                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
                         <TextBox Grid.Column="0" Text="{Binding SelectedNoteTitle, Mode=TwoWay}"
                                  MinWidth="0"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -282,7 +291,8 @@
                     </Grid>
 
                     <!-- Created and last modified -->
-                    <TextBlock FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
+                    <TextBlock Grid.Row="1"
+                               FontSize="{DynamicResource FontSize.Body.ExtraSmall}"
                                Foreground="{DynamicResource TextTertiaryBrush}"
                                Margin="0,0,0,16">
                         <Run Text="{Binding CreatedText}"/>
@@ -291,13 +301,15 @@
                     </TextBlock>
 
                     <!-- Separation line -->
-                    <Rectangle Height="1"
+                    <Rectangle Grid.Row="2" Height="1"
                                Fill="{DynamicResource NotesEditorSeparatorBrush}"
                                Margin="0,0,0,24"/>
 
                     <!-- Editable block content: negative margin so editor receives pointer events in page margins (drag-box start) -->
-                    <blockEditor:BlockEditor x:Name="NoteBlockEditor" Margin="-32,0,-32,0"/>
-                </StackPanel>
+                    <Grid Grid.Row="3" MinWidth="0" MinHeight="0">
+                        <blockEditor:BlockEditor x:Name="NoteBlockEditor" Margin="-32,0,-32,0"/>
+                    </Grid>
+                </Grid>
 
                 <!-- Empty state when no note selected -->
                 <StackPanel HorizontalAlignment="Center"
@@ -311,7 +323,8 @@
                                FontSize="{DynamicResource FontSize.Body.Medium}"
                                Foreground="{DynamicResource TextTertiaryBrush}"/>
                 </StackPanel>
-            </StackPanel>
+                </Grid>
+            </Grid>
             </views:EditorZoomHost>
             </Border>
         </ScrollViewer>

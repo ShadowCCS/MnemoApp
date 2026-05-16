@@ -34,10 +34,9 @@ public partial class CodeBlockComponent : BlockComponentBase, IBlockEditorReadOn
             SyncSelectionBackground();
             ScheduleHighlightRefresh();
         };
-        CodeEditor.KeyDown += (_, _) => PostSyncSelectionIfAlive();
         CodeEditor.KeyUp += (_, _) => PostSyncSelectionIfAlive();
         CodeEditor.PointerPressed += (_, _) => PostSyncSelectionIfAlive();
-        CodeEditor.PointerMoved += (_, _) => PostSyncSelectionIfAlive();
+        CodeEditor.PointerMoved += OnCodeEditorPointerMovedForSelection;
         CodeEditor.PointerReleased += (_, _) => PostSyncSelectionIfAlive();
         CodeEditor.GotFocus += (_, _) => PostSyncSelectionIfAlive();
         HighlightBlock.LayoutUpdated += (_, _) =>
@@ -47,6 +46,13 @@ public partial class CodeBlockComponent : BlockComponentBase, IBlockEditorReadOn
         };
 
         DataContextChanged += OnDataContextChanged;
+    }
+
+    /// <summary>Idle <see cref="PointerMoved"/> fires constantly; only sync the selection overlay when the user is actively drag-selecting.</summary>
+    private void OnCodeEditorPointerMovedForSelection(object? sender, Avalonia.Input.PointerEventArgs e)
+    {
+        if (e.GetCurrentPoint(CodeEditor).Properties.IsLeftButtonPressed)
+            PostSyncSelectionIfAlive();
     }
 
     private void PostSyncSelectionIfAlive()
@@ -193,9 +199,11 @@ public partial class CodeBlockComponent : BlockComponentBase, IBlockEditorReadOn
 
     private void ScheduleHighlightRefresh()
     {
-        _highlightDebounce ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
-        _highlightDebounce.Tick -= OnHighlightDebounceTick;
-        _highlightDebounce.Tick += OnHighlightDebounceTick;
+        if (_highlightDebounce == null)
+        {
+            _highlightDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
+            _highlightDebounce.Tick += OnHighlightDebounceTick;
+        }
         _highlightDebounce.Stop();
         _highlightDebounce.Start();
     }
@@ -225,9 +233,16 @@ public partial class CodeBlockComponent : BlockComponentBase, IBlockEditorReadOn
         if (SelectionBackground == null || CodeEditor == null)
             return;
 
-        SelectionBackground.Text = CodeEditor.Text ?? string.Empty;
-        SelectionBackground.SelectionStart = CodeEditor.SelectionStart;
-        SelectionBackground.SelectionEnd = CodeEditor.SelectionEnd;
+        // Idempotent — pointer/key events fire constantly; assigning Text reflows the layer.
+        var text = CodeEditor.Text ?? string.Empty;
+        if (!string.Equals(SelectionBackground.Text, text, StringComparison.Ordinal))
+            SelectionBackground.Text = text;
+        var selStart = CodeEditor.SelectionStart;
+        var selEnd = CodeEditor.SelectionEnd;
+        if (SelectionBackground.SelectionStart != selStart)
+            SelectionBackground.SelectionStart = selStart;
+        if (SelectionBackground.SelectionEnd != selEnd)
+            SelectionBackground.SelectionEnd = selEnd;
     }
 
     private void SyncEditorMinHeight()

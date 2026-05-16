@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Mnemo.UI.Components.BlockEditor;
 using System;
 using System.ComponentModel;
+using System.Threading;
 
 namespace Mnemo.UI.Components.BlockEditor.BlockComponents;
 
@@ -14,6 +15,14 @@ namespace Mnemo.UI.Components.BlockEditor.BlockComponents;
 /// </summary>
 public abstract class BlockComponentBase : UserControl
 {
+    // Realization counters. Diagnostics only; intentionally cheap.
+    // MountedCount = currently attached to a visual tree (live RichTextEditor / TextLayout cost).
+    // LifetimeMountCount = total attach events since process start (catches "we mount blocks more times than rows realize").
+    private static int s_mountedCount;
+    private static long s_lifetimeMountCount;
+    public static int MountedCount => Volatile.Read(ref s_mountedCount);
+    public static long LifetimeMountCount => Interlocked.Read(ref s_lifetimeMountCount);
+
     private RichTextEditor? _editor;
     private BlockViewModel? _subscribedVm;
     private bool _suppressSync;
@@ -96,12 +105,15 @@ public abstract class BlockComponentBase : UserControl
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        Interlocked.Increment(ref s_mountedCount);
+        Interlocked.Increment(ref s_lifetimeMountCount);
         SyncFromViewModel();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
+        Interlocked.Decrement(ref s_mountedCount);
         if (_editor != null)
         {
             _editor.GotFocus -= OnEditorGotFocus;
@@ -150,10 +162,12 @@ public abstract class BlockComponentBase : UserControl
     {
         if (_editor == null || ViewModel == null || _suppressSync) return;
         _suppressSync = true;
-        ViewModel.CommitSpansFromEditor(_editor.Spans);
+        // CommitSpansFromEditor returns true when normalization or autolink mutated the runs further;
+        // only then must we push VM → editor (otherwise we'd trigger a redundant layout invalidate + equation rebuild + spellcheck reschedule per keystroke).
+        var vmMutated = ViewModel.CommitSpansFromEditor(_editor.Spans);
         _suppressSync = false;
-        // Commit may normalize or auto-link; sync VM → editor after suppress ends.
-        SyncFromViewModel();
+        if (vmMutated)
+            SyncFromViewModel();
 
         EditorTextChanged?.Invoke(this, e);
         TextBoxTextChanged?.Invoke(this, e);

@@ -141,6 +141,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 }
 
                 EnsureMetaKeys();
+
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Watermark));
                 if (value == BlockType.Code || prevType == BlockType.Code)
@@ -397,27 +398,48 @@ public class BlockViewModel : INotifyPropertyChanged
     /// <summary>
     /// Commit runs from the editor: capture previous content for history, update runs, then raise ContentChanged.
     /// Use this for user edits (typing, paste, delete selection); use SetSpans for restore/undo.
+    /// Returns true if autolink/normalization mutated the spans further (caller may need to push VM → editor).
     /// </summary>
-    public void CommitSpansFromEditor(IReadOnlyList<InlineSpan> newRuns)
+    public bool CommitSpansFromEditor(IReadOnlyList<InlineSpan> newRuns)
     {
         _previousContent = _cachedFlatContent;
         _previousSpans = CloneSpans();
         SetSpans(newRuns);
+        bool mutated = false;
         if (_type != BlockType.Code)
         {
-            var autolinked = InlineSpanFormatApplier.Normalize(InlineAutoLink.Apply(_spans));
-            if (!SpansListContentEqual(_spans, autolinked))
+            // Cheap pre-check: if the flat text contains no URL-like sequences, skip the expensive
+            // autolink (regex walk + Normalize) entirely. This is the common case for every keystroke
+            // outside of URL text and dominates per-keystroke cost for documents without links.
+            if (MayContainAutoLink(_cachedFlatContent))
             {
-                _spans = autolinked;
-                EnsureHeadingBold();
-                _cachedFlatContent = InlineSpanFormatApplier.Flatten(_spans);
-                OnPropertyChanged(nameof(Content));
-                OnPropertyChanged(nameof(Spans));
-                OnPropertyChanged(nameof(Watermark));
+                var autolinked = InlineAutoLink.Apply(_spans);
+                // Apply already returns a Normalize'd list; skip the second Normalize from the old path.
+                if (!SpansListContentEqual(_spans, autolinked))
+                {
+                    _spans = autolinked;
+                    EnsureHeadingBold();
+                    _cachedFlatContent = InlineSpanFormatApplier.Flatten(_spans);
+                    OnPropertyChanged(nameof(Content));
+                    OnPropertyChanged(nameof(Spans));
+                    OnPropertyChanged(nameof(Watermark));
+                    mutated = true;
+                }
             }
         }
 
         ContentChanged?.Invoke(this);
+        return mutated;
+    }
+
+    /// <summary>Fast-path test: does <paramref name="text"/> contain any character sequence that <see cref="InlineAutoLink"/> could match?</summary>
+    private static bool MayContainAutoLink(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length < 4)
+            return false;
+        // Cheapest sniff for URL/protocol heads matching InlineAutoLink's regex.
+        return text.IndexOf(':', StringComparison.Ordinal) >= 0
+            || text.IndexOf("www.", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static bool SpansListContentEqual(IReadOnlyList<InlineSpan> a, IReadOnlyList<InlineSpan> b)

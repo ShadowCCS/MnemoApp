@@ -27,6 +27,7 @@ using Mnemo.Infrastructure.Services.LaTeX;
 using Mnemo.Infrastructure.Services.TextShortcuts;
 using Mnemo.UI.Controls;
 using Mnemo.UI;
+using Mnemo.UI.Services;
 using Mnemo.UI.Services.LaTeX.Layout.Boxes;
 using Mnemo.UI.Services.LaTeX.Rendering;
 
@@ -148,6 +149,12 @@ public class RichTextEditor : Control, ICustomHitTest
     private readonly LRUCache<(string, double, uint), FormattedText> _mathTextCache = new(200);
     private ILaTeXEngine? _latexEngine;
     private bool _inlineEquationsDirty = true;
+    /// <summary>Cached flag — set whenever <see cref="Spans"/> are reassigned. Avoids a per-keystroke LINQ <c>Any</c> scan.</summary>
+    private bool _hasEquationSpans;
+
+    /// <summary>Cached flattened text. <see cref="OnSpansChanged"/> clears this; the getter rebuilds lazily.
+    /// External callers (EditableBlock, save path, etc.) hit <see cref="Text"/> multiple times per keystroke.</summary>
+    private string? _cachedFlatText;
 
     /// <summary>Extra space so inline math ink (fractions, integrals) is not clipped vs text line metrics.</summary>
     private double _mathPadLeft, _mathPadTop, _mathPadRight, _mathPadBottom;
@@ -295,8 +302,8 @@ public class RichTextEditor : Control, ICustomHitTest
         }
     }
 
-    /// <summary>Flat text derived from the current runs.</summary>
-    public string Text => FlattenRuns(Spans ?? Array.Empty<InlineSpan>());
+    /// <summary>Flat text derived from the current runs. Cached; invalidated in <see cref="OnSpansChanged"/>.</summary>
+    public string Text => _cachedFlatText ??= FlattenRuns(Spans ?? Array.Empty<InlineSpan>());
 
     public bool IsReadOnly
     {
@@ -419,6 +426,9 @@ public class RichTextEditor : Control, ICustomHitTest
 
     protected override Size MeasureOverride(Size availableSize)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
         // Never use infinite width: causes huge desired size and can trigger infinite layout loop.
         var maxWidth = availableSize.Width > 0 && !double.IsInfinity(availableSize.Width)
             ? availableSize.Width : MaxLayoutWidth;
@@ -430,19 +440,41 @@ public class RichTextEditor : Control, ICustomHitTest
         var width = double.IsInfinity(availableSize.Width) || availableSize.Width <= 0
             ? Math.Max(MinLayoutWidth, Math.Min(MaxLayoutWidth, intrinsicW))
             : availableSize.Width;
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "richText.measure",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"text={TextLength} width={maxWidth:0.#}");
+        }
         return new Size(width, height);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
         var layoutWidth = finalSize.Width > 0 ? finalSize.Width : MinLayoutWidth;
         _lastLayoutWidth = layoutWidth;
         BuildLayout(layoutWidth);
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "richText.arrange",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"text={TextLength} width={layoutWidth:0.#}");
+        }
         return finalSize;
     }
 
     private void BuildLayout(double maxWidth)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
         if (maxWidth <= 0 || double.IsNaN(maxWidth))
             maxWidth = MinLayoutWidth;
         DisposeLayouts();
@@ -477,6 +509,14 @@ public class RichTextEditor : Control, ICustomHitTest
             _layoutBoundaryAtLogical = new int[] { 0 };
             _layoutTextLength = 0;
             _backgroundLayout = null;
+            if (perfStart != 0)
+            {
+                EditorPerfDiagnostics.ReportInteraction(
+                    perf,
+                    "richText.buildLayout",
+                    EditorPerfDiagnostics.ElapsedMs(perfStart),
+                    $"text=0 spans={runs.Count} width={maxWidth:0.#} bg=0");
+            }
             return;
         }
 
@@ -485,7 +525,8 @@ public class RichTextEditor : Control, ICustomHitTest
         if (safeForeground.Opacity == 0)
             safeForeground = new SolidColorBrush(Colors.Black);
 
-        var (layoutText, backgroundSpans, foregroundSpans, boundaries) = BuildExpandedLayoutText(runs, text.Length, safeForeground, typeface);
+        var (layoutText, backgroundSpans, foregroundSpans, boundaries, hasInlineBackground) =
+            BuildExpandedLayoutText(runs, text.Length, safeForeground, typeface);
         _layoutBoundaryAtLogical = boundaries;
         _layoutTextLength = layoutText.Length;
 
@@ -497,18 +538,31 @@ public class RichTextEditor : Control, ICustomHitTest
             null,
             foregroundSpans.Count > 0 ? foregroundSpans : null);
 
-        _backgroundLayout = new TextLayout(
-            layoutText, typeface, FontSize, Brushes.Transparent,
-            TextAlignment.Left, TextWrapping.Wrap, TextTrimming.None,
-            null, FlowDirection.LeftToRight, maxWidth,
-            double.PositiveInfinity, double.NaN, 0, 0,
-            null,
-            backgroundSpans.Count > 0 ? backgroundSpans : null);
+        // 2× layout cost per block was paid even when no run had a background/highlight.
+        // For the typical plain-text block this halves the per-block TextLayout count
+        // (matters most at load: 1500 blocks × 2 layouts → 1500).
+        _backgroundLayout = hasInlineBackground
+            ? new TextLayout(
+                layoutText, typeface, FontSize, Brushes.Transparent,
+                TextAlignment.Left, TextWrapping.Wrap, TextTrimming.None,
+                null, FlowDirection.LeftToRight, maxWidth,
+                double.PositiveInfinity, double.NaN, 0, 0,
+                null,
+                backgroundSpans.Count > 0 ? backgroundSpans : null)
+            : null;
         _lastBuiltText = text;
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "richText.buildLayout",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"text={text.Length} spans={runs.Count} width={maxWidth:0.#} bg={(hasInlineBackground ? 1 : 0)}");
+        }
     }
 
     /// <summary>Layout string uses spaces to reserve measured inline-math width (Notion-style flow).</summary>
-    private (string LayoutText, List<ValueSpan<TextRunProperties>> BackgroundSpans, List<ValueSpan<TextRunProperties>> ForegroundSpans, int[] Boundaries) BuildExpandedLayoutText(
+    private (string LayoutText, List<ValueSpan<TextRunProperties>> BackgroundSpans, List<ValueSpan<TextRunProperties>> ForegroundSpans, int[] Boundaries, bool HasInlineBackground) BuildExpandedLayoutText(
         IReadOnlyList<InlineSpan> docSpans,
         int logicalLen,
         IBrush defaultForeground,
@@ -521,6 +575,7 @@ public class RichTextEditor : Control, ICustomHitTest
         boundaries[0] = 0;
         int logicalIdx = 0;
         int layoutOffset = 0;
+        bool hasBackground = false;
 
         foreach (var seg in docSpans)
         {
@@ -551,6 +606,7 @@ public class RichTextEditor : Control, ICustomHitTest
                     runForeground = linkBrush;
 
                 var background = ResolveInlineBackgroundBrush(style);
+                if (background != null) hasBackground = true;
 
                 double runFontSize = FontSize;
                 var runBaseline = BaselineAlignment.Baseline;
@@ -599,6 +655,7 @@ public class RichTextEditor : Control, ICustomHitTest
                 var fs = style.Italic ? FontStyle.Italic : FontStyle.Normal;
                 var runTypeface = new Typeface(ff, fs, fw);
                 var background = ResolveInlineBackgroundBrush(style);
+                if (background != null) hasBackground = true;
                 var bgProps = new GenericTextRunProperties(
                     runTypeface,
                     fontRenderingEmSize: FontSize,
@@ -650,6 +707,7 @@ public class RichTextEditor : Control, ICustomHitTest
                     runForeground = linkBrush;
 
                 var background = ResolveInlineBackgroundBrush(style);
+                if (background != null) hasBackground = true;
 
                 var bgProps = new GenericTextRunProperties(
                     runTypeface,
@@ -675,7 +733,7 @@ public class RichTextEditor : Control, ICustomHitTest
             }
         }
 
-        return (sb.ToString(), backgroundSpans, foregroundSpans, boundaries);
+        return (sb.ToString(), backgroundSpans, foregroundSpans, boundaries, hasBackground);
     }
 
     private static double MeasureTextLayoutWidth(string text, Typeface typeface, IBrush fg, double fontSize)
@@ -779,6 +837,24 @@ public class RichTextEditor : Control, ICustomHitTest
 
     private void OnSpansChanged()
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
+        // Cache "has any equation span?" once per Spans assignment so the per-keystroke path
+        // skips both the LINQ Any scan and the second async equation rebuild when no equations exist.
+        var runs = Spans;
+        bool hasEq = false;
+        if (runs != null)
+        {
+            int n = runs.Count;
+            for (int i = 0; i < n; i++)
+            {
+                if (runs[i] is EquationSpan) { hasEq = true; break; }
+            }
+        }
+        _hasEquationSpans = hasEq;
+        _cachedFlatText = null;
+
         _inlineEquationsDirty = true;
         InvalidateLayout();
         var len = TextLength;
@@ -787,17 +863,34 @@ public class RichTextEditor : Control, ICustomHitTest
         if (_selectionStart > selMax) SelectionStart = selMax;
         if (_selectionEnd > selMax) SelectionEnd = selMax;
         RaiseEvent(new TextChangedEventArgs(TextChangedEvent));
-        _ = RebuildInlineEquationsAsync();
-        ScheduleSpellcheck();
-        var runs = Spans ?? Array.Empty<InlineSpan>();
-        if (runs.Any(static s => s is EquationSpan))
+
+        // No equations → MeasureOverride/Arrange will call BuildLayout exactly once. The async
+        // rebuild's only side-effect for non-equation blocks was an immediate second BuildLayout
+        // (wasted work for every keystroke and every initial bind across 1500 blocks).
+        if (hasEq)
         {
+            _ = RebuildInlineEquationsAsync();
+            // Second post-layout pass: once Bounds.Width is settled, equation reserve widths can be
+            // re-clamped accurately. Cheap when there's nothing to rebuild thanks to the dirty gate.
             Dispatcher.UIThread.Post(() =>
             {
                 _inlineEquationsDirty = true;
                 _ = RebuildInlineEquationsAsync();
             }, DispatcherPriority.Loaded);
         }
+        else
+        {
+            // Keep the dirty flag honest in case an equation appears later: a future Spans
+            // change will set it again, and the rebuild path is a no-op when the flag is false.
+            _inlineEquationsDirty = false;
+            if (_inlineEquations.Count > 0)
+                _inlineEquations.Clear();
+        }
+
+        ScheduleSpellcheck();
+
+        if (perfStart != 0)
+            EditorPerfDiagnostics.RecordIfSlow(perf, "spansChanged", EditorPerfDiagnostics.ElapsedMs(perfStart));
     }
 
     private void InvalidateLayout()
@@ -938,6 +1031,9 @@ public class RichTextEditor : Control, ICustomHitTest
 
     public override void Render(DrawingContext context)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
         // Rebuild layout only if null or content changed. Use _lastLayoutWidth to avoid building with Bounds (can be 0 during first frame) which can cause layout loops.
         var currentText = Text;
         var layoutWidth = _lastLayoutWidth > 0 ? _lastLayoutWidth : (Bounds.Width > 0 ? Bounds.Width : MinLayoutWidth);
@@ -1023,6 +1119,16 @@ public class RichTextEditor : Control, ICustomHitTest
                 context.FillRectangle(caretBrush, caretRect);
             }
 
+        }
+
+        if (perfStart != 0)
+        {
+            var selLen = Math.Abs(_selectionEnd - _selectionStart);
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "richText.render",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"text={TextLength} sel={selLen} highlights={SearchHighlightRanges?.Count ?? 0}");
         }
     }
 
@@ -1409,13 +1515,32 @@ public class RichTextEditor : Control, ICustomHitTest
 
     protected override void OnPointerMoved(PointerEventArgs e)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
         base.OnPointerMoved(e);
         UpdateInlineEquationHoverState(e.GetPosition(this));
         var isLeftPressed = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
+        if (!isLeftPressed)
+        {
+            // If the left button was released while another control (e.g. BlockEditor for cross-block
+            // selection) held pointer capture, OnPointerReleased was never called here, so _isDragging
+            // could still be true. Reset it now to prevent stale drag-select from continuing after
+            // the button is released.
+            if (_isDragging)
+                _isDragging = false;
+            if (perfStart != 0)
+            {
+                EditorPerfDiagnostics.ReportInteraction(
+                    perf,
+                    "richText.pointerMoved.hover",
+                    EditorPerfDiagnostics.ElapsedMs(perfStart),
+                    $"text={TextLength}");
+            }
+            return;
+        }
         if (!_isDragging)
         {
-            if (!isLeftPressed)
-                return;
             _dragAnchor = CaretIndex;
             _isDragging = true;
             e.Pointer.Capture(this);
@@ -1427,6 +1552,15 @@ public class RichTextEditor : Control, ICustomHitTest
         SelectionEnd = Math.Max(_dragAnchor, idx);
         CaretIndex = idx;
         ResetCaretBlink();
+
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "richText.pointerMoved.drag",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"text={TextLength} anchor={_dragAnchor} idx={idx}");
+        }
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -1438,6 +1572,7 @@ public class RichTextEditor : Control, ICustomHitTest
             e.Pointer.Capture(null);
         }
     }
+
 
     // ── Keyboard input ───────────────────────────────────────────────────────
 
@@ -2678,9 +2813,28 @@ public class RichTextEditor : Control, ICustomHitTest
         if (!_inlineEquationsDirty) return;
         _inlineEquationsDirty = false;
 
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
         var engine = ResolveLatexEngine();
         var built = new List<InlineEquationEntry>();
         var lineLayoutCap = _lastLayoutWidth > 0 ? _lastLayoutWidth : (Bounds.Width > 0 ? Bounds.Width : MinLayoutWidth);
+        double fontSize = FontSize;
+
+        // Build a lookup of already-laid-out equations keyed by (latex, fontSize). Even though
+        // LaTeXEngine caches internally, GetLayoutBoxAsync still pays Task.Run + Dispatcher hops
+        // per equation per keystroke. Reusing the existing entry's Box bypasses all of that.
+        Dictionary<(string latex, double fontSize), InlineEquationEntry>? prior = null;
+        if (_inlineEquations.Count > 0)
+        {
+            prior = new Dictionary<(string, double), InlineEquationEntry>(_inlineEquations.Count);
+            foreach (var e in _inlineEquations)
+            {
+                if (e.Layout == null) continue;
+                var k = (e.Latex.Trim(), fontSize);
+                prior[k] = e;
+            }
+        }
 
         var runs = Spans ?? Array.Empty<InlineSpan>();
         int charOffset = 0;
@@ -2698,22 +2852,32 @@ public class RichTextEditor : Control, ICustomHitTest
                     Latex = latexForLayout ?? string.Empty
                 };
 
+                var latex = (latexForLayout ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(latex))
+                {
+                    built.Add(entry);
+                    charOffset += 1;
+                    continue;
+                }
+
+                if (prior != null && prior.TryGetValue((latex, fontSize), out var cached) && cached.Layout is Box cachedBox)
+                {
+                    entry.Layout = cachedBox;
+                    entry.Width = cached.Width;
+                    entry.Height = cached.Height;
+                    built.Add(entry);
+                    charOffset += 1;
+                    continue;
+                }
+
                 try
                 {
-                    var latex = (latexForLayout ?? string.Empty).Trim();
-                    if (string.IsNullOrEmpty(latex))
-                    {
-                        built.Add(entry);
-                        charOffset += 1;
-                        continue;
-                    }
-
-                    var boxObj = await engine.GetLayoutBoxAsync(latex, FontSize).ConfigureAwait(true);
+                    var boxObj = await engine.GetLayoutBoxAsync(latex, fontSize).ConfigureAwait(true);
                     if (boxObj is Box box)
                     {
                         entry.Layout = box;
                         var advance = box.Width + 2;
-                        entry.Width = ClampInlineEquationReserveWidth(advance, latex, FontSize, lineLayoutCap);
+                        entry.Width = ClampInlineEquationReserveWidth(advance, latex, fontSize, lineLayoutCap);
                         entry.Height = box.TotalHeight + 2;
                     }
                 }
@@ -2740,6 +2904,10 @@ public class RichTextEditor : Control, ICustomHitTest
 
         if (_inlineEquationsDirty)
             _ = RebuildInlineEquationsAsync();
+
+        if (perfStart != 0)
+            EditorPerfDiagnostics.RecordIfSlow(perf, "rebuildInlineEquations", EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"{built.Count} equations");
     }
 
     /// <summary>

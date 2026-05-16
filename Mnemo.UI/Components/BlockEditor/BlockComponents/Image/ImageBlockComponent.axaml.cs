@@ -1131,9 +1131,11 @@ public partial class ImageBlockComponent : BlockComponentBase
             if (p is EditableBlock eb && eb.GetVisualParent() is Control slot && slot.Bounds.Width > 0)
                 return Math.Max(0, slot.Bounds.Width - BlockItemContentChromeInset);
 
-            if (p is ItemsControl ic && string.Equals(ic.Name, "BlocksItemsControl", StringComparison.Ordinal)
-                && ic.Bounds.Width > 0)
-                return Math.Max(0, ic.Bounds.Width - BlockItemContentChromeInset);
+            // BlocksItemsControl is an ItemsRepeater after virtualization migration; match the
+            // named element regardless of concrete type.
+            if (p is Control c && string.Equals(c.Name, "BlocksItemsControl", StringComparison.Ordinal)
+                && c.Bounds.Width > 0)
+                return Math.Max(0, c.Bounds.Width - BlockItemContentChromeInset);
 
             if (p is BlockEditor be && be.Bounds.Width > 0)
             {

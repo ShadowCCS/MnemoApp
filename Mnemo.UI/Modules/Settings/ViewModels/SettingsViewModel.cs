@@ -130,11 +130,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     private void OnAiInstallCompleted(Result<AIModelsSetupResult> result)
     {
-        _ = _mainThreadDispatcher.InvokeAsync(async () =>
-        {
-            await RefreshAiInstallStateAsync().ConfigureAwait(false);
-            RebuildCategories(SelectedCategory?.CategoryId);
-        });
+        _ = RefreshAiInstallStateAndRebuildAsync();
     }
 
     private async Task RefreshAiInstallStateAsync()
@@ -177,16 +173,13 @@ public partial class SettingsViewModel : ViewModelBase
         _developerGateUnlocked = await _settingsService.GetAsync(DeveloperModeGateUnlockedKey, false).ConfigureAwait(false);
         _developerMode = await _settingsService.GetAsync(DeveloperModeKey, false).ConfigureAwait(false);
         await RefreshAiInstallStateAsync().ConfigureAwait(false);
-        var id = SelectedCategory?.CategoryId;
-        RebuildCategories(id);
+        await RebuildCategoriesOnMainThreadAsync().ConfigureAwait(false);
     }
 
     private async void OnLanguageChanged(object? sender, EventArgs e)
     {
         await RefreshAiInstallStateAsync().ConfigureAwait(false);
-        var selectedId = SelectedCategory?.CategoryId;
-        RebuildCategories(selectedId);
-        OnPropertyChanged(nameof(CategorySubtitleText));
+        await RebuildCategoriesOnMainThreadAsync().ConfigureAwait(false);
     }
 
     private async Task LoadInitialSettingsAsync()
@@ -195,7 +188,23 @@ public partial class SettingsViewModel : ViewModelBase
         _developerGateUnlocked = await _settingsService.GetAsync(DeveloperModeGateUnlockedKey, false).ConfigureAwait(false);
         _developerMode = await _settingsService.GetAsync(DeveloperModeKey, false).ConfigureAwait(false);
         await RefreshAiInstallStateAsync().ConfigureAwait(false);
-        RebuildCategories(SelectedCategory?.CategoryId);
+        await RebuildCategoriesOnMainThreadAsync().ConfigureAwait(false);
+    }
+
+    private async Task RefreshAiInstallStateAndRebuildAsync()
+    {
+        await RefreshAiInstallStateAsync().ConfigureAwait(false);
+        await RebuildCategoriesOnMainThreadAsync().ConfigureAwait(false);
+    }
+
+    private Task RebuildCategoriesOnMainThreadAsync(string? preserveCategoryId = null)
+    {
+        return _mainThreadDispatcher.InvokeAsync(() =>
+        {
+            RebuildCategories(preserveCategoryId ?? SelectedCategory?.CategoryId);
+            OnPropertyChanged(nameof(CategorySubtitleText));
+            return Task.CompletedTask;
+        });
     }
 
     private async Task LoadUserProfileAsync()

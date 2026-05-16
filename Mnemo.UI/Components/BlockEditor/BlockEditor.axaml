@@ -12,32 +12,42 @@
     DragDrop.AllowDrop="True"
     Background="Transparent"
     VerticalAlignment="Stretch"
-    ClipToBounds="False">
+    ClipToBounds="False"
+    Cursor="IBeam">
     <Grid Background="Transparent" Cursor="IBeam">
         <Border Background="Transparent" ClipToBounds="False" Padding="32,0,32,0" DragDrop.AllowDrop="True">
             <Grid Background="Transparent">
-                <Grid x:Name="EditorRoot" RowDefinitions="Auto,*" Background="Transparent" ClipToBounds="False">
-                    <ItemsControl x:Name="BlocksItemsControl" Grid.Row="0" ItemsSource="{Binding BlockRows}" Background="Transparent">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Vertical" Spacing="6" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.Styles>
-                            <Style Selector="ContentPresenter">
-                                <Setter Property="Margin" Value="0" />
-                                <Setter Property="Padding" Value="0" />
-                            </Style>
-                        </ItemsControl.Styles>
-                        <ItemsControl.DataTemplates>
-                            <DataTemplate DataType="local:SingleBlockRowViewModel">
-                                <local:EditableBlock DataContext="{Binding Block}" />
+                <Grid x:Name="EditorRoot" RowDefinitions="Auto,Auto" Background="Transparent" ClipToBounds="False">
+                    <!--
+                        ItemsRepeater (not ItemsControl) is used here for vertical UI virtualization: only rows in
+                        the visible viewport (plus a small buffer) are realized. With 1500+ blocks this turns
+                        thousands of EditableBlock + RichTextEditor + TextLayout allocations into ~30. See
+                        ChatView.axaml for the same pattern; ItemsControl + VirtualizingStackPanel does not
+                        virtualize inside this ScrollViewer > StackPanel chain.
+
+                        The ContentControl wrapper exists so we can keep two data templates (single block row
+                        vs. split-column row) without writing a custom IDataTemplate — ContentControl resolves
+                        its DataTemplates against the bound row type.
+                    -->
+                    <ItemsRepeater x:Name="BlocksItemsControl" Grid.Row="0" ItemsSource="{Binding BlockRows}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Orientation="Vertical" Spacing="6" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
+                                <ContentControl Content="{Binding}" HorizontalAlignment="Stretch" Padding="0" Margin="0">
+                                    <ContentControl.DataTemplates>
+                                        <DataTemplate DataType="local:SingleBlockRowViewModel">
+                                            <local:EditableBlock DataContext="{Binding Block}" />
+                                        </DataTemplate>
+                                        <DataTemplate DataType="local:SplitBlockRowViewModel">
+                                            <local:SplitBlockRowView />
+                                        </DataTemplate>
+                                    </ContentControl.DataTemplates>
+                                </ContentControl>
                             </DataTemplate>
-                            <DataTemplate DataType="local:SplitBlockRowViewModel">
-                                <local:SplitBlockRowView />
-                            </DataTemplate>
-                        </ItemsControl.DataTemplates>
-                    </ItemsControl>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
                     <!-- Hit target below last block; keep modest so the page does not show a huge empty band. -->
                     <Border x:Name="BelowBlocksArea" Grid.Row="1" MinHeight="56" Background="Transparent" DragDrop.AllowDrop="True" />
                 </Grid>

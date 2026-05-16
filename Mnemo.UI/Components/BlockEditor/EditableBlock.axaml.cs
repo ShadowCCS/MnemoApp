@@ -19,6 +19,7 @@ using Mnemo.UI.Components.BlockEditor.FormattingToolbar;
 using Mnemo.UI.Components.Overlays;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Mnemo.UI;
@@ -52,6 +53,7 @@ public partial class EditableBlock : UserControl
     private string? _formattingToolbarOverlayId;
     private InlineFormattingToolbar? _currentFormattingToolbar;
     private TopLevel? _toolbarPointerTopLevel;
+    private DispatcherTimer? _formattingToolbarCloseDebounce;
 
     /// <summary>
     /// Tracks sticky sub/sup typing mode. Null = off; Subscript or Superscript = active.
@@ -219,6 +221,9 @@ public partial class EditableBlock : UserControl
 
     private void CleanupEventHandlers()
     {
+        if (_viewModel != null)
+            _cachedParentEditor?.UnregisterRealizedEditableBlock(_viewModel, this);
+
         UnsubscribeFromViewModel();
         UnsubscribeFromManagers();
         
@@ -263,11 +268,14 @@ public partial class EditableBlock : UserControl
         
         // Close any open overlays
         CloseSlashMenu();
-        CloseFormattingToolbar();
+        CloseFormattingToolbar(disposeToolbar: true);
     }
 
     private void OnControlLoaded(object? sender, RoutedEventArgs e)
     {
+        if (_viewModel != null)
+            FindParentBlockEditor()?.RegisterRealizedEditableBlock(_viewModel, this);
+
         WireUpBlockComponent();
         Dispatcher.UIThread.Post(() => WireUpBlockComponent(), DispatcherPriority.Render);
         // Content binding can apply after first layout; run again after a short delay so Runs are synced.
@@ -276,6 +284,20 @@ public partial class EditableBlock : UserControl
     
     private void WireUpBlockComponent()
     {
+        var incoming = BlockContentControl?.Content as BlockComponentBase;
+
+        // Idempotent fast-path: same component instance already wired. With OnControlLoaded posting
+        // three WireUpBlockComponent calls (immediate / Render / ApplicationIdle) to defend against
+        // late binding evaluation, the redundant ones used to do a full unwire + re-wire + Spans
+        // reassign per call (heavy at 1500 blocks). This collapses them to a near-noop.
+        if (ReferenceEquals(_currentBlockComponent, incoming) && incoming != null)
+        {
+            if (_viewModel != null && !ReferenceEquals(incoming.DataContext, _viewModel))
+                incoming.DataContext = _viewModel;
+            ApplyReadOnlyState();
+            return;
+        }
+
         _gutterMarginTopCache = double.NaN;
 
         // Unwire previous component
@@ -288,9 +310,8 @@ public partial class EditableBlock : UserControl
             _currentBlockComponent.TextBoxKeyDown -= HandleBlockComponentKeyDown;
             RemoveBackspaceTunnelHandler();
         }
-        
-        // Find and wire up new component
-        if (BlockContentControl?.Content is BlockComponentBase component)
+
+        if (incoming is { } component)
         {
             _currentBlockComponent = component;
 
@@ -366,21 +387,21 @@ public partial class EditableBlock : UserControl
         if (AddBlockBelowBorder == null || DragHandleBorder == null || BlockLayoutGrid == null)
             return;
 
-        double marginTop = 0;
+        double offsetY = 0;
         var grid = BlockLayoutGrid;
 
         if (_currentBlockComponent is ImageBlockComponent { GutterAnchorRow: { } imageRow })
         {
             var p = imageRow.TranslatePoint(new Point(0, 0), grid);
             if (p.HasValue && imageRow.Bounds.Height > 0)
-                marginTop = Math.Max(0, p.Value.Y + (imageRow.Bounds.Height - GutterChromeHeight) * 0.5);
+                offsetY = Math.Max(0, p.Value.Y + (imageRow.Bounds.Height - GutterChromeHeight) * 0.5);
         }
         else if (_currentBlockComponent?.GetRichTextEditor() is RichTextEditor rte)
         {
             var line = rte.GetFirstLineBounds();
             var p = rte.TranslatePoint(new Point(0, line.Y), grid);
             if (p.HasValue && line.Height > 0)
-                marginTop = Math.Max(0, p.Value.Y + (line.Height - GutterChromeHeight) * 0.5);
+                offsetY = Math.Max(0, p.Value.Y + (line.Height - GutterChromeHeight) * 0.5);
         }
         else if (_currentBlockComponent?.GetLegacyTextBox() is TextBox tb)
         {
@@ -388,7 +409,7 @@ public partial class EditableBlock : UserControl
             if (p.HasValue)
             {
                 var lineH = tb.FontSize * 1.25;
-                marginTop = Math.Max(0, p.Value.Y + (lineH - GutterChromeHeight) * 0.5);
+                offsetY = Math.Max(0, p.Value.Y + (lineH - GutterChromeHeight) * 0.5);
             }
         }
         else if (_currentBlockComponent != null)
@@ -396,16 +417,19 @@ public partial class EditableBlock : UserControl
             var c = _currentBlockComponent;
             var p = c.TranslatePoint(new Point(0, 0), grid);
             if (p.HasValue && c.Bounds.Height > 0)
-                marginTop = Math.Max(0, p.Value.Y + (c.Bounds.Height - GutterChromeHeight) * 0.5);
+                offsetY = Math.Max(0, p.Value.Y + (c.Bounds.Height - GutterChromeHeight) * 0.5);
         }
 
-        if (!double.IsNaN(_gutterMarginTopCache) && Math.Abs(marginTop - _gutterMarginTopCache) < 0.25)
+        if (!double.IsNaN(_gutterMarginTopCache) && Math.Abs(offsetY - _gutterMarginTopCache) < 0.25)
             return;
-        _gutterMarginTopCache = marginTop;
+        _gutterMarginTopCache = offsetY;
 
-        var m = new Thickness(0, marginTop, 2, 0);
-        AddBlockBelowBorder.Margin = m;
-        DragHandleBorder.Margin = m;
+        // Use RenderTransform (not Margin) for the vertical offset so the layout system is not
+        // affected — changing Margin propagates InvalidateMeasure up to the ItemsRepeater and
+        // causes a layout-cycle warning when many blocks are visible simultaneously.
+        var tx = new Avalonia.Media.TranslateTransform(0, offsetY);
+        AddBlockBelowBorder.RenderTransform = tx;
+        DragHandleBorder.RenderTransform = tx;
     }
 
     private void RemoveBackspaceTunnelHandler()
@@ -441,7 +465,46 @@ public partial class EditableBlock : UserControl
 
     private void OnEditorSelectionChanged()
     {
-        Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
+        // Toolbar is irrelevant while the user is actively dragging a selection — it would
+        // flash open and cause expensive HasCrossBlockTextSelection scans on every realized
+        // block's selection-change notification. Defer to pointer release instead.
+        var parentEditor = FindParentBlockEditor();
+        if (parentEditor?.IsPointerSelecting == true)
+            return;
+
+        // SelectionStart/End can flicker during drag or caret moves; debounce close only so we
+        // don't destroy/recreate the overlay (CreateOverlay) on every transient collapse.
+        var range = GetSelectionRange();
+        if (range != null && range.Value.end > range.Value.start)
+        {
+            CancelFormattingToolbarCloseDebounce();
+            Dispatcher.UIThread.Post(CheckSelectionAndToggleToolbar, DispatcherPriority.Input);
+            return;
+        }
+
+        ScheduleFormattingToolbarCloseDebounce();
+    }
+
+    private void CancelFormattingToolbarCloseDebounce()
+    {
+        if (_formattingToolbarCloseDebounce == null) return;
+        _formattingToolbarCloseDebounce.Stop();
+        _formattingToolbarCloseDebounce.Tick -= OnFormattingToolbarCloseDebounceTick;
+    }
+
+    private void ScheduleFormattingToolbarCloseDebounce()
+    {
+        _formattingToolbarCloseDebounce ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+        _formattingToolbarCloseDebounce.Stop();
+        _formattingToolbarCloseDebounce.Tick -= OnFormattingToolbarCloseDebounceTick;
+        _formattingToolbarCloseDebounce.Tick += OnFormattingToolbarCloseDebounceTick;
+        _formattingToolbarCloseDebounce.Start();
+    }
+
+    private void OnFormattingToolbarCloseDebounceTick(object? sender, EventArgs e)
+    {
+        CancelFormattingToolbarCloseDebounce();
+        CheckSelectionAndToggleToolbar();
     }
 
     private sealed class SelectionChangedObserver : IObserver<int>
@@ -584,12 +647,22 @@ public partial class EditableBlock : UserControl
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        // Unregister the previous VM mapping before swapping so the cache never points at a
+        // stale (vm,this) pair. The parent editor uses cached lookup; missing this would let
+        // ClearTextSelectionInAllBlocksExcept poke a stale RichTextEditor after virtualization
+        // or template reuse rebinds this container to a different block.
+        if (_viewModel != null)
+            _cachedParentEditor?.UnregisterRealizedEditableBlock(_viewModel, this);
+
         UnsubscribeFromViewModel();
-        
+
         _viewModel = DataContext as BlockViewModel;
         _cachedParentEditor = null; // Invalidate cache when context changes
         _focusManager?.ClearCache(); // Clear textbox cache too
-        
+
+        if (_viewModel != null && VisualRoot != null)
+            FindParentBlockEditor()?.RegisterRealizedEditableBlock(_viewModel, this);
+
         SubscribeToViewModel();
         
         // Wire up block component after data context changes; use Render so ContentControl.Content binding has run
@@ -825,8 +898,11 @@ public partial class EditableBlock : UserControl
 
         _viewModel.IsFocused = false;
         var parentEditor = FindParentBlockEditor();
+        // FlushTypingBatch is required for history grouping. NotifyBlocksChanged is NOT — any actual
+        // content edit already fired BlocksChanged through OnBlockContentChanged. Calling it here on
+        // every focus loss caused spurious autosaves (e.g. text-drag selection that just moves focus
+        // out of the active block re-armed the 500 ms save timer with zero content change).
         parentEditor?.FlushTypingBatch();
-        parentEditor?.NotifyBlocksChanged();
     }
 
     private void TextBox_TextChanged(object? sender, TextChangedEventArgs e)
@@ -1523,11 +1599,49 @@ public partial class EditableBlock : UserControl
 
     private void CheckSelectionAndToggleToolbar()
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+        var action = "none";
+
         var parentEditor = FindParentBlockEditor();
+
+        // Skip all expensive work during active pointer-drag selection. The toolbar will be
+        // re-evaluated when the pointer is released (NotifySelectionChangedByEditor).
+        if (parentEditor?.IsPointerSelecting == true)
+        {
+            action = "skip-selecting";
+            if (perfStart != 0)
+                EditorPerfDiagnostics.ReportInteraction(perf, "toolbar.checkSelection", EditorPerfDiagnostics.ElapsedMs(perfStart), $"action={action}");
+            return;
+        }
+
+        // Fast path: toolbar is already closed and this block has no selection.
+        // Avoids the O(N) HasCrossBlockTextSelection scan when nothing is happening.
+        if (_formattingToolbarOverlayId == null)
+        {
+            var quickRange = GetSelectionRange();
+            if (quickRange == null || quickRange.Value.end <= quickRange.Value.start)
+            {
+                action = "skip-noop";
+                if (perfStart != 0)
+                    EditorPerfDiagnostics.ReportInteraction(perf, "toolbar.checkSelection", EditorPerfDiagnostics.ElapsedMs(perfStart), $"action={action}");
+                return;
+            }
+        }
+
         if (parentEditor?.HasCrossBlockTextSelection() == true && _viewModel?.IsFocused != true)
         {
             _cachedSelectionRange = null;
             CloseFormattingToolbar();
+            action = "close-crossBlockOther";
+            if (perfStart != 0)
+            {
+                EditorPerfDiagnostics.ReportInteraction(
+                    perf,
+                    "toolbar.checkSelection",
+                    EditorPerfDiagnostics.ElapsedMs(perfStart),
+                    $"action={action}");
+            }
             return;
         }
 
@@ -1536,14 +1650,31 @@ public partial class EditableBlock : UserControl
         {
             _cachedSelectionRange = range;
             if (_formattingToolbarOverlayId == null)
+            {
+                action = "show";
                 ShowFormattingToolbar();
+            }
             else
+            {
+                action = "update";
                 UpdateFormattingToolbarState();
+            }
         }
         else
         {
             _cachedSelectionRange = null;
+            action = "close-empty";
             CloseFormattingToolbar();
+        }
+
+        if (perfStart != 0)
+        {
+            var len = range.HasValue ? range.Value.end - range.Value.start : 0;
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "toolbar.checkSelection",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"action={action} sel={len}");
         }
     }
 
@@ -1555,16 +1686,35 @@ public partial class EditableBlock : UserControl
 
     private void ShowFormattingToolbar()
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
         var textBox = _currentBlockComponent?.GetRichTextEditor() ?? _focusManager?.GetCurrentTextBox();
         if (_overlayService == null || textBox == null || !textBox.IsVisible) return;
 
-        CloseFormattingToolbar();
+        if (!string.IsNullOrEmpty(_formattingToolbarOverlayId))
+        {
+            UpdateFormattingToolbarState();
+            if (perfStart != 0)
+            {
+                EditorPerfDiagnostics.ReportInteraction(
+                    perf,
+                    "toolbar.show",
+                    EditorPerfDiagnostics.ElapsedMs(perfStart),
+                    "existingOverlay=1");
+            }
+            return;
+        }
 
-        var toolbar = new InlineFormattingToolbar();
-        toolbar.FormatRequested += OnFormatRequested;
-        toolbar.BackgroundColorRequested += OnBackgroundColorRequested;
-        toolbar.EquationRequested += OnEquationRequested;
-        _currentFormattingToolbar = toolbar;
+        var toolbar = _currentFormattingToolbar;
+        if (toolbar == null)
+        {
+            toolbar = new InlineFormattingToolbar();
+            toolbar.FormatRequested += OnFormatRequested;
+            toolbar.BackgroundColorRequested += OnBackgroundColorRequested;
+            toolbar.EquationRequested += OnEquationRequested;
+            _currentFormattingToolbar = toolbar;
+        }
 
         bool showAbove = ShouldShowToolbarAbove(textBox);
         var options = new OverlayOptions
@@ -1606,24 +1756,48 @@ public partial class EditableBlock : UserControl
         toolbar.SetHostingToolbarOverlayId(_formattingToolbarOverlayId);
         AttachToolbarOutsideClickHandler(textBox);
         Dispatcher.UIThread.Post(UpdateFormattingToolbarState, DispatcherPriority.Loaded);
+
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "toolbar.show",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"existingToolbar={(toolbar == _currentFormattingToolbar ? 1 : 0)} above={showAbove}");
+        }
     }
 
-    private void CloseFormattingToolbar()
+    private void CloseFormattingToolbar(bool disposeToolbar = false)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+        var hadOverlay = !string.IsNullOrEmpty(_formattingToolbarOverlayId);
+
+        CancelFormattingToolbarCloseDebounce();
+
         if (!string.IsNullOrEmpty(_formattingToolbarOverlayId) && _overlayService != null)
         {
             _overlayService.CloseOverlay(_formattingToolbarOverlayId);
             _formattingToolbarOverlayId = null;
             _cachedSelectionRange = null;
             DetachToolbarOutsideClickHandler();
+        }
 
-            if (_currentFormattingToolbar != null)
-            {
-                _currentFormattingToolbar.FormatRequested -= OnFormatRequested;
-                _currentFormattingToolbar.BackgroundColorRequested -= OnBackgroundColorRequested;
-                _currentFormattingToolbar.EquationRequested -= OnEquationRequested;
-                _currentFormattingToolbar = null;
-            }
+        if (disposeToolbar && _currentFormattingToolbar != null)
+        {
+            _currentFormattingToolbar.FormatRequested -= OnFormatRequested;
+            _currentFormattingToolbar.BackgroundColorRequested -= OnBackgroundColorRequested;
+            _currentFormattingToolbar.EquationRequested -= OnEquationRequested;
+            _currentFormattingToolbar = null;
+        }
+
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "toolbar.close",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"hadOverlay={hadOverlay} dispose={disposeToolbar}");
         }
     }
 

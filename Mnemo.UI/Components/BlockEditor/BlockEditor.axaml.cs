@@ -12,6 +12,7 @@ using Avalonia.VisualTree;
 using Avalonia.Layout;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -39,7 +40,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private ObservableCollection<BlockViewModel> _blocks = new();
 
     /// <summary>Visual rows (one item per stack row; split pairs are one row with two <see cref="EditableBlock"/>s).</summary>
-    public ObservableCollection<BlockRowViewModelBase> BlockRows { get; } = new();
+    /// <remarks>
+    /// Full rebuilds replace the <see cref="ObservableCollection{T}"/> instance (see <see cref="RebuildBlockRows"/>)
+    /// so <see cref="ItemsRepeater"/> receives one binding refresh instead of Clear + N Add notifications.
+    /// </remarks>
+    public ObservableCollection<BlockRowViewModelBase> BlockRows => _blockRows;
+
+    private ObservableCollection<BlockRowViewModelBase> _blockRows = new();
 
     /// <summary>Top-level <see cref="Blocks"/> index for the row containing keyboard focus (split row = one index).</summary>
     private int _focusedBlockIndex = -1;
@@ -99,6 +106,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private bool _crossBlockArmed;  // true after pointer-down inside TextBox, waiting for first move outside
     /// <summary>True while a cross-block text selection drag is actively in progress. Used by EditableBlock to suppress focus side-effects during the drag.</summary>
     public bool IsCrossBlockSelectingActive => _isCrossBlockSelecting;
+    /// <summary>True while any pointer-driven selection mode is armed or active. EditableBlock uses this to suppress toolbar checks during drag, which eliminates O(N) scans on every pointer-move-induced selection-change notification.</summary>
+    internal bool IsPointerSelecting => _isCrossBlockSelecting || _isBoxSelecting || _crossBlockArmed || _boxSelectArmed;
     private BlockViewModel? _crossBlockAnchorBlock;
     private int _crossBlockAnchorBlockIndex = -1;
     private int _crossBlockAnchorCharIndex;
@@ -120,6 +129,118 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     private List<InlineSpan>? _typingBatchRunsBefore;
     private CaretState? _typingBatchCaretBefore;
     private const int TypingBatchIdleMs = 300;
+
+    /// <summary>Reference count of blocks with <see cref="BlockViewModel.IsSelected"/>=true. Lets <see cref="ClearBlockSelection"/> skip a full document walk on every keystroke when no blocks are selected.</summary>
+    private int _selectedBlockCount;
+
+    /// <summary>
+    /// Cached flat document-order list. Rebuilt lazily on first access after any structural change.
+    /// Eliminates the repeated <c>EnumerateInDocumentOrder(Blocks).ToList()</c> allocation that
+    /// previously happened on every pointer-move event during selection.
+    /// </summary>
+    private List<BlockViewModel>? _cachedDocumentOrder;
+    private bool _documentOrderDirty = true;
+    /// <summary>Reverse index (VM → docIndex) built alongside <see cref="_cachedDocumentOrder"/>. Lets realized-block loops look up positions in O(1) instead of scanning the full list.</summary>
+    private Dictionary<BlockViewModel, int>? _cachedDocIndexByVm;
+
+    /// <summary>Pending pointer position captured by <see cref="Editor_PointerMoved"/> but not yet processed. Allows coalescing rapid pointer events so only the latest position is acted on per render frame.</summary>
+    private Point _pendingPointerPoint;
+    /// <summary>True when a pending pointer-move update has been scheduled on the dispatcher but has not yet run.</summary>
+    private bool _pendingPointerUpdateScheduled;
+    /// <summary>Pending mode flags for the coalesced pointer update.</summary>
+    private bool _pendingPointerIsBox;
+    private bool _pendingPointerIsCross;
+
+    /// <summary>
+    /// O(1) VM → realized <see cref="EditableBlock"/> map. <see cref="EditableBlock"/> registers in
+    /// <c>OnControlLoaded</c> and unregisters in <c>OnControlUnloaded</c>. Replaces the
+    /// <c>GetVisualDescendants</c> walks that made every focus change O(N²) over 1500 blocks.
+    /// </summary>
+    private readonly Dictionary<BlockViewModel, EditableBlock> _realizedBlocksByVm = new();
+
+    /// <summary>Tracked set of blocks whose <see cref="BlockViewModel.Type"/> is <see cref="BlockType.NumberedList"/>.
+    /// Maintained via subscribe/unsubscribe + Type-property notifications so <see cref="UpdateListNumbers"/> and
+    /// <see cref="ReorderBlocks"/> can skip a full-document walk when there are no numbered lists.</summary>
+    private readonly HashSet<BlockViewModel> _numberedListBlocks = new(ReferenceEqualityComparer.Instance);
+
+    internal void RegisterRealizedEditableBlock(BlockViewModel vm, EditableBlock eb)
+    {
+        _realizedBlocksByVm[vm] = eb;
+    }
+
+    internal void UnregisterRealizedEditableBlock(BlockViewModel vm, EditableBlock eb)
+    {
+        if (_realizedBlocksByVm.TryGetValue(vm, out var existing) && ReferenceEquals(existing, eb))
+            _realizedBlocksByVm.Remove(vm);
+    }
+
+    /// <summary>Diagnostics-only: number of <see cref="EditableBlock"/> rows currently realized by the inner <see cref="ItemsRepeater"/>.</summary>
+    public int RealizedRowCount => _realizedBlocksByVm.Count;
+
+    /// <summary>
+    /// Cheap structural hash of the live document (no serialization, no allocations beyond the
+    /// enumerator). Autosave compares this against the last-saved value to skip the JSON-serialize +
+    /// SQLite write entirely when nothing actually changed since the previous save.
+    /// </summary>
+    /// <remarks>
+    /// Covers every persisted field that <see cref="BlockViewModel.ToBlock"/> writes: id, type, order,
+    /// flat content, per-span style/value, and the block-type-specific payload fields
+    /// (Image/Code/Equation/Checklist/NumberedList). Reads <see cref="BlockViewModel.Content"/> which
+    /// is O(1) thanks to the cached flat string.
+    /// </remarks>
+    public long ComputeContentFingerprint()
+    {
+        unchecked
+        {
+            long h = 1469598103934665603L; // FNV-1a 64-bit offset basis
+            foreach (var b in BlockHierarchy.EnumerateInDocumentOrder(_blocks))
+                h = MixBlockFingerprint(h, b);
+            return h;
+        }
+    }
+
+    private static long MixBlockFingerprint(long h, BlockViewModel b)
+    {
+        unchecked
+        {
+            const long P = 1099511628211L; // FNV-1a 64-bit prime
+            h = (h ^ (long)(b.Id?.GetHashCode() ?? 0)) * P;
+            h = (h ^ (int)b.Type) * P;
+            h = (h ^ b.Order) * P;
+            h = (h ^ (long)(b.Content?.GetHashCode() ?? 0)) * P;
+
+            // Spans carry styling that isn't reflected in the flat content (bold/italic/colors/links).
+            // GetHashCode on the InlineSpan record types is a structural hash — adequate for change detection.
+            foreach (var s in b.Spans)
+                h = (h ^ (long)s.GetHashCode()) * P;
+
+            switch (b.Type)
+            {
+                case BlockType.Checklist:
+                    h = (h ^ (b.IsChecked ? 1L : 0L)) * P;
+                    break;
+                case BlockType.Image:
+                    h = (h ^ (long)(b.ImagePath?.GetHashCode() ?? 0)) * P;
+                    h = (h ^ (long)b.ImageWidth.GetHashCode()) * P;
+                    h = (h ^ (long)(b.ImageAlign?.GetHashCode() ?? 0)) * P;
+                    break;
+                case BlockType.Code:
+                    h = (h ^ (long)(b.CodeLanguage?.GetHashCode() ?? 0)) * P;
+                    break;
+                case BlockType.Equation:
+                    h = (h ^ (long)(b.EquationLatex?.GetHashCode() ?? 0)) * P;
+                    break;
+                case BlockType.NumberedList:
+                    h = (h ^ b.ListNumberIndex) * P;
+                    break;
+                case BlockType.Page:
+                    h = (h ^ (long)(b.ReferenceNoteId?.GetHashCode() ?? 0)) * P;
+                    break;
+            }
+
+            return h;
+        }
+    }
 
     /// <summary>
     /// Set by the owning view to enable document-wide undo/redo.
@@ -227,6 +348,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             _blocks.CollectionChanged -= OnBlocksCollectionChanged;
             _blocks = value ?? new ObservableCollection<BlockViewModel>();
             _blocks.CollectionChanged += OnBlocksCollectionChanged;
+            // Wholesale collection swap does NOT raise CollectionChanged on the new collection
+            // (it was constructed pre-populated). The doc-order/index caches still point at the
+            // previous note's VMs, so cross-block selection, find, and other realized-block loops
+            // would silently fail (TryGetValue returns false for every new VM → index = -1).
+            _documentOrderDirty = true;
+            _cachedDocumentOrder = null;
+            _cachedDocIndexByVm = null;
             OnPropertyChanged();
             RebuildBlockRows();
         }
@@ -234,6 +362,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnBlocksCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        _documentOrderDirty = true;
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
@@ -274,9 +403,20 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void RebuildBlockRows()
     {
-        BlockRows.Clear();
+        if (Blocks.Count == 0)
+        {
+            _blockRows = new ObservableCollection<BlockRowViewModelBase>();
+            OnPropertyChanged(nameof(BlockRows));
+            return;
+        }
+
+        var rows = new BlockRowViewModelBase[Blocks.Count];
         for (var i = 0; i < Blocks.Count; i++)
-            BlockRows.Add(MakeRow(Blocks[i], i));
+            rows[i] = MakeRow(Blocks[i], i);
+        // ctor copies into internal storage without per-item CollectionChanged — then we swap the
+        // collection reference + INotifyPropertyChanged so ItemsRepeater updates once.
+        _blockRows = new ObservableCollection<BlockRowViewModelBase>(rows);
+        OnPropertyChanged(nameof(BlockRows));
     }
 
     private static BlockRowViewModelBase MakeRow(BlockViewModel block, int index) =>
@@ -860,14 +1000,48 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     public void LoadBlocks(Block[] blocks)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        using var loadScope = EditorPerfDiagnostics.Measure(perf, "loadBlocks", $"{blocks?.Length ?? 0} top-level");
+        var phaseStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
+        void MarkPhase(string phase, string? detail = null)
+        {
+            if (perf is not { IsEnabled: true } || phaseStart == 0)
+                return;
+
+            var ms = EditorPerfDiagnostics.ElapsedMs(phaseStart);
+            perf.RecordTiming("NotesEditor", $"loadBlocks.{phase}", ms, detail);
+            phaseStart = Stopwatch.GetTimestamp();
+        }
+
         FlushTypingBatch();
         _pendingSnapshot = null;
         _pendingCaretBefore = null;
         _history?.Clear();
+        _selectedBlockCount = 0;
+        // Defensive reset: any cross-block / box-select state must not leak across notes.
+        // Anchor VMs from the previous note will be unsubscribed below; leaving them set here
+        // would let a stale pointer-move event poke a freed-up VM.
+        _isCrossBlockSelecting = false;
+        _crossBlockArmed = false;
+        _crossBlockAnchorBlock = null;
+        _crossBlockAnchorBlockIndex = -1;
+        _lastCrossBlockCurrentIndex = -1;
+        _isBoxSelecting = false;
+        _boxSelectArmed = false;
+        _pendingPointerUpdateScheduled = false;
+        MarkPhase("reset");
+
+        // Cache may hold entries for VMs from the previous document. Container Unloaded /
+        // OnDataContextChanged eventually evicts them, but the timing isn't guaranteed before
+        // the new document's first lookup, so wipe up front.
+        _realizedBlocksByVm.Clear();
+        _numberedListBlocks.Clear();
 
         // Unsubscribe from old blocks (do not register released paths — note switch / persistence owns asset lifetime).
         foreach (var block in Blocks)
             UnsubscribeFromBlock(block, registerReleasedStoredImagePath: false);
+        MarkPhase("unsubscribeOld", $"{Blocks.Count} previous top-level");
 
         // Create new collection to ensure proper UI notification
         var newBlocks = new ObservableCollection<BlockViewModel>();
@@ -877,6 +1051,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             var defaultBlock = BlockFactory.CreateBlock(BlockType.Text, 0);
             SubscribeToBlock(defaultBlock);
             newBlocks.Add(defaultBlock);
+            MarkPhase("buildDefault");
         }
         else
         {
@@ -903,6 +1078,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
 
             ColumnPairHelper.MergeConsecutiveColumnPairs(newBlocks);
+            MarkPhase("buildViewModels", $"{newBlocks.Count} top-level rows");
             
             // If no valid blocks were added, add a default one
             if (newBlocks.Count == 0)
@@ -917,13 +1093,17 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _focusedBlockIndex = -1;
         _focusedBlockId = null;
         Blocks = newBlocks;
+        MarkPhase("assignBlocks", $"{newBlocks.Count} top-level");
         
         // Update list numbers after loading
         UpdateListNumbers();
+        MarkPhase("updateListNumbers");
 
         RefreshPageBlockTitles();
+        MarkPhase("refreshPageTitles");
 
         ReconcileReleasedStoredImagePathsWithDocument();
+        MarkPhase("reconcileImages");
 
         // Focus the first block after UI updates to make it immediately editable
         if (newBlocks.Count > 0)
@@ -932,10 +1112,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 () => newBlocks[0].IsFocused = true, 
                 Avalonia.Threading.DispatcherPriority.Loaded);
         }
+        MarkPhase("postFocus");
     }
 
     public Block[] GetBlocks()
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        using var scope = EditorPerfDiagnostics.Measure(perf, "getBlocks", $"{Blocks.Count} top-level");
+
         // Update order before returning
         for (int i = 0; i < Blocks.Count; i++)
         {
@@ -1068,6 +1252,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void SubscribeToBlock(BlockViewModel block)
     {
+        if (block.Type == BlockType.NumberedList)
+            _numberedListBlocks.Add(block);
+
         block.ContentChanged += OnBlockContentChanged;
         block.PropertyChanged += OnBlockPropertyChanged;
         block.DeleteRequested += OnBlockDeleteRequested;
@@ -1126,6 +1313,8 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (registerReleasedStoredImagePath && block.Type == BlockType.Image)
             RegisterReleasedStoredImagePathCore(block.ImagePath);
 
+        _numberedListBlocks.Remove(block);
+
         block.ContentChanged -= OnBlockContentChanged;
         block.PropertyChanged -= OnBlockPropertyChanged;
         block.DeleteRequested -= OnBlockDeleteRequested;
@@ -1164,6 +1353,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (e.PropertyName == nameof(BlockViewModel.Type))
         {
+            // Keep the numbered-list set in sync. BlockViewModel doesn't expose the prior type,
+            // but the set semantics (Add/Remove are idempotent) tolerate that.
+            if (sender is BlockViewModel typedBlock)
+            {
+                if (typedBlock.Type == BlockType.NumberedList)
+                    _numberedListBlocks.Add(typedBlock);
+                else
+                    _numberedListBlocks.Remove(typedBlock);
+            }
+
             UpdateListNumbers();
             if (!_isRestoringFromHistory && _pendingSnapshot != null)
             {
@@ -1177,6 +1376,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             if (!_isRestoringFromHistory && _pendingSnapshot != null)
             {
                 CommitStructuralChange("Toggle checklist");
+            }
+            return;
+        }
+
+        if (e.PropertyName == nameof(BlockViewModel.IsSelected))
+        {
+            if (sender is BlockViewModel sb)
+            {
+                if (sb.IsSelected) _selectedBlockCount++;
+                else if (_selectedBlockCount > 0) _selectedBlockCount--;
             }
             return;
         }
@@ -1220,6 +1429,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void OnBlockContentChanged(BlockViewModel block)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+
         ClearBlockSelection();
         var prev = block.PreviousContent;
         var prevRuns = block.PreviousSpans;
@@ -1242,6 +1454,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (_findPanelVisible)
             RefreshFindMatchesAndHighlights();
         BlocksChanged?.Invoke();
+
+        if (perfStart != 0)
+        {
+            var ms = EditorPerfDiagnostics.ElapsedMs(perfStart);
+            EditorPerfDiagnostics.ReportContentChange(ms);
+            EditorPerfDiagnostics.RecordIfSlow(perf, "contentChanged", ms);
+        }
     }
 
     private void OnBlockDeleteRequested(BlockViewModel block)
@@ -1833,24 +2052,35 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
         }
 
-        if (BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.Type == BlockType.NumberedList))
+        // Old code did EnumerateInDocumentOrder(Blocks).Any(...) on every reorder — an
+        // O(N) walk just to decide whether to do the O(N) update. With 1500 blocks that
+        // doubled the reorder cost. The tracked set makes the guard O(1).
+        if (_numberedListBlocks.Count > 0)
             UpdateListNumbers();
     }
 
     private void UpdateListNumbers()
     {
+        if (_numberedListBlocks.Count == 0)
+            return;
+
         int listNumber = 1;
-        var ordered = BlockHierarchy.EnumerateInDocumentOrder(Blocks).ToList();
-        for (int i = 0; i < ordered.Count; i++)
+        bool prevWasNumbered = false;
+        // Avoid ToList(): stream the document-order enumeration and look back via a flag.
+        foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
         {
-            if (ordered[i].Type == BlockType.NumberedList)
+            if (block.Type == BlockType.NumberedList)
             {
-                if (i == 0 || ordered[i - 1].Type != BlockType.NumberedList)
-                    listNumber = Math.Max(1, ordered[i].ListNumberIndex);
-                ordered[i].ListNumberIndex = listNumber++;
+                if (!prevWasNumbered)
+                    listNumber = Math.Max(1, block.ListNumberIndex);
+                block.ListNumberIndex = listNumber++;
+                prevWasNumbered = true;
             }
             else
+            {
                 listNumber = 1;
+                prevWasNumbered = false;
+            }
         }
     }
 
@@ -1873,8 +2103,14 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     public void ClearBlockSelection()
     {
-        foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
-            block.IsSelected = false;
+        if (_selectedBlockCount > 0)
+        {
+            foreach (var block in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+            {
+                if (block.IsSelected)
+                    block.IsSelected = false;
+            }
+        }
         _blockDragHandleSelectionAnchorIndex = -1;
     }
 
@@ -2336,8 +2572,27 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             .Any(b => b.Tag is string t && t.StartsWith("SplitColumnBottom", StringComparison.Ordinal));
     }
 
-    private List<BlockViewModel> GetDocumentOrderBlocks() =>
-        BlockHierarchy.EnumerateInDocumentOrder(Blocks).ToList();
+    private List<BlockViewModel> GetDocumentOrderBlocks()
+    {
+        if (!_documentOrderDirty && _cachedDocumentOrder != null)
+            return _cachedDocumentOrder;
+        _cachedDocumentOrder = BlockHierarchy.EnumerateInDocumentOrder(Blocks).ToList();
+        _cachedDocIndexByVm = null; // rebuild on next GetDocIndexLookup call
+        _documentOrderDirty = false;
+        return _cachedDocumentOrder;
+    }
+
+    /// <summary>O(1) VM → document-order index lookup. Built alongside <see cref="GetDocumentOrderBlocks"/>; cached until the document changes.</summary>
+    private Dictionary<BlockViewModel, int> GetDocIndexLookup()
+    {
+        if (_cachedDocIndexByVm != null && !_documentOrderDirty)
+            return _cachedDocIndexByVm;
+        var doc = GetDocumentOrderBlocks(); // also clears _documentOrderDirty
+        _cachedDocIndexByVm = new Dictionary<BlockViewModel, int>(doc.Count, ReferenceEqualityComparer.Instance);
+        for (int i = 0; i < doc.Count; i++)
+            _cachedDocIndexByVm[doc[i]] = i;
+        return _cachedDocIndexByVm;
+    }
 
     /// <summary>
     /// Bubble: clear selection; arm cross-block text selection when press is inside a TextBox.
@@ -2417,13 +2672,27 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         // anchor block so selection can continue across blocks.
         if (e.Pointer.Captured != null && !ReferenceEquals(e.Pointer.Captured, this))
         {
-            if (_crossBlockArmed && _crossBlockAnchorBlock != null && !IsPointInsideBlockSurface(_crossBlockAnchorBlock, current))
+            // Recapture for both arming-stage (first cross-out) and active selection (defensive:
+            // some other control could steal capture mid-drag). Without the second condition the
+            // selection silently halts because the inner if only triggers once on first cross-out.
+            bool shouldRecapture = (_crossBlockArmed || _isCrossBlockSelecting)
+                && _crossBlockAnchorBlock != null
+                && !IsPointInsideBlockSurface(_crossBlockAnchorBlock, current);
+            if (shouldRecapture)
+            {
                 e.Pointer.Capture(this);
+                // Do NOT reset the anchor RTE's _isDragging here. The pointer event is still
+                // routing and will reach RichTextEditor.OnPointerMoved next; if _isDragging
+                // were false there with the button still pressed, it would re-capture and
+                // steal control back, breaking cross-block selection. RTE._isDragging is
+                // safely reset in OnPointerMoved when isLeftPressed becomes false (after release).
+            }
             else
                 return;
         }
 
-        // Box selection: activate once movement exceeds threshold
+        // Box selection: activate once movement exceeds threshold — state transition is synchronous
+        // so pointer capture and border visibility are set in the same event dispatch.
         if (_boxSelectArmed)
         {
             var dx = current.X - _boxSelectStart.X;
@@ -2445,17 +2714,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             }
         }
 
-        if (_isBoxSelecting)
-        {
-            var overlay = _selectionBoxBorder?.GetVisualParent() as Visual;
-            Point endInOverlay = overlay != null ? e.GetPosition(overlay) : current;
-            UpdateSelectionBoxVisual(_boxSelectStartInOverlay, endInOverlay);
-            UpdateBoxSelection(_boxSelectStart, current);
-            e.Handled = true;
-            return;
-        }
-
-        // Cross-block text selection: on first move we enter selecting mode (we already have capture from Tunnel).
+        // Cross-block text selection: state transition is synchronous (capture/arm→active).
         if (_crossBlockArmed && _crossBlockAnchorBlock != null)
         {
             if (_crossBlockAnchorBlock.Type != BlockType.Image)
@@ -2463,10 +2722,66 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             _crossBlockArmed = false;
         }
 
-        if (_isCrossBlockSelecting && _crossBlockAnchorBlock != null)
+        bool willBox = _isBoxSelecting;
+        bool willCross = _isCrossBlockSelecting && _crossBlockAnchorBlock != null;
+
+        if (!willBox && !willCross)
+            return;
+
+        // Mark handled so the event system doesn't propagate further.
+        e.Handled = true;
+
+        // For box selection, update the visual rubber-band synchronously (cheap) but coalesce
+        // the expensive hit-test pass. For cross-block, coalesce entirely.
+        if (willBox)
         {
-            UpdateCrossBlockSelection(current);
-            e.Handled = true;
+            var overlay = _selectionBoxBorder?.GetVisualParent() as Visual;
+            Point endInOverlay = overlay != null ? e.GetPosition(overlay) : current;
+            UpdateSelectionBoxVisual(_boxSelectStartInOverlay, endInOverlay);
+        }
+
+        // Coalesce rapid pointer-move events: store the latest position and schedule a single
+        // deferred update per render frame. If the dispatcher already has a pending update, just
+        // refresh the stored position — the next flush will use the most recent values.
+        _pendingPointerPoint = current;
+        _pendingPointerIsBox = willBox;
+        _pendingPointerIsCross = willCross;
+
+        if (!_pendingPointerUpdateScheduled)
+        {
+            _pendingPointerUpdateScheduled = true;
+            Dispatcher.UIThread.Post(FlushPendingPointerUpdate, DispatcherPriority.Input);
+        }
+    }
+
+    private void FlushPendingPointerUpdate()
+    {
+        _pendingPointerUpdateScheduled = false;
+
+        var perf = EditorPerfDiagnostics.Resolve();
+
+        if (_pendingPointerIsBox && _isBoxSelecting)
+        {
+            var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+            UpdateBoxSelection(_boxSelectStart, _pendingPointerPoint);
+            if (perfStart != 0)
+                EditorPerfDiagnostics.ReportInteraction(
+                    perf,
+                    "pointerMoved.boxSelect",
+                    EditorPerfDiagnostics.ElapsedMs(perfStart),
+                    $"top={Blocks.Count} realized={RealizedRowCount}");
+        }
+
+        if (_pendingPointerIsCross && _isCrossBlockSelecting && _crossBlockAnchorBlock != null)
+        {
+            var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+            UpdateCrossBlockSelection(_pendingPointerPoint);
+            if (perfStart != 0)
+                EditorPerfDiagnostics.ReportInteraction(
+                    perf,
+                    "pointerMoved.crossBlock",
+                    EditorPerfDiagnostics.ElapsedMs(perfStart),
+                    $"top={Blocks.Count} realized={RealizedRowCount}");
         }
     }
 
@@ -2474,7 +2789,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     {
         if (IsReadOnly)
             return;
-        if (e.GetCurrentPoint(this).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonReleased) return;
+        // InitialPressMouseButton is the reliable Avalonia 11+ way to identify which button was
+        // released; PointerUpdateKind can return None/Other on some platforms and scenarios.
+        if (e.InitialPressMouseButton != MouseButton.Left) return;
 
         var wasBoxSelecting = _isBoxSelecting;
         var wasBoxArmed = _boxSelectArmed;
@@ -2490,6 +2807,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         _crossBlockAnchorBlock = null;
         _crossBlockAnchorBlockIndex = -1;
         _lastCrossBlockCurrentIndex = -1;
+        // Cancel any coalesced pointer update that was queued but not yet dispatched.
+        // The state flags above are already false, so FlushPendingPointerUpdate will be a no-op,
+        // but clearing the flag avoids the unnecessary dispatch overhead.
+        _pendingPointerUpdateScheduled = false;
 
         if (wasBoxSelecting)
         {
@@ -2566,26 +2887,46 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private void UpdateBoxSelection(Point start, Point end)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+        var checkedBlocks = 0;
+        var realizedHits = 0;
+        var selectedHits = 0;
+
         double minX = Math.Min(start.X, end.X);
         double maxX = Math.Max(start.X, end.X);
         double minY = Math.Min(start.Y, end.Y);
         double maxY = Math.Max(start.Y, end.Y);
         var selectionRect = new Rect(minX, minY, maxX - minX, maxY - minY);
 
-        var doc = GetDocumentOrderBlocks();
-        for (int i = 0; i < doc.Count; i++)
+        // Only iterate realized blocks (~8-17 of 1500+). Unrealized blocks have no live UI so
+        // their intersection bounds are unavailable anyway — the original code continued past them.
+        // When blocks scroll into view during a box-select they are naturally picked up.
+        foreach (var (vm, editable) in _realizedBlocksByVm)
         {
-            var editable = GetEditableBlockForViewModel(doc[i]);
-            Rect bounds;
-            if (editable != null)
-                bounds = editable.GetBoxSelectIntersectionBoundsRelativeTo(this);
-            else
-                continue;
+            checkedBlocks++;
+            // Guard against stale containers from virtualization recycling.
+            if (!ReferenceEquals(editable.DataContext, vm)) continue;
+            realizedHits++;
 
+            var bounds = editable.GetBoxSelectIntersectionBoundsRelativeTo(this);
             if (bounds.Width <= 0 || bounds.Height <= 0)
-                doc[i].IsSelected = false;
+                vm.IsSelected = false;
             else
-                doc[i].IsSelected = selectionRect.Intersects(bounds);
+            {
+                vm.IsSelected = selectionRect.Intersects(bounds);
+                if (vm.IsSelected)
+                    selectedHits++;
+            }
+        }
+
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "updateBoxSelection",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"checked={checkedBlocks} realizedHits={realizedHits} selected={selectedHits}");
         }
     }
 
@@ -2653,7 +2994,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return false;
         if (IsFocusInsideNestedTextBox())
             return false;
-        var hasBlockSelection = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.IsSelected);
+        var hasBlockSelection = _selectedBlockCount > 0;
         _ = TryPasteFromClipboardAsync(hasBlockSelection);
         return true;
     }
@@ -2699,7 +3040,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (IsReadOnly)
             return;
 
-        var hasBlockSelection = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.IsSelected);
+        var hasBlockSelection = _selectedBlockCount > 0;
         bool deferClipboardToNestedTextBox = IsFocusInsideNestedTextBox();
         bool deferUndoRedoToNestedTextBox = IsFocusInsideNestedTextBox();
 
@@ -3799,7 +4140,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         var copied = await TryCopySelectionToClipboardCoreAsync();
         if (!copied) return;
 
-        var hasBlockSelection = BlockHierarchy.EnumerateInDocumentOrder(Blocks).Any(b => b.IsSelected);
+        var hasBlockSelection = _selectedBlockCount > 0;
         if (hasBlockSelection)
         {
             DeleteSelectedBlocks();
@@ -4502,23 +4843,140 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     #endregion
 
-    /// <summary>Document-order leaf index at the given point (editor coordinates), or -1 if none.</summary>
+    /// <summary>
+    /// Document-order leaf index of the block at <paramref name="point"/> (editor coordinates).
+    /// <para>
+    /// Iterates only the ~8-17 realized (mounted) containers instead of all 1500 document blocks,
+    /// reducing the hot-path cost from O(N) to O(realized). When the pointer falls in a gap
+    /// between realized blocks the nearest block by Y is returned so cross-block drag selection
+    /// stays stable rather than returning -1 and stalling the update.
+    /// </para>
+    /// Returns -1 only when no realized blocks are available at all.
+    /// </summary>
     private int GetBlockIndexAtPoint(Point point)
     {
-        var doc = GetDocumentOrderBlocks();
-        for (int i = 0; i < doc.Count; i++)
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+        var checkedBlocks = 0;
+
+        var docIndexLookup = GetDocIndexLookup();
+
+        int exactMatch = -1;
+        int nearestDocIndex = -1;
+        // Track 2D rect distance, not just Y. SplitBlockRowView places L/R column children at the
+        // same Y bands; with Y-only distance, blocks in the *opposite* column tied with same-Y
+        // siblings, and dictionary iteration order picked the winner non-deterministically. That
+        // caused cross-block selection to jump across the row (and past the gap into Block N+1)
+        // when the pointer was in a gap, even though the cursor never crossed those blocks.
+        double nearestDistSq = double.MaxValue;
+        int nearestTiebreakDistDocIndex = int.MaxValue;
+        double lowestBottom = double.MinValue;
+        int lowestDocIndex = -1;
+
+        foreach (var (vm, editableBlock) in _realizedBlocksByVm)
         {
-            var rect = GetControlBoundsInEditor(GetEditableBlockForViewModel(doc[i]));
-            if (rect.Width > 0 && rect.Height > 0 && rect.Contains(point))
-                return i;
+            checkedBlocks++;
+            if (!ReferenceEquals(editableBlock.DataContext, vm)) continue;
+            if (!docIndexLookup.TryGetValue(vm, out int docIndex)) continue;
+
+            var rect = GetControlBoundsInEditor(editableBlock);
+            if (rect.Width <= 0 || rect.Height <= 0) continue;
+
+            double bottom = rect.Y + rect.Height;
+            double right = rect.X + rect.Width;
+
+            // Track the realized block with the greatest bottom edge for the "tail" fallback.
+            // Must be updated for every realized block regardless of exact-hit state so the
+            // "below realized" guard knows whether the lowest realized block is the document tail.
+            if (bottom > lowestBottom)
+            {
+                lowestBottom = bottom;
+                lowestDocIndex = docIndex;
+            }
+
+            // Exact hit: point is inside this block's bounds.
+            if (exactMatch < 0 && rect.Contains(point))
+                exactMatch = docIndex;
+
+            // Gap handling: track the nearest realized block by 2D distance so drag selection
+            // does not stall when the pointer is between two blocks. Use squared euclidean
+            // distance to the rect (0 inside, otherwise distance to nearest edge).
+            double dx = point.X < rect.X
+                ? rect.X - point.X
+                : point.X > right ? point.X - right : 0.0;
+            double dy = point.Y < rect.Y
+                ? rect.Y - point.Y
+                : point.Y > bottom ? point.Y - bottom : 0.0;
+            double distSq = dx * dx + dy * dy;
+
+            // Deterministic tiebreaker on equal distance: prefer the realized block whose docIndex
+            // is closest to the previous endpoint (so a downward drag through a column row gap
+            // doesn't snap to right-column children when the pointer is in the left column gap).
+            int tiebreakDist = _lastCrossBlockCurrentIndex >= 0
+                ? Math.Abs(docIndex - _lastCrossBlockCurrentIndex)
+                : docIndex;
+
+            if (distSq < nearestDistSq
+                || (distSq == nearestDistSq && tiebreakDist < nearestTiebreakDistDocIndex))
+            {
+                nearestDistSq = distSq;
+                nearestTiebreakDistDocIndex = tiebreakDist;
+                nearestDocIndex = docIndex;
+            }
         }
-        if (doc.Count > 0)
+
+        int result;
+        string resultTag;
+
+        if (exactMatch >= 0)
         {
-            var lastRect = GetControlBoundsInEditor(GetEditableBlockForViewModel(doc[^1]));
-            if (lastRect.Height > 0 && point.Y >= lastRect.Y + lastRect.Height)
-                return doc.Count;
+            result = exactMatch;
+            resultTag = $"{result}";
         }
-        return -1;
+        else if (lowestDocIndex < 0)
+        {
+            // No realized blocks at all (empty editor or all scrolled out).
+            result = -1;
+            resultTag = "-1";
+        }
+        else if (point.Y >= lowestBottom)
+        {
+            // Pointer is below all currently realized blocks.
+            // Only signal "past end" (doc.Count) when the lowest realized block is actually the
+            // last block in the document. In a virtualized list the lowest *realized* block is
+            // often just the bottom of the visible viewport — returning doc.Count from there
+            // would snap cross-block selection all the way to block 1499, which is incorrect.
+            var doc = GetDocumentOrderBlocks();
+            if (lowestDocIndex == doc.Count - 1)
+            {
+                result = doc.Count;
+                resultTag = "tail";
+            }
+            else
+            {
+                // Still inside the virtualized document; clamp to the last realized block so
+                // selection extends to the visible edge without jumping past unrealized blocks.
+                result = lowestDocIndex;
+                resultTag = $"{result}(below-realized)";
+            }
+        }
+        else
+        {
+            // Pointer is in a gap between realized blocks; snap to the nearest one so drag
+            // selection remains continuous instead of returning -1 and freezing the update.
+            result = nearestDocIndex;
+            resultTag = $"{result}(nearest)";
+        }
+
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "getBlockIndexAtPoint",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"checked={checkedBlocks} realized={_realizedBlocksByVm.Count} result={resultTag}");
+        }
+        return result;
     }
 
     /// <summary>
@@ -4527,18 +4985,33 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// </summary>
     private void ClearTextSelectionInAllBlocksExcept(BlockViewModel? exceptBlock)
     {
-        foreach (var b in BlockHierarchy.EnumerateInDocumentOrder(Blocks))
+        // Only realized blocks have a RichTextEditor / selection to clear. Walking the full
+        // document used to be O(N) calls into GetEditableBlockForViewModel, each cache-miss
+        // scanning all row indices — O(N²) with virtualization on large notes.
+        foreach (var kv in _realizedBlocksByVm)
         {
-            if (exceptBlock != null && ReferenceEquals(b, exceptBlock)) continue;
-            GetEditableBlockForViewModel(b)?.ApplyTextSelection(0, 0);
+            var vm = kv.Key;
+            var eb = kv.Value;
+            if (exceptBlock != null && ReferenceEquals(vm, exceptBlock))
+                continue;
+            if (!ReferenceEquals(eb.DataContext, vm))
+                continue;
+            eb.ApplyTextSelection(0, 0);
         }
     }
 
     private void UpdateCrossBlockSelection(Point currentPoint)
     {
+        var perf = EditorPerfDiagnostics.Resolve();
+        var perfStart = perf is { IsEnabled: true } ? Stopwatch.GetTimestamp() : 0;
+        var checkedBlocks = 0;
+        var appliedBlocks = 0;
+
         int anchorIndex = _crossBlockAnchorBlockIndex;
         if (anchorIndex < 0 || _crossBlockAnchorBlock == null) return;
 
+        // Use cached doc list (O(1) after first build). GetBlockIndexAtPoint and the hysteresis
+        // check both need indexed access, so we still need the list — but we avoid re-allocating it.
         var docList = GetDocumentOrderBlocks();
         int rawIndex = GetBlockIndexAtPoint(currentPoint);
         if (rawIndex < 0) return;
@@ -4558,14 +5031,25 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         int startIdx = Math.Min(anchorIndex, currentIndex);
         int endIdx = Math.Max(anchorIndex, currentIndex);
 
-        // Text selection only: never use block selection (IsSelected). Clear it on all blocks.
-        foreach (var b in Blocks)
-            b.IsSelected = false;
-
-        for (int i = 0; i < docList.Count; i++)
+        // Text selection only: never use block selection (IsSelected).
+        // Only clear if any blocks are actually marked selected (avoids an O(N) scan when nothing is selected).
+        if (_selectedBlockCount > 0)
         {
-            var editableBlock = GetEditableBlockForViewModel(docList[i]);
-            if (editableBlock == null) continue;
+            foreach (var b in Blocks)
+                b.IsSelected = false;
+        }
+
+        // Interact only with realized blocks — typically ~8-17 out of 1500+.
+        // Non-realized blocks have no live RichTextEditor, so ApplyTextSelection is a no-op for them;
+        // when they scroll back into view they start fresh with no selection applied.
+        var docIndexLookup = GetDocIndexLookup();
+        foreach (var (vm, editableBlock) in _realizedBlocksByVm)
+        {
+            checkedBlocks++;
+            // Guard against stale registrations (virtualization recycles containers).
+            if (!ReferenceEquals(editableBlock.DataContext, vm)) continue;
+            if (!docIndexLookup.TryGetValue(vm, out int i)) continue;
+            appliedBlocks++;
 
             // Blocks outside the selection range must be explicitly cleared so that shrinking
             // the selection (e.g. dragging back toward the anchor) removes highlights correctly.
@@ -4575,7 +5059,6 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 continue;
             }
 
-            var block = docList[i];
             int len = editableBlock.GetLogicalTextLengthForCrossBlockSelection();
 
             if (anchorIndex == currentIndex)
@@ -4611,6 +5094,15 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                 // Intermediate blocks: select all text in the block
                 editableBlock.ApplyTextSelection(0, len);
             }
+        }
+
+        if (perfStart != 0)
+        {
+            EditorPerfDiagnostics.ReportInteraction(
+                perf,
+                "updateCrossBlockSelection",
+                EditorPerfDiagnostics.ElapsedMs(perfStart),
+                $"checked={checkedBlocks} applied={appliedBlocks} anchor={anchorIndex} current={currentIndex} realized={RealizedRowCount}");
         }
     }
 
@@ -5076,13 +5568,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (dragged is TwoColumnBlockViewModel || dragged.Type == BlockType.Divider)
             return false;
 
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return false;
-        for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
+        for (int r = 0; r < BlockRows.Count; r++)
         {
             if (BlockRows[r] is not SplitBlockRowViewModel sp) continue;
+            var rowHost = TryGetRealizedRowContainer(r);
+            if (rowHost == null) continue; // virtualized out
             tc = sp.TwoColumn;
-            var rowHost = containers[r];
             var splitView = rowHost.GetVisualDescendants().OfType<SplitBlockRowView>().FirstOrDefault();
             if (splitView == null) continue;
             // Use full column grid cells (RootGrid columns 0 / 2), not ItemsControl bounds — when one column
@@ -5147,12 +5638,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private SplitBlockRowView? FindSplitRowView(TwoColumnBlockViewModel tc)
     {
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return null;
-        for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
+        if (BlocksItemsControl == null) return null;
+        for (int r = 0; r < BlockRows.Count; r++)
         {
-            if (BlockRows[r] is SplitBlockRowViewModel sp && ReferenceEquals(sp.TwoColumn, tc))
-                return containers[r].GetVisualDescendants().OfType<SplitBlockRowView>().FirstOrDefault();
+            if (BlockRows[r] is not SplitBlockRowViewModel sp || !ReferenceEquals(sp.TwoColumn, tc))
+                continue;
+            var rowHost = TryGetRealizedRowContainer(r);
+            return rowHost?.GetVisualDescendants().OfType<SplitBlockRowView>().FirstOrDefault();
         }
         return null;
     }
@@ -5169,7 +5661,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (col.Count == 0)
         {
             var splitView = FindSplitRowView(tc);
-            var ic = splitView?.FindControl<ItemsControl>(leftColumn ? "LeftColumnItems" : "RightColumnItems");
+            var ic = splitView?.FindControl<ItemsRepeater>(leftColumn ? "LeftColumnItems" : "RightColumnItems");
             if (ic == null) return;
             var tl = ic.TranslatePoint(new Point(0, 0), overlay);
             if (!tl.HasValue) return;
@@ -5317,12 +5809,12 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         if (!TryGetSplitIntentFromEditorX(cursor.X, out leftEdge))
             return false;
 
-        var boundsList = GetBlockBoundsInEditorOrder();
-        if (boundsList.Count == 0 || boundsList.Count != BlockRows.Count) return false;
+        var boundsList = GetRealizedRowGeometryInEditorOrder();
+        if (boundsList.Count == 0) return false;
 
-        for (int r = 0; r < boundsList.Count; r++)
+        for (int i = 0; i < boundsList.Count; i++)
         {
-            var (top, bottom) = boundsList[r];
+            var (r, _, top, bottom) = boundsList[i];
             if (cursor.Y < top || cursor.Y >= bottom) continue;
 
             var row = BlockRows[r];
@@ -5482,13 +5974,13 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
 
     private int GetInsertIndex(double cursorY)
     {
-        var rowBounds = GetBlockBoundsInEditorOrder();
-        if (rowBounds.Count == 0 || BlockRows.Count != rowBounds.Count)
+        var rowBounds = GetRealizedRowGeometryInEditorOrder();
+        if (rowBounds.Count == 0)
             return -1;
 
-        for (int r = 0; r < rowBounds.Count; r++)
+        for (int i = 0; i < rowBounds.Count; i++)
         {
-            var (top, bottom) = rowBounds[r];
+            var (r, _, top, bottom) = rowBounds[i];
             if (cursorY < top || cursorY >= bottom) continue;
 
             var row = BlockRows[r];
@@ -5511,6 +6003,9 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
             return cursorY < midY ? insertBeforeTop : insertAfterBottom;
         }
 
+        // Cursor was past every realized row's vertical range. With virtualization rows beyond
+        // the viewport aren't realized; falling through to Blocks.Count is correct for both the
+        // "cursor below the last block" case and the "cursor past a virtualized region" case.
         return Blocks.Count;
     }
 
@@ -5523,16 +6018,16 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         insertIndex = -1;
         if (Blocks.IndexOf(tc) < 0) return false;
 
-        var rowBounds = GetBlockBoundsInEditorOrder();
-        if (rowBounds.Count == 0 || BlockRows.Count != rowBounds.Count)
+        var rowBounds = GetRealizedRowGeometryInEditorOrder();
+        if (rowBounds.Count == 0)
             return false;
 
-        for (int r = 0; r < rowBounds.Count; r++)
+        for (int i = 0; i < rowBounds.Count; i++)
         {
+            var (r, _, top, bottom) = rowBounds[i];
             if (BlockRows[r] is not SplitBlockRowViewModel sp || !ReferenceEquals(sp.TwoColumn, tc))
                 continue;
 
-            var (top, bottom) = rowBounds[r];
             if (cursorY < top || cursorY >= bottom)
                 continue;
 
@@ -5557,46 +6052,84 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return false;
     }
 
-    private List<(double Top, double Bottom)> GetBlockBoundsInEditorOrder()
+    /// <summary>
+    /// Row-index-aware enumeration of realized item containers. With UI virtualization the
+    /// realized set is a subset of <see cref="BlockRows"/>; previously the helpers assumed
+    /// 1:1 with row indices, which breaks once <see cref="BlocksItemsControl"/> virtualizes.
+    /// </summary>
+    private List<(int RowIndex, Control Container, double Top, double Bottom)> GetRealizedRowGeometryInEditorOrder()
     {
-        var list = new List<(double Top, double Bottom)>();
-        var containers = GetBlockContainersInOrder();
-        if (containers == null) return list;
+        var list = new List<(int, Control, double, double)>();
+        if (BlocksItemsControl == null) return list;
 
-        foreach (var child in containers)
+        for (int i = 0; i < BlockRows.Count; i++)
         {
-            var topLeft = child.TranslatePoint(new Point(0, 0), this);
-            if (topLeft == null) continue;
-            var h = child.Bounds.Height;
+            if (BlocksItemsControl.TryGetElement(i) is not Control container) continue;
+            var topLeft = container.TranslatePoint(new Point(0, 0), this);
+            if (!topLeft.HasValue) continue;
+            var h = container.Bounds.Height;
             if (double.IsNaN(h) || h <= 0) continue;
-            list.Add((topLeft.Value.Y, topLeft.Value.Y + h));
+            list.Add((i, container, topLeft.Value.Y, topLeft.Value.Y + h));
         }
-
         return list;
+    }
+
+    /// <summary>
+    /// Returns the realized container for <paramref name="rowIndex"/> or null when virtualized out.
+    /// Cheap (O(1)) — uses <see cref="ItemsRepeater.TryGetElement(int)"/>.
+    /// </summary>
+    private Control? TryGetRealizedRowContainer(int rowIndex)
+    {
+        if (BlocksItemsControl == null) return null;
+        if (rowIndex < 0 || rowIndex >= BlockRows.Count) return null;
+        return BlocksItemsControl.TryGetElement(rowIndex) as Control;
     }
 
     private List<Control>? GetBlockContainersInOrder()
     {
         if (BlocksItemsControl == null) return null;
-        // Use GetRealizedContainers and sort by index so order matches Blocks collection
-        var containers = BlocksItemsControl.GetRealizedContainers()
-            .Where(c => BlocksItemsControl.IndexFromContainer(c) >= 0)
-            .OrderBy(c => BlocksItemsControl.IndexFromContainer(c))
-            .ToList();
-        return containers.Count > 0 ? containers : null;
+
+        // ItemsRepeater realizes only rows in the viewport; iterate row indices and pick up the
+        // realized ones in order. Returns null when nothing has been realized yet (e.g. first
+        // frame before measure).
+        var list = new List<Control>(Math.Min(BlockRows.Count, 64));
+        for (int i = 0; i < BlockRows.Count; i++)
+        {
+            if (BlocksItemsControl.TryGetElement(i) is Control c)
+                list.Add(c);
+        }
+        return list.Count > 0 ? list : null;
     }
 
     private EditableBlock? GetEditableBlockForViewModel(BlockViewModel? vm)
     {
         if (vm == null) return null;
+
+        // O(1) hot path — populated by EditableBlock.OnControlLoaded/Unloaded. Hot callers
+        // (ClearTextSelectionInAllBlocksExcept, find/replace, cross-block selection) used to
+        // walk the entire visual tree per block; with 1500 blocks that was O(N²).
+        if (_realizedBlocksByVm.TryGetValue(vm, out var cached))
+        {
+            // Container can survive in the dict for one tick after detach; verify DataContext.
+            if (ReferenceEquals(cached.DataContext, vm))
+                return cached;
+            _realizedBlocksByVm.Remove(vm);
+        }
+
+        // Fallback (first-frame / nested column cells before Loaded fires): search only realized
+        // row roots (sparse list preserves document order among realized rows — index is NOT row id).
         var containers = GetBlockContainersInOrder();
         if (containers == null) return null;
-        for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
+        for (var i = 0; i < containers.Count; i++)
         {
-            var c = containers[r];
+            var c = containers[i];
             var eb = c.GetVisualDescendants().OfType<EditableBlock>()
                 .FirstOrDefault(e => ReferenceEquals(e.DataContext, vm));
-            if (eb != null) return eb;
+            if (eb != null)
+            {
+                _realizedBlocksByVm[vm] = eb;
+                return eb;
+            }
         }
         return null;
     }
@@ -5611,18 +6144,26 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
         return new Rect(tl.Value, c.Bounds.Size);
     }
 
-    /// <summary>Items row container (ContentPresenter) for the row where horizontal insert <paramref name="insertIndex"/> applies.</summary>
+    /// <summary>Items row container for the row where horizontal insert <paramref name="insertIndex"/> applies, or null when virtualized out.</summary>
     private Control? GetRowContainerForInsertIndex(int insertIndex)
     {
-        var containers = GetBlockContainersInOrder();
-        if (containers == null || containers.Count == 0) return null;
+        if (BlocksItemsControl == null || BlockRows.Count == 0) return null;
+
         if (insertIndex >= Blocks.Count)
-            return containers[^1];
-        for (int r = 0; r < BlockRows.Count && r < containers.Count; r++)
+        {
+            // Tail anchor: walk back to the highest realized row.
+            for (int r = BlockRows.Count - 1; r >= 0; r--)
+            {
+                if (BlocksItemsControl.TryGetElement(r) is Control tail) return tail;
+            }
+            return null;
+        }
+
+        for (int r = 0; r < BlockRows.Count; r++)
         {
             var row = BlockRows[r];
             if (insertIndex >= row.StartBlockIndex && insertIndex < row.StartBlockIndex + row.BlockSpan)
-                return containers[r];
+                return BlocksItemsControl.TryGetElement(r) as Control;
         }
         return null;
     }
