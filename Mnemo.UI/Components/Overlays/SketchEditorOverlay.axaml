@@ -135,18 +135,24 @@
                                     <Button
                                         Width="30"
                                         Height="28"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
                                         Padding="0"
                                         Content="-"
                                         Click="ZoomOutButton_Click" />
                                     <Button
                                         x:Name="ResetViewButton"
                                         Height="28"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
                                         Padding="10,0"
                                         Content="Reset"
                                         Click="ResetViewButton_Click" />
                                     <Button
                                         Width="30"
                                         Height="28"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
                                         Padding="0"
                                         Content="+"
                                         Click="ZoomInButton_Click" />

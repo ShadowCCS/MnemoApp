@@ -43,9 +43,21 @@ public sealed class SketchLexer
                 continue;
             }
 
+            if (c == '<' && Peek(1) == '-' && Peek(2) == '>')
+            {
+                AddFixed(SketchTokenKind.ArrowBidirectional, "<->", 3);
+                continue;
+            }
+
             if (c == '-' && Peek(1) == '>')
             {
                 AddFixed(SketchTokenKind.ArrowDirected, "->", 2);
+                continue;
+            }
+
+            if (c == '-' && Peek(1) == '-')
+            {
+                AddFixed(SketchTokenKind.ArrowUndirected, "--", 2);
                 continue;
             }
 

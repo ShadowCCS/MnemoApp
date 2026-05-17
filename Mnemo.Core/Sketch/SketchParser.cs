@@ -44,6 +44,9 @@ public sealed class SketchParser
         if (Match(SketchTokenKind.Comment, out var comment))
             return new RawSketchComment(comment.Value, comment.Span);
 
+        if (TryParseMetaBlock(out var metaBlock))
+            return metaBlock;
+
         if (TryParseClassStatement(out var classDecl))
             return classDecl;
 
@@ -58,8 +61,8 @@ public sealed class SketchParser
             return null;
         }
 
-        if (Match(SketchTokenKind.ArrowDirected, out _))
-            return ParseEdge(nodeRef);
+        if (TryMatchArrow(out var direction))
+            return ParseEdge(nodeRef, direction);
 
         string? label = null;
         SourceSpan span = nodeRef.Span;
@@ -78,6 +81,24 @@ public sealed class SketchParser
         }
 
         return new RawSketchNodeDecl(nodeRef, label, properties, span);
+    }
+
+    private bool TryParseMetaBlock(out RawSketchMetaBlock? statement)
+    {
+        statement = null;
+        if (!Match(SketchTokenKind.KeywordSketch, out var sketchToken))
+            return false;
+
+        if (!Check(SketchTokenKind.LeftBrace))
+        {
+            AddError("SKETCH_PARSE_EXPECTED_META_BLOCK", "Expected a property block after 'sketch'.", Current.Span);
+            statement = new RawSketchMetaBlock(Array.Empty<RawSketchProperty>(), sketchToken.Span);
+            return true;
+        }
+
+        var block = ParsePropertyBlock();
+        statement = new RawSketchMetaBlock(block.Properties, new SourceSpan(sketchToken.Span.Start, block.End));
+        return true;
     }
 
     private bool TryParseClassStatement(out RawSketchClassDecl? statement)
@@ -108,7 +129,7 @@ public sealed class SketchParser
     private bool TryParseIgnoredBlockStatement(out RawSketchIgnoredStatement? statement)
     {
         statement = null;
-        if (Current.Kind is not (SketchTokenKind.KeywordSketch or SketchTokenKind.KeywordClass or SketchTokenKind.KeywordGroup))
+        if (Current.Kind is not (SketchTokenKind.KeywordGroup or SketchTokenKind.KeywordEdge))
             return false;
 
         var start = Advance();
@@ -127,12 +148,36 @@ public sealed class SketchParser
         return true;
     }
 
-    private RawSketchEdgeDecl? ParseEdge(RawSketchNodeRef source)
+    private bool TryMatchArrow(out SketchEdgeDirection direction)
+    {
+        if (Match(SketchTokenKind.ArrowDirected, out _))
+        {
+            direction = SketchEdgeDirection.Directed;
+            return true;
+        }
+
+        if (Match(SketchTokenKind.ArrowUndirected, out _))
+        {
+            direction = SketchEdgeDirection.Undirected;
+            return true;
+        }
+
+        if (Match(SketchTokenKind.ArrowBidirectional, out _))
+        {
+            direction = SketchEdgeDirection.Bidirectional;
+            return true;
+        }
+
+        direction = SketchEdgeDirection.Directed;
+        return false;
+    }
+
+    private RawSketchEdgeDecl? ParseEdge(RawSketchNodeRef source, SketchEdgeDirection direction)
     {
         var target = ParseNodeRef();
         if (target == null)
         {
-            AddError("SKETCH_PARSE_EXPECTED_EDGE_TARGET", "Expected an edge target after '->'.", Current.Span);
+            AddError("SKETCH_PARSE_EXPECTED_EDGE_TARGET", "Expected an edge target after arrow.", Current.Span);
             return null;
         }
 
@@ -161,7 +206,7 @@ public sealed class SketchParser
             end = block.End;
         }
 
-        return new RawSketchEdgeDecl(source, target, string.IsNullOrWhiteSpace(label) ? null : label, properties, new SourceSpan(source.Span.Start, end));
+        return new RawSketchEdgeDecl(source, target, direction, string.IsNullOrWhiteSpace(label) ? null : label, properties, new SourceSpan(source.Span.Start, end));
     }
 
     private RawSketchNodeRef? ParseNodeRef()
@@ -297,7 +342,6 @@ public sealed class SketchParser
                 sb.Append(' ');
             sb.Append(v);
         }
-        // Trim trailing whitespace from the buffer in-place rather than allocating a trimmed copy.
         while (sb.Length > 0 && char.IsWhiteSpace(sb[sb.Length - 1]))
             sb.Length--;
         var start = 0;

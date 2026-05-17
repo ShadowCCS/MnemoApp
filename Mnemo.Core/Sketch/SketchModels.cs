@@ -35,6 +35,8 @@ public enum SketchTokenKind
     LeftBrace,
     RightBrace,
     ArrowDirected,
+    ArrowUndirected,
+    ArrowBidirectional,
     KeywordSketch,
     KeywordClass,
     KeywordGroup,
@@ -45,15 +47,35 @@ public enum SketchTokenKind
     Invalid
 }
 
+public enum SketchEdgeDirection
+{
+    Directed,
+    Undirected,
+    Bidirectional
+}
+
+public enum SketchLayoutDirection
+{
+    LeftToRight,
+    TopToBottom,
+    RightToLeft,
+    BottomToTop
+}
+
 public sealed record SketchToken(SketchTokenKind Kind, string Text, string Value, SourceSpan Span);
 
 public sealed record RawSketchAst(IReadOnlyList<RawSketchStatement> Statements, SourceSpan Span);
 
 public abstract record RawSketchStatement(SourceSpan Span);
 
+public sealed record RawSketchMetaBlock(
+    IReadOnlyList<RawSketchProperty> Properties,
+    SourceSpan Span) : RawSketchStatement(Span);
+
 public sealed record RawSketchEdgeDecl(
     RawSketchNodeRef Source,
     RawSketchNodeRef Target,
+    SketchEdgeDirection Direction,
     string? Label,
     IReadOnlyList<RawSketchProperty> Properties,
     SourceSpan Span) : RawSketchStatement(Span);
@@ -82,8 +104,17 @@ public sealed record SketchParseResult(
     IReadOnlyList<SketchToken> Tokens,
     IReadOnlyList<SketchDiagnostic> Diagnostics);
 
+public sealed record SketchDiagramMeta(
+    string? Title,
+    SketchLayoutDirection Direction,
+    string? Layout)
+{
+    public static readonly SketchDiagramMeta Default = new(null, SketchLayoutDirection.LeftToRight, "dag");
+}
+
 public sealed record ResolvedSketchDiagram(
     int Version,
+    SketchDiagramMeta Meta,
     IReadOnlyList<ResolvedSketchNode> Nodes,
     IReadOnlyList<ResolvedSketchEdge> Edges,
     IReadOnlyList<SketchDiagnostic> Diagnostics);
@@ -100,6 +131,7 @@ public sealed record ResolvedSketchEdge(
     string Id,
     string SourceId,
     string TargetId,
+    SketchEdgeDirection Direction,
     string? Label,
     ResolvedSketchStyle Style,
     SourceSpan SourceSpan);
@@ -122,6 +154,7 @@ public enum SketchColorKind
 public sealed record SketchColorValue(SketchColorKind Kind, string Value);
 
 public sealed record LaidOutSketchDiagram(
+    SketchLayoutDirection Direction,
     IReadOnlyList<LaidOutSketchNode> Nodes,
     IReadOnlyList<LaidOutSketchEdge> Edges,
     SketchBounds Bounds,
@@ -141,6 +174,7 @@ public sealed record LaidOutSketchEdge(
     string Id,
     string SourceId,
     string TargetId,
+    SketchEdgeDirection Direction,
     string? Label,
     ResolvedSketchStyle Style,
     double X1,

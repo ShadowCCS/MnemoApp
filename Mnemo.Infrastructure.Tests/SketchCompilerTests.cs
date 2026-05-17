@@ -1,3 +1,4 @@
+using System.Linq;
 using Mnemo.Core.Sketch;
 
 namespace Mnemo.Infrastructure.Tests;
@@ -147,5 +148,257 @@ public class SketchCompilerTests
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
         Assert.Contains("fill=\"#3b82f6\"", result.Svg);
         Assert.Contains("stroke=\"#123abc\"", result.Svg);
+    }
+
+    [Fact]
+    public void Resolve_ParsesMetaBlockDirectionAndTitle()
+    {
+        var diagram = new SketchCompiler().Resolve("""
+            sketch {
+              title: "My Diagram"
+              direction: top-to-bottom
+            }
+            A -> B
+            """);
+
+        Assert.DoesNotContain(diagram.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        Assert.Equal("My Diagram", diagram.Meta.Title);
+        Assert.Equal(SketchLayoutDirection.TopToBottom, diagram.Meta.Direction);
+    }
+
+    [Fact]
+    public void Layout_TopToBottomUsesBottomCenterEndpoints()
+    {
+        var diagram = new SketchCompiler().Layout("""
+            sketch {
+              direction: top-to-bottom
+            }
+            [a] "Source"
+            [b] "Target"
+            [a] -> [b]
+            """);
+
+        Assert.Equal(SketchLayoutDirection.TopToBottom, diagram.Direction);
+        var edge = diagram.Edges.Single();
+        var source = diagram.Nodes.Single(n => n.Id == "a");
+        var target = diagram.Nodes.Single(n => n.Id == "b");
+
+        Assert.Equal(source.X + source.Width / 2, edge.X1, precision: 1);
+        Assert.Equal(source.Y + source.Height, edge.Y1, precision: 1);
+        Assert.Equal(target.X + target.Width / 2, edge.X2, precision: 1);
+        Assert.Equal(target.Y, edge.Y2, precision: 1);
+    }
+
+    [Fact]
+    public void CompileToSvg_UndirectedEdgeOmitsArrowhead()
+    {
+        var result = new SketchCompiler().CompileToSvg("A -- B");
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        Assert.Contains("sketch-edge-direction=\"undirected\"", result.Svg);
+        Assert.DoesNotContain("<polygon", result.Svg);
+    }
+
+    [Fact]
+    public void CompileToSvg_BidirectionalEdgeHasTwoArrowheads()
+    {
+        var result = new SketchCompiler().CompileToSvg("A <-> B");
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        Assert.Contains("sketch-edge-direction=\"bidirectional\"", result.Svg);
+
+        var polygonCount = 0;
+        var searchIn = result.Svg;
+        var idx = 0;
+        while ((idx = searchIn.IndexOf("<polygon", idx, StringComparison.Ordinal)) >= 0)
+        {
+            polygonCount++;
+            idx++;
+        }
+        Assert.Equal(2, polygonCount);
+    }
+
+    [Fact]
+    public void Resolve_MultipleClassesAreMergedInOrder()
+    {
+        var diagram = new SketchCompiler().Resolve("""
+            class base {
+              fill: blue-100
+              stroke: blue-700
+            }
+            class highlight {
+              stroke: red-700
+            }
+            [node] {
+              class: [base, highlight]
+            }
+            """);
+
+        Assert.DoesNotContain(diagram.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        var node = diagram.Nodes.Single();
+        Assert.Equal("blue-100", node.Style.Fill?.Value);
+        Assert.Equal("red-700", node.Style.Stroke?.Value);
+    }
+
+    [Fact]
+    public void CompileToSvg_FormatsCoordinatesWithInvariantCulture()
+    {
+        var previousCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
+        try
+        {
+            // Use a culture that formats numbers with comma as the decimal separator.
+            // Without invariant formatting, SVG number attributes (and especially the
+            // polygon "points" attribute) would become invalid and the diagram would
+            // render with overlapping nodes, broken arrowheads, and mis-placed labels.
+            System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+
+            var result = new SketchCompiler().CompileToSvg("""
+                sketch { direction: top-to-bottom }
+                [a] "Source"
+                [b] "Target"
+                [a] <-> [b]
+                """);
+
+            Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+            Assert.DoesNotContain("515,5", result.Svg);
+            Assert.DoesNotMatch(new System.Text.RegularExpressions.Regex("""(x|y|width|height|rx|ry|stroke-width|x1|y1|x2|y2|font-size)="\d+,\d"""), result.Svg);
+            Assert.DoesNotMatch(new System.Text.RegularExpressions.Regex("""points="\d+,\d+,\d+ """), result.Svg);
+        }
+        finally
+        {
+            System.Threading.Thread.CurrentThread.CurrentCulture = previousCulture;
+        }
+    }
+
+    [Fact]
+    public void CompileToSvg_OffsetsBranchingEdgeLabels()
+    {
+        var source = """
+            sketch { direction: top-to-bottom }
+            [client] "Student Client App With A Long Label That Should Wrap"
+            [api] "Public API"
+            [auth] "Auth Service"
+            [cache] "Redis Cache"
+            [teacher] "Teacher Portal"
+
+            [client] -> [api] : "calls <escaped label>"
+            [teacher] -> [api] : reviews progress
+            [api] -> [auth] : validates session
+            [api] -- [cache] : shares cached data
+            """;
+
+        var compiler = new SketchCompiler();
+        var layout = compiler.Layout(source);
+        var result = compiler.CompileToSvg(source);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+
+        var labelBoxes = ExtractLabelBoxes(result.Svg);
+        Assert.False(labelBoxes["calls <escaped label>"].Intersects(labelBoxes["reviews progress"]));
+        Assert.False(labelBoxes["validates session"].Intersects(labelBoxes["shares cached data"]));
+
+        foreach (var edge in layout.Edges.Where(e => !string.IsNullOrWhiteSpace(e.Label)))
+        {
+            var midpointX = (edge.X1 + edge.X2) / 2;
+            Assert.Equal(midpointX, labelBoxes[edge.Label!].TextX, precision: 1);
+        }
+    }
+
+    [Fact]
+    public void CompileToSvg_AllNodesHaveRectInSvg()
+    {
+        const string source = """
+            sketch {
+              direction: top-to-bottom
+            }
+            class service { fill: blue-100 stroke: blue-700 }
+            [client] "Client" { fill: pink-100 stroke: pink-700 }
+            [api]    "Public API" { class: service }
+            [auth]   "Auth Service" { class: service }
+            [db]     "Database" { fill: green-100 stroke: green-700 }
+            [teacher] "Teacher Portal" { fill: purple-100 stroke: purple-700 }
+            [cache]  "Redis Cache" { fill: yellow-100 stroke: yellow-700 }
+            [client] -> [api]
+            [api] -> [auth]
+            [auth] -> [db]
+            [api] -- [cache]
+            [teacher] -> [api]
+            """;
+
+        var compiler = new SketchCompiler();
+        var layout = compiler.Layout(source);
+        var result = compiler.CompileToSvg(source);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+
+        // Every node must appear as a named group with a rect in the SVG.
+        foreach (var node in layout.Nodes)
+        {
+            Assert.Contains($"node:{node.Id}", result.Svg);
+        }
+
+        // Count <rect elements: 1 SVG background + 1 per node + 1 per edge with a label.
+        var edgesWithLabels = layout.Edges.Count(e => !string.IsNullOrWhiteSpace(e.Label));
+        var rectCount = CountSubstring(result.Svg, "<rect");
+        Assert.Equal(layout.Nodes.Count + 1 + edgesWithLabels, rectCount);
+
+        // Auth and cache must be at distinct X positions (not overlapping).
+        var authNode  = layout.Nodes.Single(n => n.Id == "auth");
+        var cacheNode = layout.Nodes.Single(n => n.Id == "cache");
+        Assert.NotEqual(authNode.X, cacheNode.X);
+
+        // All nodes should be at non-negative positions.
+        foreach (var node in layout.Nodes)
+        {
+            Assert.True(node.X >= 0, $"Node {node.Id} has negative X={node.X}");
+            Assert.True(node.Y >= 0, $"Node {node.Id} has negative Y={node.Y}");
+            Assert.True(node.Width > 0, $"Node {node.Id} has non-positive Width={node.Width}");
+            Assert.True(node.Height > 0, $"Node {node.Id} has non-positive Height={node.Height}");
+        }
+    }
+
+    private static int CountSubstring(string source, string value)
+    {
+        var count = 0;
+        var idx = 0;
+        while ((idx = source.IndexOf(value, idx, System.StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            idx++;
+        }
+        return count;
+    }
+
+    private static IReadOnlyDictionary<string, LabelBox> ExtractLabelBoxes(string svg)
+    {
+        var elements = System.Xml.Linq.XDocument.Parse(svg).Root!.Descendants().ToArray();
+        var boxes = new Dictionary<string, LabelBox>(StringComparer.Ordinal);
+        for (var i = 0; i < elements.Length - 1; i++)
+        {
+            if (elements[i].Name.LocalName != "rect" || elements[i + 1].Name.LocalName != "text")
+                continue;
+
+            boxes[elements[i + 1].Value] = new LabelBox(
+                ReadDouble(elements[i], "x"),
+                ReadDouble(elements[i], "y"),
+                ReadDouble(elements[i], "width"),
+                ReadDouble(elements[i], "height"),
+                ReadDouble(elements[i + 1], "x"),
+                ReadDouble(elements[i + 1], "y"));
+        }
+
+        return boxes;
+    }
+
+    private static double ReadDouble(System.Xml.Linq.XElement element, string attributeName) =>
+        double.Parse(element.Attribute(attributeName)?.Value ?? "0", System.Globalization.CultureInfo.InvariantCulture);
+
+    private readonly record struct LabelBox(double X, double Y, double Width, double Height, double TextX, double TextY)
+    {
+        public bool Intersects(LabelBox other) =>
+            X < other.X + other.Width
+            && X + Width > other.X
+            && Y < other.Y + other.Height
+            && Y + Height > other.Y;
     }
 }

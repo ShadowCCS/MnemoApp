@@ -13,11 +13,15 @@ public sealed class SketchResolver
         var edges = new List<ResolvedSketchEdge>();
         var edgeCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var classes = new Dictionary<string, ResolvedSketchStyle>(StringComparer.Ordinal);
+        var meta = SketchDiagramMeta.Default;
 
         foreach (var statement in parseResult.Ast.Statements)
         {
             switch (statement)
             {
+                case RawSketchMetaBlock metaBlock:
+                    meta = ResolveMeta(metaBlock.Properties);
+                    break;
                 case RawSketchClassDecl classDecl:
                     classes[classDecl.Name] = ResolveStyle(classDecl.Properties, classes);
                     break;
@@ -27,13 +31,15 @@ public sealed class SketchResolver
                 case RawSketchEdgeDecl edgeDecl:
                     EnsureImplicitNode(nodes, edgeDecl.Source);
                     EnsureImplicitNode(nodes, edgeDecl.Target);
-                    var edgeBaseId = $"edge:{edgeDecl.Source.Id}:->:{edgeDecl.Target.Id}";
+                    var opToken = EdgeDirectionToken(edgeDecl.Direction);
+                    var edgeBaseId = $"edge:{edgeDecl.Source.Id}:{opToken}:{edgeDecl.Target.Id}";
                     edgeCounts.TryGetValue(edgeBaseId, out var edgeIndex);
                     edgeCounts[edgeBaseId] = edgeIndex + 1;
                     edges.Add(new ResolvedSketchEdge(
                         $"{edgeBaseId}:{edgeIndex}",
                         edgeDecl.Source.Id,
                         edgeDecl.Target.Id,
+                        edgeDecl.Direction,
                         edgeDecl.Label,
                         ResolveStyle(edgeDecl.Properties, classes),
                         edgeDecl.Span));
@@ -43,10 +49,38 @@ public sealed class SketchResolver
 
         return new ResolvedSketchDiagram(
             1,
+            meta,
             nodes.Values.Select(n => new ResolvedSketchNode(n.Id, n.Label, n.Style, n.Declared, n.Implicit, n.SourceSpans)).ToArray(),
             edges,
             parseResult.Diagnostics);
     }
+
+    private static SketchDiagramMeta ResolveMeta(IReadOnlyList<RawSketchProperty> properties)
+    {
+        var title = FindProperty(properties, "title");
+        var layout = FindProperty(properties, "layout");
+        var directionRaw = FindProperty(properties, "direction") ?? FindProperty(properties, "layout.dir");
+        var direction = ParseLayoutDirection(directionRaw);
+        return new SketchDiagramMeta(title, direction, layout ?? "dag");
+    }
+
+    private static SketchLayoutDirection ParseLayoutDirection(string? value) =>
+        (value ?? string.Empty).ToLowerInvariant().Replace(" ", "-", StringComparison.Ordinal) switch
+        {
+            "left-to-right" or "ltr" or "lr" => SketchLayoutDirection.LeftToRight,
+            "top-to-bottom" or "ttb" or "tb" => SketchLayoutDirection.TopToBottom,
+            "right-to-left" or "rtl" or "rl" => SketchLayoutDirection.RightToLeft,
+            "bottom-to-top" or "btt" or "bt" => SketchLayoutDirection.BottomToTop,
+            _ => SketchLayoutDirection.LeftToRight
+        };
+
+    private static string EdgeDirectionToken(SketchEdgeDirection direction) =>
+        direction switch
+        {
+            SketchEdgeDirection.Undirected => "--",
+            SketchEdgeDirection.Bidirectional => "<->",
+            _ => "->"
+        };
 
     private static void DeclareNode(
         Dictionary<string, MutableNode> nodes,
@@ -86,9 +120,13 @@ public sealed class SketchResolver
         IReadOnlyDictionary<string, ResolvedSketchStyle> classes)
     {
         var style = new ResolvedSketchStyle();
-        var className = FindProperty(properties, "class");
-        if (className != null && classes.TryGetValue(className, out var classStyle))
-            style = classStyle;
+
+        var classNames = ParseClassNames(FindProperty(properties, "class"));
+        foreach (var className in classNames)
+        {
+            if (classes.TryGetValue(className, out var classStyle))
+                style = MergeStyles(style, classStyle);
+        }
 
         foreach (var property in properties)
         {
@@ -105,6 +143,39 @@ public sealed class SketchResolver
         }
 
         return style;
+    }
+
+    /// <summary>
+    /// Merges an accumulated class style with a new (later) class style.
+    /// The new class's non-null properties take priority, falling back to the accumulated values.
+    /// </summary>
+    private static ResolvedSketchStyle MergeStyles(ResolvedSketchStyle accumulated, ResolvedSketchStyle newClass) =>
+        new(
+            newClass.Fill ?? accumulated.Fill,
+            newClass.Stroke ?? accumulated.Stroke,
+            newClass.StrokeWidth ?? accumulated.StrokeWidth,
+            newClass.Shape ?? accumulated.Shape);
+
+    /// <summary>
+    /// Parses a class value that may be a single name like <c>service</c>
+    /// or a bracket-list like <c>[service,critical]</c>.
+    /// </summary>
+    private static IReadOnlyList<string> ParseClassNames(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return [];
+
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
+        {
+            var inner = trimmed[1..^1];
+            return inner
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(s => s.Length > 0)
+                .ToArray();
+        }
+
+        return [trimmed];
     }
 
     private static string? FindProperty(IReadOnlyList<RawSketchProperty> properties, string key) =>

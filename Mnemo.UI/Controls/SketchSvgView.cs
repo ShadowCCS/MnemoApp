@@ -142,23 +142,36 @@ public sealed class SketchSvgView : Control
 
         var metrics = CalculateRenderMetrics(svg, Zoom);
 
+        // Minimum stroke in drawing-space units that results in 1 physical pixel after scaling.
+        // This prevents node borders and edge lines from going sub-pixel and becoming invisible.
+        var minStroke = 1.0 / metrics.Scale;
+
         using var transform = context.PushTransform(
             Matrix.CreateScale(metrics.Scale, metrics.Scale)
             * Matrix.CreateTranslation(metrics.OffsetX, metrics.OffsetY));
 
         foreach (var line in svg.Lines)
         {
-            var pen = new Pen(ParseBrush(line.Stroke), line.StrokeThickness);
+            var pen = new Pen(ParseBrush(line.Stroke), Math.Max(line.StrokeThickness, minStroke));
             var start = new Point(line.X1, line.Y1);
             var end = new Point(line.X2, line.Y2);
             context.DrawLine(pen, start, end);
-            DrawArrowHead(context, start, end, ParseBrush(line.Stroke));
+
+            if (line.Direction == "bidirectional")
+            {
+                DrawArrowHead(context, start, end, ParseBrush(line.Stroke));
+                DrawArrowHead(context, end, start, ParseBrush(line.Stroke));
+            }
+            else if (line.Direction != "undirected")
+            {
+                DrawArrowHead(context, start, end, ParseBrush(line.Stroke));
+            }
         }
 
         foreach (var rect in svg.Rects)
         {
             var fill = ParseBrush(rect.Fill);
-            var pen = new Pen(ParseBrush(rect.Stroke), rect.StrokeThickness);
+            var pen = new Pen(ParseBrush(rect.Stroke), Math.Max(rect.StrokeThickness, minStroke));
             context.DrawRectangle(fill, pen, new Rect(rect.X, rect.Y, rect.Width, rect.Height), rect.Radius, rect.Radius);
         }
 
@@ -259,7 +272,8 @@ public sealed class SketchSvgView : Control
                             ReadDouble(element, "x2", 0),
                             ReadDouble(element, "y2", 0),
                             ReadAttribute(element, "stroke") ?? "#000000",
-                            ReadDouble(element, "stroke-width", 1)));
+                            ReadDouble(element, "stroke-width", 1),
+                            ReadAttribute(element, "sketch-edge-direction") ?? "directed"));
                         break;
                     case "text":
                         texts.Add(new SvgText(
@@ -445,7 +459,8 @@ public sealed class SketchSvgView : Control
         double X2,
         double Y2,
         string Stroke,
-        double StrokeThickness);
+        double StrokeThickness,
+        string Direction);
 
     private sealed record SvgText(
         double X,

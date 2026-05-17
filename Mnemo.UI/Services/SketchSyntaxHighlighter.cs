@@ -74,6 +74,8 @@ public static class SketchSyntaxHighlighter
                     AddRun(target, token.Text, defaultForeground);
                     break;
                 case SketchTokenKind.ArrowDirected:
+                case SketchTokenKind.ArrowUndirected:
+                case SketchTokenKind.ArrowBidirectional:
                     pendingEdgeTargetIdentifier = true;
                     AddRun(target, token.Text, ResolveBrush(token.Kind, defaultForeground, false));
                     break;
@@ -117,7 +119,8 @@ public static class SketchSyntaxHighlighter
             SketchTokenKind.String or SketchTokenKind.HexColor => ThemeBrush("SyntaxCodeStringBrush", defaultForeground),
             SketchTokenKind.Number or SketchTokenKind.Boolean => ThemeBrush("SyntaxCodeNumberBrush", defaultForeground),
             SketchTokenKind.Comment => ThemeBrush("SyntaxCodeCommentBrush", defaultForeground),
-            SketchTokenKind.ArrowDirected => ThemeBrush("SyntaxCodeOperatorBrush", defaultForeground),
+            SketchTokenKind.ArrowDirected or SketchTokenKind.ArrowUndirected or SketchTokenKind.ArrowBidirectional
+                => ThemeBrush("SyntaxCodeOperatorBrush", defaultForeground),
             SketchTokenKind.LeftBracket or SketchTokenKind.RightBracket or SketchTokenKind.LeftParen
             or SketchTokenKind.RightParen or SketchTokenKind.LeftBrace or SketchTokenKind.RightBrace
             or SketchTokenKind.Colon or SketchTokenKind.Comma
