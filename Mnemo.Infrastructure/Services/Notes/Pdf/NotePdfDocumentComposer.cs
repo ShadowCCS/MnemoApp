@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Mnemo.Core.Models;
 using Mnemo.Core.Services;
+using Mnemo.Core.Sketch;
 using Mnemo.Infrastructure.Services.Notes.Markdown;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -271,6 +272,9 @@ internal static class NotePdfDocumentComposer
                     .FontSize(Math.Max(9f, options.BaseFontSizePt - 1f));
                 break;
             }
+            case BlockType.Sketch:
+                ComposeSketch(column, block, body, options);
+                break;
             case BlockType.Divider:
                 column.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten1);
                 break;
@@ -445,6 +449,101 @@ internal static class NotePdfDocumentComposer
             FractionSpan f => $"{f.Numerator}/{f.Denominator}",
             _ => string.Empty
         }));
+
+    private static void ComposeSketch(ColumnDescriptor column, Block block, string source, NotePdfExportOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+            return;
+
+        try
+        {
+            var result = new SketchCompiler().CompileToSvg(source);
+            if (result.Diagnostics.Any(d => d.Severity == SketchDiagnosticSeverity.Error))
+            {
+                ComposeSketchFallback(column, source, options);
+                return;
+            }
+
+            var svg = NormalizeSketchSvgForPdf(result.Svg, options);
+            var (widthPt, align) = ResolveSketchPdfLayout(block);
+            if (widthPt <= 0 && align == "left")
+            {
+                column.Item()
+                    .MaxWidth(MaxSketchPdfWidthPt, Unit.Point)
+                    .Svg(svg)
+                    .FitWidth();
+                return;
+            }
+
+            var effectiveWidthPt = widthPt > 0 ? widthPt : MaxSketchPdfWidthPt;
+            column.Item().Row(row =>
+            {
+                if (align == "center" || align == "right")
+                    row.RelativeItem();
+
+                row.AutoItem().Element(host =>
+                {
+                    host
+                        .Width(effectiveWidthPt, Unit.Point)
+                        .Svg(svg)
+                        .FitWidth();
+                });
+
+                if (align == "center" || align == "left")
+                    row.RelativeItem();
+            });
+        }
+        catch
+        {
+            ComposeSketchFallback(column, source, options);
+        }
+    }
+
+    private const float MaxSketchPdfWidthPt = 480f;
+
+    internal static (float WidthPt, string Align) ResolveSketchPdfLayout(Block block)
+    {
+        if (block.Payload is not SketchPayload payload)
+            return (0, "left");
+
+        var widthPt = payload.Width > 0
+            ? (float)Math.Clamp(payload.Width * 0.75, 48, MaxSketchPdfWidthPt)
+            : 0;
+        return (widthPt, NormalizeImageAlign(payload.Align));
+    }
+
+    private static void ComposeSketchFallback(ColumnDescriptor column, string source, NotePdfExportOptions options)
+    {
+        column.Item()
+            .Background(Colors.Grey.Lighten4)
+            .Padding(10)
+            .Text(source)
+            .FontFamily("Consolas")
+            .FontSize(Math.Max(9f, options.BaseFontSizePt - 1f));
+    }
+
+    internal static string NormalizeSketchSvgForPdf(string svg, NotePdfExportOptions options)
+    {
+        var normalized = svg.Replace(
+            "<rect width=\"100%\" height=\"100%\" fill=\"transparent\" />",
+            "<rect width=\"100%\" height=\"100%\" fill=\"#ffffff\" />",
+            StringComparison.Ordinal);
+
+        if (options.BackgroundSwatchHexByName is not { Count: > 0 } swatches)
+            return normalized;
+
+        return Regex.Replace(
+            normalized,
+            @"theme\(([^)]+)\)",
+            match =>
+            {
+                var token = match.Groups[1].Value.Trim();
+                return swatches.TryGetValue(token, out var hex) && !string.IsNullOrWhiteSpace(hex)
+                    ? hex.Trim()
+                    : match.Value;
+            },
+            RegexOptions.IgnoreCase);
+    }
 
     private static bool TryResolveSpanBackground(NotePdfExportOptions options, string? rawStylesheetColor, out Color color)
     {

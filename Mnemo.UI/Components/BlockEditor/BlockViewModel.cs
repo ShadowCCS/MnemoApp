@@ -57,6 +57,12 @@ public class BlockViewModel : INotifyPropertyChanged
     /// <summary>Image horizontal alignment: left, center, right. Canonical with <see cref="ImagePayload.Align"/>.</summary>
     private string _imageAlign = "left";
 
+    /// <summary>Sketch display width (0 = natural). Canonical with <see cref="SketchPayload.Width"/>.</summary>
+    private double _sketchWidth;
+
+    /// <summary>Sketch horizontal alignment: left, center, right. Canonical with <see cref="SketchPayload.Align"/>.</summary>
+    private string _sketchAlign = "left";
+
     /// <summary>Target note id for <see cref="BlockType.Page"/>; title always comes from <see cref="ReferencedNoteTitle"/> / resolver.</summary>
     private string _referenceNoteId = string.Empty;
 
@@ -125,6 +131,12 @@ public class BlockViewModel : INotifyPropertyChanged
                         SetSpans(new List<InlineSpan> { InlineSpan.Plain(legacyAlt) });
                 }
 
+                if (prevType == BlockType.Sketch && value != BlockType.Sketch)
+                {
+                    _sketchWidth = 0;
+                    _sketchAlign = "left";
+                }
+
                 if (prevType == BlockType.Page && value != BlockType.Page)
                 {
                     _referenceNoteId = string.Empty;
@@ -155,6 +167,11 @@ public class BlockViewModel : INotifyPropertyChanged
                     OnPropertyChanged(nameof(ImagePath));
                     OnPropertyChanged(nameof(ImageWidth));
                     OnPropertyChanged(nameof(ImageAlign));
+                }
+                if (value == BlockType.Sketch || prevType == BlockType.Sketch)
+                {
+                    OnPropertyChanged(nameof(SketchWidth));
+                    OnPropertyChanged(nameof(SketchAlign));
                 }
                 if (value == BlockType.Page || prevType == BlockType.Page)
                 {
@@ -217,6 +234,35 @@ public class BlockViewModel : INotifyPropertyChanged
             "right" => "right",
             _ => "left",
         };
+
+    /// <summary>Display width in layout units; 0 means use natural size.</summary>
+    public double SketchWidth
+    {
+        get => _sketchWidth;
+        set
+        {
+            if (Math.Abs(_sketchWidth - value) < double.Epsilon) return;
+            _sketchWidth = value;
+            OnPropertyChanged();
+            if (_type == BlockType.Sketch)
+                ContentChanged?.Invoke(this);
+        }
+    }
+
+    /// <summary>Horizontal alignment for sketch layout: left, center, or right.</summary>
+    public string SketchAlign
+    {
+        get => _sketchAlign;
+        set
+        {
+            var v = NormalizeImageAlign(value);
+            if (_sketchAlign == v) return;
+            _sketchAlign = v;
+            OnPropertyChanged();
+            if (_type == BlockType.Sketch)
+                ContentChanged?.Invoke(this);
+        }
+    }
 
     /// <summary>Referenced sub-note id for <see cref="BlockType.Page"/> blocks.</summary>
     public string ReferenceNoteId
@@ -773,6 +819,7 @@ public class BlockViewModel : INotifyPropertyChanged
 
         ApplyPayloadFieldsToMeta(block.Payload, _meta);
         InitImageFromBlock(block);
+        InitSketchFromBlock(block);
         InitListNumberIndexFromMeta();
 
         block.EnsureSpans();
@@ -863,6 +910,8 @@ public class BlockViewModel : INotifyPropertyChanged
                 break;
             case PagePayload:
                 break;
+            case SketchPayload:
+                break;
             default:
                 throw new UnreachableException($"Unexpected block payload type: {payload.GetType().Name}");
         }
@@ -932,6 +981,21 @@ public class BlockViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ReferenceNoteId));
     }
 
+    private void InitSketchFromBlock(Block block)
+    {
+        if (block.Type != BlockType.Sketch)
+            return;
+
+        if (block.Payload is SketchPayload sp)
+        {
+            _sketchWidth = sp.Width;
+            _sketchAlign = NormalizeImageAlign(sp.Align);
+        }
+
+        OnPropertyChanged(nameof(SketchWidth));
+        OnPropertyChanged(nameof(SketchAlign));
+    }
+
     private void InitImageFromBlock(Block block)
     {
         if (block.Type != BlockType.Image)
@@ -989,6 +1053,7 @@ public class BlockViewModel : INotifyPropertyChanged
                 _imageWidth,
                 _imageAlign),
             BlockType.Page => new PagePayload(_referenceNoteId),
+            BlockType.Sketch => new SketchPayload(_sketchWidth, _sketchAlign),
             _ => new EmptyPayload()
         };
     }

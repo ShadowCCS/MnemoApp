@@ -20,10 +20,10 @@ public static class NoteBlockMarkdownConverter
         for (var i = 0; i < ordered.Count; i++)
         {
             var b = ordered[i];
-            if (i > 0 && b.Type is not BlockType.Code and not BlockType.Equation)
+            if (i > 0 && b.Type is not BlockType.Code and not BlockType.Equation and not BlockType.Sketch)
                 sb.AppendLine();
             sb.Append(SerializeBlock(b));
-            if (b.Type is BlockType.Code or BlockType.Equation)
+            if (b.Type is BlockType.Code or BlockType.Equation or BlockType.Sketch)
                 sb.AppendLine();
         }
 
@@ -33,7 +33,7 @@ public static class NoteBlockMarkdownConverter
     public static string SerializeBlock(Block block)
     {
         block.EnsureSpans();
-        var body = block.Type is BlockType.Code or BlockType.Divider or BlockType.Equation
+        var body = block.Type is BlockType.Code or BlockType.Divider or BlockType.Equation or BlockType.Sketch
             ? block.Content
             : InlineMarkdownSerializer.SerializeSpans(block.Spans);
         var listNum = GetListNumber(block);
@@ -53,6 +53,7 @@ public static class NoteBlockMarkdownConverter
             BlockType.Checklist => isChecked ? $"- [x] {body}" : $"- [ ] {body}",
             BlockType.Quote => "> " + body.Replace("\n", "\n> ", StringComparison.Ordinal),
             BlockType.Code => SerializeCodeFence(block),
+            BlockType.Sketch => SerializeSketchFence(block),
             BlockType.Divider => "---",
             BlockType.Equation => "$$\n" + GetEquationLatex(block) + "\n$$",
             BlockType.TwoColumn => block.Children is { Count: >= 2 }
@@ -128,6 +129,7 @@ public static class NoteBlockMarkdownConverter
             if (trimmed.StartsWith("```", StringComparison.Ordinal))
             {
                 var fenceLang = trimmed.Length > 3 ? trimmed[3..].Trim() : string.Empty;
+                var isSketch = string.Equals(fenceLang, "sketch", StringComparison.OrdinalIgnoreCase);
                 var language = string.IsNullOrEmpty(fenceLang) ? "csharp" : fenceLang;
                 var codeContent = new System.Text.StringBuilder();
                 i++;
@@ -149,10 +151,10 @@ public static class NoteBlockMarkdownConverter
                 var codeBlock = new Block
                 {
                     Id = Guid.NewGuid().ToString(),
-                    Type = BlockType.Code,
+                    Type = isSketch ? BlockType.Sketch : BlockType.Code,
                     Order = order++,
                     Spans = new List<InlineSpan> { new TextSpan(source, TextStyle.Default) },
-                    Payload = new CodePayload(language, source),
+                    Payload = isSketch ? new EmptyPayload() : new CodePayload(language, source),
                     Meta = new Dictionary<string, object>()
                 };
                 result.Add(codeBlock);
@@ -367,6 +369,9 @@ public static class NoteBlockMarkdownConverter
             ? "```\n" + source + "\n```"
             : "```" + lang + "\n" + source + "\n```";
     }
+
+    private static string SerializeSketchFence(Block block) =>
+        "```sketch\n" + (block.Content ?? string.Empty) + "\n```";
 
     private static string GetEquationLatex(Block block)
     {

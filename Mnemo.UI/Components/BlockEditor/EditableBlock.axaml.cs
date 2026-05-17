@@ -694,7 +694,7 @@ public partial class EditableBlock : UserControl
 
     private void OnViewModelContentChanged(BlockViewModel sender)
     {
-        if (_viewModel?.Type == BlockType.Image)
+        if (_viewModel?.Type is BlockType.Image or BlockType.Sketch)
             UpdateEditableBlockAlignment();
     }
 
@@ -720,6 +720,11 @@ public partial class EditableBlock : UserControl
             var align = ParseImageAlign(_viewModel);
             this.HorizontalAlignment = align;
         }
+        else if (_viewModel?.Type == BlockType.Sketch)
+        {
+            var align = ParseSketchAlign(_viewModel);
+            this.HorizontalAlignment = align;
+        }
         else
         {
             this.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -729,6 +734,16 @@ public partial class EditableBlock : UserControl
     private static HorizontalAlignment ParseImageAlign(BlockViewModel vm)
     {
         return vm.ImageAlign.Trim().ToLowerInvariant() switch
+        {
+            "center" => HorizontalAlignment.Center,
+            "right" => HorizontalAlignment.Right,
+            _ => HorizontalAlignment.Left,
+        };
+    }
+
+    private static HorizontalAlignment ParseSketchAlign(BlockViewModel vm)
+    {
+        return vm.SketchAlign.Trim().ToLowerInvariant() switch
         {
             "center" => HorizontalAlignment.Center,
             "right" => HorizontalAlignment.Right,

@@ -185,7 +185,7 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
     /// <remarks>
     /// Covers every persisted field that <see cref="BlockViewModel.ToBlock"/> writes: id, type, order,
     /// flat content, per-span style/value, and the block-type-specific payload fields
-    /// (Image/Code/Equation/Checklist/NumberedList). Reads <see cref="BlockViewModel.Content"/> which
+    /// (Image/Sketch/Code/Equation/Checklist/NumberedList). Reads <see cref="BlockViewModel.Content"/> which
     /// is O(1) thanks to the cached flat string.
     /// </remarks>
     public long ComputeContentFingerprint()
@@ -223,6 +223,10 @@ public partial class BlockEditor : UserControl, INotifyPropertyChanged
                     h = (h ^ (long)(b.ImagePath?.GetHashCode() ?? 0)) * P;
                     h = (h ^ (long)b.ImageWidth.GetHashCode()) * P;
                     h = (h ^ (long)(b.ImageAlign?.GetHashCode() ?? 0)) * P;
+                    break;
+                case BlockType.Sketch:
+                    h = (h ^ (long)b.SketchWidth.GetHashCode()) * P;
+                    h = (h ^ (long)(b.SketchAlign?.GetHashCode() ?? 0)) * P;
                     break;
                 case BlockType.Code:
                     h = (h ^ (long)(b.CodeLanguage?.GetHashCode() ?? 0)) * P;

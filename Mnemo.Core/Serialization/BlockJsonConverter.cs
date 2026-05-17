@@ -129,6 +129,9 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
             "twocolumn" => new TwoColumnPayload(
                 TryGetPropertyCaseInsensitive(el, "splitRatio", out var sr) && sr.TryGetDouble(out var s) ? s : 0.5),
             "page" => new PagePayload(ReadPageReferenceNoteId(el)),
+            "sketch" => new SketchPayload(
+                TryGetPropertyCaseInsensitive(el, "width", out var sw) && sw.TryGetDouble(out var swd) ? swd : 0,
+                TryGetPropertyCaseInsensitive(el, "align", out var sal) ? sal.GetString() ?? "left" : "left"),
             "empty" => new EmptyPayload(),
             null or "" => new EmptyPayload(),
             _ => throw new JsonException($"Unknown block payload kind '{kind}'.")
@@ -268,6 +271,11 @@ public sealed class BlockJsonConverter : JsonConverter<Block>
             case PagePayload pg:
                 writer.WriteString("kind", "page");
                 writer.WriteString("referenceNoteId", pg.ReferenceNoteId ?? string.Empty);
+                break;
+            case SketchPayload sk:
+                writer.WriteString("kind", "sketch");
+                writer.WriteNumber("width", sk.Width);
+                writer.WriteString("align", sk.Align);
                 break;
             default:
                 throw new UnreachableException($"Unknown block payload type: {payload.GetType().Name}");
