@@ -175,6 +175,20 @@ public sealed class SketchSvgView : Control
             context.DrawRectangle(fill, pen, new Rect(rect.X, rect.Y, rect.Width, rect.Height), rect.Radius, rect.Radius);
         }
 
+        foreach (var circle in svg.Circles)
+        {
+            var fill = ParseBrush(circle.Fill);
+            var pen = new Pen(ParseBrush(circle.Stroke), Math.Max(circle.StrokeThickness, minStroke));
+            context.DrawEllipse(fill, pen, new Point(circle.Cx, circle.Cy), circle.Radius, circle.Radius);
+        }
+
+        foreach (var polygon in svg.Polygons)
+        {
+            var fill = ParseBrush(polygon.Fill);
+            var pen = new Pen(ParseBrush(polygon.Stroke), Math.Max(polygon.StrokeThickness, minStroke));
+            context.DrawGeometry(fill, pen, CreatePolygonGeometry(polygon.Points));
+        }
+
         foreach (var text in svg.Texts)
             DrawSvgText(context, text);
     }
@@ -233,6 +247,20 @@ public sealed class SketchSvgView : Control
         context.DrawText(formatted, new Point(x, text.Y - formatted.Baseline));
     }
 
+    private static StreamGeometry CreatePolygonGeometry(IReadOnlyList<Point> points)
+    {
+        var geometry = new StreamGeometry();
+        if (points.Count == 0)
+            return geometry;
+
+        using var ctx = geometry.Open();
+        ctx.BeginFigure(points[0], true);
+        for (var i = 1; i < points.Count; i++)
+            ctx.LineTo(points[i]);
+        ctx.EndFigure(true);
+        return geometry;
+    }
+
     private static ParsedSketchSvg ParseSketchSvg(string svg)
     {
         try
@@ -246,6 +274,8 @@ public sealed class SketchSvgView : Control
             var height = ReadDouble(root, "height", 160);
             var rects = new List<SvgRect>();
             var lines = new List<SvgLine>();
+            var circles = new List<SvgCircle>();
+            var polygons = new List<SvgPolygon>();
             var texts = new List<SvgText>();
 
             foreach (var element in root.Descendants())
@@ -275,6 +305,30 @@ public sealed class SketchSvgView : Control
                             ReadDouble(element, "stroke-width", 1),
                             ReadAttribute(element, "sketch-edge-direction") ?? "directed"));
                         break;
+                    case "circle":
+                        circles.Add(new SvgCircle(
+                            ReadDouble(element, "cx", 0),
+                            ReadDouble(element, "cy", 0),
+                            ReadDouble(element, "r", 0),
+                            ReadAttribute(element, "fill") ?? "#00000000",
+                            ReadAttribute(element, "stroke") ?? "#000000",
+                            ReadDouble(element, "stroke-width", 1)));
+                        break;
+                    case "polygon":
+                    {
+                        var points = ParsePoints(ReadAttribute(element, "points"));
+                        // Arrowheads are drawn from line metadata, so only keep polygons
+                        // with four or more points (currently diamond nodes).
+                        if (points.Count >= 4)
+                        {
+                            polygons.Add(new SvgPolygon(
+                                points,
+                                ReadAttribute(element, "fill") ?? "#00000000",
+                                ReadAttribute(element, "stroke") ?? "#000000",
+                                ReadDouble(element, "stroke-width", 1)));
+                        }
+                        break;
+                    }
                     case "text":
                         texts.Add(new SvgText(
                             ReadDouble(element, "x", 0),
@@ -287,12 +341,37 @@ public sealed class SketchSvgView : Control
                 }
             }
 
-            return new ParsedSketchSvg(width, height, rects, lines, texts);
+            return new ParsedSketchSvg(width, height, rects, lines, circles, polygons, texts);
         }
         catch
         {
             return ParsedSketchSvg.Empty;
         }
+    }
+
+    private static IReadOnlyList<Point> ParsePoints(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return [];
+
+        var points = new List<Point>();
+        var parts = raw
+            .Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var part in parts)
+        {
+            var coords = part.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (coords.Length != 2)
+                continue;
+
+            if (double.TryParse(coords[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+                && double.TryParse(coords[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+            {
+                points.Add(new Point(x, y));
+            }
+        }
+
+        return points;
     }
 
     private static string? ReadAttribute(XElement element, string name) =>
@@ -438,9 +517,11 @@ public sealed class SketchSvgView : Control
         double Height,
         IReadOnlyList<SvgRect> Rects,
         IReadOnlyList<SvgLine> Lines,
+        IReadOnlyList<SvgCircle> Circles,
+        IReadOnlyList<SvgPolygon> Polygons,
         IReadOnlyList<SvgText> Texts)
     {
-        public static readonly ParsedSketchSvg Empty = new(320, 160, [], [], []);
+        public static readonly ParsedSketchSvg Empty = new(320, 160, [], [], [], [], []);
     }
 
     private sealed record SvgRect(
@@ -461,6 +542,20 @@ public sealed class SketchSvgView : Control
         string Stroke,
         double StrokeThickness,
         string Direction);
+
+    private sealed record SvgCircle(
+        double Cx,
+        double Cy,
+        double Radius,
+        string Fill,
+        string Stroke,
+        double StrokeThickness);
+
+    private sealed record SvgPolygon(
+        IReadOnlyList<Point> Points,
+        string Fill,
+        string Stroke,
+        double StrokeThickness);
 
     private sealed record SvgText(
         double X,

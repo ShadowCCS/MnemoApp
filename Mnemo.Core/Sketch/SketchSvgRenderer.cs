@@ -15,10 +15,15 @@ public sealed class SketchSvgRenderer
 
     public SketchSvgRenderResult Render(LaidOutSketchDiagram diagram)
     {
-        var sb = new StringBuilder(256 + diagram.Nodes.Count * 192 + diagram.Edges.Count * 160);
+        var sb = new StringBuilder(256 + diagram.Nodes.Count * 192 + diagram.Edges.Count * 160 + diagram.Groups.Count * 96);
         sb.Append(Inv, $"""<svg xmlns="http://www.w3.org/2000/svg" width="{diagram.Bounds.Width:0.##}" height="{diagram.Bounds.Height:0.##}" viewBox="0 0 {diagram.Bounds.Width:0.##} {diagram.Bounds.Height:0.##}" role="img">""");
         sb.AppendLine();
         sb.AppendLine("<rect width=\"100%\" height=\"100%\" fill=\"transparent\" />");
+
+        // Groups are rendered first so they appear behind edges and nodes
+        foreach (var group in diagram.Groups)
+            RenderGroup(sb, group);
+
         var labelPlacements = BuildLabelPlacements(diagram.Edges);
 
         foreach (var edge in diagram.Edges)
@@ -26,7 +31,8 @@ public sealed class SketchSvgRenderer
             var edgeStroke = ResolveColor(edge.Style.Stroke, "#64748b");
             var edgeStrokeWidth = edge.Style.StrokeWidth ?? 2;
             var directionAttr = EdgeDirectionAttribute(edge.Direction);
-            sb.Append(Inv, $"""<line id="{EscapeAttribute(edge.Id)}" x1="{edge.X1:0.##}" y1="{edge.Y1:0.##}" x2="{edge.X2:0.##}" y2="{edge.Y2:0.##}" stroke="{edgeStroke}" stroke-width="{edgeStrokeWidth:0.##}"{directionAttr} />""");
+            var dashAttr = EdgeDashAttribute(edge.Style.LineStyle, edgeStrokeWidth);
+            sb.Append(Inv, $"""<line id="{EscapeAttribute(edge.Id)}" x1="{edge.X1:0.##}" y1="{edge.Y1:0.##}" x2="{edge.X2:0.##}" y2="{edge.Y2:0.##}" stroke="{edgeStroke}" stroke-width="{edgeStrokeWidth:0.##}"{dashAttr}{directionAttr} />""");
             sb.AppendLine();
 
             if (edge.Direction != SketchEdgeDirection.Undirected)
@@ -64,21 +70,47 @@ public sealed class SketchSvgRenderer
             var fill = ResolveColor(node.Style.Fill, "#f8fafc");
             var stroke = ResolveColor(node.Style.Stroke, "#94a3b8");
             var strokeWidth = node.Style.StrokeWidth ?? 1.5;
-            var radius = string.Equals(node.Style.Shape, "rect", StringComparison.OrdinalIgnoreCase)
-                ? 2
-                : 10;
+            var shape = (node.Style.Shape ?? "rounded-rect").ToLowerInvariant();
+            var cx = node.X + node.Width / 2;
+            var cy = node.Y + node.Height / 2;
 
-            sb.AppendLine($"""<g id="{EscapeAttribute("node:" + node.Id)}">""");
-            sb.Append(Inv, $"""<rect x="{node.X:0.##}" y="{node.Y:0.##}" width="{node.Width:0.##}" height="{node.Height:0.##}" rx="{radius}" fill="{fill}" stroke="{stroke}" stroke-width="{strokeWidth:0.##}" />""");
-            sb.AppendLine();
-            var firstLineY = node.Y
-                + node.Height / 2
+            sb.AppendLine($"""<g id="{EscapeAttribute("node:" + node.Id)}" role="group" aria-label="{EscapeAttribute(node.Label)}">""");
+
+            if (!string.IsNullOrWhiteSpace(node.Style.Tooltip))
+            {
+                sb.AppendLine($"<title>{EscapeText(node.Style.Tooltip)}</title>");
+            }
+
+            switch (shape)
+            {
+                case "circle":
+                {
+                    var r = Math.Min(node.Width, node.Height) / 2;
+                    sb.Append(Inv, $"""<circle cx="{cx:0.##}" cy="{cy:0.##}" r="{r:0.##}" fill="{fill}" stroke="{stroke}" stroke-width="{strokeWidth:0.##}" />""");
+                    sb.AppendLine();
+                    break;
+                }
+                case "diamond":
+                    sb.Append(Inv, $"""<polygon points="{cx:0.##},{node.Y:0.##} {node.X + node.Width:0.##},{cy:0.##} {cx:0.##},{node.Y + node.Height:0.##} {node.X:0.##},{cy:0.##}" fill="{fill}" stroke="{stroke}" stroke-width="{strokeWidth:0.##}" />""");
+                    sb.AppendLine();
+                    break;
+                case "rect":
+                    sb.Append(Inv, $"""<rect x="{node.X:0.##}" y="{node.Y:0.##}" width="{node.Width:0.##}" height="{node.Height:0.##}" rx="2" fill="{fill}" stroke="{stroke}" stroke-width="{strokeWidth:0.##}" />""");
+                    sb.AppendLine();
+                    break;
+                default: // rounded-rect and anything unknown
+                    sb.Append(Inv, $"""<rect x="{node.X:0.##}" y="{node.Y:0.##}" width="{node.Width:0.##}" height="{node.Height:0.##}" rx="10" fill="{fill}" stroke="{stroke}" stroke-width="{strokeWidth:0.##}" />""");
+                    sb.AppendLine();
+                    break;
+            }
+
+            var firstLineY = cy
                 - ((node.LabelLines.Count - 1) * SketchTextWrapping.LineHeight / 2)
                 + 5;
             for (var i = 0; i < node.LabelLines.Count; i++)
             {
                 var lineY = firstLineY + i * SketchTextWrapping.LineHeight;
-                sb.Append(Inv, $"""<text x="{node.X + node.Width / 2:0.##}" y="{lineY:0.##}" text-anchor="middle" font-family="Inter,Segoe UI,sans-serif" font-size="14" fill="#0f172a">{EscapeText(node.LabelLines[i])}</text>""");
+                sb.Append(Inv, $"""<text x="{cx:0.##}" y="{lineY:0.##}" text-anchor="middle" font-family="Inter,Segoe UI,sans-serif" font-size="14" fill="#0f172a">{EscapeText(node.LabelLines[i])}</text>""");
                 sb.AppendLine();
             }
             sb.AppendLine("</g>");
@@ -87,6 +119,31 @@ public sealed class SketchSvgRenderer
         sb.Append("</svg>");
         return new SketchSvgRenderResult(sb.ToString(), diagram.Bounds, diagram.Diagnostics);
     }
+
+    private static void RenderGroup(StringBuilder sb, LaidOutSketchGroup group)
+    {
+        var fill = ResolveColor(group.Style.Fill, "#f1f5f9");
+        var stroke = ResolveColor(group.Style.Stroke, "#cbd5e1");
+        var strokeWidth = group.Style.StrokeWidth ?? 1;
+
+        sb.AppendLine($"""<g id="{EscapeAttribute("group:" + group.Id)}">""");
+        sb.Append(Inv, $"""<rect x="{group.X:0.##}" y="{group.Y:0.##}" width="{group.Width:0.##}" height="{group.Height:0.##}" rx="8" fill="{fill}" fill-opacity="0.6" stroke="{stroke}" stroke-width="{strokeWidth:0.##}" stroke-dasharray="4 3" />""");
+        sb.AppendLine();
+        if (!string.IsNullOrWhiteSpace(group.Label))
+        {
+            sb.Append(Inv, $"""<text x="{group.X + 10:0.##}" y="{group.Y + 14:0.##}" font-family="Inter,Segoe UI,sans-serif" font-size="11" font-weight="600" fill="{stroke}">{EscapeText(group.Label)}</text>""");
+            sb.AppendLine();
+        }
+        sb.AppendLine("</g>");
+    }
+
+    private static string EdgeDashAttribute(SketchEdgeLineStyle? lineStyle, double strokeWidth) =>
+        lineStyle switch
+        {
+            SketchEdgeLineStyle.Dashed => string.Create(Inv, $" stroke-dasharray=\"{strokeWidth * 4:0.##} {strokeWidth * 2:0.##}\""),
+            SketchEdgeLineStyle.Dotted => string.Create(Inv, $" stroke-dasharray=\"{strokeWidth:0.##} {strokeWidth * 2:0.##}\""),
+            _ => string.Empty
+        };
 
     private static Dictionary<string, LabelPlacement> BuildLabelPlacements(IReadOnlyList<LaidOutSketchEdge> edges)
     {

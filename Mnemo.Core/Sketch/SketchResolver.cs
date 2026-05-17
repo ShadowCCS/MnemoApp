@@ -11,6 +11,7 @@ public sealed class SketchResolver
     {
         var nodes = new Dictionary<string, MutableNode>(StringComparer.Ordinal);
         var edges = new List<ResolvedSketchEdge>();
+        var groups = new List<ResolvedSketchGroup>();
         var edgeCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var classes = new Dictionary<string, ResolvedSketchStyle>(StringComparer.Ordinal);
         var meta = SketchDiagramMeta.Default;
@@ -27,6 +28,9 @@ public sealed class SketchResolver
                     break;
                 case RawSketchNodeDecl nodeDecl:
                     DeclareNode(nodes, nodeDecl, classes);
+                    break;
+                case RawSketchGroupDecl groupDecl:
+                    ResolveGroup(nodes, groups, groupDecl, classes);
                     break;
                 case RawSketchEdgeDecl edgeDecl:
                     EnsureImplicitNode(nodes, edgeDecl.Source);
@@ -52,7 +56,24 @@ public sealed class SketchResolver
             meta,
             nodes.Values.Select(n => new ResolvedSketchNode(n.Id, n.Label, n.Style, n.Declared, n.Implicit, n.SourceSpans)).ToArray(),
             edges,
+            groups,
             parseResult.Diagnostics);
+    }
+
+    private static void ResolveGroup(
+        Dictionary<string, MutableNode> nodes,
+        List<ResolvedSketchGroup> groups,
+        RawSketchGroupDecl groupDecl,
+        IReadOnlyDictionary<string, ResolvedSketchStyle> classes)
+    {
+        foreach (var memberRef in groupDecl.MemberRefs)
+            EnsureImplicitNode(nodes, memberRef);
+
+        var style = ResolveStyle(groupDecl.Properties, classes);
+        var label = groupDecl.Label ?? groupDecl.Name;
+        var nodeIds = groupDecl.MemberRefs.Select(r => r.Id).Distinct(StringComparer.Ordinal).ToArray();
+
+        groups.Add(new ResolvedSketchGroup(groupDecl.Name, label, nodeIds, style, groupDecl.Span));
     }
 
     private static SketchDiagramMeta ResolveMeta(IReadOnlyList<RawSketchProperty> properties)
@@ -138,6 +159,8 @@ public sealed class SketchResolver
                     ? style with { StrokeWidth = strokeWidth }
                     : style,
                 "shape" => style with { Shape = property.Value },
+                "style" => style with { LineStyle = ParseEdgeLineStyle(property.Value) },
+                "tooltip" => style with { Tooltip = property.Value.Trim() },
                 _ => style
             };
         }
@@ -154,7 +177,18 @@ public sealed class SketchResolver
             newClass.Fill ?? accumulated.Fill,
             newClass.Stroke ?? accumulated.Stroke,
             newClass.StrokeWidth ?? accumulated.StrokeWidth,
-            newClass.Shape ?? accumulated.Shape);
+            newClass.Shape ?? accumulated.Shape,
+            newClass.LineStyle ?? accumulated.LineStyle,
+            newClass.Tooltip ?? accumulated.Tooltip);
+
+    private static SketchEdgeLineStyle? ParseEdgeLineStyle(string value) =>
+        (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "dashed" => SketchEdgeLineStyle.Dashed,
+            "dotted" => SketchEdgeLineStyle.Dotted,
+            "solid" => SketchEdgeLineStyle.Solid,
+            _ => null
+        };
 
     /// <summary>
     /// Parses a class value that may be a single name like <c>service</c>

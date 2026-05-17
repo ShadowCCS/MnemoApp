@@ -241,6 +241,50 @@ public class SketchCompilerTests
     }
 
     [Fact]
+    public void Resolve_ParsesInlineNodeProperties()
+    {
+        var diagram = new SketchCompiler().Resolve("""
+            class important { stroke: red-700 }
+            [c] "Output" { class: important fill: green }
+            """);
+
+        Assert.DoesNotContain(diagram.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        var node = diagram.Nodes.Single(n => n.Id == "c");
+        Assert.Equal("green", node.Style.Fill?.Value);
+        Assert.Equal("red-700", node.Style.Stroke?.Value);
+    }
+
+    [Fact]
+    public void Resolve_ParsesInlineClassProperties()
+    {
+        var diagram = new SketchCompiler().Resolve("""
+            class important { fill: green stroke: red-700 stroke-width: 3 }
+            [c] "Output" { class: important }
+            """);
+
+        Assert.DoesNotContain(diagram.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        var node = diagram.Nodes.Single(n => n.Id == "c");
+        Assert.Equal("green", node.Style.Fill?.Value);
+        Assert.Equal("red-700", node.Style.Stroke?.Value);
+        Assert.Equal(3, node.Style.StrokeWidth);
+    }
+
+    [Fact]
+    public void Resolve_ParsesInlineGroupProperties()
+    {
+        var diagram = new SketchCompiler().Resolve("""
+            group outputs "Outputs" { fill: green stroke: red-700 [c] }
+            [c] "Output"
+            """);
+
+        Assert.DoesNotContain(diagram.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        var group = Assert.Single(diagram.Groups);
+        Assert.Equal("green", group.Style.Fill?.Value);
+        Assert.Equal("red-700", group.Style.Stroke?.Value);
+        Assert.Equal(new[] { "c" }, group.NodeIds.ToArray());
+    }
+
+    [Fact]
     public void CompileToSvg_FormatsCoordinatesWithInvariantCulture()
     {
         var previousCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
@@ -355,6 +399,164 @@ public class SketchCompilerTests
             Assert.True(node.Width > 0, $"Node {node.Id} has non-positive Width={node.Width}");
             Assert.True(node.Height > 0, $"Node {node.Id} has non-positive Height={node.Height}");
         }
+    }
+
+    [Fact]
+    public void CompileToSvg_CircleShapeRendersCircleElement()
+    {
+        var result = new SketchCompiler().CompileToSvg("""
+            [a] "Node A" { shape: circle }
+            [b] "Node B"
+            [a] -> [b]
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        Assert.Contains("<circle", result.Svg);
+    }
+
+    [Fact]
+    public void CompileToSvg_DiamondShapeRendersDiamondPolygon()
+    {
+        var result = new SketchCompiler().CompileToSvg("""
+            [d] "Decision" { shape: diamond }
+            [a] "Action"
+            [d] -> [a]
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        // Diamond renders as polygon (node polygons) — arrowheads are also polygons, so just check
+        // that the SVG contains a polygon that is NOT an arrowhead (arrowheads have 3 points, diamond has 4).
+        var doc = System.Xml.Linq.XDocument.Parse(result.Svg);
+        var polygons = doc.Root!.Descendants()
+            .Where(e => e.Name.LocalName == "polygon")
+            .ToList();
+        Assert.Contains(polygons, p => (p.Attribute("points")?.Value ?? string.Empty).Split(' ').Length == 4);
+    }
+
+    [Fact]
+    public void CompileToSvg_DashedEdgeHasStrokeDasharray()
+    {
+        var result = new SketchCompiler().CompileToSvg("""
+            A -> B { style: dashed }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        Assert.Contains("stroke-dasharray", result.Svg);
+    }
+
+    [Fact]
+    public void CompileToSvg_DottedEdgeHasStrokeDasharray()
+    {
+        var result = new SketchCompiler().CompileToSvg("""
+            A -- B { style: dotted }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        Assert.Contains("stroke-dasharray", result.Svg);
+    }
+
+    [Fact]
+    public void CompileToSvg_TooltipRendersAsTitleElement()
+    {
+        var result = new SketchCompiler().CompileToSvg("""
+            [api] "API" { tooltip: "Handles all requests" }
+            [db] "Database"
+            [api] -> [db]
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        Assert.Contains("<title>Handles all requests</title>", result.Svg);
+    }
+
+    [Fact]
+    public void Resolve_GroupDeclarationCreatesResolvedGroup()
+    {
+        var diagram = new SketchCompiler().Resolve("""
+            group backend "Backend Services" {
+              fill: blue-50
+              [api]
+              [db]
+            }
+            [api] -> [db]
+            """);
+
+        Assert.DoesNotContain(diagram.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        var group = Assert.Single(diagram.Groups);
+        Assert.Equal("backend", group.Id);
+        Assert.Equal("Backend Services", group.Label);
+        Assert.Equal(new[] { "api", "db" }, group.NodeIds.ToArray());
+        Assert.Equal("blue-50", group.Style.Fill?.Value);
+    }
+
+    [Fact]
+    public void Layout_GroupBoundsContainMemberNodes()
+    {
+        var layout = new SketchCompiler().Layout("""
+            group sys "System" {
+              [a]
+              [b]
+            }
+            [a] -> [b]
+            """);
+
+        var group = Assert.Single(layout.Groups);
+        var nodeA = layout.Nodes.Single(n => n.Id == "a");
+        var nodeB = layout.Nodes.Single(n => n.Id == "b");
+
+        // Group bounding box must contain both nodes
+        Assert.True(group.X <= nodeA.X, $"Group left ({group.X}) should be <= node A left ({nodeA.X})");
+        Assert.True(group.Y <= nodeA.Y, $"Group top ({group.Y}) should be <= node A top ({nodeA.Y})");
+        Assert.True(group.X + group.Width >= nodeB.X + nodeB.Width, "Group right should contain node B");
+        Assert.True(group.Y + group.Height >= nodeB.Y + nodeB.Height, "Group bottom should contain node B");
+    }
+
+    [Fact]
+    public void CompileToSvg_GroupRendersBackgroundRect()
+    {
+        var result = new SketchCompiler().CompileToSvg("""
+            group infra "Infrastructure" {
+              [db]
+              [cache]
+            }
+            [api] -> [db]
+            [api] -> [cache]
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == SketchDiagnosticSeverity.Error);
+        Assert.Contains("group:infra", result.Svg);
+        Assert.Contains("Infrastructure", result.Svg);
+    }
+
+    [Fact]
+    public void Layout_RightToLeftMirrorsNodePositions()
+    {
+        var ltr = new SketchCompiler().Layout("[a] \"A\"\n[b] \"B\"\n[a] -> [b]");
+        var rtl = new SketchCompiler().Layout("sketch { direction: right-to-left }\n[a] \"A\"\n[b] \"B\"\n[a] -> [b]");
+
+        var ltrA = ltr.Nodes.Single(n => n.Id == "a");
+        var ltrB = ltr.Nodes.Single(n => n.Id == "b");
+        var rtlA = rtl.Nodes.Single(n => n.Id == "a");
+        var rtlB = rtl.Nodes.Single(n => n.Id == "b");
+
+        // In LTR: A is to the left of B. In RTL: A should be to the right of B.
+        Assert.True(ltrA.X < ltrB.X, "LTR: A before B");
+        Assert.True(rtlA.X > rtlB.X, "RTL: A after B (mirrored)");
+    }
+
+    [Fact]
+    public void Layout_BottomToTopMirrorsNodePositions()
+    {
+        var ttb = new SketchCompiler().Layout("sketch { direction: top-to-bottom }\n[a] \"A\"\n[b] \"B\"\n[a] -> [b]");
+        var btt = new SketchCompiler().Layout("sketch { direction: bottom-to-top }\n[a] \"A\"\n[b] \"B\"\n[a] -> [b]");
+
+        var ttbA = ttb.Nodes.Single(n => n.Id == "a");
+        var ttbB = ttb.Nodes.Single(n => n.Id == "b");
+        var bttA = btt.Nodes.Single(n => n.Id == "a");
+        var bttB = btt.Nodes.Single(n => n.Id == "b");
+
+        // In TTB: A is above B. In BTT: A should be below B.
+        Assert.True(ttbA.Y < ttbB.Y, "TTB: A above B");
+        Assert.True(bttA.Y > bttB.Y, "BTT: A below B (mirrored)");
     }
 
     private static int CountSubstring(string source, string value)

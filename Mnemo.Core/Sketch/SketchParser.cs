@@ -50,6 +50,9 @@ public sealed class SketchParser
         if (TryParseClassStatement(out var classDecl))
             return classDecl;
 
+        if (TryParseGroupStatement(out var groupDecl))
+            return groupDecl;
+
         if (TryParseIgnoredBlockStatement(out var ignored))
             return ignored;
 
@@ -126,10 +129,115 @@ public sealed class SketchParser
         return true;
     }
 
+    private bool TryParseGroupStatement(out RawSketchGroupDecl? statement)
+    {
+        statement = null;
+        if (!Match(SketchTokenKind.KeywordGroup, out var groupToken))
+            return false;
+
+        if (!Match(SketchTokenKind.Identifier, out var nameToken))
+        {
+            AddError("SKETCH_PARSE_EXPECTED_GROUP_NAME", "Expected a group name after 'group'.", Current.Span);
+            statement = new RawSketchGroupDecl(string.Empty, null, Array.Empty<RawSketchProperty>(), Array.Empty<RawSketchNodeRef>(), groupToken.Span);
+            return true;
+        }
+
+        string? label = null;
+        if (Match(SketchTokenKind.String, out var labelToken))
+            label = labelToken.Value;
+
+        if (!Check(SketchTokenKind.LeftBrace))
+        {
+            AddError("SKETCH_PARSE_EXPECTED_GROUP_BLOCK", "Expected '{' after group name.", Current.Span);
+            statement = new RawSketchGroupDecl(nameToken.Value, label, Array.Empty<RawSketchProperty>(), Array.Empty<RawSketchNodeRef>(), new SourceSpan(groupToken.Span.Start, nameToken.Span.End));
+            return true;
+        }
+
+        var (properties, memberRefs, end) = ParseGroupBody();
+        statement = new RawSketchGroupDecl(nameToken.Value, label, properties, memberRefs, new SourceSpan(groupToken.Span.Start, end));
+        return true;
+    }
+
+    private (IReadOnlyList<RawSketchProperty> Properties, IReadOnlyList<RawSketchNodeRef> MemberRefs, SourcePosition End) ParseGroupBody()
+    {
+        var properties = new List<RawSketchProperty>();
+        var memberRefs = new List<RawSketchNodeRef>();
+        var end = Current.Span.End;
+
+        if (!Match(SketchTokenKind.LeftBrace, out var left))
+            return (properties, memberRefs, end);
+
+        end = left.Span.End;
+
+        while (!Check(SketchTokenKind.RightBrace) && !Check(SketchTokenKind.EndOfFile))
+        {
+            SkipNewlines();
+            if (Check(SketchTokenKind.RightBrace) || Check(SketchTokenKind.EndOfFile))
+                break;
+
+            // Node ref: [id]
+            if (Check(SketchTokenKind.LeftBracket))
+            {
+                var nodeRef = ParseNodeRef();
+                if (nodeRef != null)
+                {
+                    memberRefs.Add(nodeRef);
+                    end = nodeRef.Span.End;
+                }
+                continue;
+            }
+
+            // Property: key: value
+            if (MatchPropertyKey(out var key))
+            {
+                if (!Match(SketchTokenKind.Colon, out _))
+                {
+                    AddError("SKETCH_PARSE_EXPECTED_PROPERTY_COLON", "Expected ':' after property name.", Current.Span);
+                    end = key.Span.End;
+                    SynchronizeToNextLine();
+                    continue;
+                }
+
+                var valueTokens = new List<SketchToken>();
+                var valueNestingDepth = 0;
+                while (!Check(SketchTokenKind.Newline)
+                       && !Check(SketchTokenKind.Comment)
+                       && !Check(SketchTokenKind.RightBrace)
+                       && !Check(SketchTokenKind.EndOfFile))
+                {
+                    if (IsInlinePropertyBoundary(valueTokens.Count, valueNestingDepth)
+                        || IsInlineGroupMemberBoundary(valueTokens.Count, valueNestingDepth))
+                        break;
+
+                    var token = Advance();
+                    UpdateValueNestingDepth(token, ref valueNestingDepth);
+                    valueTokens.Add(token);
+                }
+
+                var value = FormatPropertyValue(valueTokens);
+                var valueEnd = valueTokens.Count > 0 ? valueTokens[^1].Span.End : key.Span.End;
+                end = valueEnd;
+                properties.Add(new RawSketchProperty(key.Value, value, new SourceSpan(key.Span.Start, valueEnd)));
+                continue;
+            }
+
+            // Unknown token — skip to next line
+            end = Advance().Span.End;
+            SynchronizeToNextLine();
+        }
+
+        if (Match(SketchTokenKind.RightBrace, out var right))
+            end = right.Span.End;
+        else
+            AddError("SKETCH_PARSE_MISSING_BRACE", "Expected '}' to close group block.", Current.Span);
+
+        return (properties, memberRefs, end);
+    }
+
     private bool TryParseIgnoredBlockStatement(out RawSketchIgnoredStatement? statement)
     {
         statement = null;
-        if (Current.Kind is not (SketchTokenKind.KeywordGroup or SketchTokenKind.KeywordEdge))
+        if (Current.Kind is not SketchTokenKind.KeywordEdge)
             return false;
 
         var start = Advance();
@@ -303,12 +411,18 @@ public sealed class SketchParser
             }
 
             var valueTokens = new List<SketchToken>();
+            var valueNestingDepth = 0;
             while (!Check(SketchTokenKind.Newline)
                    && !Check(SketchTokenKind.Comment)
                    && !Check(SketchTokenKind.RightBrace)
                    && !Check(SketchTokenKind.EndOfFile))
             {
-                valueTokens.Add(Advance());
+                if (IsInlinePropertyBoundary(valueTokens.Count, valueNestingDepth))
+                    break;
+
+                var token = Advance();
+                UpdateValueNestingDepth(token, ref valueNestingDepth);
+                valueTokens.Add(token);
             }
 
             var value = FormatPropertyValue(valueTokens);
@@ -400,11 +514,7 @@ public sealed class SketchParser
 
     private bool MatchPropertyKey(out SketchToken token)
     {
-        if (Current.Kind is SketchTokenKind.Identifier
-            or SketchTokenKind.KeywordSketch
-            or SketchTokenKind.KeywordClass
-            or SketchTokenKind.KeywordGroup
-            or SketchTokenKind.KeywordEdge)
+        if (IsPropertyKeyToken(Current.Kind))
         {
             token = Advance();
             return true;
@@ -414,7 +524,44 @@ public sealed class SketchParser
         return false;
     }
 
+    private bool IsInlinePropertyBoundary(int valueTokenCount, int valueNestingDepth) =>
+        valueTokenCount > 0
+        && valueNestingDepth == 0
+        && IsPropertyKeyToken(Current.Kind)
+        && PeekKind(1) == SketchTokenKind.Colon;
+
+    private bool IsInlineGroupMemberBoundary(int valueTokenCount, int valueNestingDepth) =>
+        valueTokenCount > 0
+        && valueNestingDepth == 0
+        && Check(SketchTokenKind.LeftBracket);
+
+    private static bool IsPropertyKeyToken(SketchTokenKind kind) =>
+        kind is SketchTokenKind.Identifier
+            or SketchTokenKind.KeywordSketch
+            or SketchTokenKind.KeywordClass
+            or SketchTokenKind.KeywordGroup
+            or SketchTokenKind.KeywordEdge;
+
+    private static void UpdateValueNestingDepth(SketchToken token, ref int depth)
+    {
+        switch (token.Kind)
+        {
+            case SketchTokenKind.LeftBracket:
+            case SketchTokenKind.LeftParen:
+                depth++;
+                break;
+            case SketchTokenKind.RightBracket:
+            case SketchTokenKind.RightParen:
+                if (depth > 0)
+                    depth--;
+                break;
+        }
+    }
+
     private bool Check(SketchTokenKind kind) => Current.Kind == kind;
+
+    private SketchTokenKind PeekKind(int offset) =>
+        _tokens[Math.Min(_position + offset, _tokens.Count - 1)].Kind;
 
     private SketchToken Advance()
     {

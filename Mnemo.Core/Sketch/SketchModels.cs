@@ -62,6 +62,13 @@ public enum SketchLayoutDirection
     BottomToTop
 }
 
+public enum SketchEdgeLineStyle
+{
+    Solid,
+    Dashed,
+    Dotted
+}
+
 public sealed record SketchToken(SketchTokenKind Kind, string Text, string Value, SourceSpan Span);
 
 public sealed record RawSketchAst(IReadOnlyList<RawSketchStatement> Statements, SourceSpan Span);
@@ -91,6 +98,13 @@ public sealed record RawSketchClassDecl(
     IReadOnlyList<RawSketchProperty> Properties,
     SourceSpan Span) : RawSketchStatement(Span);
 
+public sealed record RawSketchGroupDecl(
+    string Name,
+    string? Label,
+    IReadOnlyList<RawSketchProperty> Properties,
+    IReadOnlyList<RawSketchNodeRef> MemberRefs,
+    SourceSpan Span) : RawSketchStatement(Span);
+
 public sealed record RawSketchProperty(string Key, string Value, SourceSpan Span);
 
 public sealed record RawSketchComment(string Text, SourceSpan Span) : RawSketchStatement(Span);
@@ -112,11 +126,19 @@ public sealed record SketchDiagramMeta(
     public static readonly SketchDiagramMeta Default = new(null, SketchLayoutDirection.LeftToRight, "dag");
 }
 
+public sealed record ResolvedSketchGroup(
+    string Id,
+    string Label,
+    IReadOnlyList<string> NodeIds,
+    ResolvedSketchStyle Style,
+    SourceSpan SourceSpan);
+
 public sealed record ResolvedSketchDiagram(
     int Version,
     SketchDiagramMeta Meta,
     IReadOnlyList<ResolvedSketchNode> Nodes,
     IReadOnlyList<ResolvedSketchEdge> Edges,
+    IReadOnlyList<ResolvedSketchGroup> Groups,
     IReadOnlyList<SketchDiagnostic> Diagnostics);
 
 public sealed record ResolvedSketchNode(
@@ -140,7 +162,9 @@ public sealed record ResolvedSketchStyle(
     SketchColorValue? Fill = null,
     SketchColorValue? Stroke = null,
     double? StrokeWidth = null,
-    string? Shape = null);
+    string? Shape = null,
+    SketchEdgeLineStyle? LineStyle = null,
+    string? Tooltip = null);
 
 public enum SketchColorKind
 {
@@ -153,10 +177,20 @@ public enum SketchColorKind
 
 public sealed record SketchColorValue(SketchColorKind Kind, string Value);
 
+public sealed record LaidOutSketchGroup(
+    string Id,
+    string Label,
+    ResolvedSketchStyle Style,
+    double X,
+    double Y,
+    double Width,
+    double Height);
+
 public sealed record LaidOutSketchDiagram(
     SketchLayoutDirection Direction,
     IReadOnlyList<LaidOutSketchNode> Nodes,
     IReadOnlyList<LaidOutSketchEdge> Edges,
+    IReadOnlyList<LaidOutSketchGroup> Groups,
     SketchBounds Bounds,
     IReadOnlyList<SketchDiagnostic> Diagnostics);
 

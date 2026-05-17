@@ -14,6 +14,9 @@ public sealed class SketchLayoutEngine
     private const double VerticalGap = 56;
     private const double Padding = 32;
 
+    private const double GroupPadding = 24;
+    private const double GroupLabelHeight = 20;
+
     public LaidOutSketchDiagram Layout(ResolvedSketchDiagram diagram)
     {
         var direction = diagram.Meta.Direction;
@@ -25,11 +28,18 @@ public sealed class SketchLayoutEngine
             ? LayoutTopToBottom(diagram.Nodes, byRank, nodeSizes, direction)
             : LayoutLeftToRight(diagram.Nodes, byRank, nodeSizes, direction);
 
+        // Mirror positions for reversed directions
+        if (direction is SketchLayoutDirection.RightToLeft)
+            laidOutNodes = MirrorHorizontal(laidOutNodes);
+        else if (direction is SketchLayoutDirection.BottomToTop)
+            laidOutNodes = MirrorVertical(laidOutNodes);
+
         var byId = new Dictionary<string, LaidOutSketchNode>(laidOutNodes.Count, StringComparer.Ordinal);
         foreach (var n in laidOutNodes)
             byId[n.Id] = n;
 
         var laidOutEdges = BuildEdges(diagram.Edges, byId, direction);
+        var laidOutGroups = BuildGroups(diagram.Groups, byId);
 
         double maxRight = 2 * Padding;
         double maxBottom = 2 * Padding;
@@ -40,8 +50,15 @@ public sealed class SketchLayoutEngine
             if (r > maxRight) maxRight = r;
             if (b > maxBottom) maxBottom = b;
         }
+        foreach (var g in laidOutGroups)
+        {
+            var r = g.X + g.Width + Padding;
+            var b = g.Y + g.Height + Padding;
+            if (r > maxRight) maxRight = r;
+            if (b > maxBottom) maxBottom = b;
+        }
 
-        return new LaidOutSketchDiagram(direction, laidOutNodes, laidOutEdges, new SketchBounds(maxRight, maxBottom), diagram.Diagnostics);
+        return new LaidOutSketchDiagram(direction, laidOutNodes, laidOutEdges, laidOutGroups, new SketchBounds(maxRight, maxBottom), diagram.Diagnostics);
     }
 
     // ── Sizing ─────────────────────────────────────────────────────────────
@@ -60,6 +77,12 @@ public sealed class SketchLayoutEngine
             }
             var width = Math.Clamp(maxLineWidth + NodeHorizontalPadding, MinNodeWidth, MaxNodeWidth);
             var height = Math.Max(48, lines.Count * SketchTextWrapping.LineHeight + NodeVerticalPadding);
+            if (IsSquareNodeShape(node.Style.Shape))
+            {
+                var size = Math.Max(width, height);
+                width = size;
+                height = size;
+            }
             sizes[node.Id] = new NodeSize(width, height, lines);
         }
         return sizes;
@@ -265,6 +288,10 @@ public sealed class SketchLayoutEngine
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
+    private static bool IsSquareNodeShape(string? shape) =>
+        string.Equals(shape, "circle", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(shape, "diamond", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// Builds a cumulative offset map: rank → sum of sizes of all earlier ranks plus gaps.
     /// </summary>
@@ -285,6 +312,56 @@ public sealed class SketchLayoutEngine
             cumulative += size + gap;
         }
         return offsets;
+    }
+
+    // ── Direction mirroring ────────────────────────────────────────────────
+
+    private static List<LaidOutSketchNode> MirrorHorizontal(List<LaidOutSketchNode> nodes)
+    {
+        if (nodes.Count == 0) return nodes;
+        var maxRight = nodes.Max(n => n.X + n.Width);
+        return nodes.Select(n => n with { X = maxRight - n.X - n.Width }).ToList();
+    }
+
+    private static List<LaidOutSketchNode> MirrorVertical(List<LaidOutSketchNode> nodes)
+    {
+        if (nodes.Count == 0) return nodes;
+        var maxBottom = nodes.Max(n => n.Y + n.Height);
+        return nodes.Select(n => n with { Y = maxBottom - n.Y - n.Height }).ToList();
+    }
+
+    // ── Group bounds ──────────────────────────────────────────────────────
+
+    private static List<LaidOutSketchGroup> BuildGroups(
+        IReadOnlyList<ResolvedSketchGroup> groups,
+        IReadOnlyDictionary<string, LaidOutSketchNode> byId)
+    {
+        var result = new List<LaidOutSketchGroup>(groups.Count);
+        foreach (var group in groups)
+        {
+            var members = group.NodeIds
+                .Where(id => byId.ContainsKey(id))
+                .Select(id => byId[id])
+                .ToList();
+
+            if (members.Count == 0)
+                continue;
+
+            var minX = members.Min(n => n.X) - GroupPadding;
+            var minY = members.Min(n => n.Y) - GroupPadding - GroupLabelHeight;
+            var maxX = members.Max(n => n.X + n.Width) + GroupPadding;
+            var maxY = members.Max(n => n.Y + n.Height) + GroupPadding;
+
+            result.Add(new LaidOutSketchGroup(
+                group.Id,
+                group.Label,
+                group.Style,
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY));
+        }
+        return result;
     }
 
     private readonly record struct NodeSize(double Width, double Height, IReadOnlyList<string> LabelLines);
